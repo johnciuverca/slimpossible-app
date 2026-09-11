@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.local
+
+# Editor files
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
