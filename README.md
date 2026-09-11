@@ -26,7 +26,11 @@ Available checks:
 npm run lint
 npm run typecheck
 npm run format:check
+npm test
 npm run build
 ```
 
 Run `npm run format` to apply the formatting conventions automatically.
+
+Run `npm test` to execute the Vitest unit tests once. The first test covers the
+visible foundation screen so the initial React app has a regression check.
