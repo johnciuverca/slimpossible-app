@@ -1,10 +1,16 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 import { Button } from '../components/ui'
 import { useAuth } from './useAuth'
 
 export function AuthSessionUI() {
   const { retrySession, signOut, state } = useAuth()
+  const navigate = useNavigate()
+
+  function handleLogout() {
+    signOut()
+    navigate('/', { replace: true })
+  }
 
   if (state.status === 'loading') {
     return (
@@ -33,7 +39,7 @@ export function AuthSessionUI() {
         <p aria-live="polite" className="text-sm text-slate-600">
           Signed in as <span className="font-semibold">{state.user.email}</span>
         </p>
-        <Button onClick={signOut} variant="ghost">
+        <Button onClick={handleLogout} variant="ghost">
           Log out
         </Button>
       </div>

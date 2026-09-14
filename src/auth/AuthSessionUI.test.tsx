@@ -1,15 +1,22 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { AuthProvider, type AuthState } from './AuthContext'
 import { AuthSessionUI } from './AuthSessionUI'
 
-function renderSession(initialState?: AuthState) {
+function LocationProbe() {
+  const location = useLocation()
+
+  return <output aria-label="Current route">{location.pathname}</output>
+}
+
+function renderSession(initialState?: AuthState, initialEntries = ['/']) {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={initialEntries}>
       <AuthProvider initialState={initialState}>
         <AuthSessionUI />
+        <LocationProbe />
       </AuthProvider>
     </MemoryRouter>,
   )
@@ -31,11 +38,14 @@ describe('AuthSessionUI', () => {
   })
 
   it('shows the user and supports signing out', () => {
-    renderSession({
-      error: null,
-      status: 'signed-in',
-      user: { email: 'person@example.com' },
-    })
+    renderSession(
+      {
+        error: null,
+        status: 'signed-in',
+        user: { email: 'person@example.com' },
+      },
+      ['/today'],
+    )
 
     expect(screen.getByText('Signed in as')).toBeInTheDocument()
     expect(screen.getByText('person@example.com')).toBeInTheDocument()
@@ -43,6 +53,9 @@ describe('AuthSessionUI', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Log out' }))
 
     expect(screen.getByRole('link', { name: 'Log in' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('status', { name: 'Current route' }),
+    ).toHaveTextContent('/')
   })
 
   it('shows errors and can retry the local session check', () => {
