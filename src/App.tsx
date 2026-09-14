@@ -2,6 +2,7 @@ import { BrowserRouter, Outlet, Route, Routes } from 'react-router-dom'
 
 import { AppLayout } from './layout/AppLayout'
 import { LoginPage } from './pages/LoginPage'
+import { RegisterPage } from './pages/RegisterPage'
 import {
   GoalsPage,
   HomePage,
@@ -25,6 +26,7 @@ function App() {
         <Route element={<RoutedLayout />}>
           <Route index element={<HomePage />} />
           <Route path="login" element={<LoginPage />} />
+          <Route path="register" element={<RegisterPage />} />
           <Route path="today" element={<TodayPage />} />
           <Route path="progress" element={<ProgressPage />} />
           <Route path="goals" element={<GoalsPage />} />

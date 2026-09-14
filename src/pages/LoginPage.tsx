@@ -111,8 +111,10 @@ export function LoginPage() {
         </form>
 
         <p className="mt-6 text-sm leading-6 text-slate-600">
-          Registration and remote authentication will be connected in the
-          following auth issues.
+          Need an account?{' '}
+          <Link className="text-emerald-700 underline" to="/register">
+            Create one
+          </Link>
         </p>
         <Link
           className="mt-4 inline-block text-sm text-emerald-700 underline"
