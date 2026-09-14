@@ -1,6 +1,14 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
+import {
+  Button,
+  Card,
+  PageHeader,
+  ProgressBar,
+  StatusPill,
+} from '../components/ui'
+
 type PlaceholderPageProps = {
   children?: ReactNode
   description: string
@@ -17,21 +25,12 @@ function PlaceholderPage({
       aria-labelledby="page-title"
       className="mx-auto flex w-full max-w-4xl flex-1 items-center"
     >
-      <div className="w-full rounded-3xl bg-white p-8 shadow-xl shadow-slate-200/60 sm:p-12">
-        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">
-          Slimpossible
-        </p>
-        <h1
-          id="page-title"
-          className="mt-5 text-4xl font-bold tracking-tight text-slate-950 sm:text-6xl"
-        >
-          {title}
-        </h1>
-        <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600">
-          {description}
-        </p>
-        {children ? <div className="mt-6">{children}</div> : null}
-      </div>
+      <Card className="w-full p-8 sm:p-12">
+        <PageHeader description={description} title={title}>
+          <StatusPill>Placeholder</StatusPill>
+          {children}
+        </PageHeader>
+      </Card>
     </section>
   )
 }
@@ -39,26 +38,15 @@ function PlaceholderPage({
 export function HomePage() {
   return (
     <section className="w-full" aria-labelledby="welcome-title">
-      <div className="mx-auto grid max-w-4xl overflow-hidden rounded-3xl bg-white shadow-xl shadow-slate-200/60 md:grid-cols-[1.2fr_0.8fr]">
+      <Card className="mx-auto grid max-w-4xl overflow-hidden p-0 md:grid-cols-[1.2fr_0.8fr]">
         <div className="p-8 sm:p-12">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">
-            Slimpossible
-          </p>
-          <h1
-            id="welcome-title"
-            className="mt-5 max-w-md text-4xl font-bold tracking-tight text-slate-950 sm:text-6xl"
+          <PageHeader
+            description="A calm, focused space for building sustainable progress together."
+            title="Your challenge starts here."
+            titleId="welcome-title"
           >
-            Your challenge starts here.
-          </h1>
-          <p className="mt-6 max-w-lg text-lg leading-8 text-slate-600">
-            A calm, focused space for building sustainable progress together.
-          </p>
-          <div
-            className="mt-8 inline-flex rounded-full bg-emerald-100 px-4 py-2 text-sm font-semibold text-emerald-800"
-            role="status"
-          >
-            Tailwind is working
-          </div>
+            <StatusPill tone="success">Tailwind is working</StatusPill>
+          </PageHeader>
         </div>
 
         <div className="flex min-h-64 items-center justify-center bg-emerald-800 p-8 text-white md:min-h-full">
@@ -71,7 +59,7 @@ export function HomePage() {
             </p>
           </div>
         </div>
-      </div>
+      </Card>
     </section>
   )
 }
@@ -81,7 +69,9 @@ export function TodayPage() {
     <PlaceholderPage
       description="Your daily challenge space will live here."
       title="Today"
-    />
+    >
+      <Button disabled>Coming soon</Button>
+    </PlaceholderPage>
   )
 }
 
@@ -90,7 +80,9 @@ export function ProgressPage() {
     <PlaceholderPage
       description="Your progress history will live here."
       title="Progress"
-    />
+    >
+      <ProgressBar label="Progress preview" value={0} />
+    </PlaceholderPage>
   )
 }
 

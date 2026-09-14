@@ -7,6 +7,8 @@ are imported from `src/index.css` and are available throughout the React app.
 `AppLayout` provides the shared page shell and a content slot for future routed
 pages. Client-side routes use React Router and currently include Today, Progress,
 Goals, and a not-found fallback.
+Reusable UI primitives live in `src/components/ui` and currently include typed
+buttons, cards, page headers, status pills, progress bars, and text inputs.
 
 ## Code style
 
