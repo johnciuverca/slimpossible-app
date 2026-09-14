@@ -4,6 +4,8 @@ React weight-loss challenge app based on the Slimpossible tracker
 
 The app uses Tailwind CSS v4 through the Vite plugin. Tailwind utility classes
 are imported from `src/index.css` and are available throughout the React app.
+`AppLayout` provides the shared page shell and a content slot for future routed
+pages.
 
 ## Code style
 

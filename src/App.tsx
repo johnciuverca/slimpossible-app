@@ -1,8 +1,10 @@
+import { AppLayout } from './layout/AppLayout'
+
 function App() {
   return (
-    <main className="min-h-screen bg-stone-100 px-6 py-12 text-slate-900 sm:px-10">
-      <section className="mx-auto max-w-4xl" aria-labelledby="welcome-title">
-        <div className="grid overflow-hidden rounded-3xl bg-white shadow-xl shadow-slate-200/60 md:grid-cols-[1.2fr_0.8fr]">
+    <AppLayout>
+      <section className="w-full" aria-labelledby="welcome-title">
+        <div className="mx-auto grid max-w-4xl overflow-hidden rounded-3xl bg-white shadow-xl shadow-slate-200/60 md:grid-cols-[1.2fr_0.8fr]">
           <div className="p-8 sm:p-12">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">
               Slimpossible
@@ -36,7 +38,7 @@ function App() {
           </div>
         </div>
       </section>
-    </main>
+    </AppLayout>
   )
 }
 
