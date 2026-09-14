@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 
+import { AuthSessionUI } from '../auth/AuthSessionUI'
+
 type AppLayoutProps = {
   children: ReactNode
 }
@@ -24,24 +26,27 @@ export function AppLayout({ children }: AppLayoutProps) {
             Slimpossible
           </Link>
 
-          <nav aria-label="Primary navigation" className="overflow-x-auto">
-            <ul className="flex min-w-max items-center gap-5 text-sm font-semibold text-slate-600">
-              {navigationItems.map(({ label, to }) => (
-                <li key={to}>
-                  <NavLink
-                    className={({ isActive }) =>
-                      `transition hover:text-emerald-700 ${
-                        isActive ? 'text-emerald-700' : ''
-                      }`
-                    }
-                    to={to}
-                  >
-                    {label}
-                  </NavLink>
-                </li>
-              ))}
-            </ul>
-          </nav>
+          <div className="flex flex-wrap items-center gap-5">
+            <nav aria-label="Primary navigation" className="overflow-x-auto">
+              <ul className="flex min-w-max items-center gap-5 text-sm font-semibold text-slate-600">
+                {navigationItems.map(({ label, to }) => (
+                  <li key={to}>
+                    <NavLink
+                      className={({ isActive }) =>
+                        `transition hover:text-emerald-700 ${
+                          isActive ? 'text-emerald-700' : ''
+                        }`
+                      }
+                      to={to}
+                    >
+                      {label}
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+            <AuthSessionUI />
+          </div>
         </div>
       </header>
 
