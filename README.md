@@ -10,6 +10,11 @@ Goals, and a not-found fallback.
 Reusable UI primitives live in `src/components/ui` and currently include typed
 buttons, cards, page headers, status pills, progress bars, and text inputs.
 
+Authentication is planned around Supabase Auth. The provider decision,
+environment variable contract, local fallback, and account requirement are
+documented in [`docs/authentication.md`](docs/authentication.md). No remote
+authentication is connected until the required local environment values exist.
+
 ## Code style
 
 ESLint checks TypeScript and React code. Prettier provides the shared formatting
