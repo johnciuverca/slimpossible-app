@@ -14,6 +14,8 @@ test('keeps the application shell usable on a narrow viewport', async ({
   await expect(page.getByRole('contentinfo')).toBeVisible()
 
   await page.getByRole('link', { name: 'Today' }).click()
-  await expect(page).toHaveURL(/\/today$/)
-  await expect(page.getByRole('heading', { name: 'Today' })).toBeVisible()
+  await expect(page).toHaveURL(/\/login$/)
+  await expect(
+    page.getByRole('heading', { name: 'Welcome back.' }),
+  ).toBeVisible()
 })
