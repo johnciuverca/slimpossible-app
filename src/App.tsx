@@ -5,6 +5,7 @@ import { ProtectedRoute } from './auth/ProtectedRoute'
 import { AppLayout } from './layout/AppLayout'
 import { ChallengeSetupPage } from './pages/ChallengeSetupPage'
 import { LoginPage } from './pages/LoginPage'
+import { ParticipantEnrollmentPage } from './pages/ParticipantEnrollmentPage'
 import { RegisterPage } from './pages/RegisterPage'
 import {
   GoalsPage,
@@ -32,6 +33,10 @@ function App() {
             <Route path="login" element={<LoginPage />} />
             <Route path="register" element={<RegisterPage />} />
             <Route path="challenge/setup" element={<ChallengeSetupPage />} />
+            <Route
+              path="challenge/participants/enroll"
+              element={<ParticipantEnrollmentPage />}
+            />
             <Route element={<ProtectedRoute />}>
               <Route path="today" element={<TodayPage />} />
               <Route path="progress" element={<ProgressPage />} />

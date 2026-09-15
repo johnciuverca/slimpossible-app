@@ -204,6 +204,12 @@ export function ChallengeSetupPage() {
         >
           Back to home
         </Link>
+        <Link
+          className="mt-3 block text-sm text-emerald-700 underline"
+          to="/challenge/participants/enroll"
+        >
+          Enroll participants
+        </Link>
       </Card>
     </section>
   )
