@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { findWeighInForDate, upsertWeighIn } from './weighInStore'
+import {
+  findWeighInForDate,
+  sortWeighInsByDate,
+  upsertWeighIn,
+} from './weighInStore'
 import type { WeighIn } from './weighIn'
 
 const today = '2026-09-15'
@@ -94,5 +98,14 @@ describe('upsertWeighIn', () => {
       issues: [expect.objectContaining({ field: 'weightKg' })],
       success: false,
     })
+  })
+
+  it('sorts history newest first without mutating the input', () => {
+    const older: WeighIn = { ...firstWeighIn, date: '2026-09-13' }
+    const newer: WeighIn = { ...firstWeighIn, date: '2026-09-15' }
+    const initialState = [older, newer]
+
+    expect(sortWeighInsByDate(initialState)).toEqual([newer, older])
+    expect(initialState).toEqual([older, newer])
   })
 })

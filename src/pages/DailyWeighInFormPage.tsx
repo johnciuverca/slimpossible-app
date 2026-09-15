@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 
 import { participantFixture } from '../models/fixtures'
-import { upsertWeighIn } from '../models/weighInStore'
+import { sortWeighInsByDate, upsertWeighIn } from '../models/weighInStore'
 import type { WeighInValidationField } from '../models/weighIn'
 import type { WeighIn } from '../models/weighIn'
 import {
@@ -50,12 +50,33 @@ export function DailyWeighInFormPage() {
   const [values, setValues] = useState(initialValues)
   const [weighIns, setWeighIns] = useState<WeighIn[]>([])
   const [errors, setErrors] = useState<WeighInFormErrors>({})
+  const [editingDate, setEditingDate] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
 
   function updateValue(field: WeighInFormField, value: string) {
     setValues((currentValues) => ({ ...currentValues, [field]: value }))
     setErrors((currentErrors) => ({ ...currentErrors, [field]: undefined }))
+    setSubmitError('')
+    setSuccessMessage('')
+  }
+
+  function startEditing(weighIn: WeighIn) {
+    setEditingDate(weighIn.date)
+    setValues({
+      date: weighIn.date,
+      note: weighIn.note ?? '',
+      weightKg: String(weighIn.weightKg),
+    })
+    setErrors({})
+    setSubmitError('')
+    setSuccessMessage('')
+  }
+
+  function cancelEditing() {
+    setEditingDate(null)
+    setValues(initialValues)
+    setErrors({})
     setSubmitError('')
     setSuccessMessage('')
   }
@@ -118,6 +139,7 @@ export function DailyWeighInFormPage() {
               label="Date"
               max={todayAsDateOnly()}
               onChange={(event) => updateValue('date', event.target.value)}
+              readOnly={editingDate !== null}
               type="date"
               value={values.date}
             />
@@ -180,7 +202,20 @@ export function DailyWeighInFormPage() {
               </p>
             ) : null}
 
-            <Button type="submit">Save weigh-in</Button>
+            <div className="flex flex-wrap gap-3">
+              <Button type="submit">
+                {editingDate ? 'Update weigh-in' : 'Save weigh-in'}
+              </Button>
+              {editingDate ? (
+                <Button
+                  onClick={cancelEditing}
+                  type="button"
+                  variant="secondary"
+                >
+                  Cancel edit
+                </Button>
+              ) : null}
+            </div>
           </form>
 
           <Link
@@ -207,7 +242,7 @@ export function DailyWeighInFormPage() {
             </p>
           ) : (
             <ul className="mt-5 space-y-3" aria-label="Saved weigh-ins">
-              {weighIns.map((weighIn) => (
+              {sortWeighInsByDate(weighIns).map((weighIn) => (
                 <li
                   className="rounded-2xl border border-stone-200 bg-stone-50 p-4"
                   key={`${weighIn.participantId}-${weighIn.date}`}
@@ -220,10 +255,22 @@ export function DailyWeighInFormPage() {
                       {weighIn.note}
                     </p>
                   ) : null}
+                  <Button
+                    className="mt-3"
+                    onClick={() => startEditing(weighIn)}
+                    type="button"
+                    variant="secondary"
+                  >
+                    Edit {weighIn.date}
+                  </Button>
                 </li>
               ))}
             </ul>
           )}
+          <p className="mt-6 text-sm leading-6 text-slate-600">
+            Missing calendar days stay absent; no record or change is created
+            for them.
+          </p>
           <p className="mt-6 text-xs leading-5 text-slate-500">
             This local state is cleared when the page is refreshed.
           </p>
