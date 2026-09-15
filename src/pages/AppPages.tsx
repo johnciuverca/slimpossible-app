@@ -77,6 +77,12 @@ export function TodayPage() {
       title="Today"
     >
       <Button disabled>Coming soon</Button>
+      <Link
+        className="mt-4 inline-block text-sm font-semibold text-emerald-700 underline"
+        to="/weigh-ins"
+      >
+        Record a weigh-in
+      </Link>
     </PlaceholderPage>
   )
 }
