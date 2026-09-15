@@ -7,6 +7,7 @@ import { ChallengeSetupPage } from './pages/ChallengeSetupPage'
 import { LoginPage } from './pages/LoginPage'
 import { ParticipantEnrollmentPage } from './pages/ParticipantEnrollmentPage'
 import { RegisterPage } from './pages/RegisterPage'
+import { WeighInPage } from './pages/WeighInPage'
 import {
   GoalsPage,
   HomePage,
@@ -37,6 +38,7 @@ function App() {
               path="challenge/participants/enroll"
               element={<ParticipantEnrollmentPage />}
             />
+            <Route path="weigh-ins" element={<WeighInPage />} />
             <Route element={<ProtectedRoute />}>
               <Route path="today" element={<TodayPage />} />
               <Route path="progress" element={<ProgressPage />} />
