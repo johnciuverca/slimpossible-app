@@ -55,4 +55,21 @@ describe('App foundation screen', () => {
       '/',
     )
   })
+
+  it('keeps authentication routes public', () => {
+    window.history.pushState({}, '', '/login')
+    render(<App />)
+
+    expect(
+      screen.getByRole('heading', { name: 'Welcome back.' }),
+    ).toBeInTheDocument()
+
+    cleanup()
+    window.history.pushState({}, '', '/register')
+    render(<App />)
+
+    expect(
+      screen.getByRole('heading', { name: 'Create your account.' }),
+    ).toBeInTheDocument()
+  })
 })
