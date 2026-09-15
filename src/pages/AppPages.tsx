@@ -46,6 +46,12 @@ export function HomePage() {
             titleId="welcome-title"
           >
             <StatusPill tone="success">Tailwind is working</StatusPill>
+            <Link
+              className="mt-4 inline-block text-sm font-semibold text-emerald-700 underline"
+              to="/challenge/setup"
+            >
+              Set up a challenge
+            </Link>
           </PageHeader>
         </div>
 
