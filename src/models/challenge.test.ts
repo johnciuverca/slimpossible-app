@@ -1,37 +1,24 @@
 import { describe, expect, it } from 'vitest'
 
 import { validateChallenge } from './challenge'
-
-const validChallenge = {
-  createdAt: '2026-09-15T08:00:00.000Z',
-  createdBy: 'user-owner',
-  description: 'A shared sustainable progress challenge.',
-  endDate: '2027-09-15',
-  id: 'challenge-1',
-  name: 'Slimpossible 2026',
-  ownerId: 'user-owner',
-  startDate: '2026-09-15',
-  status: 'draft',
-  targetWeightKg: 80.5,
-  updatedAt: '2026-09-15T08:00:00.000Z',
-}
+import { challengeFixture } from './fixtures'
 
 describe('validateChallenge', () => {
   it('accepts a complete challenge and optional target omission', () => {
     const result = validateChallenge({
-      ...validChallenge,
+      ...challengeFixture,
       targetWeightKg: undefined,
     })
 
     expect(result).toEqual({
-      data: { ...validChallenge, targetWeightKg: undefined },
+      data: { ...challengeFixture, targetWeightKg: undefined },
       success: true,
     })
   })
 
   it('rejects missing identity and ownership fields', () => {
     const result = validateChallenge({
-      ...validChallenge,
+      ...challengeFixture,
       createdBy: '',
       id: '',
       name: '',
@@ -51,7 +38,7 @@ describe('validateChallenge', () => {
 
   it('rejects invalid dates, reversed ranges, and unknown status', () => {
     const invalidDateResult = validateChallenge({
-      ...validChallenge,
+      ...challengeFixture,
       endDate: '2026-02-30',
       status: 'paused',
     })
@@ -67,7 +54,7 @@ describe('validateChallenge', () => {
     }
 
     const reversedRangeResult = validateChallenge({
-      ...validChallenge,
+      ...challengeFixture,
       endDate: '2026-12-31',
       startDate: '2027-01-01',
     })
@@ -82,7 +69,7 @@ describe('validateChallenge', () => {
 
   it('rejects invalid target and audit timestamps', () => {
     const result = validateChallenge({
-      ...validChallenge,
+      ...challengeFixture,
       createdAt: 'not-a-date',
       targetWeightKg: 0,
       updatedAt: '2026-09-15',
