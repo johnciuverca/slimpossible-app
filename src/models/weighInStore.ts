@@ -20,6 +20,12 @@ export function findWeighInForDate(
   )
 }
 
+export function sortWeighInsByDate(weighIns: readonly WeighIn[]): WeighIn[] {
+  return [...weighIns].sort((first, second) =>
+    second.date.localeCompare(first.date),
+  )
+}
+
 export function upsertWeighIn(
   weighIns: readonly WeighIn[],
   input: unknown,
