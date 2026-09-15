@@ -1,44 +1,34 @@
 import { describe, expect, it } from 'vitest'
 
 import { validateParticipant } from './participant'
-
-const validParticipant = {
-  challengeId: 'challenge-1',
-  displayName: 'Alex Participant',
-  id: 'participant-1',
-  joinedAt: '2026-09-15T08:00:00.000Z',
-  status: 'active',
-  startingWeightKg: 92.5,
-  targetWeightKg: 80,
-  userId: 'user-alex',
-}
+import { participantFixture } from './fixtures'
 
 describe('validateParticipant', () => {
   it('accepts a participant with challenge membership and weight goals', () => {
-    const result = validateParticipant(validParticipant)
+    const result = validateParticipant(participantFixture)
 
     expect(result).toEqual({
-      data: validParticipant,
+      data: participantFixture,
       success: true,
     })
   })
 
   it('accepts an invited participant before they join', () => {
     const result = validateParticipant({
-      ...validParticipant,
+      ...participantFixture,
       joinedAt: undefined,
       status: 'invited',
     })
 
     expect(result).toEqual({
-      data: { ...validParticipant, joinedAt: undefined, status: 'invited' },
+      data: { ...participantFixture, joinedAt: undefined, status: 'invited' },
       success: true,
     })
   })
 
   it('rejects missing identity and membership fields', () => {
     const result = validateParticipant({
-      ...validParticipant,
+      ...participantFixture,
       challengeId: '',
       displayName: '',
       id: '',
@@ -58,7 +48,7 @@ describe('validateParticipant', () => {
 
   it('rejects invalid values, reversed weight goals, and unknown status', () => {
     const result = validateParticipant({
-      ...validParticipant,
+      ...participantFixture,
       joinedAt: 'not-a-date',
       startingWeightKg: 0,
       status: 'paused',
@@ -78,7 +68,7 @@ describe('validateParticipant', () => {
     }
 
     const reversedGoalResult = validateParticipant({
-      ...validParticipant,
+      ...participantFixture,
       targetWeightKg: 100,
     })
 
@@ -94,7 +84,7 @@ describe('validateParticipant', () => {
 
   it('requires a join time for participants beyond invited status', () => {
     const result = validateParticipant({
-      ...validParticipant,
+      ...participantFixture,
       joinedAt: undefined,
     })
 
