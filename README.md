@@ -72,11 +72,11 @@ build commands for pull requests targeting `development` and for pushes to
 
 ## Local-only authentication and data
 
-The current sign-in and registration flow is an in-memory local preview only.
-It does not contact Supabase or another remote provider, validate real
-credentials, persist a session, store user data, or create real accounts.
-Refreshing the browser resets the local session. The protected routes only
-demonstrate client-side route behavior; they are not production access control.
+The login and registration screens currently provide local client-side input
+validation only. A valid submission reports that remote authentication or
+registration is not configured; it does not sign a user in, create an account,
+or persist a session. The protected routes only demonstrate client-side route
+behavior; they are not production access control.
 
 No environment variables or secrets are required to run the project today.
 For the future remote-auth direction and its security boundary, see
