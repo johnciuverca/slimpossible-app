@@ -1,58 +1,37 @@
 # Authentication boundary
 
-Issue #31 defines the contract for the authentication work that follows. It
-does not add the authentication SDK or connect the app to a remote project.
+## Current local behavior
 
-## Provider decision
+Authentication is currently a local, in-memory preview. No authentication SDK
+or remote project is connected. A non-empty email and password can demonstrate
+the local sign-in flow, but they are not validated against a real account and
+are not persisted. Refreshing the browser clears the session.
 
-The app will use Supabase Auth for email/password authentication. Supabase is
-the smallest fit for the current React/Vite app because it supplies hosted
-authentication and session handling without requiring us to build password
-storage or a session backend. The later authentication issues own the SDK
-integration and the login, registration, logout, profile, and protected-route
-behavior.
+This means the app currently has no remote registration, password storage,
+email verification, session restoration, user profile, or production-grade
+access control. Client-side protected routes are only a local UI boundary and
+must not be treated as security.
 
-Social login is out of scope unless a later issue shows that the chosen
-implementation needs it.
+## Current environment policy
 
-## Environment contract
+No environment variables are required today. Do not add real credentials to
+this repository. `.env.local` remains ignored by the existing `*.local` rule,
+and a future `.env.example` may contain placeholders only.
 
-The browser client will read these Vite variables:
+Never expose a password, token, private key, database credential, or a
+privileged service key through a `VITE_` variable: Vite includes `VITE_`
+variables in the browser bundle.
 
-| Variable                 | Required for remote auth | Meaning                                                                  |
-| ------------------------ | ------------------------ | ------------------------------------------------------------------------ |
-| `VITE_SUPABASE_URL`      | Yes                      | The Supabase project URL, for example `https://your-project.supabase.co` |
-| `VITE_SUPABASE_ANON_KEY` | Yes                      | The Supabase publishable/anonymous browser key                           |
+## Future remote authentication
 
-Use `.env.local` for local values. `.env.local` is ignored by Git through the
-existing `*.local` rule. `.env.example` contains placeholders only and is safe
-to commit.
+Supabase Auth remains a possible future option for email/password
+authentication, but it is not configured or required yet. If the project adopts
+it, the repository owner must create and manage their own Supabase account and
+project, then provide only the appropriate local configuration. The owner—not
+Codex—handles accounts, billing, and credentials.
 
-Only the public browser key belongs in these `VITE_` variables. Never place a
-Supabase service-role key, database password, or other privileged secret in a
-`VITE_` variable or in the repository. Vite exposes `VITE_` variables to the
-browser bundle.
-
-## Local development fallback
-
-Until valid Supabase variables are available, the app remains runnable in a
-local, unauthenticated preview mode:
-
-- build, lint, tests, and the public shell continue to work;
-- remote sign-in and registration are not attempted;
-- later auth UI should explain that remote authentication is not configured;
-- protected features must not pretend that a local placeholder user is a real
-  authenticated Supabase user.
-
-This fallback is intentionally non-persistent. It must not store passwords,
-tokens, or fake sessions in source code, browser storage, or test fixtures.
-
-## Account and service requirement
-
-Remote authentication requires the repository owner to create a Supabase
-account and project personally. The project is needed to provide the URL and
-anonymous browser key above and to enable email/password auth. Codex does not
-create the account, subscribe to a plan, or handle the owner’s credentials.
-
-The next integration issue can begin after the owner supplies local
-`.env.local` values. No real values are committed to this repository.
+Any future remote-auth work must document its exact variables, keep secrets in
+the service's secret store or ignored local files, and avoid committing real
+values. A browser-safe publishable key may be exposed only when the provider's
+documentation explicitly permits it; privileged keys must never enter the
+client bundle.
