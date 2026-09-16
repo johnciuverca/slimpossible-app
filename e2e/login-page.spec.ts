@@ -17,9 +17,7 @@ test('shows accessible login validation and local auth fallback', async ({
   await page.getByLabel('Password').fill('password')
   await page.getByRole('button', { name: 'Sign in' }).click()
 
-  await expect(
-    page.getByRole('alert', {
-      name: 'Remote authentication is not configured in this local preview yet.',
-    }),
-  ).toBeVisible()
+  await expect(page.getByRole('alert')).toHaveText(
+    'Remote authentication is not configured in this local preview yet.',
+  )
 })

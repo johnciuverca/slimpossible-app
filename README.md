@@ -57,18 +57,18 @@ npm test
 npm run build
 ```
 
-Use `npm run format` to apply Prettier formatting. The optional browser smoke
-suite is separate from CI and runs with `npm run test:e2e`; install Playwright's
-Chromium browser first when needed:
+Use `npm run format` to apply Prettier formatting. Run the browser smoke suite
+locally with `npm run test:e2e`; install Playwright's Chromium browser first
+when needed:
 
 ```bash
 npx playwright install chromium
 npm run test:e2e
 ```
 
-GitHub Actions runs the formatting, lint, type-check, unit-test, and production
-build commands for pull requests targeting `development` and for pushes to
-`development`.
+GitHub Actions runs the formatting, lint, type-check, unit-test, production
+build, and browser smoke commands for pull requests targeting `development` and
+for pushes to `development`.
 
 ## Local-only authentication and data
 
