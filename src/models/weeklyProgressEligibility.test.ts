@@ -97,6 +97,35 @@ describe('determineWeeklyProgressEligibility', () => {
     })
   })
 
+  it('rejects Sunday pairs that are not exactly one week apart', () => {
+    const participant = createParticipantFixture({ id: 'participant-ava' })
+    const olderSunday = '2026-09-06'
+
+    expect(
+      determineWeeklyProgressEligibility(
+        createInput({
+          participants: [participant],
+          previousSunday: olderSunday,
+          weighIns: [
+            {
+              date: olderSunday,
+              participantId: participant.id,
+              weightKg: 100,
+            },
+            {
+              date: currentSunday,
+              participantId: participant.id,
+              weightKg: 95,
+            },
+          ],
+        }),
+      ),
+    ).toMatchObject({
+      candidates: [],
+      state: 'invalid-sunday-pair',
+    })
+  })
+
   it('allows partial group participation without blocking eligible candidates', () => {
     const firstParticipant = createParticipantFixture({ id: 'participant-ava' })
     const secondParticipant = createParticipantFixture({

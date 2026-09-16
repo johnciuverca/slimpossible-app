@@ -35,6 +35,17 @@ function isSunday(dateOnly: DateOnly) {
   return date.toISOString().slice(0, 10) === dateOnly && date.getUTCDay() === 0
 }
 
+function areConsecutiveSundays(
+  previousSunday: DateOnly,
+  currentSunday: DateOnly,
+) {
+  if (!isSunday(previousSunday) || !isSunday(currentSunday)) return false
+
+  const previousTime = new Date(`${previousSunday}T00:00:00.000Z`).getTime()
+  const currentTime = new Date(`${currentSunday}T00:00:00.000Z`).getTime()
+  return currentTime - previousTime === 7 * 24 * 60 * 60 * 1000
+}
+
 function findWeighIn(
   weighIns: readonly WeighIn[],
   participantId: string,
@@ -69,7 +80,7 @@ export function determineWeeklyProgressEligibility({
     return { ...base, candidates: [], state: 'not-group-challenge' }
   }
 
-  if (!isSunday(currentSunday) || !isSunday(previousSunday)) {
+  if (!areConsecutiveSundays(previousSunday, currentSunday)) {
     return { ...base, candidates: [], state: 'invalid-sunday-pair' }
   }
 
