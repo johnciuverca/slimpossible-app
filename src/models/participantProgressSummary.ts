@@ -60,6 +60,17 @@ export function createParticipantProgressSummary(
   }
 
   if (dashboard.state === 'no-records') {
+    if (dashboard.targetWeightKg === null) {
+      return {
+        ...base,
+        direction: null,
+        goalLabel: null,
+        message: 'Add a target weight to see your progress.',
+        state: 'no-target',
+        statusLabel: 'No target set',
+      }
+    }
+
     return {
       ...base,
       direction: null,

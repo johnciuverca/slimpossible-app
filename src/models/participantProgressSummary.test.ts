@@ -111,6 +111,19 @@ describe('createParticipantProgressSummary', () => {
     })
   })
 
+  it('prioritizes a missing target over a missing first record', () => {
+    const participant = createParticipantFixture({ targetWeightKg: undefined })
+
+    expect(
+      createParticipantProgressSummary(createDashboard(participant)),
+    ).toMatchObject({
+      direction: null,
+      message: 'Add a target weight to see your progress.',
+      state: 'no-target',
+      statusLabel: 'No target set',
+    })
+  })
+
   it('keeps a missing participant understandable', () => {
     const dashboard = createParticipantDashboardView({
       challenge: challengeFixture,
