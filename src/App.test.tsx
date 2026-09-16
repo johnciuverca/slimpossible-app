@@ -72,4 +72,18 @@ describe('App foundation screen', () => {
       screen.getByRole('heading', { name: 'Create your account.' }),
     ).toBeInTheDocument()
   })
+
+  it('shows the public local milestone preview', () => {
+    window.history.pushState({}, '', '/milestones-preview')
+    render(<App />)
+
+    expect(
+      screen.getByRole('heading', { name: 'Milestone progress preview' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('progressbar', {
+        name: 'Milestone progress: 50% complete',
+      }),
+    ).toHaveAttribute('aria-valuenow', '50')
+  })
 })

@@ -8,11 +8,42 @@ import {
   ProgressBar,
   StatusPill,
 } from '../components/ui'
+import { MilestoneProgress } from '../components/MilestoneProgress'
+import type { ParticipantMilestones } from '../models/participantMilestones'
 
 type PlaceholderPageProps = {
   children?: ReactNode
   description: string
   title: string
+}
+
+const milestonePreview: ParticipantMilestones = {
+  challengeId: 'local-preview',
+  completionPercentage: 50,
+  milestones: [
+    {
+      id: 'local-preview:participant-preview:25',
+      state: 'reached',
+      thresholdPercentage: 25,
+    },
+    {
+      id: 'local-preview:participant-preview:50',
+      state: 'reached',
+      thresholdPercentage: 50,
+    },
+    {
+      id: 'local-preview:participant-preview:75',
+      state: 'upcoming',
+      thresholdPercentage: 75,
+    },
+    {
+      id: 'local-preview:participant-preview:100',
+      state: 'upcoming',
+      thresholdPercentage: 100,
+    },
+  ],
+  participantId: 'participant-preview',
+  state: 'available',
 }
 
 function PlaceholderPage({
@@ -101,9 +132,30 @@ export function ProgressPage() {
 export function GoalsPage() {
   return (
     <PlaceholderPage
-      description="Your goals and milestones will live here."
+      description="A local preview of the milestone component for the future participant dashboard."
       title="Goals"
-    />
+    >
+      <MilestoneProgress milestones={milestonePreview} />
+    </PlaceholderPage>
+  )
+}
+
+export function MilestonePreviewPage() {
+  return (
+    <section
+      className="mx-auto w-full max-w-3xl"
+      aria-labelledby="preview-title"
+    >
+      <Card className="p-6 sm:p-10">
+        <PageHeader
+          description="A local, reusable preview of the participant milestone component."
+          title="Milestone progress preview"
+          titleId="preview-title"
+        >
+          <MilestoneProgress milestones={milestonePreview} />
+        </PageHeader>
+      </Card>
+    </section>
   )
 }
 

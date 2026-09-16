@@ -11,6 +11,7 @@ import { RegisterPage } from './pages/RegisterPage'
 import {
   GoalsPage,
   HomePage,
+  MilestonePreviewPage,
   NotFoundPage,
   ProgressPage,
   TodayPage,
@@ -35,6 +36,10 @@ function App() {
             <Route path="register" element={<RegisterPage />} />
             <Route path="challenge/setup" element={<ChallengeSetupPage />} />
             <Route path="weigh-ins" element={<DailyWeighInFormPage />} />
+            <Route
+              path="milestones-preview"
+              element={<MilestonePreviewPage />}
+            />
             <Route
               path="challenge/participants/enroll"
               element={<ParticipantEnrollmentPage />}
