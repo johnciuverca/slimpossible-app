@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { AuthContext, type AuthProviderProps, type AuthState } from './context'
+import { createSupabaseAuthGateway } from './supabaseAuth'
 
 export type { AuthState, AuthUser } from './context'
 
@@ -20,7 +21,11 @@ function checkLocalSession(setState: (state: AuthState) => void) {
   return window.setTimeout(() => setState(signedOutState), sessionCheckDelay)
 }
 
-export function AuthProvider({ children, initialState }: AuthProviderProps) {
+export function AuthProvider({
+  authGateway = createSupabaseAuthGateway(),
+  children,
+  initialState,
+}: AuthProviderProps) {
   const [state, setState] = useState<AuthState>(initialState ?? loadingState)
 
   useEffect(() => {
@@ -41,34 +46,50 @@ export function AuthProvider({ children, initialState }: AuthProviderProps) {
     setState(signedOutState)
   }
 
-  function signIn(email: string, password: string) {
-    setState(loadingState)
-
-    return new Promise<void>((resolve) => {
-      window.setTimeout(() => {
-        if (!email.trim() || !password) {
-          setState({
-            error: 'Email and password are required for local sign-in.',
-            status: 'error',
-            user: null,
-          })
-          resolve()
-          return
-        }
-
+  const signIn = useCallback(
+    async (email: string, password: string) => {
+      setState(loadingState)
+      try {
+        const user = await authGateway.signIn(email.trim(), password)
+        setState({ error: null, status: 'signed-in', user })
+      } catch (error) {
         setState({
-          error: null,
-          status: 'signed-in',
-          user: { email: email.trim() },
+          error: error instanceof Error ? error.message : 'Unable to sign in.',
+          status: 'error',
+          user: null,
         })
-        resolve()
-      }, sessionCheckDelay)
-    })
-  }
+      }
+    },
+    [authGateway],
+  )
+
+  const signUp = useCallback(
+    async (name: string, email: string, password: string) => {
+      setState(loadingState)
+      try {
+        const result = await authGateway.signUp(name, email.trim(), password)
+        setState(
+          result.needsVerification || !result.user
+            ? { error: null, status: 'verification-pending', user: null }
+            : { error: null, status: 'signed-in', user: result.user },
+        )
+      } catch (error) {
+        setState({
+          error:
+            error instanceof Error
+              ? error.message
+              : 'Unable to create an account.',
+          status: 'error',
+          user: null,
+        })
+      }
+    },
+    [authGateway],
+  )
 
   const value = useMemo(
-    () => ({ retrySession, signIn, signOut, state }),
-    [state],
+    () => ({ retrySession, signIn, signOut, signUp, state }),
+    [signIn, signUp, state],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

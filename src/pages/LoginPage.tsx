@@ -8,10 +8,7 @@ import {
   StatusPill,
   TextInput,
 } from '../components/ui'
-import {
-  getSupabaseConfiguration,
-  missingSupabaseConfigurationMessage,
-} from '../auth/supabaseConfig'
+import { useAuth } from '../auth/useAuth'
 
 type LoginErrors = {
   email?: string
@@ -37,13 +34,14 @@ function validateLogin(email: string, password: string): LoginErrors {
 }
 
 export function LoginPage() {
+  const { signIn, state } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [errors, setErrors] = useState<LoginErrors>({})
   const [submitError, setSubmitError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
     const nextErrors = validateLogin(email, password)
@@ -54,19 +52,9 @@ export function LoginPage() {
       return
     }
 
-    if (getSupabaseConfiguration().state === 'missing-configuration') {
-      setSubmitError(missingSupabaseConfigurationMessage)
-      return
-    }
-
     setIsSubmitting(true)
-
-    window.setTimeout(() => {
-      setIsSubmitting(false)
-      setSubmitError(
-        'Remote authentication is not configured in this local preview yet.',
-      )
-    }, 300)
+    await signIn(email, password)
+    setIsSubmitting(false)
   }
 
   return (
@@ -108,9 +96,14 @@ export function LoginPage() {
             value={password}
           />
 
-          {submitError ? (
-            <p aria-live="polite" className="text-sm text-red-700" role="alert">
-              {submitError}
+          {state.status === 'error' || submitError ? (
+            <p aria-live="polite" className="text-sm text-red-700">
+              {state.status === 'error' ? state.error : submitError}
+            </p>
+          ) : null}
+          {state.status === 'signed-in' ? (
+            <p aria-live="polite" className="text-sm text-emerald-700">
+              Signed in successfully.
             </p>
           ) : null}
 

@@ -5,7 +5,7 @@ import { AuthProvider } from './AuthContext'
 import { useAuth } from './useAuth'
 
 function AuthHarness() {
-  const { signIn, state } = useAuth()
+  const { signIn, signUp, state } = useAuth()
 
   return (
     <>
@@ -13,6 +13,13 @@ function AuthHarness() {
       {state.status === 'signed-in' ? <p>{state.user.email}</p> : null}
       <button onClick={() => void signIn('person@example.com', 'password')}>
         Sign in locally
+      </button>
+      <button
+        onClick={() =>
+          void signUp('Participant', 'person@example.com', 'password')
+        }
+      >
+        Sign up
       </button>
     </>
   )
@@ -47,16 +54,22 @@ describe('AuthContext', () => {
 
     render(
       <AuthProvider
+        authGateway={{
+          signIn: async () => ({ email: 'person@example.com', id: 'user-1' }),
+          signUp: async () => ({
+            needsVerification: false,
+            user: { email: 'person@example.com', id: 'user-1' },
+          }),
+        }}
         initialState={{ error: null, status: 'signed-out', user: null }}
       >
         <AuthHarness />
       </AuthProvider>,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Sign in locally' }))
-
-    act(() => {
-      vi.advanceTimersByTime(150)
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Sign in locally' }))
+      await Promise.resolve()
     })
 
     expect(screen.getByText('signed-in')).toBeInTheDocument()

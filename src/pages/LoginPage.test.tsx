@@ -1,8 +1,15 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 
 import { LoginPage } from './LoginPage'
+import { AuthProvider } from '../auth/AuthContext'
 
 describe('LoginPage', () => {
   afterEach(() => {
@@ -11,9 +18,13 @@ describe('LoginPage', () => {
 
   it('validates required and malformed fields accessibly', () => {
     render(
-      <MemoryRouter>
-        <LoginPage />
-      </MemoryRouter>,
+      <AuthProvider
+        initialState={{ error: null, status: 'signed-out', user: null }}
+      >
+        <MemoryRouter>
+          <LoginPage />
+        </MemoryRouter>
+      </AuthProvider>,
     )
 
     fireEvent.submit(screen.getByRole('form', { name: 'Login form' }))
@@ -36,11 +47,15 @@ describe('LoginPage', () => {
     expect(screen.getByText('Enter a valid email address.')).toBeInTheDocument()
   })
 
-  it('shows configuration guidance without starting a remote request', () => {
+  it('shows configuration guidance without starting a remote request', async () => {
     render(
-      <MemoryRouter>
-        <LoginPage />
-      </MemoryRouter>,
+      <AuthProvider
+        initialState={{ error: null, status: 'signed-out', user: null }}
+      >
+        <MemoryRouter>
+          <LoginPage />
+        </MemoryRouter>
+      </AuthProvider>,
     )
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Email' }), {
@@ -51,8 +66,12 @@ describe('LoginPage', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
 
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'Remote authentication is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          'Remote authentication is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
+        ),
+      ).toBeInTheDocument(),
     )
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeEnabled()
   })

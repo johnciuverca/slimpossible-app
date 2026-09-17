@@ -1,8 +1,10 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it } from 'vitest'
+import { waitFor } from '@testing-library/react'
 
 import { RegisterPage } from './RegisterPage'
+import { AuthProvider } from '../auth/AuthContext'
 
 describe('RegisterPage', () => {
   afterEach(() => {
@@ -11,9 +13,13 @@ describe('RegisterPage', () => {
 
   it('validates fields and password confirmation accessibly', () => {
     render(
-      <MemoryRouter>
-        <RegisterPage />
-      </MemoryRouter>,
+      <AuthProvider
+        initialState={{ error: null, status: 'signed-out', user: null }}
+      >
+        <MemoryRouter>
+          <RegisterPage />
+        </MemoryRouter>
+      </AuthProvider>,
     )
 
     fireEvent.submit(screen.getByRole('form', { name: 'Registration form' }))
@@ -40,11 +46,15 @@ describe('RegisterPage', () => {
     expect(screen.getByText('Passwords must match.')).toBeInTheDocument()
   })
 
-  it('shows configuration guidance without starting a remote request', () => {
+  it('shows configuration guidance without starting a remote request', async () => {
     render(
-      <MemoryRouter>
-        <RegisterPage />
-      </MemoryRouter>,
+      <AuthProvider
+        initialState={{ error: null, status: 'signed-out', user: null }}
+      >
+        <MemoryRouter>
+          <RegisterPage />
+        </MemoryRouter>
+      </AuthProvider>,
     )
 
     fireEvent.change(screen.getByLabelText('Full name'), {
@@ -61,8 +71,12 @@ describe('RegisterPage', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
 
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'Remote authentication is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          'Remote authentication is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
+        ),
+      ).toBeInTheDocument(),
     )
     expect(screen.getByRole('button', { name: 'Create account' })).toBeEnabled()
   })

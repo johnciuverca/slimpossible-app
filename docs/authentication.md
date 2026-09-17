@@ -7,11 +7,10 @@ source of truth for Issues #123–#126.
 
 ## Current local behavior
 
-The login and registration UI currently provide local client-side input
-validation only. No authentication SDK or remote request is connected yet. When
-the required public configuration is absent, a valid submission safely explains
-which variables must be set. Even when the values are present, this issue does
-not create an account or a signed-in session.
+The login and registration UI provide client-side input validation and connect
+valid submissions to Supabase Auth when the required public configuration is
+present. When configuration is absent, a valid submission safely explains
+which variables must be set without making a request.
 
 This means the app currently has no successful sign-in or registration,
 persistent session, remote password storage, email verification, session
@@ -49,11 +48,11 @@ keep-alive traffic, and does not attempt authentication.
 
 ## Future remote authentication
 
-Supabase Auth is the planned option for email/password authentication. Issue
-#119 adds only a typed browser client and repository boundary; Issue #122
-defines the real account UX contract. Neither issue adds authentication UX,
-session handling, or a Supabase Auth integration. The owner—not Codex—handles
-accounts, billing, and credentials.
+Supabase Auth provides the email/password integration. Issue #119 adds the
+typed browser client and repository boundary, Issue #122 defines the real
+account UX contract, and Issue #123 connects sign-up and sign-in. Session
+handling remains Issue #124. The owner—not Codex—handles accounts, billing,
+and credentials.
 
 Any future remote-auth work must document its exact variables, keep secrets in
 the service's secret store or ignored local files, and avoid committing real
