@@ -34,9 +34,9 @@ duplicate challenge/profile memberships, and duplicate participant/date
 weigh-ins. Indexes support owner lookups, challenge membership/status queries,
 and date-based weekly weigh-in calculations.
 
-There is no demo data in the migration. Row-level security, policies,
+There is no demo data in the migration. Row-level security, policies, typed
 repositories, persistence flows, activity checks, and application-side
-timestamps are separate concerns for later issues.
+timestamps remain separate concerns from the schema migration.
 
 ## Applying it later
 

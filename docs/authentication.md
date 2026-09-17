@@ -44,9 +44,9 @@ keep-alive traffic, and does not attempt authentication.
 
 ## Future remote authentication
 
-Supabase Auth is the planned option for email/password authentication. The
-owner has created the project, but this issue adds only its safe environment
-contract—not the Supabase SDK, client, or authentication integration. The
+Supabase Auth is the planned option for email/password authentication. Issue
+#119 adds only a typed browser client and repository boundary; it does not add
+authentication UX, session handling, or a Supabase Auth integration. The
 owner—not Codex—handles accounts, billing, and credentials.
 
 Any future remote-auth work must document its exact variables, keep secrets in
