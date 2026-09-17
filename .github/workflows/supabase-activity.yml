@@ -1,0 +1,42 @@
+name: Supabase activity check
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  activity:
+    name: Read-only Supabase health check
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+
+    steps:
+      - name: Check required configuration
+        shell: bash
+        run: |
+          if [[ -z "$SUPABASE_URL" || -z "$SUPABASE_ANON_KEY" ]]; then
+            echo "::error::SUPABASE_URL and SUPABASE_ANON_KEY repository secrets are required."
+            exit 1
+          fi
+
+      - name: Request Supabase Auth health endpoint
+        shell: bash
+        run: |
+          endpoint="${SUPABASE_URL%/}/auth/v1/health"
+          if ! status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 --header "apikey: ${SUPABASE_ANON_KEY}" "$endpoint")"; then
+            echo "::error::Supabase Auth health request failed before receiving an HTTP response."
+            exit 1
+          fi
+
+          if [[ "$status" != 2?? ]]; then
+            echo "::error::Supabase Auth health request returned HTTP $status."
+            exit 1
+          fi
+
+          echo "Supabase Auth health check succeeded with an HTTP 2xx response."
