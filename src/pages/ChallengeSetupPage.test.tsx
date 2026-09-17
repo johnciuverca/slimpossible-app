@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 
@@ -6,6 +12,7 @@ import { ChallengeSetupPage } from './ChallengeSetupPage'
 
 afterEach(() => {
   cleanup()
+  window.localStorage.clear()
 })
 
 describe('ChallengeSetupPage', () => {
@@ -41,7 +48,7 @@ describe('ChallengeSetupPage', () => {
     ).toBeInTheDocument()
   })
 
-  it('accepts valid challenge details and keeps the preview local', () => {
+  it('accepts valid challenge details and keeps the preview local', async () => {
     render(
       <MemoryRouter>
         <ChallengeSetupPage />
@@ -63,10 +70,12 @@ describe('ChallengeSetupPage', () => {
     fireEvent.change(screen.getByLabelText('Target weight in kg (optional)'), {
       target: { value: '80' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Review challenge' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save challenge' }))
 
-    expect(
-      screen.getByText(/Nothing has been saved remotely\./),
-    ).toBeInTheDocument()
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Nothing has been saved remotely\./),
+      ).toBeInTheDocument()
+    })
   })
 })

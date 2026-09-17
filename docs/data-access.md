@@ -1,6 +1,7 @@
 # Typed data access
 
-Issue #119 adds the typed Supabase boundary under `src/data/supabase/`.
+Issues #119 and #120 provide the typed Supabase and persistence boundary under
+`src/data/`.
 
 ## Boundary
 
@@ -14,10 +15,16 @@ Issue #119 adds the typed Supabase boundary under `src/data/supabase/`.
   models and returns explicit `success`, `empty`, or safe `error` results.
 - Components do not import the Supabase SDK or call `.from()` directly.
 
-The repositories currently expose read-oriented methods needed to establish the
-boundary: owned challenge lookup/listing, participants for a challenge, and
-weigh-ins for a participant. Challenge, participant, and weigh-in persistence
-flows remain out of scope for Issue #119.
+The repositories now expose challenge create/read/update and participant
+create/read/update methods for Issue #120. Weigh-in persistence remains out of
+scope for Issue #121.
+
+When public Supabase configuration is missing, the setup and enrollment pages
+use the same repository-shaped interface backed by browser local storage. This
+keeps the local MVP usable and lets saved local data survive refresh. When
+public configuration exists but there is no real Supabase session/user ID, the
+UI clearly reports remote persistence as unavailable and does not claim that a
+save succeeded.
 
 ## Configuration
 

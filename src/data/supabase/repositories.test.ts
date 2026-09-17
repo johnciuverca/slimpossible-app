@@ -26,6 +26,39 @@ afterEach(() => {
 })
 
 describe('Supabase repositories', () => {
+  it('creates and maps a challenge through the repository', async () => {
+    stubResponse({
+      created_at: '2026-09-17T10:00:00.000Z',
+      created_by: 'owner-1',
+      description: null,
+      end_date: '2026-10-01',
+      id: 'challenge-1',
+      name: 'September challenge',
+      owner_id: 'owner-1',
+      start_date: '2026-09-17',
+      status: 'draft',
+      target_weight_kg: null,
+      updated_at: '2026-09-17T10:00:00.000Z',
+    })
+
+    const result = await createRepositories(client).challenges.create({
+      createdBy: 'owner-1',
+      endDate: '2026-10-01',
+      name: 'September challenge',
+      ownerId: 'owner-1',
+      startDate: '2026-09-17',
+    })
+
+    expect(result).toMatchObject({
+      data: {
+        id: 'challenge-1',
+        name: 'September challenge',
+        ownerId: 'owner-1',
+      },
+      state: 'success',
+    })
+  })
+
   it('maps a database challenge row to the domain shape', async () => {
     stubResponse([
       {
@@ -74,6 +107,42 @@ describe('Supabase repositories', () => {
       )
 
     expect(result).toEqual({ data: [], state: 'empty' })
+  })
+
+  it('updates and maps a participant through the repository', async () => {
+    stubResponse({
+      challenge_id: 'challenge-1',
+      created_at: '2026-09-17T10:00:00.000Z',
+      display_name: 'Alex Updated',
+      id: 'participant-1',
+      joined_at: '2026-09-17T10:00:00.000Z',
+      starting_weight_kg: 92.5,
+      status: 'active',
+      target_weight_kg: 80,
+      updated_at: '2026-09-17T11:00:00.000Z',
+      user_id: 'user-alex',
+    })
+
+    const result = await createRepositories(client).participants.update(
+      'participant-1',
+      {
+        challengeId: 'challenge-1',
+        displayName: 'Alex Updated',
+        joinedAt: '2026-09-17T10:00:00.000Z',
+        startingWeightKg: 92.5,
+        status: 'active',
+        targetWeightKg: 80,
+        userId: 'user-alex',
+      },
+    )
+
+    expect(result).toMatchObject({
+      data: {
+        displayName: 'Alex Updated',
+        id: 'participant-1',
+      },
+      state: 'success',
+    })
   })
 
   it('returns a safe request error without exposing the server message', async () => {

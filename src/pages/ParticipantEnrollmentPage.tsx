@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 
 import type {
@@ -13,6 +13,8 @@ import {
   StatusPill,
   TextInput,
 } from '../components/ui'
+import { useOptionalAuth } from '../auth/useAuth'
+import { createPersistence } from '../data/persistence'
 
 type EnrollmentValues = {
   displayName: string
@@ -48,11 +50,71 @@ function mapValidationErrors(
 }
 
 export function ParticipantEnrollmentPage() {
+  const { state: authState } = useOptionalAuth()
+  const persistence = useMemo(() => createPersistence(authState), [authState])
   const [values, setValues] = useState(initialValues)
   const [participants, setParticipants] = useState<Participant[]>([])
   const [errors, setErrors] = useState<EnrollmentErrors>({})
+  const [isLoading, setIsLoading] = useState(true)
   const [submitError, setSubmitError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const [challengeId, setChallengeId] = useState(localChallengeId)
+
+  useEffect(() => {
+    let isCurrent = true
+
+    async function loadParticipants() {
+      if (persistence.mode === 'unavailable') {
+        if (isCurrent) {
+          setSubmitError(persistence.message)
+          setIsLoading(false)
+        }
+        return
+      }
+
+      const challenges = await persistence.repositories.challenges.listOwned()
+      if (!isCurrent) {
+        return
+      }
+
+      if (challenges.state === 'error') {
+        setSubmitError(challenges.error.message)
+        setIsLoading(false)
+        return
+      }
+
+      const savedChallengeId =
+        challenges.state === 'success' ? challenges.data[0]?.id : undefined
+      if (persistence.mode === 'remote' && !savedChallengeId) {
+        setSubmitError('Create a challenge before enrolling participants.')
+        setIsLoading(false)
+        return
+      }
+
+      const nextChallengeId = savedChallengeId ?? localChallengeId
+      setChallengeId(nextChallengeId)
+      const result =
+        await persistence.repositories.participants.listForChallenge(
+          nextChallengeId,
+        )
+      if (!isCurrent) {
+        return
+      }
+
+      if (result.state === 'error') {
+        setSubmitError(result.error.message)
+      } else if (result.state === 'success') {
+        setParticipants(result.data)
+      }
+      setIsLoading(false)
+    }
+
+    void loadParticipants()
+    return () => {
+      isCurrent = false
+    }
+  }, [persistence])
 
   function updateValue(field: EnrollmentField, value: string) {
     setValues((currentValues) => ({ ...currentValues, [field]: value }))
@@ -61,11 +123,11 @@ export function ParticipantEnrollmentPage() {
     setSuccessMessage('')
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
     const candidate: Participant = {
-      challengeId: localChallengeId,
+      challengeId,
       displayName: values.displayName.trim(),
       id: `participant-${participants.length + 1}`,
       joinedAt: new Date().toISOString(),
@@ -86,13 +148,41 @@ export function ParticipantEnrollmentPage() {
 
     setErrors({})
     setSubmitError('')
+    if (persistence.mode === 'unavailable') {
+      setSubmitError(persistence.message)
+      return
+    }
+
+    setIsSaving(true)
+    const saved = await persistence.repositories.participants.create({
+      challengeId: result.data.challengeId,
+      displayName: result.data.displayName,
+      joinedAt: result.data.joinedAt,
+      startingWeightKg: result.data.startingWeightKg,
+      status: result.data.status,
+      targetWeightKg: result.data.targetWeightKg,
+      userId: result.data.userId,
+    })
+    setIsSaving(false)
+
+    if (saved.state === 'error') {
+      setSubmitError(saved.error.message)
+      return
+    }
+    if (saved.state === 'empty') {
+      setSubmitError('The participant could not be saved.')
+      return
+    }
+
     setParticipants((currentParticipants) => [
       ...currentParticipants,
-      result.data,
+      saved.data,
     ])
     setValues(initialValues)
     setSuccessMessage(
-      `${result.data.displayName} was enrolled in the local challenge.`,
+      persistence.mode === 'remote'
+        ? `${saved.data.displayName} was enrolled remotely.`
+        : `${saved.data.displayName} was enrolled in the local challenge.`,
     )
   }
 
@@ -108,7 +198,13 @@ export function ParticipantEnrollmentPage() {
             title="Enroll a participant."
             titleId="participant-enrollment-title"
           >
-            <StatusPill>Local enrollment</StatusPill>
+            <StatusPill>
+              {persistence.mode === 'remote'
+                ? 'Remote enrollment'
+                : persistence.mode === 'unavailable'
+                  ? 'Remote unavailable'
+                  : 'Local enrollment'}
+            </StatusPill>
           </PageHeader>
 
           <form
@@ -183,8 +279,8 @@ export function ParticipantEnrollmentPage() {
               </p>
             ) : null}
 
-            <Button className="w-full" type="submit">
-              Enroll participant
+            <Button className="w-full" disabled={isSaving} type="submit">
+              {isSaving ? 'Saving participant…' : 'Enroll participant'}
             </Button>
           </form>
 
@@ -201,7 +297,9 @@ export function ParticipantEnrollmentPage() {
           className="p-8 sm:p-10"
         >
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">
-            Local preview
+            {persistence.mode === 'remote'
+              ? 'Remote memberships'
+              : 'Local preview'}
           </p>
           <h2
             className="mt-4 text-2xl font-bold tracking-tight text-slate-950"
@@ -209,11 +307,20 @@ export function ParticipantEnrollmentPage() {
           >
             Enrolled participants
           </h2>
-          {participants.length === 0 ? (
+          {isLoading ? (
+            <p
+              aria-live="polite"
+              className="mt-5 text-sm text-slate-600"
+              role="status"
+            >
+              Loading saved participants…
+            </p>
+          ) : null}
+          {!isLoading && participants.length === 0 ? (
             <p className="mt-5 text-sm leading-6 text-slate-600">
               No participants enrolled yet.
             </p>
-          ) : (
+          ) : !isLoading ? (
             <ul className="mt-5 space-y-3" aria-label="Enrolled participants">
               {participants.map((participant) => (
                 <li
@@ -233,10 +340,11 @@ export function ParticipantEnrollmentPage() {
                 </li>
               ))}
             </ul>
-          )}
+          ) : null}
           <p className="mt-6 text-xs leading-5 text-slate-500">
-            This preview is held in memory only and is cleared when the page is
-            refreshed.
+            {persistence.mode === 'remote'
+              ? 'Memberships are loaded from the owner-authorized repository.'
+              : 'This local preview is stored in this browser and is available after refresh.'}
           </p>
         </Card>
       </div>

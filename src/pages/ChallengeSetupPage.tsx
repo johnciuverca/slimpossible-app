@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 
 import {
@@ -8,6 +8,9 @@ import {
   StatusPill,
   TextInput,
 } from '../components/ui'
+import { useOptionalAuth } from '../auth/useAuth'
+import { createPersistence } from '../data/persistence'
+import type { Challenge } from '../models/challenge'
 
 type ChallengeSetupErrors = {
   endDate?: string
@@ -80,25 +83,123 @@ function validateChallengeSetup({
 }
 
 export function ChallengeSetupPage() {
+  const { state: authState } = useOptionalAuth()
+  const persistence = useMemo(() => createPersistence(authState), [authState])
   const [values, setValues] = useState(initialValues)
   const [errors, setErrors] = useState<ChallengeSetupErrors>({})
+  const [isLoading, setIsLoading] = useState(true)
   const [isSaved, setIsSaved] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [savedChallenge, setSavedChallenge] = useState<Challenge | null>(null)
+  const [submitError, setSubmitError] = useState('')
+
+  useEffect(() => {
+    let isCurrent = true
+
+    async function loadSavedChallenge() {
+      if (persistence.mode === 'unavailable') {
+        if (isCurrent) {
+          setSubmitError(persistence.message)
+          setIsLoading(false)
+        }
+        return
+      }
+
+      const result = await persistence.repositories.challenges.listOwned()
+      if (!isCurrent) {
+        return
+      }
+
+      if (result.state === 'error') {
+        setSubmitError(result.error.message)
+        setIsLoading(false)
+        return
+      }
+
+      setIsLoading(false)
+      if (result.state === 'success') {
+        const challenge = result.data[0]
+        setSavedChallenge(challenge)
+        setValues({
+          description: challenge.description ?? '',
+          endDate: challenge.endDate,
+          name: challenge.name,
+          startDate: challenge.startDate,
+          targetWeightKg: challenge.targetWeightKg?.toString() ?? '',
+        })
+      }
+    }
+
+    void loadSavedChallenge()
+    return () => {
+      isCurrent = false
+    }
+  }, [persistence])
 
   function updateValue(field: keyof ChallengeSetupValues, value: string) {
     setValues((currentValues) => ({ ...currentValues, [field]: value }))
     setIsSaved(false)
+    setSubmitError('')
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
     const nextErrors = validateChallengeSetup(values)
     setErrors(nextErrors)
     setIsSaved(false)
+    setSubmitError('')
 
-    if (Object.keys(nextErrors).length === 0) {
-      setIsSaved(true)
+    if (Object.keys(nextErrors).length > 0) {
+      return
     }
+
+    if (persistence.mode === 'unavailable') {
+      setSubmitError(persistence.message)
+      return
+    }
+
+    const ownerId =
+      authState.status === 'signed-in' && authState.user.id
+        ? authState.user.id
+        : 'local-owner'
+    setIsSaving(true)
+
+    const input = {
+      createdBy: ownerId,
+      ...(values.description.trim()
+        ? { description: values.description.trim() }
+        : {}),
+      endDate: values.endDate,
+      name: values.name.trim(),
+      ownerId,
+      startDate: values.startDate,
+      targetWeightKg: values.targetWeightKg
+        ? Number(values.targetWeightKg)
+        : undefined,
+    }
+    const result = savedChallenge
+      ? await persistence.repositories.challenges.update(
+          savedChallenge.id,
+          input,
+        )
+      : await persistence.repositories.challenges.create(input)
+
+    setIsSaving(false)
+
+    if (result.state === 'error') {
+      setSubmitError(result.error.message)
+      return
+    }
+    if (result.state === 'empty') {
+      setSubmitError(
+        'The challenge could not be saved because it was not found.',
+      )
+      return
+    }
+
+    setSavedChallenge(result.data)
+    setIsSaved(true)
   }
 
   return (
@@ -112,7 +213,13 @@ export function ChallengeSetupPage() {
           title="Set up your challenge."
           titleId="challenge-setup-title"
         >
-          <StatusPill>Local setup</StatusPill>
+          <StatusPill>
+            {persistence.mode === 'remote'
+              ? 'Remote setup'
+              : persistence.mode === 'unavailable'
+                ? 'Remote unavailable'
+                : 'Local setup'}
+          </StatusPill>
         </PageHeader>
 
         <form
@@ -182,19 +289,36 @@ export function ChallengeSetupPage() {
             value={values.targetWeightKg}
           />
 
+          {isLoading ? (
+            <p
+              aria-live="polite"
+              className="text-sm text-slate-600"
+              role="status"
+            >
+              Loading saved challenge…
+            </p>
+          ) : null}
+
+          {submitError ? (
+            <p aria-live="polite" className="text-sm text-red-700" role="alert">
+              {submitError}
+            </p>
+          ) : null}
+
           {isSaved ? (
             <p
               aria-live="polite"
               className="text-sm text-emerald-800"
               role="status"
             >
-              Challenge details are valid and ready for local preview. Nothing
-              has been saved remotely.
+              {persistence.mode === 'remote'
+                ? 'Challenge was saved remotely.'
+                : 'Challenge was saved in local preview. Nothing has been saved remotely.'}
             </p>
           ) : null}
 
-          <Button className="w-full" type="submit">
-            Review challenge
+          <Button className="w-full" disabled={isSaving} type="submit">
+            {isSaving ? 'Saving challenge…' : 'Save challenge'}
           </Button>
         </form>
 

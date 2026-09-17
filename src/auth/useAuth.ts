@@ -2,6 +2,13 @@ import { useContext } from 'react'
 
 import { AuthContext } from './context'
 
+const signedOutFallback = {
+  error: null,
+  status: 'signed-out' as const,
+  user: null,
+}
+const optionalAuthFallback = { state: signedOutFallback }
+
 export function useAuth() {
   const context = useContext(AuthContext)
 
@@ -10,4 +17,8 @@ export function useAuth() {
   }
 
   return context
+}
+
+export function useOptionalAuth() {
+  return useContext(AuthContext) ?? optionalAuthFallback
 }
