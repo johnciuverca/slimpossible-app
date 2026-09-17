@@ -15,16 +15,24 @@ Issues #119 and #120 provide the typed Supabase and persistence boundary under
   models and returns explicit `success`, `empty`, or safe `error` results.
 - Components do not import the Supabase SDK or call `.from()` directly.
 
-The repositories now expose challenge create/read/update and participant
-create/read/update methods for Issue #120. Weigh-in persistence remains out of
-scope for Issue #121.
+The repositories now expose challenge and participant create/read/update
+methods for Issue #120, plus weigh-in create/read/update/upsert methods for
+Issue #121. The weigh-in upsert uses the participant/calendar-date uniqueness
+rule, so correcting a submitted date replaces that record instead of creating
+a duplicate.
 
-When public Supabase configuration is missing, the setup and enrollment pages
-use the same repository-shaped interface backed by browser local storage. This
-keeps the local MVP usable and lets saved local data survive refresh. When
-public configuration exists but there is no real Supabase session/user ID, the
-UI clearly reports remote persistence as unavailable and does not claim that a
-save succeeded.
+Loaded weigh-ins remain ordinary domain records for the existing Chapter 5,
+6, and 9 models. Those models continue to compare consecutive Sundays,
+consider only participants with both submitted records, recalculate whenever
+the loaded list changes (including late entries), and preserve shared ties plus
+loss, maintenance, and gain goal progress.
+
+When public Supabase configuration is missing, the setup, enrollment, and
+weigh-in pages use the same repository-shaped interface backed by browser local
+storage. This keeps the local MVP usable and lets saved local data survive
+refresh. When public configuration exists but there is no real Supabase
+session/user ID, the UI clearly reports remote persistence as unavailable and
+does not claim that a save succeeded.
 
 ## Configuration
 

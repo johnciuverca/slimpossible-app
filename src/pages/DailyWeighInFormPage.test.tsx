@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 
@@ -6,6 +12,7 @@ import { DailyWeighInFormPage } from './DailyWeighInFormPage'
 
 afterEach(() => {
   cleanup()
+  window.localStorage.clear()
 })
 
 function renderPage() {
@@ -46,7 +53,7 @@ describe('DailyWeighInFormPage', () => {
     )
   })
 
-  it('creates a local weigh-in and reports the created state', () => {
+  it('creates a local weigh-in and reports the created state', async () => {
     renderPage()
 
     fireEvent.change(screen.getByLabelText('Weight in kg'), {
@@ -57,14 +64,16 @@ describe('DailyWeighInFormPage', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
 
-    expect(
-      screen.getByText('Weigh-in created in local state.'),
-    ).toBeInTheDocument()
+    await waitFor(() => {
+      expect(
+        screen.getByText('Weigh-in created in local storage.'),
+      ).toBeInTheDocument()
+    })
     expect(screen.getByText(/91.8 kg/)).toBeInTheDocument()
-    expect(screen.getAllByText('Morning reading.')).toHaveLength(2)
+    expect(screen.getAllByText('Morning reading.')).toHaveLength(1)
   })
 
-  it('updates the same date instead of adding a duplicate', () => {
+  it('updates the same date instead of adding a duplicate', async () => {
     renderPage()
 
     fireEvent.change(screen.getByLabelText('Weight in kg'), {
@@ -72,20 +81,28 @@ describe('DailyWeighInFormPage', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
 
+    await waitFor(() => {
+      expect(
+        screen.getByText('Weigh-in created in local storage.'),
+      ).toBeInTheDocument()
+    })
+
     fireEvent.change(screen.getByLabelText('Weight in kg'), {
       target: { value: '91.5' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
 
-    expect(
-      screen.getByText('Weigh-in updated in local state.'),
-    ).toBeInTheDocument()
+    await waitFor(() => {
+      expect(
+        screen.getByText('Weigh-in updated in local storage.'),
+      ).toBeInTheDocument()
+    })
     expect(screen.getByText(/91.5 kg/)).toBeInTheDocument()
     expect(screen.queryByText(/91.8 kg/)).not.toBeInTheDocument()
     expect(screen.getAllByRole('listitem')).toHaveLength(1)
   })
 
-  it('orders history, keeps missing days absent, and edits an existing entry', () => {
+  it('orders history, keeps missing days absent, and edits an existing entry', async () => {
     renderPage()
 
     const today = dateOffset(0)
@@ -97,6 +114,12 @@ describe('DailyWeighInFormPage', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
 
+    await waitFor(() => {
+      expect(
+        screen.getByText('Weigh-in created in local storage.'),
+      ).toBeInTheDocument()
+    })
+
     fireEvent.change(screen.getByLabelText('Date'), {
       target: { value: olderDate },
     })
@@ -104,6 +127,10 @@ describe('DailyWeighInFormPage', () => {
       target: { value: '92.5' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('listitem')).toHaveLength(2)
+    })
 
     const historyItems = screen.getAllByRole('listitem')
     expect(historyItems[0]).toHaveTextContent(today)
@@ -124,9 +151,11 @@ describe('DailyWeighInFormPage', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Update weigh-in' }))
 
-    expect(
-      screen.getByText('Weigh-in updated in local state.'),
-    ).toBeInTheDocument()
+    await waitFor(() => {
+      expect(
+        screen.getByText('Weigh-in updated in local storage.'),
+      ).toBeInTheDocument()
+    })
     expect(screen.getAllByRole('listitem')).toHaveLength(2)
     expect(
       screen.getByText(new RegExp(`${today}: 91.5 kg`)),

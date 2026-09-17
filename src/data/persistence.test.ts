@@ -40,6 +40,18 @@ describe('challenge and participant persistence', () => {
       targetWeightKg: 80,
       userId: 'alex-1',
     })
+    await first.repositories.weighIns.upsert({
+      date: '2026-10-01',
+      note: 'Morning reading.',
+      participantId: 'participant-1',
+      weightKg: 91.8,
+    })
+    await first.repositories.weighIns.upsert({
+      date: '2026-10-01',
+      note: 'Corrected reading.',
+      participantId: 'participant-1',
+      weightKg: 91.5,
+    })
 
     const second = createPersistence(signedOutState)
     if (second.mode !== 'local') {
@@ -53,6 +65,19 @@ describe('challenge and participant persistence', () => {
     await expect(
       second.repositories.participants.listForChallenge(challenge.data.id),
     ).resolves.toMatchObject({ state: 'success' })
+    await expect(
+      second.repositories.weighIns.listForParticipant('participant-1'),
+    ).resolves.toEqual({
+      data: [
+        {
+          date: '2026-10-01',
+          note: 'Corrected reading.',
+          participantId: 'participant-1',
+          weightKg: 91.5,
+        },
+      ],
+      state: 'success',
+    })
   })
 
   it('does not enable remote writes without a signed-in Supabase user id', () => {

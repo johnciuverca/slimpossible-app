@@ -50,9 +50,15 @@ export type ParticipantRepository = {
 }
 
 export type WeighInRepository = {
+  create: (input: WeighInWriteInput) => Promise<RepositoryResult<WeighIn>>
   listForParticipant: (
     participantId: string,
   ) => Promise<RepositoryListResult<WeighIn>>
+  update: (
+    id: string,
+    input: WeighInWriteInput,
+  ) => Promise<RepositoryResult<WeighIn>>
+  upsert: (input: WeighInWriteInput) => Promise<RepositoryResult<WeighIn>>
 }
 
 export type Repositories = {
@@ -80,6 +86,13 @@ export type ParticipantWriteInput = {
   status?: ParticipantRow['status']
   targetWeightKg: number
   userId: string
+}
+
+export type WeighInWriteInput = {
+  date: string
+  note?: string
+  participantId: string
+  weightKg: number
 }
 
 function requestError(operation: string, error: unknown): RepositoryError {
@@ -315,6 +328,22 @@ export function createRepositories(client: DatabaseClient): Repositories {
       },
     },
     weighIns: {
+      async create(input) {
+        const { data, error } = await client
+          .from('weigh_ins')
+          .insert({
+            note: input.note ?? null,
+            participant_id: input.participantId,
+            recorded_date: input.date,
+            weight_kg: input.weightKg,
+          })
+          .select('*')
+          .single()
+
+        return error
+          ? { error: requestError('save the weigh-in', error), state: 'error' }
+          : mapSingle(data, mapWeighIn, 'weigh-in')
+      },
       async listForParticipant(participantId) {
         const { data, error } = await client
           .from('weigh_ins')
@@ -328,6 +357,45 @@ export function createRepositories(client: DatabaseClient): Repositories {
               state: 'error',
             }
           : mapList(data, mapWeighIn, 'weigh-in')
+      },
+      async update(id, input) {
+        const { data, error } = await client
+          .from('weigh_ins')
+          .update({
+            note: input.note ?? null,
+            participant_id: input.participantId,
+            recorded_date: input.date,
+            weight_kg: input.weightKg,
+          })
+          .eq('id', id)
+          .select('*')
+          .maybeSingle()
+
+        return error
+          ? {
+              error: requestError('update the weigh-in', error),
+              state: 'error',
+            }
+          : mapSingle(data, mapWeighIn, 'weigh-in')
+      },
+      async upsert(input) {
+        const { data, error } = await client
+          .from('weigh_ins')
+          .upsert(
+            {
+              note: input.note ?? null,
+              participant_id: input.participantId,
+              recorded_date: input.date,
+              weight_kg: input.weightKg,
+            },
+            { onConflict: 'participant_id,recorded_date' },
+          )
+          .select('*')
+          .single()
+
+        return error
+          ? { error: requestError('save the weigh-in', error), state: 'error' }
+          : mapSingle(data, mapWeighIn, 'weigh-in')
       },
     },
   }
