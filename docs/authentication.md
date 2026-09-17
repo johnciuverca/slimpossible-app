@@ -12,6 +12,11 @@ valid submissions to Supabase Auth when the required public configuration is
 present. When configuration is absent, a valid submission safely explains
 which variables must be set without making a request.
 
+Provider failures are mapped to safe, actionable messages before they reach the
+UI. The app does not display provider internals, tokens, or raw authentication
+error payloads. Verification-pending is informational, while a returned
+session produces an explicit signed-in success message.
+
 This means the app currently has no successful sign-in or registration,
 persistent session, remote password storage, email verification, session
 restoration, user profile, or production-grade access control. Client-side

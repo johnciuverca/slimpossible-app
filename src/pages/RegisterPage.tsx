@@ -141,13 +141,23 @@ export function RegisterPage() {
 
           {state.status === 'error' ||
           state.status === 'verification-pending' ||
+          state.status === 'signed-in' ||
           submitError ? (
-            <p aria-live="polite" className="text-sm text-red-700">
+            <p
+              aria-live="polite"
+              className={
+                state.status === 'error' || submitError
+                  ? 'text-sm text-red-700'
+                  : 'text-sm text-emerald-700'
+              }
+            >
               {state.status === 'error'
                 ? state.error
                 : state.status === 'verification-pending'
                   ? 'Account created. Check your email to verify your account before signing in.'
-                  : submitError}
+                  : state.status === 'signed-in'
+                    ? 'Account created and signed in successfully.'
+                    : submitError}
             </p>
           ) : null}
 
