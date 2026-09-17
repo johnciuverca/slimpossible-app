@@ -55,9 +55,10 @@ keep-alive traffic, and does not attempt authentication.
 
 Supabase Auth provides the email/password integration. Issue #119 adds the
 typed browser client and repository boundary, Issue #122 defines the real
-account UX contract, and Issue #123 connects sign-up and sign-in. Session
-handling remains Issue #124. The owner—not Codex—handles accounts, billing,
-and credentials.
+account UX contract, Issue #123 connects sign-up and sign-in, and Issue #124
+restores sessions, listens for auth changes, and protects account-owned routes.
+Profile persistence remains Issue #125. The owner—not Codex—handles accounts,
+billing, and credentials.
 
 Any future remote-auth work must document its exact variables, keep secrets in
 the service's secret store or ignored local files, and avoid committing real

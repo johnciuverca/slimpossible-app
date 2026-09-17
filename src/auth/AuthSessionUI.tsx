@@ -7,8 +7,8 @@ export function AuthSessionUI() {
   const { retrySession, signOut, state } = useAuth()
   const navigate = useNavigate()
 
-  function handleLogout() {
-    signOut()
+  async function handleLogout() {
+    await signOut()
     navigate('/', { replace: true })
   }
 

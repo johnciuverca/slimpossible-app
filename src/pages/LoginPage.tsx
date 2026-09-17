@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState, type FormEvent } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import {
   Button,
@@ -35,11 +35,27 @@ function validateLogin(email: string, password: string): LoginErrors {
 
 export function LoginPage() {
   const { signIn, state } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [errors, setErrors] = useState<LoginErrors>({})
   const [submitError, setSubmitError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (state.status !== 'signed-in') return
+
+    const from = (
+      location.state as {
+        from?: { pathname?: string; search?: string; hash?: string }
+      } | null
+    )?.from
+    const destination = from
+      ? `${from.pathname ?? '/'}${from.search ?? ''}${from.hash ?? ''}`
+      : '/'
+    navigate(destination, { replace: true })
+  }, [location.state, navigate, state.status])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

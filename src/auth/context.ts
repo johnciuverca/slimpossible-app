@@ -16,7 +16,7 @@ export type AuthContextValue = {
   retrySession: () => void
   signIn: (email: string, password: string) => Promise<void>
   signUp: (name: string, email: string, password: string) => Promise<void>
-  signOut: () => void
+  signOut: () => Promise<void>
   state: AuthState
 }
 
@@ -27,6 +27,8 @@ export type AuthProviderProps = {
 }
 
 export type AuthGateway = {
+  getSession: () => Promise<AuthUser | null>
+  onAuthStateChange: (callback: (user: AuthUser | null) => void) => () => void
   signIn: (email: string, password: string) => Promise<AuthUser>
   signUp: (
     name: string,
@@ -36,6 +38,7 @@ export type AuthGateway = {
     user: AuthUser | null
     needsVerification: boolean
   }>
+  signOut: () => Promise<void>
 }
 
 export const AuthContext = createContext<AuthContextValue | undefined>(

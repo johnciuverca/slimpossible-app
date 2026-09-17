@@ -58,7 +58,7 @@ describe('AuthSessionUI', () => {
     ).toHaveTextContent('/')
   })
 
-  it('shows errors and can retry the local session check', () => {
+  it('shows errors and can retry the local session check', async () => {
     vi.useFakeTimers()
     renderSession({
       error: 'Session check failed.',
@@ -71,8 +71,9 @@ describe('AuthSessionUI', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
     expect(screen.getByText('Checking session…')).toBeInTheDocument()
 
-    act(() => {
+    await act(async () => {
       vi.advanceTimersByTime(150)
+      await Promise.resolve()
     })
 
     expect(screen.getByRole('link', { name: 'Log in' })).toBeInTheDocument()

@@ -5,7 +5,6 @@ import { createSupabaseAuthGateway } from './supabaseAuth'
 
 export type { AuthState, AuthUser } from './context'
 
-const sessionCheckDelay = 150
 const loadingState: AuthState = {
   error: null,
   status: 'loading',
@@ -17,10 +16,6 @@ const signedOutState: AuthState = {
   user: null,
 }
 
-function checkLocalSession(setState: (state: AuthState) => void) {
-  return window.setTimeout(() => setState(signedOutState), sessionCheckDelay)
-}
-
 export function AuthProvider({
   authGateway = createSupabaseAuthGateway(),
   children,
@@ -28,23 +23,68 @@ export function AuthProvider({
 }: AuthProviderProps) {
   const [state, setState] = useState<AuthState>(initialState ?? loadingState)
 
+  const restoreSession = useCallback(() => {
+    const timerId = window.setTimeout(() => {
+      void authGateway
+        .getSession()
+        .then((user) =>
+          setState(
+            user ? { error: null, status: 'signed-in', user } : signedOutState,
+          ),
+        )
+        .catch((error) =>
+          setState({
+            error:
+              error instanceof Error
+                ? error.message
+                : 'We could not restore your session. Try again.',
+            status: 'error',
+            user: null,
+          }),
+        )
+    }, 150)
+    return () => window.clearTimeout(timerId)
+  }, [authGateway])
+
   useEffect(() => {
     if (initialState) {
       return
     }
 
-    const timerId = checkLocalSession(setState)
-    return () => window.clearTimeout(timerId)
-  }, [initialState])
+    let active = true
+    const cancelRestore = restoreSession()
+    const unsubscribe = authGateway.onAuthStateChange((user) => {
+      if (active) {
+        setState(
+          user ? { error: null, status: 'signed-in', user } : signedOutState,
+        )
+      }
+    })
+    return () => {
+      active = false
+      cancelRestore()
+      unsubscribe()
+    }
+  }, [authGateway, initialState, restoreSession])
 
-  function retrySession() {
+  const retrySession = useCallback(() => {
     setState(loadingState)
-    checkLocalSession(setState)
-  }
+    return restoreSession()
+  }, [restoreSession])
 
-  function signOut() {
+  const signOut = useCallback(async () => {
     setState(signedOutState)
-  }
+    try {
+      await authGateway.signOut()
+    } catch (error) {
+      setState({
+        error:
+          error instanceof Error ? error.message : 'We could not sign you out.',
+        status: 'error',
+        user: null,
+      })
+    }
+  }, [authGateway])
 
   const signIn = useCallback(
     async (email: string, password: string) => {
@@ -89,7 +129,7 @@ export function AuthProvider({
 
   const value = useMemo(
     () => ({ retrySession, signIn, signOut, signUp, state }),
-    [signIn, signUp, state],
+    [retrySession, signIn, signOut, signUp, state],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

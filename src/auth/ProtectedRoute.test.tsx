@@ -76,7 +76,7 @@ describe('ProtectedRoute', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Checking session…')
   })
 
-  it('shows an auth error with a retry action', () => {
+  it('shows an auth error with a retry action', async () => {
     vi.useFakeTimers()
     renderGuard({ error: 'Session check failed.', status: 'error', user: null })
 
@@ -85,8 +85,9 @@ describe('ProtectedRoute', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
     expect(screen.getByRole('status')).toHaveTextContent('Checking session…')
 
-    act(() => {
+    await act(async () => {
       vi.advanceTimersByTime(150)
+      await Promise.resolve()
     })
 
     expect(

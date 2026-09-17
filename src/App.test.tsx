@@ -26,15 +26,16 @@ describe('App foundation screen', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Tailwind is working')
   })
 
-  it('redirects signed-out users from protected pages to login', () => {
+  it('redirects signed-out users from protected pages to login', async () => {
     vi.useFakeTimers()
     render(<App />)
 
     fireEvent.click(screen.getByRole('link', { name: 'Progress' }))
 
     expect(window.location.pathname).toBe('/progress')
-    act(() => {
+    await act(async () => {
       vi.advanceTimersByTime(150)
+      await Promise.resolve()
     })
 
     expect(window.location.pathname).toBe('/login')
