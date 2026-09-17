@@ -17,10 +17,12 @@ const signedOutState: AuthState = {
 }
 
 export function AuthProvider({
-  authGateway = createSupabaseAuthGateway(),
+  authGateway: providedAuthGateway,
   children,
   initialState,
 }: AuthProviderProps) {
+  const [fallbackAuthGateway] = useState(createSupabaseAuthGateway)
+  const authGateway = providedAuthGateway ?? fallbackAuthGateway
   const [state, setState] = useState<AuthState>(initialState ?? loadingState)
 
   const restoreSession = useCallback(() => {
