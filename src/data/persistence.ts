@@ -14,6 +14,7 @@ import type {
   RepositoryListResult,
   RepositoryResult,
   Repositories,
+  ProfileRepository,
   WeighInRepository,
   WeighInWriteInput,
 } from './supabase/repositories'
@@ -24,7 +25,7 @@ export const remotePersistenceUnavailableMessage =
 
 export type PersistenceRepositories = Pick<
   Repositories,
-  'challenges' | 'participants' | 'weighIns'
+  'challenges' | 'participants' | 'profiles' | 'weighIns'
 >
 
 export type ChallengeParticipantRepositories = Pick<
@@ -270,7 +271,16 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
     },
   }
 
-  return { challenges, participants, weighIns }
+  const profiles: ProfileRepository = {
+    async ensure(input) {
+      return {
+        data: { displayName: input.displayName, id: input.id },
+        state: 'success',
+      }
+    },
+  }
+
+  return { challenges, participants, profiles, weighIns }
 }
 
 export function createPersistence(

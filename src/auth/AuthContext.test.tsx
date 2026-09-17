@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const signedOutGateway = {
+  ensureProfile: async () => undefined,
   getSession: async () => null,
   onAuthStateChange: () => () => undefined,
   signIn: async () => ({ email: 'person@example.com', id: 'user-1' }),
@@ -63,6 +64,7 @@ describe('AuthContext', () => {
     render(
       <AuthProvider
         authGateway={{
+          ensureProfile: async () => undefined,
           getSession: async () => null,
           onAuthStateChange: () => () => undefined,
           signIn: async () => ({ email: 'person@example.com', id: 'user-1' }),

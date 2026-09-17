@@ -1,6 +1,7 @@
 import { createContext, type ReactNode } from 'react'
 
 export type AuthUser = {
+  displayName?: string
   email: string
   id?: string
 }
@@ -27,6 +28,7 @@ export type AuthProviderProps = {
 }
 
 export type AuthGateway = {
+  ensureProfile: (user: AuthUser) => Promise<void>
   getSession: () => Promise<AuthUser | null>
   onAuthStateChange: (callback: (user: AuthUser | null) => void) => () => void
   signIn: (email: string, password: string) => Promise<AuthUser>

@@ -1,8 +1,20 @@
 import { createSupabaseBrowserClient } from '../data/supabase/client'
+import { createRepositories } from '../data/supabase/repositories'
 import type { AuthGateway, AuthUser } from './context'
 
-function mapUser(user: { id: string; email?: string | null }): AuthUser {
-  return { email: user.email ?? '', id: user.id }
+function mapUser(user: {
+  id: string
+  email?: string | null
+  user_metadata?: { display_name?: unknown }
+}): AuthUser {
+  return {
+    displayName:
+      typeof user.user_metadata?.display_name === 'string'
+        ? user.user_metadata.display_name
+        : undefined,
+    email: user.email ?? '',
+    id: user.id,
+  }
 }
 
 export function mapSupabaseAuthError(
@@ -34,6 +46,15 @@ export function mapSupabaseAuthError(
 
 export function createSupabaseAuthGateway(): AuthGateway {
   return {
+    async ensureProfile(user) {
+      const result = createSupabaseBrowserClient()
+      if (result.state !== 'configured') throw new Error(result.message)
+      const profile = await createRepositories(result.client).profiles.ensure({
+        displayName: user.displayName?.trim() || user.email,
+        id: user.id!,
+      })
+      if (profile.state === 'error') throw new Error(profile.error.message)
+    },
     async getSession() {
       const result = createSupabaseBrowserClient()
       if (result.state === 'missing-configuration') return null

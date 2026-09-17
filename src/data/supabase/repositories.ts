@@ -24,6 +24,7 @@ export type RepositoryListResult<T> =
 type DatabaseClient = SupabaseClient<Database>
 type ChallengeRow = Database['public']['Tables']['challenges']['Row']
 type ParticipantRow = Database['public']['Tables']['participants']['Row']
+type ProfileRow = Database['public']['Tables']['profiles']['Row']
 type WeighInRow = Database['public']['Tables']['weigh_ins']['Row']
 
 export type ChallengeRepository = {
@@ -49,6 +50,18 @@ export type ParticipantRepository = {
   ) => Promise<RepositoryResult<Participant>>
 }
 
+export type Profile = {
+  displayName: string
+  id: string
+}
+
+export type ProfileRepository = {
+  ensure: (input: {
+    displayName: string
+    id: string
+  }) => Promise<RepositoryResult<Profile>>
+}
+
 export type WeighInRepository = {
   create: (input: WeighInWriteInput) => Promise<RepositoryResult<WeighIn>>
   listForParticipant: (
@@ -64,6 +77,7 @@ export type WeighInRepository = {
 export type Repositories = {
   challenges: ChallengeRepository
   participants: ParticipantRepository
+  profiles: ProfileRepository
   weighIns: WeighInRepository
 }
 
@@ -144,6 +158,10 @@ function mapParticipant(row: ParticipantRow): Participant {
     targetWeightKg: row.target_weight_kg,
     userId: row.user_id,
   }
+}
+
+function mapProfile(row: ProfileRow): Profile {
+  return { displayName: row.display_name, id: row.id }
 }
 
 function mapWeighIn(row: WeighInRow): WeighIn {
@@ -325,6 +343,22 @@ export function createRepositories(client: DatabaseClient): Repositories {
               state: 'error',
             }
           : mapSingle(data, mapParticipant, 'participant')
+      },
+    },
+    profiles: {
+      async ensure(input) {
+        const { data, error } = await client
+          .from('profiles')
+          .upsert({ id: input.id, display_name: input.displayName })
+          .select('*')
+          .single()
+
+        return error
+          ? {
+              error: requestError('initialize the profile', error),
+              state: 'error',
+            }
+          : mapSingle(data, mapProfile, 'profile')
       },
     },
     weighIns: {

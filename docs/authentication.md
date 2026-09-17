@@ -17,11 +17,10 @@ UI. The app does not display provider internals, tokens, or raw authentication
 error payloads. Verification-pending is informational, while a returned
 session produces an explicit signed-in success message.
 
-This means the app currently has no successful sign-in or registration,
-persistent session, remote password storage, email verification, session
-restoration, user profile, or production-grade access control. Client-side
-protected routes are only a local UI boundary and must not be treated as
-security.
+This means the app still has no profile editing workflow or production-grade
+access control beyond the authenticated route boundary. Client-side route
+guards and RLS remain separate concerns; browser guards must not be treated as
+the complete security boundary.
 
 ## Environment contract
 
@@ -57,8 +56,19 @@ Supabase Auth provides the email/password integration. Issue #119 adds the
 typed browser client and repository boundary, Issue #122 defines the real
 account UX contract, Issue #123 connects sign-up and sign-in, and Issue #124
 restores sessions, listens for auth changes, and protects account-owned routes.
-Profile persistence remains Issue #125. The owner—not Codex—handles accounts,
+Additional profile editing remains outside this issue. The owner—not Codex—handles accounts,
 billing, and credentials.
+
+## Profile boundary
+
+When an authenticated session is restored or created, the app upserts one
+`public.profiles` row with `id = auth.users.id` through the authenticated
+repository boundary. The minimum stored field is `display_name`; the verified
+Auth email remains the account email source and is not duplicated into the
+profile table. Participant records use that same authenticated profile ID as
+`participants.user_id`, so the existing RLS policies enforce identity
+ownership. Profile initialization failures remain visible as a retryable auth
+state; no local fake profile is presented as remote persistence.
 
 Any future remote-auth work must document its exact variables, keep secrets in
 the service's secret store or ignored local files, and avoid committing real
