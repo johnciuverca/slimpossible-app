@@ -1,5 +1,10 @@
 # Authentication boundary
 
+The agreed real-account UX and ownership contract is documented in
+[authentication-ux-contract.md](authentication-ux-contract.md). This file
+records the current implementation/configuration boundary; the contract is the
+source of truth for Issues #123–#126.
+
 ## Current local behavior
 
 The login and registration UI currently provide local client-side input
@@ -45,9 +50,10 @@ keep-alive traffic, and does not attempt authentication.
 ## Future remote authentication
 
 Supabase Auth is the planned option for email/password authentication. Issue
-#119 adds only a typed browser client and repository boundary; it does not add
-authentication UX, session handling, or a Supabase Auth integration. The
-owner—not Codex—handles accounts, billing, and credentials.
+#119 adds only a typed browser client and repository boundary; Issue #122
+defines the real account UX contract. Neither issue adds authentication UX,
+session handling, or a Supabase Auth integration. The owner—not Codex—handles
+accounts, billing, and credentials.
 
 Any future remote-auth work must document its exact variables, keep secrets in
 the service's secret store or ignored local files, and avoid committing real
