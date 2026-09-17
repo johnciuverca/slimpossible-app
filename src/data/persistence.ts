@@ -5,6 +5,7 @@ import {
 } from './supabase/client'
 import type { Challenge } from '../models/challenge'
 import type { Participant } from '../models/participant'
+import type { WeighIn } from '../models/weighIn'
 import type {
   ChallengeRepository,
   ChallengeWriteInput,
@@ -13,11 +14,18 @@ import type {
   RepositoryListResult,
   RepositoryResult,
   Repositories,
+  WeighInRepository,
+  WeighInWriteInput,
 } from './supabase/repositories'
 import { createRepositories } from './supabase/repositories'
 
 export const remotePersistenceUnavailableMessage =
   'Remote persistence is unavailable until a Supabase session is signed in.'
+
+export type PersistenceRepositories = Pick<
+  Repositories,
+  'challenges' | 'participants' | 'weighIns'
+>
 
 export type ChallengeParticipantRepositories = Pick<
   Repositories,
@@ -27,7 +35,7 @@ export type ChallengeParticipantRepositories = Pick<
 export type Persistence =
   | {
       mode: 'local' | 'remote'
-      repositories: ChallengeParticipantRepositories
+      repositories: PersistenceRepositories
     }
   | {
       message: string
@@ -36,6 +44,7 @@ export type Persistence =
 
 const challengesStorageKey = 'slimpossible.local.challenges'
 const participantsStorageKey = 'slimpossible.local.participants'
+const weighInsStorageKey = 'slimpossible.local.weigh-ins'
 
 function createLocalId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -69,9 +78,7 @@ function localStorageError() {
   }
 }
 
-function createLocalRepositories(
-  storage: Storage,
-): ChallengeParticipantRepositories {
+function createLocalRepositories(storage: Storage): PersistenceRepositories {
   const challenges: ChallengeRepository = {
     async create(input: ChallengeWriteInput) {
       const now = new Date().toISOString()
@@ -194,7 +201,76 @@ function createLocalRepositories(
     },
   }
 
-  return { challenges, participants }
+  const weighIns: WeighInRepository = {
+    async create(input: WeighInWriteInput) {
+      const weighIn: WeighIn = {
+        date: input.date,
+        ...(input.note ? { note: input.note } : {}),
+        participantId: input.participantId,
+        weightKg: input.weightKg,
+      }
+      const values = readList<WeighIn>(storage, weighInsStorageKey)
+      if (!writeList(storage, weighInsStorageKey, [weighIn, ...values])) {
+        return localStorageError()
+      }
+      return { data: weighIn, state: 'success' }
+    },
+    async listForParticipant(participantId: string) {
+      const values = readList<WeighIn>(storage, weighInsStorageKey).filter(
+        (value) => value.participantId === participantId,
+      )
+      return values.length > 0
+        ? { data: values, state: 'success' }
+        : { data: [], state: 'empty' }
+    },
+    async update(id: string, input: WeighInWriteInput) {
+      const values = readList<WeighIn>(storage, weighInsStorageKey)
+      const index = values.findIndex(
+        (value) => `${value.participantId}-${value.date}` === id,
+      )
+      if (index < 0) {
+        return { data: null, state: 'empty' }
+      }
+
+      const weighIn: WeighIn = {
+        date: input.date,
+        ...(input.note ? { note: input.note } : {}),
+        participantId: input.participantId,
+        weightKg: input.weightKg,
+      }
+      values[index] = weighIn
+      if (!writeList(storage, weighInsStorageKey, values)) {
+        return localStorageError()
+      }
+      return { data: weighIn, state: 'success' }
+    },
+    async upsert(input: WeighInWriteInput) {
+      const values = readList<WeighIn>(storage, weighInsStorageKey)
+      const index = values.findIndex(
+        (value) =>
+          value.participantId === input.participantId &&
+          value.date === input.date,
+      )
+      const weighIn: WeighIn = {
+        date: input.date,
+        ...(input.note ? { note: input.note } : {}),
+        participantId: input.participantId,
+        weightKg: input.weightKg,
+      }
+
+      if (index < 0) {
+        values.unshift(weighIn)
+      } else {
+        values[index] = weighIn
+      }
+      if (!writeList(storage, weighInsStorageKey, values)) {
+        return localStorageError()
+      }
+      return { data: weighIn, state: 'success' }
+    },
+  }
+
+  return { challenges, participants, weighIns }
 }
 
 export function createPersistence(

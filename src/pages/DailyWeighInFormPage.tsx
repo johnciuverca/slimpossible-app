@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 
 import { participantFixture } from '../models/fixtures'
@@ -12,6 +12,8 @@ import {
   StatusPill,
   TextInput,
 } from '../components/ui'
+import { useOptionalAuth } from '../auth/useAuth'
+import { createPersistence } from '../data/persistence'
 
 type WeighInFormValues = {
   date: string
@@ -47,12 +49,49 @@ function mapValidationErrors(
 }
 
 export function DailyWeighInFormPage() {
+  const { state: authState } = useOptionalAuth()
+  const persistence = useMemo(() => createPersistence(authState), [authState])
   const [values, setValues] = useState(initialValues)
   const [weighIns, setWeighIns] = useState<WeighIn[]>([])
   const [errors, setErrors] = useState<WeighInFormErrors>({})
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
   const [editingDate, setEditingDate] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+
+  useEffect(() => {
+    let isCurrent = true
+
+    async function loadWeighIns() {
+      if (persistence.mode === 'unavailable') {
+        if (isCurrent) {
+          setSubmitError(persistence.message)
+          setIsLoading(false)
+        }
+        return
+      }
+
+      const result = await persistence.repositories.weighIns.listForParticipant(
+        participantFixture.id,
+      )
+      if (!isCurrent) {
+        return
+      }
+
+      if (result.state === 'error') {
+        setSubmitError(result.error.message)
+      } else if (result.state === 'success') {
+        setWeighIns(result.data)
+      }
+      setIsLoading(false)
+    }
+
+    void loadWeighIns()
+    return () => {
+      isCurrent = false
+    }
+  }, [persistence])
 
   function updateValue(field: WeighInFormField, value: string) {
     setValues((currentValues) => ({ ...currentValues, [field]: value }))
@@ -81,15 +120,16 @@ export function DailyWeighInFormPage() {
     setSuccessMessage('')
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    const result = upsertWeighIn(weighIns, {
+    const input = {
       date: values.date,
       note: values.note.trim() || undefined,
       participantId: participantFixture.id,
       weightKg: Number(values.weightKg),
-    })
+    }
+    const result = upsertWeighIn(weighIns, input)
 
     if (!result.success) {
       setErrors(mapValidationErrors(result.issues))
@@ -98,13 +138,47 @@ export function DailyWeighInFormPage() {
       return
     }
 
-    setWeighIns(result.data)
+    if (persistence.mode === 'unavailable') {
+      setSubmitError(persistence.message)
+      setSuccessMessage('')
+      return
+    }
+
+    setIsSaving(true)
+    const saved = await persistence.repositories.weighIns.upsert(input)
+    setIsSaving(false)
+
+    if (saved.state === 'error') {
+      setSubmitError(saved.error.message)
+      setSuccessMessage('')
+      return
+    }
+    if (saved.state === 'empty') {
+      setSubmitError('The weigh-in could not be saved.')
+      setSuccessMessage('')
+      return
+    }
+
+    const nextState = upsertWeighIn(weighIns, saved.data, {
+      today: values.date,
+    })
+    if (!nextState.success) {
+      setSubmitError('The saved weigh-in could not be displayed.')
+      setSuccessMessage('')
+      return
+    }
+
+    setWeighIns(nextState.data)
     setErrors({})
     setSubmitError('')
+    setEditingDate(null)
+    setValues(initialValues)
     setSuccessMessage(
-      result.operation === 'created'
-        ? 'Weigh-in created in local state.'
-        : 'Weigh-in updated in local state.',
+      persistence.mode === 'remote'
+        ? 'Weigh-in saved remotely.'
+        : result.operation === 'created'
+          ? 'Weigh-in created in local storage.'
+          : 'Weigh-in updated in local storage.',
     )
   }
 
@@ -120,7 +194,13 @@ export function DailyWeighInFormPage() {
             title="Daily weigh-in."
             titleId="daily-weigh-in-title"
           >
-            <StatusPill>Local state</StatusPill>
+            <StatusPill>
+              {persistence.mode === 'remote'
+                ? 'Remote data'
+                : persistence.mode === 'unavailable'
+                  ? 'Remote unavailable'
+                  : 'Local storage'}
+            </StatusPill>
           </PageHeader>
 
           <p className="mt-6 text-sm text-slate-600">
@@ -203,7 +283,7 @@ export function DailyWeighInFormPage() {
             ) : null}
 
             <div className="flex flex-wrap gap-3">
-              <Button type="submit">
+              <Button disabled={isSaving} type="submit">
                 {editingDate ? 'Update weigh-in' : 'Save weigh-in'}
               </Button>
               {editingDate ? (
@@ -236,7 +316,15 @@ export function DailyWeighInFormPage() {
           >
             Saved weigh-ins
           </h2>
-          {weighIns.length === 0 ? (
+          {isLoading ? (
+            <p
+              aria-live="polite"
+              className="mt-5 text-sm text-slate-600"
+              role="status"
+            >
+              Loading saved weigh-ins…
+            </p>
+          ) : weighIns.length === 0 ? (
             <p className="mt-5 text-sm leading-6 text-slate-600">
               No weigh-ins saved yet.
             </p>
@@ -272,7 +360,9 @@ export function DailyWeighInFormPage() {
             for them.
           </p>
           <p className="mt-6 text-xs leading-5 text-slate-500">
-            This local state is cleared when the page is refreshed.
+            {persistence.mode === 'remote'
+              ? 'Weigh-ins are loaded from the owner-authorized repository.'
+              : 'This local preview is stored in this browser and is available after refresh.'}
           </p>
         </Card>
       </div>

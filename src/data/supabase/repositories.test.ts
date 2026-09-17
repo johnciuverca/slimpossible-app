@@ -145,6 +145,34 @@ describe('Supabase repositories', () => {
     })
   })
 
+  it('upserts a weigh-in using participant and calendar date uniqueness', async () => {
+    stubResponse({
+      created_at: '2026-09-17T10:00:00.000Z',
+      id: 'weigh-in-1',
+      note: 'Corrected reading.',
+      participant_id: 'participant-1',
+      recorded_date: '2026-09-17',
+      updated_at: '2026-09-17T11:00:00.000Z',
+      weight_kg: 91.5,
+    })
+
+    const result = await createRepositories(client).weighIns.upsert({
+      date: '2026-09-17',
+      note: 'Corrected reading.',
+      participantId: 'participant-1',
+      weightKg: 91.5,
+    })
+
+    expect(result).toMatchObject({
+      data: {
+        date: '2026-09-17',
+        participantId: 'participant-1',
+        weightKg: 91.5,
+      },
+      state: 'success',
+    })
+  })
+
   it('returns a safe request error without exposing the server message', async () => {
     stubResponse(
       {
