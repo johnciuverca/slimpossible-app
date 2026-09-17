@@ -7,7 +7,7 @@ It is operational housekeeping, not application functionality.
 
 ## Request behavior
 
-- Runs weekly at 03:17 UTC on Monday and can also be started manually with
+- Runs daily at 03:17 UTC and can also be started manually with
   **Run workflow**.
 - Calls only the documented Supabase Auth health endpoint:
   `GET /auth/v1/health`.

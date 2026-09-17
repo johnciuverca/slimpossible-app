@@ -9,7 +9,7 @@ const workflow = readFileSync(
 
 describe('Supabase activity workflow contract', () => {
   it('is scheduled, manually dispatchable, and read-only', () => {
-    expect(workflow).toContain("cron: '17 3 * * 1'")
+    expect(workflow).toContain("cron: '17 3 * * *'")
     expect(workflow).toContain('workflow_dispatch:')
     expect(workflow).toContain('contents: read')
     expect(workflow).toContain('/auth/v1/health')
