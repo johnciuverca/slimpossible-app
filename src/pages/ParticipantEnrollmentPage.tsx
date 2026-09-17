@@ -194,7 +194,7 @@ export function ParticipantEnrollmentPage() {
       <div className="grid w-full gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]">
         <Card className="p-8 sm:p-10">
           <PageHeader
-            description="Add a participant and set their starting point and goal for this challenge."
+            description="Add a participant and set a loss, maintenance, or gain goal for this challenge."
             title="Enroll a participant."
             titleId="participant-enrollment-title"
           >

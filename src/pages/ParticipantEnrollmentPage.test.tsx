@@ -44,7 +44,7 @@ describe('ParticipantEnrollmentPage', () => {
     ).toBeInTheDocument()
   })
 
-  it('rejects a target above the starting weight', async () => {
+  it('accepts a positive target above the starting weight for a gain goal', async () => {
     renderPage()
 
     fireEvent.change(screen.getByLabelText('Display name'), {
@@ -61,12 +61,11 @@ describe('ParticipantEnrollmentPage', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Enroll participant' }))
 
-    expect(
-      screen.getByText('Target weight must be on or below starting weight.'),
-    ).toBeInTheDocument()
     await waitFor(() => {
       expect(
-        screen.getByText('No participants enrolled yet.'),
+        screen.getByText(
+          'Alex Participant was enrolled in the local challenge.',
+        ),
       ).toBeInTheDocument()
     })
   })
