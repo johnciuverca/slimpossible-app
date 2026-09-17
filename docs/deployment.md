@@ -2,9 +2,10 @@
 
 ## Current status
 
-The repository is prepared for Vercel static hosting, but no Vercel account,
-project, preview, or production deployment has been created. Issue #102 is the
-owner-managed deployment handoff.
+Vercel production is owner-managed and connected to `main`. After an approved
+pull request merges into `main`, Vercel creates the production release. This
+repository configuration does not create, access, or change Vercel accounts,
+projects, tokens, or deployment settings.
 
 ## Vite build output
 
@@ -33,10 +34,10 @@ hosting-provider 404. Static assets remain served by Vercel.
 
 ## Owner deployment handoff
 
-For issue #102, the project owner should create and manage their own Vercel
-account, import this repository, and confirm the build command and `dist`
-output directory in Vercel. No Vercel token, account, preview URL, or
-deployment has been created by this repository change.
+The owner keeps Vercel's production branch connected to `main` and confirms the
+existing build command and `dist` output directory. This GitHub Flow transition
+does not change any Vercel setting or create a preview or production deployment.
+`development` remains a historical branch and is not a release branch.
 
 If a later remote service needs configuration, keep secrets in Vercel's project
 environment settings or ignored local files. Never commit secrets or privileged

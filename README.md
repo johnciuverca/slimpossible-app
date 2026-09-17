@@ -1,8 +1,9 @@
 # Slimpossible
 
 Slimpossible is a React weight-loss challenge app based on the Slimpossible
-tracker. It is currently a local-development MVP: it has no deployed public
-environment, remote database, or remote authentication service.
+tracker. It is currently a local-development MVP with no remote database or
+remote authentication service. Approved merges into `main` release through the
+owner-managed Vercel production connection.
 
 ## Prerequisites
 
@@ -67,8 +68,8 @@ npm run test:e2e
 ```
 
 GitHub Actions runs the formatting, lint, type-check, unit-test, production
-build, and browser smoke commands for pull requests targeting `development` and
-for pushes to `development`.
+build, and browser smoke commands for pull requests targeting `main` and for
+pushes to `main`.
 
 ## Local-only authentication and data
 
@@ -101,22 +102,22 @@ privileged values in browser-exposed `VITE_` variables.
 Track work in the
 [Slimpossible Development GitHub Project](https://github.com/users/johnciuverca/projects/8):
 
-1. Start from the latest `development` branch and create one focused branch for
-   the issue.
-2. Keep each pull request narrowly scoped and target `development`.
+1. Start from the latest `main` branch and create one focused branch for the
+   issue.
+2. Keep each pull request narrowly scoped and target `main`.
 3. Run the quality checks above, open the pull request, and let GitHub Actions
    complete successfully.
 4. Request review; do not merge or close the pull request or linked issue until
    the reviewer or project owner directs it.
-5. After the merge, the owner can close any still-open linked issue and update
-   the Project status.
+5. After an approved merge into `main`, Vercel creates the production release.
+   The owner can then close any still-open linked issue and update the Project
+   status.
 
-The app is not deployed yet. `vercel.json` prepares the Vite SPA for static
-hosting and direct client-side routes, but it does not create an account or a
-deployment. A public Vercel preview is a future handoff for issue #102 and
-requires the project owner to create and configure their own Vercel account.
-See [docs/deployment.md](docs/deployment.md) for the build output, route
-fallback, and owner handoff.
+`development` remains in the repository as historical context; it is not
+deleted or rewritten as part of this GitHub Flow transition. `vercel.json`
+prepares the Vite SPA for static hosting and direct client-side routes. See
+[docs/deployment.md](docs/deployment.md) for the build output, route fallback,
+and owner-managed Vercel handoff.
 
 ## Code style
 
