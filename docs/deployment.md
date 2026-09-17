@@ -17,7 +17,12 @@ npm run build
 
 The build writes the static site to `dist/`, including `dist/index.html`. No
 backend, serverless function, environment variable, or secret is required for
-the current local-only app.
+the current local-only app. When a later remote-auth issue is ready, the owner
+must add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to that Vercel
+project's environment settings for the intended preview and production scopes.
+Those values are public browser configuration; service-role keys, database
+passwords, and other privileged values must never be added to Vercel client
+environment variables.
 
 ## Client-side routes
 

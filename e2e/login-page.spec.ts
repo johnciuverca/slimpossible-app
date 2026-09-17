@@ -18,6 +18,6 @@ test('shows accessible login validation and local auth fallback', async ({
   await page.getByRole('button', { name: 'Sign in' }).click()
 
   await expect(page.getByRole('alert')).toHaveText(
-    'Remote authentication is not configured in this local preview yet.',
+    'Remote authentication is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
   )
 })

@@ -1,5 +1,5 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 
 import { LoginPage } from './LoginPage'
@@ -7,7 +7,6 @@ import { LoginPage } from './LoginPage'
 describe('LoginPage', () => {
   afterEach(() => {
     cleanup()
-    vi.useRealTimers()
   })
 
   it('validates required and malformed fields accessibly', () => {
@@ -37,9 +36,7 @@ describe('LoginPage', () => {
     expect(screen.getByText('Enter a valid email address.')).toBeInTheDocument()
   })
 
-  it('shows loading and local fallback error states for valid input', () => {
-    vi.useFakeTimers()
-
+  it('shows configuration guidance without starting a remote request', () => {
     render(
       <MemoryRouter>
         <LoginPage />
@@ -54,14 +51,8 @@ describe('LoginPage', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
 
-    expect(screen.getByRole('button', { name: 'Signing in…' })).toBeDisabled()
-
-    act(() => {
-      vi.advanceTimersByTime(300)
-    })
-
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'Remote authentication is not configured in this local preview yet.',
+      'Remote authentication is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
     )
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeEnabled()
   })
