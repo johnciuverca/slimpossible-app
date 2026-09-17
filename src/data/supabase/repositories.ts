@@ -27,14 +27,26 @@ type ParticipantRow = Database['public']['Tables']['participants']['Row']
 type WeighInRow = Database['public']['Tables']['weigh_ins']['Row']
 
 export type ChallengeRepository = {
+  create: (input: ChallengeWriteInput) => Promise<RepositoryResult<Challenge>>
   findOwnedById: (id: string) => Promise<RepositoryResult<Challenge>>
   listOwned: () => Promise<RepositoryListResult<Challenge>>
+  update: (
+    id: string,
+    input: ChallengeWriteInput,
+  ) => Promise<RepositoryResult<Challenge>>
 }
 
 export type ParticipantRepository = {
+  create: (
+    input: ParticipantWriteInput,
+  ) => Promise<RepositoryResult<Participant>>
   listForChallenge: (
     challengeId: string,
   ) => Promise<RepositoryListResult<Participant>>
+  update: (
+    id: string,
+    input: ParticipantWriteInput,
+  ) => Promise<RepositoryResult<Participant>>
 }
 
 export type WeighInRepository = {
@@ -47,6 +59,27 @@ export type Repositories = {
   challenges: ChallengeRepository
   participants: ParticipantRepository
   weighIns: WeighInRepository
+}
+
+export type ChallengeWriteInput = {
+  createdBy: string
+  description?: string
+  endDate: string
+  name: string
+  ownerId: string
+  startDate: string
+  status?: ChallengeRow['status']
+  targetWeightKg?: number
+}
+
+export type ParticipantWriteInput = {
+  challengeId: string
+  displayName: string
+  joinedAt?: string
+  startingWeightKg: number
+  status?: ParticipantRow['status']
+  targetWeightKg: number
+  userId: string
 }
 
 function requestError(operation: string, error: unknown): RepositoryError {
@@ -147,6 +180,28 @@ function mapSingle<TDatabase, TDomain>(
 export function createRepositories(client: DatabaseClient): Repositories {
   return {
     challenges: {
+      async create(input) {
+        const { data, error } = await client
+          .from('challenges')
+          .insert({
+            created_by: input.createdBy,
+            description: input.description ?? null,
+            end_date: input.endDate,
+            name: input.name,
+            owner_id: input.ownerId,
+            start_date: input.startDate,
+            ...(input.status ? { status: input.status } : {}),
+            ...(input.targetWeightKg === undefined
+              ? {}
+              : { target_weight_kg: input.targetWeightKg }),
+          })
+          .select('*')
+          .single()
+
+        return error
+          ? { error: requestError('save the challenge', error), state: 'error' }
+          : mapSingle(data, mapChallenge, 'challenge')
+      },
       async findOwnedById(id) {
         const { data, error } = await client
           .from('challenges')
@@ -171,8 +226,56 @@ export function createRepositories(client: DatabaseClient): Repositories {
             }
           : mapList(data, mapChallenge, 'challenge')
       },
+      async update(id, input) {
+        const { data, error } = await client
+          .from('challenges')
+          .update({
+            created_by: input.createdBy,
+            description: input.description ?? null,
+            end_date: input.endDate,
+            name: input.name,
+            owner_id: input.ownerId,
+            start_date: input.startDate,
+            ...(input.status ? { status: input.status } : {}),
+            ...(input.targetWeightKg === undefined
+              ? {}
+              : { target_weight_kg: input.targetWeightKg }),
+          })
+          .eq('id', id)
+          .select('*')
+          .maybeSingle()
+
+        return error
+          ? {
+              error: requestError('update the challenge', error),
+              state: 'error',
+            }
+          : mapSingle(data, mapChallenge, 'challenge')
+      },
     },
     participants: {
+      async create(input) {
+        const { data, error } = await client
+          .from('participants')
+          .insert({
+            challenge_id: input.challengeId,
+            display_name: input.displayName,
+            joined_at: input.joinedAt ?? null,
+            starting_weight_kg: input.startingWeightKg,
+            ...(input.status ? { status: input.status } : {}),
+            target_weight_kg: input.targetWeightKg,
+            user_id: input.userId,
+          })
+          .select('*')
+          .single()
+
+        return error
+          ? {
+              error: requestError('save the participant', error),
+              state: 'error',
+            }
+          : mapSingle(data, mapParticipant, 'participant')
+      },
       async listForChallenge(challengeId) {
         const { data, error } = await client
           .from('participants')
@@ -186,6 +289,29 @@ export function createRepositories(client: DatabaseClient): Repositories {
               state: 'error',
             }
           : mapList(data, mapParticipant, 'participant')
+      },
+      async update(id, input) {
+        const { data, error } = await client
+          .from('participants')
+          .update({
+            challenge_id: input.challengeId,
+            display_name: input.displayName,
+            joined_at: input.joinedAt ?? null,
+            starting_weight_kg: input.startingWeightKg,
+            ...(input.status ? { status: input.status } : {}),
+            target_weight_kg: input.targetWeightKg,
+            user_id: input.userId,
+          })
+          .eq('id', id)
+          .select('*')
+          .maybeSingle()
+
+        return error
+          ? {
+              error: requestError('update the participant', error),
+              state: 'error',
+            }
+          : mapSingle(data, mapParticipant, 'participant')
       },
     },
     weighIns: {

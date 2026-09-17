@@ -46,7 +46,7 @@ describe('validateParticipant', () => {
     }
   })
 
-  it('rejects invalid values, reversed weight goals, and unknown status', () => {
+  it('rejects invalid values and unknown status', () => {
     const result = validateParticipant({
       ...participantFixture,
       joinedAt: 'not-a-date',
@@ -67,19 +67,15 @@ describe('validateParticipant', () => {
       )
     }
 
-    const reversedGoalResult = validateParticipant({
+    const gainGoalResult = validateParticipant({
       ...participantFixture,
       targetWeightKg: 100,
     })
 
-    expect(reversedGoalResult.success).toBe(false)
-    if (!reversedGoalResult.success) {
-      expect(reversedGoalResult.issues).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ field: 'targetWeightKg' }),
-        ]),
-      )
-    }
+    expect(gainGoalResult).toEqual({
+      data: { ...participantFixture, targetWeightKg: 100 },
+      success: true,
+    })
   })
 
   it('requires a join time for participants beyond invited status', () => {

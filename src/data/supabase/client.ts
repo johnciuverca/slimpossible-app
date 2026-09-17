@@ -6,6 +6,8 @@ import {
 } from '../../auth/supabaseConfig'
 import type { Database } from './database.types'
 
+export type { SupabaseEnvironment } from '../../auth/supabaseConfig'
+
 export const invalidSupabaseConfigurationMessage =
   'Supabase configuration is invalid. Check the public project URL and anonymous key.'
 

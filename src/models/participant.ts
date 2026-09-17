@@ -102,17 +102,6 @@ export function validateParticipant(
     })
   }
 
-  if (
-    isPositiveFiniteNumber(input.startingWeightKg) &&
-    isPositiveFiniteNumber(input.targetWeightKg) &&
-    input.targetWeightKg > input.startingWeightKg
-  ) {
-    issues.push({
-      field: 'targetWeightKg',
-      message: 'Target weight must be on or below starting weight.',
-    })
-  }
-
   if (input.joinedAt !== undefined && !isValidDateTime(input.joinedAt)) {
     issues.push({
       field: 'joinedAt',

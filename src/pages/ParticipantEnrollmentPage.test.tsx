@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 
@@ -6,6 +12,7 @@ import { ParticipantEnrollmentPage } from './ParticipantEnrollmentPage'
 
 afterEach(() => {
   cleanup()
+  window.localStorage.clear()
 })
 
 function renderPage() {
@@ -37,7 +44,7 @@ describe('ParticipantEnrollmentPage', () => {
     ).toBeInTheDocument()
   })
 
-  it('rejects a target above the starting weight', () => {
+  it('accepts a positive target above the starting weight for a gain goal', async () => {
     renderPage()
 
     fireEvent.change(screen.getByLabelText('Display name'), {
@@ -54,15 +61,16 @@ describe('ParticipantEnrollmentPage', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Enroll participant' }))
 
-    expect(
-      screen.getByText('Target weight must be on or below starting weight.'),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByText('No participants enrolled yet.'),
-    ).toBeInTheDocument()
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          'Alex Participant was enrolled in the local challenge.',
+        ),
+      ).toBeInTheDocument()
+    })
   })
 
-  it('enrolls a valid participant into local typed state', () => {
+  it('enrolls a valid participant into local persisted state', async () => {
     renderPage()
 
     fireEvent.change(screen.getByLabelText('Display name'), {
@@ -79,9 +87,13 @@ describe('ParticipantEnrollmentPage', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Enroll participant' }))
 
-    expect(
-      screen.getByText('Alex Participant was enrolled in the local challenge.'),
-    ).toBeInTheDocument()
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          'Alex Participant was enrolled in the local challenge.',
+        ),
+      ).toBeInTheDocument()
+    })
     expect(screen.getByText('Alex Participant')).toBeInTheDocument()
     expect(screen.getByText('92.5 kg → 80 kg')).toBeInTheDocument()
     expect(

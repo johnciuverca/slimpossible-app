@@ -2,6 +2,7 @@ import { createContext, type ReactNode } from 'react'
 
 export type AuthUser = {
   email: string
+  id?: string
 }
 
 export type AuthState =
