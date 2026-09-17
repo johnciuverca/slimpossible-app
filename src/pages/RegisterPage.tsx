@@ -8,10 +8,7 @@ import {
   StatusPill,
   TextInput,
 } from '../components/ui'
-import {
-  getSupabaseConfiguration,
-  missingSupabaseConfigurationMessage,
-} from '../auth/supabaseConfig'
+import { useAuth } from '../auth/useAuth'
 import { isValidEmail } from './authValidation'
 
 type RegisterErrors = {
@@ -55,6 +52,7 @@ function validateRegistration(
 }
 
 export function RegisterPage() {
+  const { signUp, state } = useAuth()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -63,7 +61,7 @@ export function RegisterPage() {
   const [submitError, setSubmitError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
     const nextErrors = validateRegistration(
@@ -79,19 +77,9 @@ export function RegisterPage() {
       return
     }
 
-    if (getSupabaseConfiguration().state === 'missing-configuration') {
-      setSubmitError(missingSupabaseConfigurationMessage)
-      return
-    }
-
     setIsSubmitting(true)
-
-    window.setTimeout(() => {
-      setIsSubmitting(false)
-      setSubmitError(
-        'Remote registration is not configured in this local preview yet.',
-      )
-    }, 300)
+    await signUp(name, email, password)
+    setIsSubmitting(false)
   }
 
   return (
@@ -151,9 +139,25 @@ export function RegisterPage() {
             value={confirmPassword}
           />
 
-          {submitError ? (
-            <p aria-live="polite" className="text-sm text-red-700" role="alert">
-              {submitError}
+          {state.status === 'error' ||
+          state.status === 'verification-pending' ||
+          state.status === 'signed-in' ||
+          submitError ? (
+            <p
+              aria-live="polite"
+              className={
+                state.status === 'error' || submitError
+                  ? 'text-sm text-red-700'
+                  : 'text-sm text-emerald-700'
+              }
+            >
+              {state.status === 'error'
+                ? state.error
+                : state.status === 'verification-pending'
+                  ? 'Account created. Check your email to verify your account before signing in.'
+                  : state.status === 'signed-in'
+                    ? 'Account created and signed in successfully.'
+                    : submitError}
             </p>
           ) : null}
 
