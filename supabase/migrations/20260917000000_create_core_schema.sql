@@ -39,9 +39,7 @@ create table public.participants (
     status in ('invited', 'active', 'completed', 'withdrawn')
   ),
   starting_weight_kg numeric(6, 2) not null check (starting_weight_kg > 0),
-  target_weight_kg numeric(6, 2) not null check (
-    target_weight_kg > 0 and target_weight_kg <= starting_weight_kg
-  ),
+  target_weight_kg numeric(6, 2) not null check (target_weight_kg > 0),
   joined_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),

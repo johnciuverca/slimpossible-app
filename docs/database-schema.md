@@ -11,7 +11,10 @@ Issue #117 adds the first version-controlled Supabase migration at
   lifecycle status, and timestamps.
 - `participants` is the challenge membership record. Each membership connects
   one profile to one challenge and stores the participant's display name,
-  lifecycle status, starting weight, and target weight.
+  lifecycle status, starting weight, and target weight. Both weights must be
+  positive, while the target may be lower than, equal to, or higher than the
+  starting weight to support loss, maintenance, and gain goals, including
+  normal day-to-day fluctuations.
 - `weigh_ins` stores one dated weight record for a participant. Its unique
   `(participant_id, recorded_date)` constraint prevents duplicate same-day
   records.
@@ -25,12 +28,11 @@ auth.users -> profiles -> challenges
 
 ## Integrity rules
 
-The migration rejects blank names, non-positive weights, participant targets
-above their starting weight, invalid challenge date ranges, invalid lifecycle
-statuses, active memberships without `joined_at`, duplicate challenge/profile
-memberships, and duplicate participant/date weigh-ins. Indexes support owner
-lookups, challenge membership/status queries, and date-based weekly weigh-in
-calculations.
+The migration rejects blank names, non-positive weights, invalid challenge date
+ranges, invalid lifecycle statuses, active memberships without `joined_at`,
+duplicate challenge/profile memberships, and duplicate participant/date
+weigh-ins. Indexes support owner lookups, challenge membership/status queries,
+and date-based weekly weigh-in calculations.
 
 There is no demo data in the migration. Row-level security, policies,
 repositories, persistence flows, activity checks, and application-side
