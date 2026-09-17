@@ -78,8 +78,10 @@ registration is not configured; it does not sign a user in, create an account,
 or persist a session. The protected routes only demonstrate client-side route
 behavior; they are not production access control.
 
-No environment variables or secrets are required to run the project today.
-For the future remote-auth direction and its security boundary, see
+No environment variables are required to run the project today. Future remote
+authentication uses the owner-provided public `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_ANON_KEY` values from `.env.local`; missing values keep remote
+authentication safely unavailable. For the exact local and Vercel setup, see
 [docs/authentication.md](docs/authentication.md).
 
 ## Environment-variable policy

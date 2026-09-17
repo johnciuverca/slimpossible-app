@@ -1,13 +1,12 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 
 import { RegisterPage } from './RegisterPage'
 
 describe('RegisterPage', () => {
   afterEach(() => {
     cleanup()
-    vi.useRealTimers()
   })
 
   it('validates fields and password confirmation accessibly', () => {
@@ -41,9 +40,7 @@ describe('RegisterPage', () => {
     expect(screen.getByText('Passwords must match.')).toBeInTheDocument()
   })
 
-  it('shows loading and local fallback error states for valid input', () => {
-    vi.useFakeTimers()
-
+  it('shows configuration guidance without starting a remote request', () => {
     render(
       <MemoryRouter>
         <RegisterPage />
@@ -64,16 +61,8 @@ describe('RegisterPage', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
 
-    expect(
-      screen.getByRole('button', { name: 'Creating account…' }),
-    ).toBeDisabled()
-
-    act(() => {
-      vi.advanceTimersByTime(300)
-    })
-
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'Remote registration is not configured in this local preview yet.',
+      'Remote authentication is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
     )
     expect(screen.getByRole('button', { name: 'Create account' })).toBeEnabled()
   })

@@ -8,6 +8,10 @@ import {
   StatusPill,
   TextInput,
 } from '../components/ui'
+import {
+  getSupabaseConfiguration,
+  missingSupabaseConfigurationMessage,
+} from '../auth/supabaseConfig'
 import { isValidEmail } from './authValidation'
 
 type RegisterErrors = {
@@ -72,6 +76,11 @@ export function RegisterPage() {
     setSubmitError('')
 
     if (Object.keys(nextErrors).length > 0) {
+      return
+    }
+
+    if (getSupabaseConfiguration().state === 'missing-configuration') {
+      setSubmitError(missingSupabaseConfigurationMessage)
       return
     }
 

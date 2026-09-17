@@ -20,6 +20,6 @@ test('shows accessible registration validation and local fallback', async ({
   await page.getByRole('button', { name: 'Create account' }).click()
 
   await expect(page.getByRole('alert')).toHaveText(
-    'Remote registration is not configured in this local preview yet.',
+    'Remote authentication is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
   )
 })
