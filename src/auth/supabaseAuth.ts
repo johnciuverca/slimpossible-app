@@ -34,6 +34,25 @@ export function mapSupabaseAuthError(
 
 export function createSupabaseAuthGateway(): AuthGateway {
   return {
+    async getSession() {
+      const result = createSupabaseBrowserClient()
+      if (result.state === 'missing-configuration') return null
+      if (result.state !== 'configured') throw new Error(result.message)
+      const { data, error } = await result.client.auth.getSession()
+      if (error)
+        throw new Error('We could not restore your session. Try again.')
+      return data.session?.user ? mapUser(data.session.user) : null
+    },
+    onAuthStateChange(callback) {
+      const result = createSupabaseBrowserClient()
+      if (result.state !== 'configured') return () => undefined
+      const { data } = result.client.auth.onAuthStateChange(
+        (_event, session) => {
+          callback(session?.user ? mapUser(session.user) : null)
+        },
+      )
+      return () => data.subscription.unsubscribe()
+    },
     async signIn(email, password) {
       const result = createSupabaseBrowserClient()
       if (result.state !== 'configured') throw new Error(result.message)
@@ -59,6 +78,13 @@ export function createSupabaseAuthGateway(): AuthGateway {
         needsVerification: !data.session,
         user: data.user ? mapUser(data.user) : null,
       }
+    },
+    async signOut() {
+      const result = createSupabaseBrowserClient()
+      if (result.state === 'missing-configuration') return
+      if (result.state !== 'configured') throw new Error(result.message)
+      const { error } = await result.client.auth.signOut()
+      if (error) throw new Error('We could not sign you out. Try again.')
     },
   }
 }

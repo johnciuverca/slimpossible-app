@@ -1,6 +1,14 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+const signedOutGateway = {
+  getSession: async () => null,
+  onAuthStateChange: () => () => undefined,
+  signIn: async () => ({ email: 'person@example.com', id: 'user-1' }),
+  signOut: async () => undefined,
+  signUp: async () => ({ needsVerification: false, user: null }),
+}
+
 import { AuthProvider } from './AuthContext'
 import { useAuth } from './useAuth'
 
@@ -31,19 +39,19 @@ describe('AuthContext', () => {
     vi.useRealTimers()
   })
 
-  it('starts loading and settles into a signed-out local session', () => {
+  it('restores a signed-out session without exposing protected content', async () => {
     vi.useFakeTimers()
-
     render(
-      <AuthProvider>
+      <AuthProvider authGateway={signedOutGateway}>
         <AuthHarness />
       </AuthProvider>,
     )
 
     expect(screen.getByText('loading')).toBeInTheDocument()
 
-    act(() => {
+    await act(async () => {
       vi.advanceTimersByTime(150)
+      await Promise.resolve()
     })
 
     expect(screen.getByText('signed-out')).toBeInTheDocument()
@@ -55,11 +63,14 @@ describe('AuthContext', () => {
     render(
       <AuthProvider
         authGateway={{
+          getSession: async () => null,
+          onAuthStateChange: () => () => undefined,
           signIn: async () => ({ email: 'person@example.com', id: 'user-1' }),
           signUp: async () => ({
             needsVerification: false,
             user: { email: 'person@example.com', id: 'user-1' },
           }),
+          signOut: async () => undefined,
         }}
         initialState={{ error: null, status: 'signed-out', user: null }}
       >
