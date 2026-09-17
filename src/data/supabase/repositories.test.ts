@@ -26,6 +26,25 @@ afterEach(() => {
 })
 
 describe('Supabase repositories', () => {
+  it('upserts and maps the authenticated profile identity', async () => {
+    stubResponse({
+      created_at: '2026-09-17T10:00:00.000Z',
+      display_name: 'Participant',
+      id: 'user-1',
+      updated_at: '2026-09-17T10:00:00.000Z',
+    })
+
+    const result = await createRepositories(client).profiles.ensure({
+      displayName: 'Participant',
+      id: 'user-1',
+    })
+
+    expect(result).toEqual({
+      data: { displayName: 'Participant', id: 'user-1' },
+      state: 'success',
+    })
+  })
+
   it('creates and maps a challenge through the repository', async () => {
     stubResponse({
       created_at: '2026-09-17T10:00:00.000Z',

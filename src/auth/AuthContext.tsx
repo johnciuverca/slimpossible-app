@@ -27,11 +27,12 @@ export function AuthProvider({
     const timerId = window.setTimeout(() => {
       void authGateway
         .getSession()
-        .then((user) =>
+        .then(async (user) => {
+          if (user) await authGateway.ensureProfile(user)
           setState(
             user ? { error: null, status: 'signed-in', user } : signedOutState,
-          ),
-        )
+          )
+        })
         .catch((error) =>
           setState({
             error:
@@ -55,9 +56,27 @@ export function AuthProvider({
     const cancelRestore = restoreSession()
     const unsubscribe = authGateway.onAuthStateChange((user) => {
       if (active) {
-        setState(
-          user ? { error: null, status: 'signed-in', user } : signedOutState,
-        )
+        if (!user) {
+          setState(signedOutState)
+          return
+        }
+        void authGateway
+          .ensureProfile(user)
+          .then(() => {
+            if (active) setState({ error: null, status: 'signed-in', user })
+          })
+          .catch((error) => {
+            if (active) {
+              setState({
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : 'We could not initialize your profile.',
+                status: 'error',
+                user: null,
+              })
+            }
+          })
       }
     })
     return () => {
@@ -91,6 +110,7 @@ export function AuthProvider({
       setState(loadingState)
       try {
         const user = await authGateway.signIn(email.trim(), password)
+        await authGateway.ensureProfile(user)
         setState({ error: null, status: 'signed-in', user })
       } catch (error) {
         setState({
@@ -108,6 +128,7 @@ export function AuthProvider({
       setState(loadingState)
       try {
         const result = await authGateway.signUp(name, email.trim(), password)
+        if (result.user) await authGateway.ensureProfile(result.user)
         setState(
           result.needsVerification || !result.user
             ? { error: null, status: 'verification-pending', user: null }
