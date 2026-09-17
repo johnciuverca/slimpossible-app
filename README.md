@@ -109,10 +109,12 @@ Track work in the
 5. After the merge, the owner can close any still-open linked issue and update
    the Project status.
 
-The app is not deployed yet. A public Vercel preview is a future handoff for
-issue #102 and requires the project owner to create and configure their own
-Vercel account. This repository currently contains no Vercel deployment
-configuration.
+The app is not deployed yet. `vercel.json` prepares the Vite SPA for static
+hosting and direct client-side routes, but it does not create an account or a
+deployment. A public Vercel preview is a future handoff for issue #102 and
+requires the project owner to create and configure their own Vercel account.
+See [docs/deployment.md](docs/deployment.md) for the build output, route
+fallback, and owner handoff.
 
 ## Code style
 
