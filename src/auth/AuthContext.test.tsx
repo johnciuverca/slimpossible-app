@@ -89,4 +89,35 @@ describe('AuthContext', () => {
     expect(screen.getByText('person@example.com')).toBeInTheDocument()
     expect(screen.queryByText('password')).not.toBeInTheDocument()
   })
+
+  it('does not initialize a profile before email verification', async () => {
+    const ensureProfile = vi.fn(async () => undefined)
+
+    render(
+      <AuthProvider
+        authGateway={{
+          ensureProfile,
+          getSession: async () => null,
+          onAuthStateChange: () => () => undefined,
+          signIn: async () => ({ email: 'person@example.com', id: 'user-1' }),
+          signOut: async () => undefined,
+          signUp: async () => ({
+            needsVerification: true,
+            user: { email: 'person@example.com', id: 'user-1' },
+          }),
+        }}
+        initialState={{ error: null, status: 'signed-out', user: null }}
+      >
+        <AuthHarness />
+      </AuthProvider>,
+    )
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Sign up' }))
+      await Promise.resolve()
+    })
+
+    expect(screen.getByText('verification-pending')).toBeInTheDocument()
+    expect(ensureProfile).not.toHaveBeenCalled()
+  })
 })

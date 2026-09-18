@@ -70,6 +70,13 @@ profile table. Participant records use that same authenticated profile ID as
 ownership. Profile initialization failures remain visible as a retryable auth
 state; no local fake profile is presented as remote persistence.
 
+Issue #144 keeps confirmation-required sign-up anonymous: a profile write is
+attempted only after a session-bearing sign-up, sign-in, or restored session.
+Existing profile display names are preserved, and delayed restore/profile work
+is discarded after logout or an account change. Live confirmation still needs
+the owner-managed test project and dedicated mailbox described in the staging
+setup handoff.
+
 Any future remote-auth work must document its exact variables, keep secrets in
 the service's secret store or ignored local files, and avoid committing real
 values. A browser-safe publishable key may be exposed only when the provider's

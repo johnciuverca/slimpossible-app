@@ -347,9 +347,24 @@ export function createRepositories(client: DatabaseClient): Repositories {
     },
     profiles: {
       async ensure(input) {
+        const existing = await client
+          .from('profiles')
+          .select('*')
+          .eq('id', input.id)
+          .maybeSingle()
+
+        if (existing.error) {
+          return {
+            error: requestError('load the profile', existing.error),
+            state: 'error',
+          }
+        }
+        if (existing.data)
+          return mapSingle(existing.data, mapProfile, 'profile')
+
         const { data, error } = await client
           .from('profiles')
-          .upsert({ id: input.id, display_name: input.displayName })
+          .insert({ id: input.id, display_name: input.displayName })
           .select('*')
           .single()
 

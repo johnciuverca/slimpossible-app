@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { AuthContext, type AuthProviderProps, type AuthState } from './context'
 import { createSupabaseAuthGateway } from './supabaseAuth'
@@ -24,26 +24,31 @@ export function AuthProvider({
   const [fallbackAuthGateway] = useState(createSupabaseAuthGateway)
   const authGateway = providedAuthGateway ?? fallbackAuthGateway
   const [state, setState] = useState<AuthState>(initialState ?? loadingState)
+  const operationRef = useRef(0)
 
   const restoreSession = useCallback(() => {
+    const operation = ++operationRef.current
     const timerId = window.setTimeout(() => {
       void authGateway
         .getSession()
         .then(async (user) => {
           if (user) await authGateway.ensureProfile(user)
+          if (operationRef.current !== operation) return
           setState(
             user ? { error: null, status: 'signed-in', user } : signedOutState,
           )
         })
-        .catch((error) =>
-          setState({
-            error:
-              error instanceof Error
-                ? error.message
-                : 'We could not restore your session. Try again.',
-            status: 'error',
-            user: null,
-          }),
+        .catch(
+          (error) =>
+            operationRef.current === operation &&
+            setState({
+              error:
+                error instanceof Error
+                  ? error.message
+                  : 'We could not restore your session. Try again.',
+              status: 'error',
+              user: null,
+            }),
         )
     }, 150)
     return () => window.clearTimeout(timerId)
@@ -59,16 +64,19 @@ export function AuthProvider({
     const unsubscribe = authGateway.onAuthStateChange((user) => {
       if (active) {
         if (!user) {
+          ++operationRef.current
           setState(signedOutState)
           return
         }
+        const operation = ++operationRef.current
         void authGateway
           .ensureProfile(user)
           .then(() => {
-            if (active) setState({ error: null, status: 'signed-in', user })
+            if (active && operationRef.current === operation)
+              setState({ error: null, status: 'signed-in', user })
           })
           .catch((error) => {
-            if (active) {
+            if (active && operationRef.current === operation) {
               setState({
                 error:
                   error instanceof Error
@@ -94,6 +102,7 @@ export function AuthProvider({
   }, [restoreSession])
 
   const signOut = useCallback(async () => {
+    ++operationRef.current
     setState(signedOutState)
     try {
       await authGateway.signOut()
@@ -109,10 +118,12 @@ export function AuthProvider({
 
   const signIn = useCallback(
     async (email: string, password: string) => {
+      const operation = ++operationRef.current
       setState(loadingState)
       try {
         const user = await authGateway.signIn(email.trim(), password)
         await authGateway.ensureProfile(user)
+        if (operationRef.current !== operation) return
         setState({ error: null, status: 'signed-in', user })
       } catch (error) {
         setState({
@@ -127,10 +138,13 @@ export function AuthProvider({
 
   const signUp = useCallback(
     async (name: string, email: string, password: string) => {
+      const operation = ++operationRef.current
       setState(loadingState)
       try {
         const result = await authGateway.signUp(name, email.trim(), password)
-        if (result.user) await authGateway.ensureProfile(result.user)
+        if (result.user && !result.needsVerification)
+          await authGateway.ensureProfile(result.user)
+        if (operationRef.current !== operation) return
         setState(
           result.needsVerification || !result.user
             ? { error: null, status: 'verification-pending', user: null }
