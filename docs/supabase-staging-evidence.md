@@ -12,10 +12,19 @@ database migrations have executed.
   in the GitHub Actions configuration check.
 - No health request was made and no response body was logged.
 
+## 2026-09-18 — activity workflow rerun
+
+- Run: [35335247840](https://github.com/johnciuverca/slimpossible-app/actions/runs/35335247840)
+- Result: **blocked before network response**
+- Redacted reason: both secrets passed the presence check, but `curl` rejected
+  the configured `SUPABASE_URL` as malformed input.
+- No HTTP status or response body was received or logged.
+
 ## Pending live evidence
 
-- Owner must populate the GitHub Actions `SUPABASE_ANON_KEY` secret with the
-  public anonymous key, then rerun the read-only workflow.
+- Owner must correct the GitHub Actions `SUPABASE_URL` secret to the exact
+  `https://<project-ref>.supabase.co` form with no quotes, whitespace,
+  placeholder text, or path suffix, then rerun the read-only workflow.
 - Owner must apply both checked-in migrations through the approved Supabase SQL
   Editor or authorized migration workflow and provide redacted success evidence.
 - Tables, constraints, RLS policies, local/preview project targeting, and
