@@ -6,6 +6,10 @@ const guide = readFileSync(
   resolve(process.cwd(), 'docs/supabase-staging-setup.md'),
   'utf8',
 )
+const evidence = readFileSync(
+  resolve(process.cwd(), 'docs/supabase-staging-evidence.md'),
+  'utf8',
+)
 const schema = readFileSync(
   resolve(
     process.cwd(),
@@ -54,5 +58,12 @@ describe('Supabase staging setup contract', () => {
   it('does not permit privileged credentials in the browser path', () => {
     expect(guide).not.toContain('VITE_SUPABASE_SERVICE_ROLE_KEY')
     expect(guide).toContain('service-role key')
+  })
+
+  it('keeps live evidence distinct from prepared or mocked checks', () => {
+    expect(evidence).toContain('blocked before request')
+    expect(evidence).toContain('not verified live')
+    expect(evidence).toContain('SUPABASE_ANON_KEY')
+    expect(evidence).not.toContain('SUPABASE_SERVICE_ROLE_KEY')
   })
 })
