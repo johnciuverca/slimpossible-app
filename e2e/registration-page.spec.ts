@@ -19,7 +19,12 @@ test('shows accessible registration validation and local fallback', async ({
   await page.getByLabel('Confirm password').fill('password123')
   await page.getByRole('button', { name: 'Create account' }).click()
 
-  await expect(page.getByRole('alert')).toHaveText(
-    'Remote authentication is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
-  )
+  await expect(
+    page
+      .getByRole('form', { name: 'Registration form' })
+      .getByText(
+        'Remote authentication is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
+        { exact: true },
+      ),
+  ).toBeVisible()
 })
