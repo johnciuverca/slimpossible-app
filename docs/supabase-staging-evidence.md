@@ -29,14 +29,26 @@ database migrations have executed.
 - This verifies only the configured Auth health request; it does not verify
   migrations, tables, constraints, RLS, or application persistence.
 
+## 2026-09-18 — owner-reported migration execution
+
+- Environment: authorized empty/non-production Supabase project, ref
+  `xtpbjhdzerdgaaxnsbtu`.
+- `20260917000000_create_core_schema.sql`: **owner reported success**.
+- `20260917000001_add_rls_policies.sql`: **owner reported success**.
+- Supabase Table Editor reportedly shows `public.profiles`,
+  `public.challenges`, `public.participants`, and `public.weigh_ins`.
+- No passwords, privileged keys, secret values, response bodies, or row data
+  were shared. This is recorded as owner-reported evidence, not an independent
+  SQL-session observation.
+
 ## Pending live evidence
 
 - The read-only activity check is now verified live. Migration execution and
   database/RLS evidence remain pending.
 - Owner must apply both checked-in migrations through the approved Supabase SQL
   Editor or authorized migration workflow and provide redacted success evidence.
-- Tables, constraints, RLS policies, local/preview project targeting, and
-  authenticated persistence/ownership flows remain **not verified live**.
+- Constraint/RLS behavior, local/preview project targeting, and authenticated
+  persistence/ownership flows remain **not verified live**.
 
 No passwords, service-role keys, database credentials, project tokens, or
 secret values belong in this file or in issue/PR comments.
