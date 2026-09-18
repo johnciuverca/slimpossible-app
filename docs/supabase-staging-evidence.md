@@ -20,11 +20,19 @@ database migrations have executed.
   the configured `SUPABASE_URL` as malformed input.
 - No HTTP status or response body was received or logged.
 
+## 2026-09-18 — activity workflow success
+
+- Run: [35335643126](https://github.com/johnciuverca/slimpossible-app/actions/runs/35335643126)
+- Result: **verified live read-only activity check**
+- The workflow completed successfully after the owner corrected the URL
+  configuration.
+- This verifies only the configured Auth health request; it does not verify
+  migrations, tables, constraints, RLS, or application persistence.
+
 ## Pending live evidence
 
-- Owner must correct the GitHub Actions `SUPABASE_URL` secret to the exact
-  `https://<project-ref>.supabase.co` form with no quotes, whitespace,
-  placeholder text, or path suffix, then rerun the read-only workflow.
+- The read-only activity check is now verified live. Migration execution and
+  database/RLS evidence remain pending.
 - Owner must apply both checked-in migrations through the approved Supabase SQL
   Editor or authorized migration workflow and provide redacted success evidence.
 - Tables, constraints, RLS policies, local/preview project targeting, and
