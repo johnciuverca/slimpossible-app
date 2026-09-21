@@ -85,16 +85,25 @@ function validateChallengeSetup({
 export function ChallengeSetupPage() {
   const { state: authState } = useOptionalAuth()
   const persistence = useMemo(() => createPersistence(authState), [authState])
+  const ownerId =
+    authState.status === 'signed-in' && authState.user.id
+      ? authState.user.id
+      : 'local-owner'
   const [values, setValues] = useState(initialValues)
+  const [challenges, setChallenges] = useState<Challenge[]>([])
+  const [selectedChallengeId, setSelectedChallengeId] = useState('')
   const [errors, setErrors] = useState<ChallengeSetupErrors>({})
   const [isLoading, setIsLoading] = useState(true)
   const [isSaved, setIsSaved] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [savedChallenge, setSavedChallenge] = useState<Challenge | null>(null)
   const [submitError, setSubmitError] = useState('')
 
   useEffect(() => {
     let isCurrent = true
+    setIsLoading(true)
+    setChallenges([])
+    setSelectedChallengeId('')
+    setValues(initialValues)
 
     async function loadSavedChallenge() {
       if (persistence.mode === 'unavailable') {
@@ -105,7 +114,8 @@ export function ChallengeSetupPage() {
         return
       }
 
-      const result = await persistence.repositories.challenges.listOwned()
+      const result =
+        await persistence.repositories.challenges.listOwned(ownerId)
       if (!isCurrent) {
         return
       }
@@ -116,25 +126,38 @@ export function ChallengeSetupPage() {
         return
       }
 
+      setChallenges(result.state === 'success' ? result.data : [])
       setIsLoading(false)
-      if (result.state === 'success') {
-        const challenge = result.data[0]
-        setSavedChallenge(challenge)
-        setValues({
-          description: challenge.description ?? '',
-          endDate: challenge.endDate,
-          name: challenge.name,
-          startDate: challenge.startDate,
-          targetWeightKg: challenge.targetWeightKg?.toString() ?? '',
-        })
-      }
     }
 
     void loadSavedChallenge()
     return () => {
       isCurrent = false
     }
-  }, [persistence])
+  }, [ownerId, persistence])
+
+  function selectChallenge(id: string) {
+    setSelectedChallengeId(id)
+    const challenge = challenges.find((value) => value.id === id)
+    setValues(
+      challenge
+        ? {
+            description: challenge.description ?? '',
+            endDate: challenge.endDate,
+            name: challenge.name,
+            startDate: challenge.startDate,
+            targetWeightKg: challenge.targetWeightKg?.toString() ?? '',
+          }
+        : initialValues,
+    )
+    setErrors({})
+    setIsSaved(false)
+    setSubmitError('')
+  }
+
+  function startNewChallenge() {
+    selectChallenge('')
+  }
 
   function updateValue(field: keyof ChallengeSetupValues, value: string) {
     setValues((currentValues) => ({ ...currentValues, [field]: value }))
@@ -159,10 +182,6 @@ export function ChallengeSetupPage() {
       return
     }
 
-    const ownerId =
-      authState.status === 'signed-in' && authState.user.id
-        ? authState.user.id
-        : 'local-owner'
     setIsSaving(true)
 
     const input = {
@@ -178,9 +197,9 @@ export function ChallengeSetupPage() {
         ? Number(values.targetWeightKg)
         : undefined,
     }
-    const result = savedChallenge
+    const result = selectedChallengeId
       ? await persistence.repositories.challenges.update(
-          savedChallenge.id,
+          selectedChallengeId,
           input,
         )
       : await persistence.repositories.challenges.create(input)
@@ -198,7 +217,16 @@ export function ChallengeSetupPage() {
       return
     }
 
-    setSavedChallenge(result.data)
+    setChallenges((currentChallenges) => {
+      const existingIndex = currentChallenges.findIndex(
+        (challenge) => challenge.id === result.data.id,
+      )
+      if (existingIndex < 0) return [result.data, ...currentChallenges]
+      return currentChallenges.map((challenge) =>
+        challenge.id === result.data.id ? result.data : challenge,
+      )
+    })
+    setSelectedChallengeId(result.data.id)
     setIsSaved(true)
   }
 
@@ -228,6 +256,47 @@ export function ChallengeSetupPage() {
           noValidate
           onSubmit={handleSubmit}
         >
+          {!isLoading && challenges.length > 0 ? (
+            <div>
+              <label
+                className="text-sm font-semibold text-slate-700"
+                htmlFor="saved-challenge"
+              >
+                Saved challenge
+              </label>
+              <div className="mt-2 flex flex-wrap gap-3">
+                <select
+                  className="min-w-0 flex-1 rounded-xl border border-stone-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                  id="saved-challenge"
+                  onChange={(event) => selectChallenge(event.target.value)}
+                  value={selectedChallengeId}
+                >
+                  <option value="">Create a new challenge</option>
+                  {challenges.map((challenge) => (
+                    <option key={challenge.id} value={challenge.id}>
+                      {challenge.name}
+                    </option>
+                  ))}
+                </select>
+                {selectedChallengeId ? (
+                  <Button
+                    onClick={startNewChallenge}
+                    type="button"
+                    variant="secondary"
+                  >
+                    New challenge
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          {!isLoading && challenges.length === 0 && !submitError ? (
+            <p className="text-sm text-slate-600" role="status">
+              No saved challenges yet. Create your first challenge below.
+            </p>
+          ) : null}
+
           <TextInput
             autoComplete="off"
             error={errors.name}
@@ -317,8 +386,20 @@ export function ChallengeSetupPage() {
             </p>
           ) : null}
 
-          <Button className="w-full" disabled={isSaving} type="submit">
-            {isSaving ? 'Saving challenge…' : 'Save challenge'}
+          <Button
+            className="w-full"
+            disabled={
+              isSaving ||
+              persistence.mode === 'unavailable' ||
+              (persistence.mode === 'remote' && isLoading)
+            }
+            type="submit"
+          >
+            {isSaving
+              ? 'Saving challenge…'
+              : selectedChallengeId
+                ? 'Update challenge'
+                : 'Save challenge'}
           </Button>
         </form>
 

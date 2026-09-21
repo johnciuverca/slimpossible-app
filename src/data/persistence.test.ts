@@ -58,7 +58,9 @@ describe('challenge and participant persistence', () => {
       throw new Error('Expected local persistence without public configuration')
     }
 
-    await expect(second.repositories.challenges.listOwned()).resolves.toEqual({
+    await expect(
+      second.repositories.challenges.listOwned('local-owner'),
+    ).resolves.toEqual({
       data: [challenge.data],
       state: 'success',
     })

@@ -145,7 +145,8 @@ describe('Supabase repositories', () => {
       },
     ])
 
-    const result = await createRepositories(client).challenges.listOwned()
+    const result =
+      await createRepositories(client).challenges.listOwned('owner-1')
 
     expect(result).toEqual({
       data: [
@@ -167,6 +168,15 @@ describe('Supabase repositories', () => {
     })
   })
 
+  it('scopes challenge listing to the authenticated owner', async () => {
+    stubResponse([])
+
+    await createRepositories(client).challenges.listOwned('owner-1')
+
+    const requestUrl = String(vi.mocked(fetch).mock.calls[0]?.[0])
+    expect(requestUrl).toContain('owner_id=eq.owner-1')
+  })
+
   it('returns an explicit empty state for an empty participant list', async () => {
     stubResponse([])
 
@@ -176,6 +186,15 @@ describe('Supabase repositories', () => {
       )
 
     expect(result).toEqual({ data: [], state: 'empty' })
+  })
+
+  it('scopes memberships to the authenticated user', async () => {
+    stubResponse([])
+
+    await createRepositories(client).participants.listForUser('user-1')
+
+    const requestUrl = String(vi.mocked(fetch).mock.calls[0]?.[0])
+    expect(requestUrl).toContain('user_id=eq.user-1')
   })
 
   it('updates and maps a participant through the repository', async () => {
@@ -253,8 +272,10 @@ describe('Supabase repositories', () => {
       403,
     )
 
-    const result =
-      await createRepositories(client).challenges.findOwnedById('challenge-1')
+    const result = await createRepositories(client).challenges.findOwnedById(
+      'challenge-1',
+      'owner-1',
+    )
 
     expect(result).toEqual({
       error: {

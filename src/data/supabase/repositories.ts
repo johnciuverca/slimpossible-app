@@ -29,8 +29,11 @@ type WeighInRow = Database['public']['Tables']['weigh_ins']['Row']
 
 export type ChallengeRepository = {
   create: (input: ChallengeWriteInput) => Promise<RepositoryResult<Challenge>>
-  findOwnedById: (id: string) => Promise<RepositoryResult<Challenge>>
-  listOwned: () => Promise<RepositoryListResult<Challenge>>
+  findOwnedById: (
+    id: string,
+    ownerId: string,
+  ) => Promise<RepositoryResult<Challenge>>
+  listOwned: (ownerId: string) => Promise<RepositoryListResult<Challenge>>
   update: (
     id: string,
     input: ChallengeWriteInput,
@@ -44,6 +47,7 @@ export type ParticipantRepository = {
   listForChallenge: (
     challengeId: string,
   ) => Promise<RepositoryListResult<Participant>>
+  listForUser: (userId: string) => Promise<RepositoryListResult<Participant>>
   update: (
     id: string,
     input: ParticipantWriteInput,
@@ -233,22 +237,24 @@ export function createRepositories(client: DatabaseClient): Repositories {
           ? { error: requestError('save the challenge', error), state: 'error' }
           : mapSingle(data, mapChallenge, 'challenge')
       },
-      async findOwnedById(id) {
+      async findOwnedById(id, ownerId) {
         const { data, error } = await client
           .from('challenges')
           .select('*')
           .eq('id', id)
+          .eq('owner_id', ownerId)
           .maybeSingle()
 
         return error
           ? { error: requestError('load the challenge', error), state: 'error' }
           : mapSingle(data, mapChallenge, 'challenge')
       },
-      async listOwned() {
+      async listOwned(ownerId) {
         const { data, error } = await client
           .from('challenges')
           .select('*')
           .order('created_at', { ascending: false })
+          .eq('owner_id', ownerId)
 
         return error
           ? {
@@ -273,6 +279,7 @@ export function createRepositories(client: DatabaseClient): Repositories {
               : { target_weight_kg: input.targetWeightKg }),
           })
           .eq('id', id)
+          .eq('owner_id', input.ownerId)
           .select('*')
           .maybeSingle()
 
@@ -317,6 +324,20 @@ export function createRepositories(client: DatabaseClient): Repositories {
         return error
           ? {
               error: requestError('load the participants', error),
+              state: 'error',
+            }
+          : mapList(data, mapParticipant, 'participant')
+      },
+      async listForUser(userId) {
+        const { data, error } = await client
+          .from('participants')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: true })
+
+        return error
+          ? {
+              error: requestError('load your challenge memberships', error),
               state: 'error',
             }
           : mapList(data, mapParticipant, 'participant')
