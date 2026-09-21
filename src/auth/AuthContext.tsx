@@ -86,7 +86,17 @@ export function AuthProvider({
 
       const key = userKey(user)
       currentUserKey.current = key
-      setState({ error: null, status: 'signed-in', user })
+      setState((currentState) => {
+        if (
+          currentState.status === 'signed-in' &&
+          currentState.user.id === user.id &&
+          currentState.user.email === user.email &&
+          currentState.user.displayName === user.displayName
+        ) {
+          return currentState
+        }
+        return { error: null, status: 'signed-in', user }
+      })
 
       // Supabase requires auth callbacks to return without starting another
       // Supabase request. Profile initialization is deliberately deferred.

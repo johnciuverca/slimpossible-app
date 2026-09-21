@@ -31,6 +31,13 @@ const challengeLoadTimeoutMs = 10_000
 const challengeLoadTimeoutMessage =
   'Saved challenges took too long to load. Check your connection and try again.'
 
+function reportChallengeLoadFailure(
+  reason: 'request' | 'timeout' | 'unexpected',
+) {
+  // Keep production diagnostics redacted: no user ids, form values, or provider responses.
+  console.warn('[Slimpossible] challenge load failure', { reason })
+}
+
 const initialValues: ChallengeSetupValues = {
   description: '',
   endDate: '',
@@ -155,12 +162,14 @@ export function ChallengeSetupPage() {
         }
 
         if (result.state === 'timeout' || didTimeout) {
+          reportChallengeLoadFailure('timeout')
           setSubmitError(challengeLoadTimeoutMessage)
           setIsLoading(false)
           return
         }
 
         if (result.state === 'error') {
+          reportChallengeLoadFailure('request')
           setSubmitError(result.error.message)
           setIsLoading(false)
           return
@@ -173,6 +182,7 @@ export function ChallengeSetupPage() {
         if (!isCurrent || requestGeneration !== loadGeneration.current) {
           return
         }
+        reportChallengeLoadFailure('unexpected')
         setSubmitError('Unable to load saved challenges. Try again.')
         setIsLoading(false)
       } finally {
