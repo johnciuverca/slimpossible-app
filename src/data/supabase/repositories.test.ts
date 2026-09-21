@@ -188,15 +188,6 @@ describe('Supabase repositories', () => {
     expect(result).toEqual({ data: [], state: 'empty' })
   })
 
-  it('scopes memberships to the authenticated user', async () => {
-    stubResponse([])
-
-    await createRepositories(client).participants.listForUser('user-1')
-
-    const requestUrl = String(vi.mocked(fetch).mock.calls[0]?.[0])
-    expect(requestUrl).toContain('user_id=eq.user-1')
-  })
-
   it('updates and maps a participant through the repository', async () => {
     stubResponse({
       challenge_id: 'challenge-1',

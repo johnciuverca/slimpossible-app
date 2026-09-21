@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 
 import { participantFixture } from '../models/fixtures'
-import type { Participant } from '../models/participant'
 import { sortWeighInsByDate, upsertWeighIn } from '../models/weighInStore'
 import type { WeighInValidationField } from '../models/weighIn'
 import type { WeighIn } from '../models/weighIn'
@@ -52,17 +51,7 @@ function mapValidationErrors(
 export function DailyWeighInFormPage() {
   const { state: authState } = useOptionalAuth()
   const persistence = useMemo(() => createPersistence(authState), [authState])
-  const authenticatedUserId =
-    authState.status === 'signed-in' && authState.user.id
-      ? authState.user.id
-      : ''
   const [values, setValues] = useState(initialValues)
-  const [memberships, setMemberships] = useState<Participant[]>([
-    participantFixture,
-  ])
-  const [selectedParticipantId, setSelectedParticipantId] = useState(
-    participantFixture.id,
-  )
   const [weighIns, setWeighIns] = useState<WeighIn[]>([])
   const [errors, setErrors] = useState<WeighInFormErrors>({})
   const [isLoading, setIsLoading] = useState(true)
@@ -75,9 +64,6 @@ export function DailyWeighInFormPage() {
     let isCurrent = true
 
     async function loadWeighIns() {
-      setIsLoading(true)
-      setWeighIns([])
-
       if (persistence.mode === 'unavailable') {
         if (isCurrent) {
           setSubmitError(persistence.message)
@@ -86,55 +72,9 @@ export function DailyWeighInFormPage() {
         return
       }
 
-      let participantId = participantFixture.id
-      if (persistence.mode === 'remote') {
-        if (!authenticatedUserId) {
-          setSubmitError(
-            'Sign in before loading your challenge membership and weigh-ins.',
-          )
-          setMemberships([])
-          setSelectedParticipantId('')
-          setIsLoading(false)
-          return
-        }
-
-        const membershipsResult =
-          await persistence.repositories.participants.listForUser(
-            authenticatedUserId,
-          )
-        if (!isCurrent) {
-          return
-        }
-
-        if (membershipsResult.state === 'error') {
-          setSubmitError(membershipsResult.error.message)
-          setMemberships([])
-          setSelectedParticipantId('')
-          setIsLoading(false)
-          return
-        }
-        if (membershipsResult.state === 'empty') {
-          setSubmitError(
-            'You are not enrolled in a challenge yet. Ask the challenge owner to add your account.',
-          )
-          setMemberships([])
-          setSelectedParticipantId('')
-          setIsLoading(false)
-          return
-        }
-
-        setMemberships(membershipsResult.data)
-        participantId = membershipsResult.data[0].id
-        setSelectedParticipantId(participantId)
-      } else {
-        setMemberships([participantFixture])
-        setSelectedParticipantId(participantId)
-      }
-
-      const result =
-        await persistence.repositories.weighIns.listForParticipant(
-          participantId,
-        )
+      const result = await persistence.repositories.weighIns.listForParticipant(
+        participantFixture.id,
+      )
       if (!isCurrent) {
         return
       }
@@ -151,34 +91,7 @@ export function DailyWeighInFormPage() {
     return () => {
       isCurrent = false
     }
-  }, [authenticatedUserId, persistence])
-
-  async function selectMembership(participantId: string) {
-    if (persistence.mode === 'unavailable') {
-      setSubmitError(persistence.message)
-      return
-    }
-    if (!memberships.some((membership) => membership.id === participantId)) {
-      setSubmitError(
-        'That challenge membership is not available to the signed-in account.',
-      )
-      return
-    }
-
-    setSelectedParticipantId(participantId)
-    setWeighIns([])
-    setSubmitError('')
-    setSuccessMessage('')
-    setIsLoading(true)
-    const result =
-      await persistence.repositories.weighIns.listForParticipant(participantId)
-    if (result.state === 'error') {
-      setSubmitError(result.error.message)
-    } else if (result.state === 'success') {
-      setWeighIns(result.data)
-    }
-    setIsLoading(false)
-  }
+  }, [persistence])
 
   function updateValue(field: WeighInFormField, value: string) {
     setValues((currentValues) => ({ ...currentValues, [field]: value }))
@@ -210,18 +123,10 @@ export function DailyWeighInFormPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (!selectedParticipantId) {
-      setSubmitError(
-        'Select an available challenge membership before saving a weigh-in.',
-      )
-      setSuccessMessage('')
-      return
-    }
-
     const input = {
       date: values.date,
       note: values.note.trim() || undefined,
-      participantId: selectedParticipantId,
+      participantId: participantFixture.id,
       weightKg: Number(values.weightKg),
     }
     const result = upsertWeighIn(weighIns, input)
@@ -285,11 +190,7 @@ export function DailyWeighInFormPage() {
       <div className="grid w-full gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]">
         <Card className="p-8 sm:p-10">
           <PageHeader
-            description={
-              persistence.mode === 'remote'
-                ? 'Record your weight for the selected challenge membership.'
-                : 'Record today’s weight for the local preview participant.'
-            }
+            description="Record today’s weight for the local preview participant."
             title="Daily weigh-in."
             titleId="daily-weigh-in-title"
           >
@@ -302,16 +203,9 @@ export function DailyWeighInFormPage() {
             </StatusPill>
           </PageHeader>
 
-          {selectedParticipantId ? (
-            <p className="mt-6 text-sm text-slate-600">
-              Participant:{' '}
-              <strong>
-                {memberships.find(
-                  (membership) => membership.id === selectedParticipantId,
-                )?.displayName ?? participantFixture.displayName}
-              </strong>
-            </p>
-          ) : null}
+          <p className="mt-6 text-sm text-slate-600">
+            Participant: <strong>{participantFixture.displayName}</strong>
+          </p>
 
           <form
             aria-label="Daily weigh-in form"
@@ -319,31 +213,6 @@ export function DailyWeighInFormPage() {
             noValidate
             onSubmit={handleSubmit}
           >
-            {persistence.mode === 'remote' && memberships.length > 0 ? (
-              <div>
-                <label
-                  className="text-sm font-semibold text-slate-700"
-                  htmlFor="weigh-in-challenge"
-                >
-                  Challenge membership
-                </label>
-                <select
-                  className="mt-2 block w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-                  id="weigh-in-challenge"
-                  onChange={(event) =>
-                    void selectMembership(event.target.value)
-                  }
-                  value={selectedParticipantId}
-                >
-                  {memberships.map((membership) => (
-                    <option key={membership.id} value={membership.id}>
-                      Challenge {membership.challengeId}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : null}
-
             <TextInput
               error={errors.date}
               id="daily-weigh-in-date"
@@ -414,14 +283,7 @@ export function DailyWeighInFormPage() {
             ) : null}
 
             <div className="flex flex-wrap gap-3">
-              <Button
-                disabled={
-                  isSaving ||
-                  (persistence.mode === 'remote' &&
-                    (isLoading || !selectedParticipantId))
-                }
-                type="submit"
-              >
+              <Button disabled={isSaving} type="submit">
                 {editingDate ? 'Update weigh-in' : 'Save weigh-in'}
               </Button>
               {editingDate ? (
@@ -446,9 +308,7 @@ export function DailyWeighInFormPage() {
 
         <Card aria-labelledby="local-weigh-ins-title" className="p-8 sm:p-10">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">
-            {persistence.mode === 'remote'
-              ? 'Your challenge weigh-ins'
-              : 'Local preview'}
+            Local preview
           </p>
           <h2
             className="mt-4 text-2xl font-bold tracking-tight text-slate-950"
@@ -463,11 +323,6 @@ export function DailyWeighInFormPage() {
               role="status"
             >
               Loading saved weigh-ins…
-            </p>
-          ) : persistence.mode === 'remote' && memberships.length === 0 ? (
-            <p className="mt-5 text-sm leading-6 text-slate-600">
-              {submitError ||
-                'No challenge memberships are available for this account.'}
             </p>
           ) : weighIns.length === 0 ? (
             <p className="mt-5 text-sm leading-6 text-slate-600">

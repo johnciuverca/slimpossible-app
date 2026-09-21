@@ -47,7 +47,6 @@ export type ParticipantRepository = {
   listForChallenge: (
     challengeId: string,
   ) => Promise<RepositoryListResult<Participant>>
-  listForUser: (userId: string) => Promise<RepositoryListResult<Participant>>
   update: (
     id: string,
     input: ParticipantWriteInput,
@@ -324,20 +323,6 @@ export function createRepositories(client: DatabaseClient): Repositories {
         return error
           ? {
               error: requestError('load the participants', error),
-              state: 'error',
-            }
-          : mapList(data, mapParticipant, 'participant')
-      },
-      async listForUser(userId) {
-        const { data, error } = await client
-          .from('participants')
-          .select('*')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: true })
-
-        return error
-          ? {
-              error: requestError('load your challenge memberships', error),
               state: 'error',
             }
           : mapList(data, mapParticipant, 'participant')

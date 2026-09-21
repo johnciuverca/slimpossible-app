@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 
-import type { Challenge } from '../models/challenge'
 import type {
   Participant,
   ParticipantValidationField,
@@ -53,12 +52,7 @@ function mapValidationErrors(
 export function ParticipantEnrollmentPage() {
   const { state: authState } = useOptionalAuth()
   const persistence = useMemo(() => createPersistence(authState), [authState])
-  const ownerId =
-    authState.status === 'signed-in' && authState.user.id
-      ? authState.user.id
-      : 'local-owner'
   const [values, setValues] = useState(initialValues)
-  const [challenges, setChallenges] = useState<Challenge[]>([])
   const [participants, setParticipants] = useState<Participant[]>([])
   const [errors, setErrors] = useState<EnrollmentErrors>({})
   const [isLoading, setIsLoading] = useState(true)
@@ -70,7 +64,7 @@ export function ParticipantEnrollmentPage() {
   useEffect(() => {
     let isCurrent = true
 
-    async function loadParticipants(nextChallengeId: string) {
+    async function loadParticipants() {
       if (persistence.mode === 'unavailable') {
         if (isCurrent) {
           setSubmitError(persistence.message)
@@ -78,6 +72,28 @@ export function ParticipantEnrollmentPage() {
         }
         return
       }
+
+      const challenges = await persistence.repositories.challenges.listOwned()
+      if (!isCurrent) {
+        return
+      }
+
+      if (challenges.state === 'error') {
+        setSubmitError(challenges.error.message)
+        setIsLoading(false)
+        return
+      }
+
+      const savedChallengeId =
+        challenges.state === 'success' ? challenges.data[0]?.id : undefined
+      if (persistence.mode === 'remote' && !savedChallengeId) {
+        setSubmitError('Create a challenge before enrolling participants.')
+        setIsLoading(false)
+        return
+      }
+
+      const nextChallengeId = savedChallengeId ?? localChallengeId
+      setChallengeId(nextChallengeId)
       const result =
         await persistence.repositories.participants.listForChallenge(
           nextChallengeId,
@@ -90,84 +106,15 @@ export function ParticipantEnrollmentPage() {
         setSubmitError(result.error.message)
       } else if (result.state === 'success') {
         setParticipants(result.data)
-      } else {
-        setParticipants([])
       }
       setIsLoading(false)
     }
 
-    async function loadChallengeAndParticipants() {
-      if (persistence.mode === 'unavailable') {
-        if (isCurrent) {
-          setSubmitError(persistence.message)
-          setIsLoading(false)
-        }
-        return
-      }
-
-      const savedChallenges =
-        await persistence.repositories.challenges.listOwned(ownerId)
-      if (!isCurrent) {
-        return
-      }
-
-      if (savedChallenges.state === 'error') {
-        setSubmitError(savedChallenges.error.message)
-        setIsLoading(false)
-        return
-      }
-
-      const savedChallengeList =
-        savedChallenges.state === 'success' ? savedChallenges.data : []
-      setChallenges(savedChallengeList)
-
-      const savedChallengeId = savedChallengeList[0]?.id
-      if (persistence.mode === 'remote' && !savedChallengeId) {
-        setSubmitError('Create a challenge before enrolling participants.')
-        setIsLoading(false)
-        return
-      }
-
-      const nextChallengeId = savedChallengeId ?? localChallengeId
-      setChallengeId(nextChallengeId)
-      await loadParticipants(nextChallengeId)
-    }
-
-    void loadChallengeAndParticipants()
+    void loadParticipants()
     return () => {
       isCurrent = false
     }
-  }, [ownerId, persistence])
-
-  async function selectChallenge(nextChallengeId: string) {
-    if (persistence.mode === 'unavailable') {
-      setSubmitError(persistence.message)
-      return
-    }
-    if (
-      persistence.mode === 'remote' &&
-      !challenges.some((challenge) => challenge.id === nextChallengeId)
-    ) {
-      setSubmitError('Select one of your saved challenges.')
-      return
-    }
-
-    setChallengeId(nextChallengeId)
-    setParticipants([])
-    setSubmitError('')
-    setSuccessMessage('')
-    setIsLoading(true)
-    const result =
-      await persistence.repositories.participants.listForChallenge(
-        nextChallengeId,
-      )
-    if (result.state === 'error') {
-      setSubmitError(result.error.message)
-    } else if (result.state === 'success') {
-      setParticipants(result.data)
-    }
-    setIsLoading(false)
-  }
+  }, [persistence])
 
   function updateValue(field: EnrollmentField, value: string) {
     setValues((currentValues) => ({ ...currentValues, [field]: value }))
@@ -187,12 +134,7 @@ export function ParticipantEnrollmentPage() {
       status: 'active',
       startingWeightKg: Number(values.startingWeightKg),
       targetWeightKg: Number(values.targetWeightKg),
-      userId:
-        persistence.mode === 'remote' &&
-        authState.status === 'signed-in' &&
-        authState.user.id
-          ? authState.user.id
-          : values.userId.trim(),
+      userId: values.userId.trim(),
     }
     const result = validateParticipant(candidate)
 
@@ -282,45 +224,15 @@ export function ParticipantEnrollmentPage() {
               type="text"
               value={values.displayName}
             />
-            {persistence.mode === 'remote' ? (
-              <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-                This membership will be linked to your signed-in account. No
-                participant identifier is entered manually.
-              </p>
-            ) : (
-              <TextInput
-                autoComplete="off"
-                error={errors.userId}
-                id="participant-user-id"
-                label="Participant identifier"
-                onChange={(event) => updateValue('userId', event.target.value)}
-                type="text"
-                value={values.userId}
-              />
-            )}
-
-            {persistence.mode === 'remote' && challenges.length > 0 ? (
-              <div>
-                <label
-                  className="text-sm font-semibold text-slate-700"
-                  htmlFor="membership-challenge"
-                >
-                  Challenge
-                </label>
-                <select
-                  className="mt-2 block w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-                  id="membership-challenge"
-                  onChange={(event) => void selectChallenge(event.target.value)}
-                  value={challengeId}
-                >
-                  {challenges.map((challenge) => (
-                    <option key={challenge.id} value={challenge.id}>
-                      {challenge.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : null}
+            <TextInput
+              autoComplete="off"
+              error={errors.userId}
+              id="participant-user-id"
+              label="Participant identifier"
+              onChange={(event) => updateValue('userId', event.target.value)}
+              type="text"
+              value={values.userId}
+            />
             <TextInput
               error={errors.startingWeightKg}
               id="participant-starting-weight"
@@ -367,14 +279,7 @@ export function ParticipantEnrollmentPage() {
               </p>
             ) : null}
 
-            <Button
-              className="w-full"
-              disabled={
-                isSaving ||
-                (persistence.mode === 'remote' && (isLoading || !challengeId))
-              }
-              type="submit"
-            >
+            <Button className="w-full" disabled={isSaving} type="submit">
               {isSaving ? 'Saving participant…' : 'Enroll participant'}
             </Button>
           </form>
