@@ -27,6 +27,10 @@ type ChallengeSetupValues = {
   targetWeightKg: string
 }
 
+const challengeLoadTimeoutMs = 10_000
+const challengeLoadTimeoutMessage =
+  'Saved challenges took too long to load. Check your connection and try again.'
+
 const initialValues: ChallengeSetupValues = {
   description: '',
   endDate: '',
@@ -84,11 +88,17 @@ function validateChallengeSetup({
 
 export function ChallengeSetupPage() {
   const { state: authState } = useOptionalAuth()
-  const persistence = useMemo(() => createPersistence(authState), [authState])
   const ownerId =
     authState.status === 'signed-in' && authState.user.id
       ? authState.user.id
       : 'local-owner'
+  const persistence = useMemo(
+    () => createPersistence(authState),
+    // Auth object identity can change for duplicate auth events; these are the
+    // only values that affect persistence mode and owner-scoped repositories.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [authState.status, ownerId],
+  )
   const [values, setValues] = useState(initialValues)
   const [challenges, setChallenges] = useState<Challenge[]>([])
   const [selectedChallengeId, setSelectedChallengeId] = useState('')
@@ -98,11 +108,18 @@ export function ChallengeSetupPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const previousOwnerId = useRef(ownerId)
+  const loadGeneration = useRef(0)
+  const activeLoadAbortController = useRef<AbortController | null>(null)
 
   useEffect(() => {
     let isCurrent = true
+    const requestGeneration = ++loadGeneration.current
+    const abortController = new AbortController()
+    let didTimeout = false
+    let timeoutId: number | undefined
     const ownerChanged = previousOwnerId.current !== ownerId
     previousOwnerId.current = ownerId
+    activeLoadAbortController.current = abortController
 
     setIsLoading(true)
     if (ownerChanged) {
@@ -111,34 +128,73 @@ export function ChallengeSetupPage() {
     }
 
     async function loadSavedChallenge() {
-      if (persistence.mode === 'unavailable') {
-        if (isCurrent) {
-          setSubmitError(persistence.message)
-          setIsLoading(false)
+      try {
+        if (persistence.mode === 'unavailable') {
+          if (isCurrent) {
+            setSubmitError(persistence.message)
+            setIsLoading(false)
+          }
+          return
         }
-        return
-      }
 
-      const result =
-        await persistence.repositories.challenges.listOwned(ownerId)
-      if (!isCurrent) {
-        return
-      }
+        const timeoutPromise = new Promise<{ state: 'timeout' }>((resolve) => {
+          timeoutId = window.setTimeout(() => {
+            didTimeout = true
+            abortController.abort()
+            resolve({ state: 'timeout' })
+          }, challengeLoadTimeoutMs)
+        })
+        const result = await Promise.race([
+          persistence.repositories.challenges.listOwned(ownerId, {
+            signal: abortController.signal,
+          }),
+          timeoutPromise,
+        ])
+        if (!isCurrent || requestGeneration !== loadGeneration.current) {
+          return
+        }
 
-      if (result.state === 'error') {
-        setSubmitError(result.error.message)
+        if (result.state === 'timeout' || didTimeout) {
+          setSubmitError(challengeLoadTimeoutMessage)
+          setIsLoading(false)
+          return
+        }
+
+        if (result.state === 'error') {
+          setSubmitError(result.error.message)
+          setIsLoading(false)
+          return
+        }
+
+        setChallenges(result.state === 'success' ? result.data : [])
+        setSubmitError('')
         setIsLoading(false)
-        return
+      } catch {
+        if (!isCurrent || requestGeneration !== loadGeneration.current) {
+          return
+        }
+        setSubmitError('Unable to load saved challenges. Try again.')
+        setIsLoading(false)
+      } finally {
+        if (activeLoadAbortController.current === abortController) {
+          activeLoadAbortController.current = null
+        }
+        if (timeoutId !== undefined) {
+          window.clearTimeout(timeoutId)
+        }
       }
-
-      setChallenges(result.state === 'success' ? result.data : [])
-      setSubmitError('')
-      setIsLoading(false)
     }
 
     void loadSavedChallenge()
     return () => {
       isCurrent = false
+      abortController.abort()
+      if (activeLoadAbortController.current === abortController) {
+        activeLoadAbortController.current = null
+      }
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId)
+      }
     }
   }, [ownerId, persistence])
 
@@ -188,6 +244,9 @@ export function ChallengeSetupPage() {
       return
     }
 
+    loadGeneration.current += 1
+    activeLoadAbortController.current?.abort()
+    setIsLoading(false)
     setIsSaving(true)
 
     const input = {
@@ -394,11 +453,7 @@ export function ChallengeSetupPage() {
 
           <Button
             className="w-full"
-            disabled={
-              isSaving ||
-              persistence.mode === 'unavailable' ||
-              (persistence.mode === 'remote' && isLoading)
-            }
+            disabled={isSaving || persistence.mode === 'unavailable'}
             type="submit"
           >
             {isSaving
