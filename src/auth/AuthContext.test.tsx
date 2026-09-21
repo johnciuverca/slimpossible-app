@@ -1,7 +1,11 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-const signedOutGateway = {
+import type { AuthGateway } from './context'
+import { AuthProvider } from './AuthContext'
+import { useAuth } from './useAuth'
+
+const signedOutGateway: AuthGateway = {
   ensureProfile: async () => undefined,
   getSession: async () => null,
   onAuthStateChange: () => () => undefined,
@@ -10,11 +14,8 @@ const signedOutGateway = {
   signUp: async () => ({ needsVerification: false, user: null }),
 }
 
-import { AuthProvider } from './AuthContext'
-import { useAuth } from './useAuth'
-
 function AuthHarness() {
-  const { signIn, signUp, state } = useAuth()
+  const { signIn, signOut, signUp, state } = useAuth()
 
   return (
     <>
@@ -30,8 +31,13 @@ function AuthHarness() {
       >
         Sign up
       </button>
+      <button onClick={() => void signOut()}>Sign out</button>
     </>
   )
+}
+
+function createGateway(overrides: Partial<AuthGateway> = {}): AuthGateway {
+  return { ...signedOutGateway, ...overrides }
 }
 
 describe('AuthContext', () => {
@@ -51,7 +57,7 @@ describe('AuthContext', () => {
     expect(screen.getByText('loading')).toBeInTheDocument()
 
     await act(async () => {
-      vi.advanceTimersByTime(150)
+      vi.runOnlyPendingTimers()
       await Promise.resolve()
     })
 
@@ -63,17 +69,7 @@ describe('AuthContext', () => {
 
     render(
       <AuthProvider
-        authGateway={{
-          ensureProfile: async () => undefined,
-          getSession: async () => null,
-          onAuthStateChange: () => () => undefined,
-          signIn: async () => ({ email: 'person@example.com', id: 'user-1' }),
-          signUp: async () => ({
-            needsVerification: false,
-            user: { email: 'person@example.com', id: 'user-1' },
-          }),
-          signOut: async () => undefined,
-        }}
+        authGateway={signedOutGateway}
         initialState={{ error: null, status: 'signed-out', user: null }}
       >
         <AuthHarness />
@@ -95,17 +91,13 @@ describe('AuthContext', () => {
 
     render(
       <AuthProvider
-        authGateway={{
+        authGateway={createGateway({
           ensureProfile,
-          getSession: async () => null,
-          onAuthStateChange: () => () => undefined,
-          signIn: async () => ({ email: 'person@example.com', id: 'user-1' }),
-          signOut: async () => undefined,
           signUp: async () => ({
             needsVerification: true,
             user: { email: 'person@example.com', id: 'user-1' },
           }),
-        }}
+        })}
         initialState={{ error: null, status: 'signed-out', user: null }}
       >
         <AuthHarness />
@@ -119,5 +111,126 @@ describe('AuthContext', () => {
 
     expect(screen.getByText('verification-pending')).toBeInTheDocument()
     expect(ensureProfile).not.toHaveBeenCalled()
+  })
+
+  it('settles a refreshed session and initializes its profile once', async () => {
+    vi.useFakeTimers()
+    const user = { email: 'person@example.com', id: 'user-1' }
+    const ensureProfile = vi.fn(async () => undefined)
+
+    render(
+      <AuthProvider
+        authGateway={createGateway({
+          ensureProfile,
+          getSession: async () => user,
+        })}
+      >
+        <AuthHarness />
+      </AuthProvider>,
+    )
+
+    await act(async () => {
+      vi.runOnlyPendingTimers()
+      await Promise.resolve()
+      vi.runOnlyPendingTimers()
+      await Promise.resolve()
+    })
+
+    expect(screen.getByText('signed-in')).toBeInTheDocument()
+    expect(ensureProfile).toHaveBeenCalledTimes(1)
+  })
+
+  it('defers repeated auth-event profile work and shares one in-flight request', async () => {
+    vi.useFakeTimers()
+    const user = { email: 'person@example.com', id: 'user-1' }
+    let emitAuthEvent: ((nextUser: typeof user | null) => void) | undefined
+    let resolveProfile!: () => void
+    const profileRequest = new Promise<void>((resolve) => {
+      resolveProfile = resolve
+    })
+    const ensureProfile = vi.fn(() => profileRequest)
+
+    render(
+      <AuthProvider
+        authGateway={createGateway({
+          ensureProfile,
+          onAuthStateChange: (callback) => {
+            emitAuthEvent = callback
+            return () => undefined
+          },
+        })}
+      >
+        <AuthHarness />
+      </AuthProvider>,
+    )
+
+    await act(async () => {
+      vi.runOnlyPendingTimers()
+      await Promise.resolve()
+    })
+
+    await act(async () => {
+      emitAuthEvent?.(user)
+    })
+    expect(ensureProfile).not.toHaveBeenCalled()
+
+    await act(async () => {
+      vi.runOnlyPendingTimers()
+      await Promise.resolve()
+    })
+    expect(ensureProfile).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      emitAuthEvent?.(user)
+      vi.runOnlyPendingTimers()
+      await Promise.resolve()
+    })
+    expect(ensureProfile).toHaveBeenCalledTimes(1)
+
+    resolveProfile()
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    await act(async () => {
+      emitAuthEvent?.(user)
+      vi.runOnlyPendingTimers()
+      await Promise.resolve()
+    })
+    expect(ensureProfile).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores a stale session restore after logout', async () => {
+    vi.useFakeTimers()
+    let resolveSession!: (user: { email: string; id: string } | null) => void
+    const sessionRequest = new Promise<{ email: string; id: string } | null>(
+      (resolve) => {
+        resolveSession = resolve
+      },
+    )
+
+    render(
+      <AuthProvider
+        authGateway={createGateway({ getSession: () => sessionRequest })}
+      >
+        <AuthHarness />
+      </AuthProvider>,
+    )
+
+    await act(async () => {
+      vi.runOnlyPendingTimers()
+      await Promise.resolve()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
+    expect(screen.getByText('signed-out')).toBeInTheDocument()
+
+    resolveSession({ email: 'person@example.com', id: 'user-1' })
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(screen.getByText('signed-out')).toBeInTheDocument()
+    expect(screen.queryByText('person@example.com')).not.toBeInTheDocument()
   })
 })

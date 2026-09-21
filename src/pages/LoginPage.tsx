@@ -9,6 +9,7 @@ import {
   TextInput,
 } from '../components/ui'
 import { useAuth } from '../auth/useAuth'
+import { getAuthenticationEnvironmentLabel } from '../auth/supabaseConfig'
 
 type LoginErrors = {
   email?: string
@@ -84,7 +85,7 @@ export function LoginPage() {
           title="Welcome back."
           titleId="login-title"
         >
-          <StatusPill>Local preview</StatusPill>
+          <StatusPill>{getAuthenticationEnvironmentLabel()}</StatusPill>
         </PageHeader>
 
         <form

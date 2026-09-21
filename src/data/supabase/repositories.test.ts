@@ -26,13 +26,43 @@ afterEach(() => {
 })
 
 describe('Supabase repositories', () => {
-  it('upserts and maps the authenticated profile identity', async () => {
+  it('loads an existing profile without overwriting its display name', async () => {
     stubResponse({
       created_at: '2026-09-17T10:00:00.000Z',
-      display_name: 'Participant',
+      display_name: 'Existing participant name',
       id: 'user-1',
       updated_at: '2026-09-17T10:00:00.000Z',
     })
+
+    const result = await createRepositories(client).profiles.ensure({
+      displayName: 'New metadata name',
+      id: 'user-1',
+    })
+
+    expect(result).toEqual({
+      data: { displayName: 'Existing participant name', id: 'user-1' },
+      state: 'success',
+    })
+  })
+
+  it('inserts a profile when the authenticated user has no profile yet', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(new Response('null', { status: 200 }))
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              created_at: '2026-09-17T10:00:00.000Z',
+              display_name: 'Participant',
+              id: 'user-1',
+              updated_at: '2026-09-17T10:00:00.000Z',
+            }),
+            { headers: { 'Content-Type': 'application/json' }, status: 201 },
+          ),
+        ),
+    )
 
     const result = await createRepositories(client).profiles.ensure({
       displayName: 'Participant',
@@ -43,6 +73,7 @@ describe('Supabase repositories', () => {
       data: { displayName: 'Participant', id: 'user-1' },
       state: 'success',
     })
+    expect(fetch).toHaveBeenCalledTimes(2)
   })
 
   it('preserves an existing profile display name during initialization', async () => {

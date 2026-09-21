@@ -368,12 +368,26 @@ export function createRepositories(client: DatabaseClient): Repositories {
           .select('*')
           .single()
 
-        return error
-          ? {
-              error: requestError('initialize the profile', error),
-              state: 'error',
+        if (error) {
+          if (error.code === '23505') {
+            const concurrent = await client
+              .from('profiles')
+              .select('*')
+              .eq('id', input.id)
+              .maybeSingle()
+
+            if (!concurrent.error && concurrent.data) {
+              return mapSingle(concurrent.data, mapProfile, 'profile')
             }
-          : mapSingle(data, mapProfile, 'profile')
+          }
+
+          return {
+            error: requestError('initialize the profile', error),
+            state: 'error',
+          }
+        }
+
+        return mapSingle(data, mapProfile, 'profile')
       },
     },
     weighIns: {

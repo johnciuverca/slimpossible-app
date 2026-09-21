@@ -9,6 +9,7 @@ import {
   TextInput,
 } from '../components/ui'
 import { useAuth } from '../auth/useAuth'
+import { getAuthenticationEnvironmentLabel } from '../auth/supabaseConfig'
 import { isValidEmail } from './authValidation'
 
 type RegisterErrors = {
@@ -93,7 +94,7 @@ export function RegisterPage() {
           title="Create your account."
           titleId="register-title"
         >
-          <StatusPill>Local preview</StatusPill>
+          <StatusPill>{getAuthenticationEnvironmentLabel()}</StatusPill>
         </PageHeader>
 
         <form
