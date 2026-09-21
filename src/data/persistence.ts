@@ -112,9 +112,9 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
         ? { data: challenge, state: 'success' }
         : { data: null, state: 'empty' }
     },
-    async listOwned(ownerId: string) {
+    async listOwned(ownerId?: string) {
       const values = readList<Challenge>(storage, challengesStorageKey).filter(
-        (value) => value.ownerId === ownerId,
+        (value) => !ownerId || value.ownerId === ownerId,
       )
       return values.length > 0
         ? { data: values, state: 'success' }
