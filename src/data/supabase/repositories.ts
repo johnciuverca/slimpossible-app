@@ -29,8 +29,11 @@ type WeighInRow = Database['public']['Tables']['weigh_ins']['Row']
 
 export type ChallengeRepository = {
   create: (input: ChallengeWriteInput) => Promise<RepositoryResult<Challenge>>
-  findOwnedById: (id: string) => Promise<RepositoryResult<Challenge>>
-  listOwned: () => Promise<RepositoryListResult<Challenge>>
+  findOwnedById: (
+    id: string,
+    ownerId: string,
+  ) => Promise<RepositoryResult<Challenge>>
+  listOwned: (ownerId?: string) => Promise<RepositoryListResult<Challenge>>
   update: (
     id: string,
     input: ChallengeWriteInput,
@@ -233,22 +236,25 @@ export function createRepositories(client: DatabaseClient): Repositories {
           ? { error: requestError('save the challenge', error), state: 'error' }
           : mapSingle(data, mapChallenge, 'challenge')
       },
-      async findOwnedById(id) {
+      async findOwnedById(id, ownerId) {
         const { data, error } = await client
           .from('challenges')
           .select('*')
           .eq('id', id)
+          .eq('owner_id', ownerId)
           .maybeSingle()
 
         return error
           ? { error: requestError('load the challenge', error), state: 'error' }
           : mapSingle(data, mapChallenge, 'challenge')
       },
-      async listOwned() {
-        const { data, error } = await client
+      async listOwned(ownerId) {
+        let query = client
           .from('challenges')
           .select('*')
           .order('created_at', { ascending: false })
+        if (ownerId) query = query.eq('owner_id', ownerId)
+        const { data, error } = await query
 
         return error
           ? {
@@ -273,6 +279,7 @@ export function createRepositories(client: DatabaseClient): Repositories {
               : { target_weight_kg: input.targetWeightKg }),
           })
           .eq('id', id)
+          .eq('owner_id', input.ownerId)
           .select('*')
           .maybeSingle()
 

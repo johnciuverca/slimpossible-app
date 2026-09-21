@@ -16,6 +16,14 @@ afterEach(() => {
 })
 
 describe('ChallengeSetupPage', () => {
+  function renderPage() {
+    render(
+      <MemoryRouter>
+        <ChallengeSetupPage />
+      </MemoryRouter>,
+    )
+  }
+
   it('reports required and date-order errors accessibly', () => {
     render(
       <MemoryRouter>
@@ -77,5 +85,70 @@ describe('ChallengeSetupPage', () => {
         screen.getByText(/Nothing has been saved remotely\./),
       ).toBeInTheDocument()
     })
+  })
+
+  it('restores multiple local challenges and edits only the selected one', async () => {
+    renderPage()
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Challenge name' }), {
+      target: { value: 'Autumn reset' },
+    })
+    fireEvent.change(screen.getByLabelText('Start date'), {
+      target: { value: '2026-10-01' },
+    })
+    fireEvent.change(screen.getByLabelText('End date'), {
+      target: { value: '2026-11-01' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save challenge' }))
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Nothing has been saved remotely\./),
+      ).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'New challenge' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Challenge name' }), {
+      target: { value: 'Winter reset' },
+    })
+    fireEvent.change(screen.getByLabelText('Start date'), {
+      target: { value: '2026-12-01' },
+    })
+    fireEvent.change(screen.getByLabelText('End date'), {
+      target: { value: '2027-01-01' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save challenge' }))
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('option', { name: 'Autumn reset' }),
+      ).toBeInTheDocument()
+      expect(
+        screen.getByRole('option', { name: 'Winter reset' }),
+      ).toBeInTheDocument()
+    })
+
+    cleanup()
+    renderPage()
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('option', { name: 'Autumn reset' }),
+      ).toBeInTheDocument()
+      expect(
+        screen.getByRole('option', { name: 'Winter reset' }),
+      ).toBeInTheDocument()
+    })
+
+    fireEvent.change(screen.getByLabelText('Saved challenge'), {
+      target: {
+        value: screen
+          .getByRole('option', { name: 'Autumn reset' })
+          .getAttribute('value'),
+      },
+    })
+    expect(screen.getByRole('textbox', { name: 'Challenge name' })).toHaveValue(
+      'Autumn reset',
+    )
   })
 })

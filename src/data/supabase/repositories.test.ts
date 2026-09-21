@@ -145,7 +145,8 @@ describe('Supabase repositories', () => {
       },
     ])
 
-    const result = await createRepositories(client).challenges.listOwned()
+    const result =
+      await createRepositories(client).challenges.listOwned('owner-1')
 
     expect(result).toEqual({
       data: [
@@ -165,6 +166,15 @@ describe('Supabase repositories', () => {
       ],
       state: 'success',
     })
+  })
+
+  it('scopes challenge listing to the authenticated owner', async () => {
+    stubResponse([])
+
+    await createRepositories(client).challenges.listOwned('owner-1')
+
+    const requestUrl = String(vi.mocked(fetch).mock.calls[0]?.[0])
+    expect(requestUrl).toContain('owner_id=eq.owner-1')
   })
 
   it('returns an explicit empty state for an empty participant list', async () => {
@@ -253,8 +263,10 @@ describe('Supabase repositories', () => {
       403,
     )
 
-    const result =
-      await createRepositories(client).challenges.findOwnedById('challenge-1')
+    const result = await createRepositories(client).challenges.findOwnedById(
+      'challenge-1',
+      'owner-1',
+    )
 
     expect(result).toEqual({
       error: {

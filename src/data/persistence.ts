@@ -104,16 +104,18 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
       }
       return { data: challenge, state: 'success' }
     },
-    async findOwnedById(id: string) {
+    async findOwnedById(id: string, ownerId: string) {
       const challenge = readList<Challenge>(storage, challengesStorageKey).find(
-        (value) => value.id === id,
+        (value) => value.id === id && value.ownerId === ownerId,
       )
       return challenge
         ? { data: challenge, state: 'success' }
         : { data: null, state: 'empty' }
     },
-    async listOwned() {
-      const values = readList<Challenge>(storage, challengesStorageKey)
+    async listOwned(ownerId?: string) {
+      const values = readList<Challenge>(storage, challengesStorageKey).filter(
+        (value) => !ownerId || value.ownerId === ownerId,
+      )
       return values.length > 0
         ? { data: values, state: 'success' }
         : { data: [], state: 'empty' }
