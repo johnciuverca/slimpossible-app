@@ -200,6 +200,48 @@ describe('AuthContext', () => {
     expect(ensureProfile).toHaveBeenCalledTimes(1)
   })
 
+  it('does not rerender for duplicate authenticated session events', async () => {
+    vi.useFakeTimers()
+    const user = { email: 'person@example.com', id: 'user-1' }
+    let emitAuthEvent: ((nextUser: typeof user | null) => void) | undefined
+    let renderCount = 0
+
+    function RenderCountHarness() {
+      renderCount += 1
+      const { state } = useAuth()
+      return <output>{state.status}</output>
+    }
+
+    render(
+      <AuthProvider
+        authGateway={createGateway({
+          getSession: async () => user,
+          onAuthStateChange: (callback) => {
+            emitAuthEvent = callback
+            return () => undefined
+          },
+        })}
+      >
+        <RenderCountHarness />
+      </AuthProvider>,
+    )
+
+    await act(async () => {
+      vi.runOnlyPendingTimers()
+      await Promise.resolve()
+    })
+    expect(screen.getByText('signed-in')).toBeInTheDocument()
+    const renderCountAfterRestore = renderCount
+
+    await act(async () => {
+      emitAuthEvent?.(user)
+      emitAuthEvent?.(user)
+      await Promise.resolve()
+    })
+
+    expect(renderCount).toBe(renderCountAfterRestore)
+  })
+
   it('ignores a stale session restore after logout', async () => {
     vi.useFakeTimers()
     let resolveSession!: (user: { email: string; id: string } | null) => void
