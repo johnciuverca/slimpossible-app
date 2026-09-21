@@ -592,4 +592,18 @@ describe('ChallengeSetupPage', () => {
       'Autumn reset',
     )
   })
+
+  it('keeps the enrollment link sized to its visible control and keyboard-focusable', () => {
+    renderPage()
+
+    const enrollmentLink = screen.getByRole('link', {
+      name: 'Enroll participants',
+    })
+    expect(enrollmentLink).toHaveClass('inline-block')
+    expect(enrollmentLink).not.toHaveClass('block')
+    expect(enrollmentLink).toHaveClass('focus-visible:outline-emerald-700')
+
+    enrollmentLink.focus()
+    expect(enrollmentLink).toHaveFocus()
+  })
 })
