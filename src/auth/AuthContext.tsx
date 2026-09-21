@@ -16,6 +16,14 @@ const signedOutState: AuthState = {
   user: null,
 }
 
+function userKey(user: { email: string; id?: string }) {
+  return user.id ?? user.email
+}
+
+function errorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback
+}
+
 export function AuthProvider({
   authGateway: providedAuthGateway,
   children,
@@ -24,92 +32,189 @@ export function AuthProvider({
   const [fallbackAuthGateway] = useState(createSupabaseAuthGateway)
   const authGateway = providedAuthGateway ?? fallbackAuthGateway
   const [state, setState] = useState<AuthState>(initialState ?? loadingState)
-  const operationRef = useRef(0)
+  const operationGeneration = useRef(0)
+  const currentUserKey = useRef(
+    initialState?.status === 'signed-in' ? userKey(initialState.user) : null,
+  )
+  const blockedUserKey = useRef<string | null>(null)
+  const initializedProfiles = useRef(new Set<string>())
+  const pendingProfiles = useRef(new Map<string, Promise<void>>())
+
+  const ensureProfileOnce = useCallback(
+    (
+      user: NonNullable<Extract<AuthState, { status: 'signed-in' }>['user']>,
+    ) => {
+      const key = userKey(user)
+      if (initializedProfiles.current.has(key)) return Promise.resolve()
+      const pending = pendingProfiles.current.get(key)
+      if (pending) return pending
+
+      const next = authGateway.ensureProfile(user).then(() => {
+        initializedProfiles.current.add(key)
+      })
+      pendingProfiles.current.set(key, next)
+      void next
+        .finally(() => {
+          if (pendingProfiles.current.get(key) === next) {
+            pendingProfiles.current.delete(key)
+          }
+        })
+        .catch(() => undefined)
+      return next
+    },
+    [authGateway],
+  )
+
+  const applySignedOut = useCallback((generation: number) => {
+    if (generation !== operationGeneration.current) return
+    currentUserKey.current = null
+    blockedUserKey.current = null
+    setState(signedOutState)
+  }, [])
+
+  const applySignedIn = useCallback(
+    (
+      user: NonNullable<Extract<AuthState, { status: 'signed-in' }>['user']>,
+      generation: number,
+    ) => {
+      if (
+        generation !== operationGeneration.current ||
+        blockedUserKey.current === userKey(user)
+      ) {
+        return
+      }
+
+      const key = userKey(user)
+      currentUserKey.current = key
+      setState({ error: null, status: 'signed-in', user })
+
+      // Supabase requires auth callbacks to return without starting another
+      // Supabase request. Profile initialization is deliberately deferred.
+      window.setTimeout(() => {
+        if (
+          generation !== operationGeneration.current ||
+          currentUserKey.current !== key ||
+          blockedUserKey.current === key
+        ) {
+          return
+        }
+
+        void ensureProfileOnce(user).catch((error) => {
+          if (
+            generation === operationGeneration.current &&
+            currentUserKey.current === key
+          ) {
+            setState({
+              error: errorMessage(
+                error,
+                'We could not initialize your profile. Try again.',
+              ),
+              status: 'error',
+              user: null,
+            })
+          }
+        })
+      }, 0)
+    },
+    [ensureProfileOnce],
+  )
 
   const restoreSession = useCallback(() => {
-    const operation = ++operationRef.current
+    const generation = operationGeneration.current
+    let cancelled = false
     const timerId = window.setTimeout(() => {
       void authGateway
         .getSession()
-        .then(async (user) => {
-          if (user) await authGateway.ensureProfile(user)
-          if (operationRef.current !== operation) return
-          setState(
-            user ? { error: null, status: 'signed-in', user } : signedOutState,
-          )
+        .then((user) => {
+          if (cancelled || generation !== operationGeneration.current) return
+
+          // A callback may have delivered a newer authenticated session while
+          // getSession was resolving. Do not let an older empty result sign it
+          // back out.
+          if (!user && currentUserKey.current) return
+          if (user) {
+            applySignedIn(user, generation)
+          } else {
+            applySignedOut(generation)
+          }
         })
-        .catch(
-          (error) =>
-            operationRef.current === operation &&
-            setState({
-              error:
-                error instanceof Error
-                  ? error.message
-                  : 'We could not restore your session. Try again.',
-              status: 'error',
-              user: null,
-            }),
-        )
-    }, 150)
-    return () => window.clearTimeout(timerId)
-  }, [authGateway])
+        .catch((error) => {
+          if (
+            cancelled ||
+            generation !== operationGeneration.current ||
+            currentUserKey.current
+          ) {
+            return
+          }
+          setState({
+            error: errorMessage(
+              error,
+              'We could not restore your session. Try again.',
+            ),
+            status: 'error',
+            user: null,
+          })
+        })
+    }, 0)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timerId)
+    }
+  }, [applySignedIn, applySignedOut, authGateway])
 
   useEffect(() => {
-    if (initialState) {
-      return
-    }
+    if (initialState) return
 
     let active = true
-    const cancelRestore = restoreSession()
     const unsubscribe = authGateway.onAuthStateChange((user) => {
-      if (active) {
-        if (!user) {
-          ++operationRef.current
-          setState(signedOutState)
-          return
-        }
-        const operation = ++operationRef.current
-        void authGateway
-          .ensureProfile(user)
-          .then(() => {
-            if (active && operationRef.current === operation)
-              setState({ error: null, status: 'signed-in', user })
-          })
-          .catch((error) => {
-            if (active && operationRef.current === operation) {
-              setState({
-                error:
-                  error instanceof Error
-                    ? error.message
-                    : 'We could not initialize your profile.',
-                status: 'error',
-                user: null,
-              })
-            }
-          })
+      if (!active) return
+
+      const generation = operationGeneration.current
+      if (!user) {
+        applySignedOut(generation)
+        return
       }
+
+      // This callback only updates React state. applySignedIn defers profile
+      // I/O until after the provider callback has returned to Supabase.
+      applySignedIn(user, generation)
     })
+    const cancelRestore = restoreSession()
+
     return () => {
       active = false
+      operationGeneration.current += 1
       cancelRestore()
       unsubscribe()
     }
-  }, [authGateway, initialState, restoreSession])
+  }, [applySignedIn, applySignedOut, authGateway, initialState, restoreSession])
 
   const retrySession = useCallback(() => {
+    operationGeneration.current += 1
+    blockedUserKey.current = null
+    currentUserKey.current = null
     setState(loadingState)
-    return restoreSession()
+    restoreSession()
   }, [restoreSession])
 
   const signOut = useCallback(async () => {
-    ++operationRef.current
+    const generation = operationGeneration.current + 1
+    operationGeneration.current = generation
+    blockedUserKey.current = currentUserKey.current
+    currentUserKey.current = null
     setState(signedOutState)
+
     try {
       await authGateway.signOut()
+      if (generation === operationGeneration.current) {
+        blockedUserKey.current = null
+      }
     } catch (error) {
+      if (generation !== operationGeneration.current) return
+      blockedUserKey.current = null
       setState({
-        error:
-          error instanceof Error ? error.message : 'We could not sign you out.',
+        error: errorMessage(error, 'We could not sign you out.'),
         status: 'error',
         user: null,
       })
@@ -118,50 +223,61 @@ export function AuthProvider({
 
   const signIn = useCallback(
     async (email: string, password: string) => {
-      const operation = ++operationRef.current
+      const generation = operationGeneration.current + 1
+      operationGeneration.current = generation
+      blockedUserKey.current = null
+      currentUserKey.current = null
       setState(loadingState)
+
       try {
         const user = await authGateway.signIn(email.trim(), password)
-        await authGateway.ensureProfile(user)
-        if (operationRef.current !== operation) return
-        setState({ error: null, status: 'signed-in', user })
+        if (generation === operationGeneration.current) {
+          applySignedIn(user, generation)
+        }
       } catch (error) {
+        if (generation !== operationGeneration.current) return
         setState({
-          error: error instanceof Error ? error.message : 'Unable to sign in.',
+          error: errorMessage(error, 'Unable to sign in.'),
           status: 'error',
           user: null,
         })
       }
     },
-    [authGateway],
+    [applySignedIn, authGateway],
   )
 
   const signUp = useCallback(
     async (name: string, email: string, password: string) => {
-      const operation = ++operationRef.current
+      const generation = operationGeneration.current + 1
+      operationGeneration.current = generation
+      blockedUserKey.current = null
+      currentUserKey.current = null
       setState(loadingState)
+
       try {
         const result = await authGateway.signUp(name, email.trim(), password)
-        if (result.user && !result.needsVerification)
-          await authGateway.ensureProfile(result.user)
-        if (operationRef.current !== operation) return
-        setState(
-          result.needsVerification || !result.user
-            ? { error: null, status: 'verification-pending', user: null }
-            : { error: null, status: 'signed-in', user: result.user },
-        )
+        if (generation !== operationGeneration.current) return
+
+        if (result.needsVerification || !result.user) {
+          setState({
+            error: null,
+            status: 'verification-pending',
+            user: null,
+          })
+          return
+        }
+
+        applySignedIn(result.user, generation)
       } catch (error) {
+        if (generation !== operationGeneration.current) return
         setState({
-          error:
-            error instanceof Error
-              ? error.message
-              : 'Unable to create an account.',
+          error: errorMessage(error, 'Unable to create an account.'),
           status: 'error',
           user: null,
         })
       }
     },
-    [authGateway],
+    [applySignedIn, authGateway],
   )
 
   const value = useMemo(

@@ -1,6 +1,9 @@
 export const missingSupabaseConfigurationMessage =
   'Remote authentication is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.'
 
+export const localAuthenticationLabel = 'Local preview'
+export const remoteAuthenticationLabel = 'Remote authentication'
+
 export type SupabaseEnvironment = {
   VITE_SUPABASE_ANON_KEY?: string
   VITE_SUPABASE_URL?: string
@@ -35,4 +38,12 @@ export function getSupabaseConfiguration(
   }
 
   return { anonKey, state: 'configured', url }
+}
+
+export function getAuthenticationEnvironmentLabel(
+  environment: SupabaseEnvironment = import.meta.env as SupabaseEnvironment,
+) {
+  return getSupabaseConfiguration(environment).state === 'configured'
+    ? remoteAuthenticationLabel
+    : localAuthenticationLabel
 }

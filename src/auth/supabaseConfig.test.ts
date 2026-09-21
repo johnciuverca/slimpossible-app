@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  getAuthenticationEnvironmentLabel,
   getSupabaseConfiguration,
+  localAuthenticationLabel,
   missingSupabaseConfigurationMessage,
+  remoteAuthenticationLabel,
 } from './supabaseConfig'
 
 describe('getSupabaseConfiguration', () => {
@@ -32,5 +35,15 @@ describe('getSupabaseConfiguration', () => {
       state: 'configured',
       url: 'https://project.supabase.co',
     })
+  })
+
+  it('labels the authentication mode from the public configuration', () => {
+    expect(getAuthenticationEnvironmentLabel({})).toBe(localAuthenticationLabel)
+    expect(
+      getAuthenticationEnvironmentLabel({
+        VITE_SUPABASE_ANON_KEY: 'public-anon-key',
+        VITE_SUPABASE_URL: 'https://project.supabase.co',
+      }),
+    ).toBe(remoteAuthenticationLabel)
   })
 })
