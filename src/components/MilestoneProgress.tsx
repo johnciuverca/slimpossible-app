@@ -24,6 +24,10 @@ function stateLabel(state: DisplayMilestoneState) {
   return 'Upcoming'
 }
 
+function trackProgressPercentage(completionPercentage: number) {
+  return Math.max(0, Math.min(100, ((completionPercentage - 25) / 75) * 100))
+}
+
 function unavailableCopy(
   reason: 'no-records' | 'no-target' | 'participant-not-found',
 ) {
@@ -78,6 +82,7 @@ export function MilestoneProgress({
       (milestone) =>
         milestones.completionPercentage <= milestone.thresholdPercentage,
     )?.thresholdPercentage ?? milestones.milestones.at(-1)!.thresholdPercentage
+  const trackProgress = trackProgressPercentage(milestones.completionPercentage)
 
   return (
     <section
@@ -113,19 +118,23 @@ export function MilestoneProgress({
             {milestones.completionPercentage}%
           </p>
         </div>
-        <div
-          aria-label={`${title}: ${milestones.completionPercentage}% complete`}
-          aria-valuemax={100}
-          aria-valuemin={0}
-          aria-valuenow={milestones.completionPercentage}
-          aria-valuetext={`${milestones.completionPercentage}% complete. ${reachedCount} of ${milestones.milestones.length} milestones reached.`}
-          className="relative mt-4 h-5 rounded-full bg-emerald-100 shadow-inner shadow-emerald-950/10"
-          role="progressbar"
-        >
+        <div className="relative mt-4 h-5">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-teal-500 shadow-sm transition-[width]"
-            style={{ width: `${milestones.completionPercentage}%` }}
-          />
+            aria-label={`${title}: ${milestones.completionPercentage}% complete`}
+            aria-valuemax={100}
+            aria-valuemin={0}
+            aria-valuenow={milestones.completionPercentage}
+            aria-valuetext={`${milestones.completionPercentage}% complete. ${reachedCount} of ${milestones.milestones.length} milestones reached.`}
+            className="absolute left-[12.5%] right-[12.5%] top-1/2 h-5 -translate-y-1/2 rounded-full bg-emerald-100 shadow-inner shadow-emerald-950/10"
+            data-testid="milestone-track"
+            role="progressbar"
+          >
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-teal-500 shadow-sm motion-reduce:transition-none motion-safe:transition-[width]"
+              data-testid="milestone-track-fill"
+              style={{ width: `${trackProgress}%` }}
+            />
+          </div>
           {milestones.milestones.map((milestone) => {
             const state = milestoneState(milestone, currentThreshold)
 
@@ -139,24 +148,22 @@ export function MilestoneProgress({
                       ? 'border-teal-500 ring-4 ring-teal-100'
                       : 'border-stone-300'
                 }`}
+                data-milestone-marker={milestone.thresholdPercentage}
                 key={milestone.id}
-                style={{ left: `${milestone.thresholdPercentage}%` }}
+                style={{ left: `${milestone.thresholdPercentage - 12.5}%` }}
               />
             )
           })}
         </div>
       </div>
 
-      <ol
-        aria-label="Milestone status"
-        className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4"
-      >
+      <ol aria-label="Milestone status" className="mt-7 grid grid-cols-4 gap-0">
         {milestones.milestones.map((milestone) => {
           const state = milestoneState(milestone, currentThreshold)
 
           return (
             <li
-              className={`rounded-2xl border px-3 py-3 text-center ${
+              className={`mx-1.5 rounded-2xl border px-1.5 py-3 text-center sm:mx-1.5 sm:px-3 ${
                 state === 'reached'
                   ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
                   : state === 'current'
