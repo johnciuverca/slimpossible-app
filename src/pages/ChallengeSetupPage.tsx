@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 
 import {
@@ -97,13 +97,18 @@ export function ChallengeSetupPage() {
   const [isSaved, setIsSaved] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const previousOwnerId = useRef(ownerId)
 
   useEffect(() => {
     let isCurrent = true
+    const ownerChanged = previousOwnerId.current !== ownerId
+    previousOwnerId.current = ownerId
+
     setIsLoading(true)
-    setChallenges([])
-    setSelectedChallengeId('')
-    setValues(initialValues)
+    if (ownerChanged) {
+      setChallenges([])
+      setSelectedChallengeId('')
+    }
 
     async function loadSavedChallenge() {
       if (persistence.mode === 'unavailable') {
@@ -127,6 +132,7 @@ export function ChallengeSetupPage() {
       }
 
       setChallenges(result.state === 'success' ? result.data : [])
+      setSubmitError('')
       setIsLoading(false)
     }
 
