@@ -33,7 +33,10 @@ export type ChallengeRepository = {
     id: string,
     ownerId: string,
   ) => Promise<RepositoryResult<Challenge>>
-  listOwned: (ownerId?: string) => Promise<RepositoryListResult<Challenge>>
+  listOwned: (
+    ownerId?: string,
+    options?: { signal?: AbortSignal },
+  ) => Promise<RepositoryListResult<Challenge>>
   update: (
     id: string,
     input: ChallengeWriteInput,
@@ -248,12 +251,13 @@ export function createRepositories(client: DatabaseClient): Repositories {
           ? { error: requestError('load the challenge', error), state: 'error' }
           : mapSingle(data, mapChallenge, 'challenge')
       },
-      async listOwned(ownerId) {
+      async listOwned(ownerId, options) {
         let query = client
           .from('challenges')
           .select('*')
           .order('created_at', { ascending: false })
         if (ownerId) query = query.eq('owner_id', ownerId)
+        if (options?.signal) query = query.abortSignal(options.signal)
         const { data, error } = await query
 
         return error

@@ -15,12 +15,29 @@ describe('createSupabaseBrowserClient', () => {
   })
 
   it('creates a typed client from public configuration only', () => {
-    const result = createSupabaseBrowserClient({
+    const environment = {
       VITE_SUPABASE_ANON_KEY: 'public-anon-key',
       VITE_SUPABASE_URL: 'https://project.supabase.co',
-    })
+    }
+    const result = createSupabaseBrowserClient(environment)
 
     expect(result.state).toBe('configured')
+  })
+
+  it('reuses the configured client for the same public configuration', () => {
+    const environment = {
+      VITE_SUPABASE_ANON_KEY: 'cached-anon-key',
+      VITE_SUPABASE_URL: 'https://cached-project.supabase.co',
+    }
+
+    const first = createSupabaseBrowserClient(environment)
+    const second = createSupabaseBrowserClient(environment)
+
+    expect(first.state).toBe('configured')
+    expect(second.state).toBe('configured')
+    if (first.state === 'configured' && second.state === 'configured') {
+      expect(second.client).toBe(first.client)
+    }
   })
 
   it('returns a safe error for an invalid public URL', () => {

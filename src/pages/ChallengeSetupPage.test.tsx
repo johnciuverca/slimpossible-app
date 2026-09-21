@@ -16,6 +16,7 @@ import { ChallengeSetupPage } from './ChallengeSetupPage'
 afterEach(() => {
   cleanup()
   window.localStorage.clear()
+  vi.useRealTimers()
   vi.unstubAllEnvs()
   vi.unstubAllGlobals()
 })
@@ -316,6 +317,215 @@ describe('ChallengeSetupPage', () => {
         screen.getByText(/Nothing has been saved remotely\./),
       ).toBeInTheDocument()
     })
+  })
+
+  it('settles a failed remote load with a clear error', async () => {
+    vi.stubEnv('VITE_SUPABASE_URL', 'https://failed-project.supabase.co')
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-anon-key')
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response('', { status: 500 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(
+      <AuthProvider
+        initialState={{
+          error: null,
+          status: 'signed-in',
+          user: { email: 'owner@example.com', id: 'owner-1' },
+        }}
+      >
+        <MemoryRouter>
+          <ChallengeSetupPage />
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Unable to load the challenges.',
+      )
+    })
+    expect(
+      screen.queryByText('Loading saved challenge…'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('settles a stalled remote load after the timeout', async () => {
+    vi.useFakeTimers()
+    vi.stubEnv('VITE_SUPABASE_URL', 'https://slow-project.supabase.co')
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-anon-key')
+    const fetchMock = vi.fn(() => new Promise<Response>(() => undefined))
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(
+      <AuthProvider
+        initialState={{
+          error: null,
+          status: 'signed-in',
+          user: { email: 'owner@example.com', id: 'owner-1' },
+        }}
+      >
+        <MemoryRouter>
+          <ChallengeSetupPage />
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(
+      screen.getByRole('button', { name: 'Save challenge' }),
+    ).not.toBeDisabled()
+
+    await act(async () => {
+      vi.advanceTimersByTime(10_000)
+      await Promise.resolve()
+    })
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Saved challenges took too long to load.',
+    )
+    expect(
+      screen.queryByText('Loading saved challenge…'),
+    ).not.toBeInTheDocument()
+
+    cleanup()
+    render(
+      <AuthProvider
+        initialState={{
+          error: null,
+          status: 'signed-in',
+          user: { email: 'owner@example.com', id: 'owner-1' },
+        }}
+      >
+        <MemoryRouter>
+          <ChallengeSetupPage />
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+
+    await act(async () => {
+      vi.advanceTimersByTime(10_000)
+      await Promise.resolve()
+    })
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Saved challenges took too long to load.',
+    )
+  })
+
+  it('validates a negative target weight while remote loading is pending', () => {
+    vi.stubEnv('VITE_SUPABASE_URL', 'https://negative-project.supabase.co')
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-anon-key')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => undefined)),
+    )
+
+    render(
+      <AuthProvider
+        initialState={{
+          error: null,
+          status: 'signed-in',
+          user: { email: 'owner@example.com', id: 'owner-1' },
+        }}
+      >
+        <MemoryRouter>
+          <ChallengeSetupPage />
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Challenge name' }), {
+      target: { value: 'Negative target check' },
+    })
+    fireEvent.change(screen.getByLabelText('Start date'), {
+      target: { value: '2026-10-01' },
+    })
+    fireEvent.change(screen.getByLabelText('End date'), {
+      target: { value: '2026-11-01' },
+    })
+    fireEvent.change(screen.getByLabelText('Target weight in kg (optional)'), {
+      target: { value: '-10' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save challenge' }))
+
+    expect(
+      screen.getByText('Target weight must be greater than zero.'),
+    ).toBeInTheDocument()
+  })
+
+  it('does not query remote challenges again for the same auth notification', async () => {
+    vi.stubEnv('VITE_SUPABASE_URL', 'https://stable-project.supabase.co')
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-anon-key')
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify([]), {
+        headers: { 'Content-Type': 'application/json' },
+        status: 200,
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const user = { email: 'owner@example.com', id: 'owner-1' }
+    let emitAuthStateChange:
+      ((nextUser: typeof user | null) => void) | undefined
+    const gateway: AuthGateway = {
+      ensureProfile: async () => undefined,
+      getSession: async () => user,
+      onAuthStateChange: (callback) => {
+        emitAuthStateChange = callback
+        return () => undefined
+      },
+      signIn: async () => user,
+      signOut: async () => undefined,
+      signUp: async () => ({ needsVerification: false, user: null }),
+    }
+
+    render(
+      <AuthProvider authGateway={gateway}>
+        <MemoryRouter>
+          <ChallengeSetupPage />
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+
+    await act(async () => {
+      emitAuthStateChange?.(user)
+      await Promise.resolve()
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows signed-out remote persistence as an actionable state', () => {
+    vi.stubEnv('VITE_SUPABASE_URL', 'https://signed-out-project.supabase.co')
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-anon-key')
+
+    render(
+      <AuthProvider
+        initialState={{ error: null, status: 'signed-out', user: null }}
+      >
+        <MemoryRouter>
+          <ChallengeSetupPage />
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Remote persistence is unavailable until a Supabase session is signed in.',
+    )
+    expect(
+      screen.queryByText('Loading saved challenge…'),
+    ).not.toBeInTheDocument()
   })
 
   it('restores multiple local challenges and edits only the selected one', async () => {

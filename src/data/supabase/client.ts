@@ -11,6 +11,8 @@ export type { SupabaseEnvironment } from '../../auth/supabaseConfig'
 export const invalidSupabaseConfigurationMessage =
   'Supabase configuration is invalid. Check the public project URL and anonymous key.'
 
+const clientCache = new Map<string, SupabaseClient<Database>>()
+
 export type SupabaseBrowserClientResult =
   | {
       client: SupabaseClient<Database>
@@ -31,8 +33,19 @@ export function createSupabaseBrowserClient(
   }
 
   try {
+    const cacheKey = `${configuration.url}\u0000${configuration.anonKey}`
+    const cachedClient = clientCache.get(cacheKey)
+    if (cachedClient) {
+      return { client: cachedClient, state: 'configured' }
+    }
+
+    const client = createClient<Database>(
+      configuration.url,
+      configuration.anonKey,
+    )
+    clientCache.set(cacheKey, client)
     return {
-      client: createClient<Database>(configuration.url, configuration.anonKey),
+      client,
       state: 'configured',
     }
   } catch {
