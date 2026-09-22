@@ -39,7 +39,10 @@ function response(body: unknown) {
   })
 }
 
-function renderRemotePage(fetchMock: ReturnType<typeof vi.fn>) {
+function renderRemotePage(
+  fetchMock: ReturnType<typeof vi.fn>,
+  initialEntries = ['/weigh-ins'],
+) {
   vi.stubEnv('VITE_SUPABASE_URL', 'https://weigh-ins-project.supabase.co')
   vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-anon-key')
   vi.stubGlobal('fetch', fetchMock)
@@ -52,7 +55,7 @@ function renderRemotePage(fetchMock: ReturnType<typeof vi.fn>) {
         user: { email: 'member@example.com', id: 'member-1' },
       }}
     >
-      <MemoryRouter>
+      <MemoryRouter initialEntries={initialEntries}>
         <DailyWeighInFormPage />
       </MemoryRouter>
     </AuthProvider>,
@@ -139,7 +142,7 @@ describe('DailyWeighInFormPage', () => {
       .mockResolvedValueOnce(
         response([
           {
-            challenge_id: 'challenge-real',
+            challenge_id: 'challenge-other',
             created_at: '2026-09-17T10:00:00.000Z',
             display_name: 'Another member',
             id: 'participant-other',
@@ -148,7 +151,7 @@ describe('DailyWeighInFormPage', () => {
             status: 'active',
             target_weight_kg: 75,
             updated_at: '2026-09-17T10:00:00.000Z',
-            user_id: 'other-member',
+            user_id: 'member-1',
           },
           {
             challenge_id: 'challenge-real',
@@ -189,7 +192,7 @@ describe('DailyWeighInFormPage', () => {
         }),
       )
 
-    renderRemotePage(fetchMock)
+    renderRemotePage(fetchMock, ['/weigh-ins?challenge=challenge-real'])
 
     await waitFor(() => {
       expect(screen.getByText('Saved member')).toBeInTheDocument()

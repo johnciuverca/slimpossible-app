@@ -1,18 +1,19 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 
-import {
-  Button,
-  Card,
-  PageHeader,
-  ProgressBar,
-  StatusPill,
-} from '../components/ui'
+import { Card, PageHeader, ProgressBar, StatusPill } from '../components/ui'
 import { MilestoneProgress } from '../components/MilestoneProgress'
 import type { ParticipantMilestones } from '../models/participantMilestones'
+import { createParticipantMilestones } from '../models/participantMilestones'
+import {
+  createParticipantDashboardFlow,
+  type ParticipantDashboardFlow,
+} from '../models/participantDashboardFlow'
 import { useOptionalAuth } from '../auth/useAuth'
 import { createPersistence } from '../data/persistence'
 import type { Challenge } from '../models/challenge'
+import type { Participant } from '../models/participant'
+import type { WeighIn } from '../models/weighIn'
 
 type PlaceholderPageProps = {
   children?: ReactNode
@@ -67,6 +68,147 @@ function PlaceholderPage({
       </Card>
     </section>
   )
+}
+
+type PersonalDashboardData = {
+  challenge: Challenge
+  flow: ParticipantDashboardFlow
+  participant: Participant
+  weighIns: WeighIn[]
+}
+
+function usePersonalDashboard() {
+  const { state: authState } = useOptionalAuth()
+  const [searchParams] = useSearchParams()
+  const challengeParam = searchParams.get('challenge')
+  const ownerId = authState.user?.id
+  const persistence = useMemo(() => createPersistence(authState), [authState])
+  const [data, setData] = useState<PersonalDashboardData | null>(null)
+  const [isLoading, setIsLoading] = useState(authState.status === 'signed-in')
+  const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    let isCurrent = true
+
+    async function loadDashboard() {
+      if (authState.status !== 'signed-in' || !ownerId) {
+        setData(null)
+        setMessage('Sign in to view your saved dashboard.')
+        setIsLoading(false)
+        return
+      }
+      if (persistence.mode === 'unavailable') {
+        setData(null)
+        setMessage(persistence.message)
+        setIsLoading(false)
+        return
+      }
+
+      setIsLoading(true)
+      const challenges =
+        await persistence.repositories.challenges.listOwned(ownerId)
+      if (!isCurrent) return
+      if (challenges.state === 'error') {
+        setData(null)
+        setMessage(challenges.error.message)
+        setIsLoading(false)
+        return
+      }
+      const savedChallenges =
+        challenges.state === 'success' ? challenges.data : []
+      const challenge =
+        savedChallenges.find(({ id }) => id === challengeParam) ??
+        savedChallenges[0]
+      if (!challenge) {
+        setData(null)
+        setMessage('Set up a challenge before viewing your dashboard.')
+        setIsLoading(false)
+        return
+      }
+
+      const participants =
+        await persistence.repositories.participants.listForUser(ownerId)
+      if (!isCurrent) return
+      if (participants.state === 'error') {
+        setData(null)
+        setMessage(participants.error.message)
+        setIsLoading(false)
+        return
+      }
+      const participant = participants.data.find(
+        (candidate) =>
+          candidate.challengeId === challenge.id &&
+          candidate.status === 'active',
+      )
+      if (!participant) {
+        setData(null)
+        setMessage(
+          'Enroll yourself in the selected challenge before viewing your dashboard.',
+        )
+        setIsLoading(false)
+        return
+      }
+
+      const weighIns =
+        await persistence.repositories.weighIns.listForParticipant(
+          participant.id,
+        )
+      if (!isCurrent) return
+      if (weighIns.state === 'error') {
+        setData(null)
+        setMessage(weighIns.error.message)
+        setIsLoading(false)
+        return
+      }
+      const records = weighIns.state === 'success' ? weighIns.data : []
+      setData({
+        challenge,
+        flow: createParticipantDashboardFlow({
+          challenge,
+          participantId: participant.id,
+          participants: [participant],
+          weighIns: records,
+        }),
+        participant,
+        weighIns: records,
+      })
+      setMessage('')
+      setIsLoading(false)
+    }
+
+    void loadDashboard()
+    return () => {
+      isCurrent = false
+    }
+  }, [authState.status, challengeParam, ownerId, persistence])
+
+  return { data, isLoading, message }
+}
+
+function DashboardState({
+  children,
+  isLoading,
+  message,
+}: {
+  children: ReactNode
+  isLoading: boolean
+  message: string
+}) {
+  if (isLoading) {
+    return (
+      <p aria-live="polite" className="text-sm text-slate-600" role="status">
+        Loading your saved dashboard…
+      </p>
+    )
+  }
+  if (message) {
+    return (
+      <p aria-live="polite" className="text-sm text-slate-600" role="status">
+        {message}
+      </p>
+    )
+  }
+  return <>{children}</>
 }
 
 export function HomePage() {
@@ -262,41 +404,145 @@ export function HomePage() {
 }
 
 export function TodayPage() {
+  const { data, isLoading, message } = usePersonalDashboard()
+  const challengeQuery = data
+    ? `?challenge=${encodeURIComponent(data.challenge.id)}`
+    : ''
+
   return (
-    <PlaceholderPage
-      description="Your daily challenge space will live here."
-      title="Today"
-    >
-      <Button disabled>Coming soon</Button>
-      <Link
-        className="mt-4 inline-block text-sm font-semibold text-emerald-700 underline"
-        to="/weigh-ins"
-      >
-        Record a weigh-in
-      </Link>
-    </PlaceholderPage>
+    <section className="mx-auto w-full max-w-4xl" aria-labelledby="today-title">
+      <Card className="p-8 sm:p-12">
+        <PageHeader
+          description="Your saved weigh-ins and current challenge status."
+          title="Today"
+          titleId="today-title"
+        >
+          <StatusPill>
+            {data?.challenge.name ?? 'Personal dashboard'}
+          </StatusPill>
+        </PageHeader>
+        <DashboardState isLoading={isLoading} message={message}>
+          {data ? (
+            <div className="mt-8 grid gap-4 sm:grid-cols-3">
+              <Card className="border border-stone-200 p-5 shadow-none">
+                <p className="text-sm text-slate-600">Current weight</p>
+                <p className="mt-2 text-2xl font-bold">
+                  {data.flow.dashboard.currentWeightKg ?? '—'} kg
+                </p>
+              </Card>
+              <Card className="border border-stone-200 p-5 shadow-none">
+                <p className="text-sm text-slate-600">Starting weight</p>
+                <p className="mt-2 text-2xl font-bold">
+                  {data.flow.dashboard.startingWeightKg ?? '—'} kg
+                </p>
+              </Card>
+              <Card className="border border-stone-200 p-5 shadow-none">
+                <p className="text-sm text-slate-600">Target weight</p>
+                <p className="mt-2 text-2xl font-bold">
+                  {data.flow.dashboard.targetWeightKg ?? '—'} kg
+                </p>
+              </Card>
+              <div className="sm:col-span-3">
+                <p className="text-sm leading-6 text-slate-600">
+                  {data.flow.progressSummary.message}
+                </p>
+                <Link
+                  className="mt-5 inline-block text-sm font-semibold text-emerald-700 underline"
+                  to={`/weigh-ins${challengeQuery}`}
+                >
+                  Record a weigh-in
+                </Link>
+              </div>
+            </div>
+          ) : null}
+        </DashboardState>
+      </Card>
+    </section>
   )
 }
 
 export function ProgressPage() {
+  const { data, isLoading, message } = usePersonalDashboard()
   return (
-    <PlaceholderPage
-      description="Your progress history will live here."
-      title="Progress"
+    <section
+      className="mx-auto w-full max-w-4xl"
+      aria-labelledby="progress-title"
     >
-      <ProgressBar label="Progress preview" value={0} />
-    </PlaceholderPage>
+      <Card className="p-8 sm:p-12">
+        <PageHeader
+          description="Your saved history and trend for the selected challenge."
+          title="Progress"
+          titleId="progress-title"
+        >
+          <StatusPill>
+            {data?.challenge.name ?? 'Personal dashboard'}
+          </StatusPill>
+        </PageHeader>
+        <DashboardState isLoading={isLoading} message={message}>
+          {data ? (
+            <div className="mt-8 space-y-6">
+              <ProgressBar
+                label="Progress toward target"
+                value={data.flow.dashboard.completionPercentage ?? 0}
+              />
+              <p className="text-sm leading-6 text-slate-600">
+                {data.flow.progressSummary.message}
+              </p>
+              <h2 className="text-xl font-bold">Weight history</h2>
+              {data.flow.historyTrend.history.length === 0 ? (
+                <p className="text-sm text-slate-600">
+                  No weigh-ins saved yet.
+                </p>
+              ) : (
+                <ul aria-label="Saved weight history" className="space-y-3">
+                  {data.flow.historyTrend.history.map((weighIn) => (
+                    <li
+                      className="rounded-xl border border-stone-200 p-4"
+                      key={`${weighIn.participantId}-${weighIn.date}`}
+                    >
+                      <span className="font-semibold">{weighIn.date}</span>:{' '}
+                      {weighIn.weightKg} kg
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="text-sm text-slate-600">
+                Trend:{' '}
+                {data.flow.historyTrend.trendChangeKg === null
+                  ? 'Not enough saved records yet.'
+                  : `${data.flow.historyTrend.trendChangeKg} kg`}
+              </p>
+            </div>
+          ) : null}
+        </DashboardState>
+      </Card>
+    </section>
   )
 }
 
 export function GoalsPage() {
+  const { data, isLoading, message } = usePersonalDashboard()
   return (
-    <PlaceholderPage
-      description="A local preview of the milestone component for the future participant dashboard."
-      title="Goals"
-    >
-      <MilestoneProgress milestones={milestonePreview} />
-    </PlaceholderPage>
+    <section className="mx-auto w-full max-w-4xl" aria-labelledby="goals-title">
+      <Card className="p-8 sm:p-12">
+        <PageHeader
+          description="Your saved challenge target and milestone progress."
+          title="Goals"
+          titleId="goals-title"
+        >
+          <StatusPill>
+            {data?.challenge.name ?? 'Personal dashboard'}
+          </StatusPill>
+        </PageHeader>
+        <DashboardState isLoading={isLoading} message={message}>
+          {data ? (
+            <MilestoneProgress
+              milestones={createParticipantMilestones(data.flow.dashboard)}
+            />
+          ) : null}
+        </DashboardState>
+      </Card>
+    </section>
   )
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 
 import { participantFixture } from '../models/fixtures'
 import { sortWeighInsByDate, upsertWeighIn } from '../models/weighInStore'
@@ -51,6 +51,8 @@ function mapValidationErrors(
 
 export function DailyWeighInFormPage() {
   const { state: authState } = useOptionalAuth()
+  const [searchParams] = useSearchParams()
+  const challengeParam = searchParams.get('challenge')
   const persistence = useMemo(() => createPersistence(authState), [authState])
   const [values, setValues] = useState(initialValues)
   const [weighIns, setWeighIns] = useState<WeighIn[]>([])
@@ -131,6 +133,7 @@ export function DailyWeighInFormPage() {
       const savedParticipant = participants.data.find(
         (candidate) =>
           candidate.userId === authenticatedUserId &&
+          (!challengeParam || candidate.challengeId === challengeParam) &&
           candidate.status === 'active',
       )
 
@@ -160,7 +163,7 @@ export function DailyWeighInFormPage() {
     return () => {
       isCurrent = false
     }
-  }, [authState.user?.id, persistence])
+  }, [authState.user?.id, challengeParam, persistence])
 
   function updateValue(field: WeighInFormField, value: string) {
     setValues((currentValues) => ({ ...currentValues, [field]: value }))
