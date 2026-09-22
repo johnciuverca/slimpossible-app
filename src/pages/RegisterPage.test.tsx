@@ -96,9 +96,13 @@ describe('RegisterPage', () => {
       name: 'Forgot your password?',
     })
     const homeLink = screen.getByRole('link', { name: 'Back to home' })
+    const linkGroup = screen.getByRole('navigation', {
+      name: 'Authentication links',
+    })
     expect(recoveryLink).toHaveAttribute('href', '/forgot-password')
     expect(homeLink).toHaveAttribute('href', '/')
-    expect(recoveryLink).toHaveClass('mt-6', 'inline-block')
-    expect(homeLink).toHaveClass('mt-6', 'inline-block')
+    expect(recoveryLink).toHaveClass('inline-block')
+    expect(homeLink).toHaveClass('inline-block')
+    expect(linkGroup).toHaveClass('flex', 'flex-col', 'gap-4')
   })
 })

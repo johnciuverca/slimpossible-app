@@ -173,18 +173,23 @@ export function RegisterPage() {
             Sign in
           </Link>
         </p>
-        <Link
-          className="mt-6 inline-block text-sm text-emerald-700 underline"
-          to="/forgot-password"
+        <nav
+          aria-label="Authentication links"
+          className="mt-6 flex flex-col items-start gap-4"
         >
-          Forgot your password?
-        </Link>
-        <Link
-          className="mt-6 inline-block text-sm text-emerald-700 underline"
-          to="/"
-        >
-          Back to home
-        </Link>
+          <Link
+            className="inline-block text-sm text-emerald-700 underline"
+            to="/forgot-password"
+          >
+            Forgot your password?
+          </Link>
+          <Link
+            className="inline-block text-sm text-emerald-700 underline"
+            to="/"
+          >
+            Back to home
+          </Link>
+        </nav>
         {state.status === 'verification-pending' ? (
           <Link
             className="mt-4 inline-block text-sm text-emerald-700 underline"
