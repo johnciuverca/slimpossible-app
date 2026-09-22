@@ -16,6 +16,13 @@ const hardeningMigration = readFileSync(
   ),
   'utf8',
 )
+const inviteMigration = readFileSync(
+  resolve(
+    process.cwd(),
+    'supabase/migrations/20260922000001_add_secure_challenge_invites.sql',
+  ),
+  'utf8',
+)
 
 describe('row-level security migration contract', () => {
   it('enables RLS on every application table', () => {
@@ -70,5 +77,31 @@ describe('row-level security migration contract', () => {
     )
     expect(hardeningMigration).toContain('weigh_ins.participant_id = old.id')
     expect(hardeningMigration).toContain("errcode = '42501'")
+  })
+
+  it('keeps invite creation, acceptance, and ownership server-authorized', () => {
+    expect(inviteMigration).toContain('create table public.challenge_invites')
+    expect(inviteMigration).toContain(
+      'create or replace function public.create_challenge_invite',
+    )
+    expect(inviteMigration).toContain(
+      "encode(digest(raw_token, 'sha256'), 'hex')",
+    )
+    expect(inviteMigration).toContain(
+      'create or replace function public.accept_challenge_invite',
+    )
+    expect(inviteMigration).toContain('auth.uid()')
+    expect(inviteMigration).toContain(
+      'on conflict (challenge_id, user_id) do nothing',
+    )
+    expect(inviteMigration).toContain(
+      'create or replace function public.prevent_challenge_ownership_change',
+    )
+    expect(inviteMigration).toContain(
+      'create or replace function public.prevent_participant_user_reassignment',
+    )
+    expect(inviteMigration).toContain(
+      'revoke all on table public.challenge_invites from anon, authenticated',
+    )
   })
 })

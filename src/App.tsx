@@ -8,6 +8,8 @@ import { DailyWeighInFormPage } from './pages/DailyWeighInFormPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { LoginPage } from './pages/LoginPage'
 import { ParticipantEnrollmentPage } from './pages/ParticipantEnrollmentPage'
+import { ChallengeInvitesPage } from './pages/ChallengeInvitesPage'
+import { InviteAcceptancePage } from './pages/InviteAcceptancePage'
 import { RegisterPage } from './pages/RegisterPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import {
@@ -39,6 +41,7 @@ function App() {
             <Route path="forgot-password" element={<ForgotPasswordPage />} />
             <Route path="reset-password" element={<ResetPasswordPage />} />
             <Route path="challenge/setup" element={<ChallengeSetupPage />} />
+            <Route path="invite/:token" element={<InviteAcceptancePage />} />
             <Route path="weigh-ins" element={<DailyWeighInFormPage />} />
             <Route
               path="milestones-preview"
@@ -52,6 +55,10 @@ function App() {
               <Route path="today" element={<TodayPage />} />
               <Route path="progress" element={<ProgressPage />} />
               <Route path="goals" element={<GoalsPage />} />
+              <Route
+                path="challenge/invites"
+                element={<ChallengeInvitesPage />}
+              />
             </Route>
             <Route path="*" element={<NotFoundPage />} />
           </Route>

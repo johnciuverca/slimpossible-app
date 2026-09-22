@@ -2,6 +2,11 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { Challenge } from '../../models/challenge'
 import type { Participant } from '../../models/participant'
+import type {
+  ChallengeInvite,
+  ChallengeInvitePreview,
+  InviteAcceptanceValues,
+} from '../../models/challengeInvite'
 import type { WeighIn } from '../../models/weighIn'
 import type { Database } from './database.types'
 
@@ -26,6 +31,12 @@ type ChallengeRow = Database['public']['Tables']['challenges']['Row']
 type ParticipantRow = Database['public']['Tables']['participants']['Row']
 type ProfileRow = Database['public']['Tables']['profiles']['Row']
 type WeighInRow = Database['public']['Tables']['weigh_ins']['Row']
+type ChallengeInviteRow =
+  Database['public']['Functions']['list_challenge_invites']['Returns'][number]
+type ChallengeInvitePreviewRow =
+  Database['public']['Functions']['preview_challenge_invite']['Returns'][number]
+type CreatedChallengeInviteRow =
+  Database['public']['Functions']['create_challenge_invite']['Returns'][number]
 
 export type ChallengeRepository = {
   create: (input: ChallengeWriteInput) => Promise<RepositoryResult<Challenge>>
@@ -81,10 +92,33 @@ export type WeighInRepository = {
   upsert: (input: WeighInWriteInput) => Promise<RepositoryResult<WeighIn>>
 }
 
+export type CreatedChallengeInvite = {
+  invite: ChallengeInvite
+  token: string
+}
+
+export type ChallengeInviteRepository = {
+  accept: (
+    token: string,
+    input: InviteAcceptanceValues,
+    localUserId?: string,
+  ) => Promise<RepositoryResult<Participant>>
+  create: (
+    challengeId: string,
+    expiresAt: string,
+  ) => Promise<RepositoryResult<CreatedChallengeInvite>>
+  listForChallenge: (
+    challengeId: string,
+  ) => Promise<RepositoryListResult<ChallengeInvite>>
+  preview: (token: string) => Promise<RepositoryResult<ChallengeInvitePreview>>
+  revoke: (id: string) => Promise<RepositoryResult<boolean>>
+}
+
 export type Repositories = {
   challenges: ChallengeRepository
   participants: ParticipantRepository
   profiles: ProfileRepository
+  invites: ChallengeInviteRepository
   weighIns: WeighInRepository
 }
 
@@ -177,6 +211,59 @@ function mapWeighIn(row: WeighInRow): WeighIn {
     ...(row.note === null ? {} : { note: row.note }),
     participantId: row.participant_id,
     weightKg: row.weight_kg,
+  }
+}
+
+function mapChallengeInvite(row: ChallengeInviteRow): ChallengeInvite {
+  return {
+    challengeId: row.challenge_id,
+    createdAt: row.created_at,
+    expiresAt: row.expires_at,
+    id: row.invite_id,
+    ...(row.revoked_at === null ? {} : { revokedAt: row.revoked_at }),
+  }
+}
+
+function mapChallengeInvitePreview(
+  row: ChallengeInvitePreviewRow,
+): ChallengeInvitePreview {
+  if (
+    row.status !== 'active' &&
+    row.status !== 'expired' &&
+    row.status !== 'revoked'
+  ) {
+    throw new Error('Invalid invitation status')
+  }
+
+  return {
+    challengeId: row.challenge_id,
+    challengeName: row.challenge_name,
+    expiresAt: row.expires_at,
+    id: row.invite_id,
+    ...(row.revoked_at === null ? {} : { revokedAt: row.revoked_at }),
+    status: row.status,
+  }
+}
+
+function inviteRequestError(
+  operation: string,
+  error: unknown,
+): RepositoryError {
+  const code =
+    typeof error === 'object' && error !== null && 'code' in error
+      ? String(error.code)
+      : undefined
+  const messages: Record<string, string> = {
+    P0002: 'This invitation has been revoked.',
+    P0003: 'This invitation has expired.',
+    P0004: 'This invitation is invalid.',
+  }
+
+  return {
+    ...(code ? { code } : {}),
+    kind: 'request',
+    message:
+      code && messages[code] ? messages[code] : `Unable to ${operation}.`,
   }
 }
 
@@ -414,6 +501,96 @@ export function createRepositories(client: DatabaseClient): Repositories {
         }
 
         return mapSingle(data, mapProfile, 'profile')
+      },
+    },
+    invites: {
+      async accept(token, input) {
+        const { data, error } = await client.rpc('accept_challenge_invite', {
+          invite_token: token,
+          participant_display_name: input.displayName,
+          participant_starting_weight_kg: input.startingWeightKg,
+          participant_target_weight_kg: input.targetWeightKg,
+        })
+
+        return error
+          ? {
+              error: inviteRequestError('accept the invitation', error),
+              state: 'error',
+            }
+          : mapSingle(data, mapParticipant, 'participant')
+      },
+      async create(challengeId, expiresAt) {
+        const { data, error } = await client.rpc('create_challenge_invite', {
+          target_challenge_id: challengeId,
+          target_expires_at: expiresAt,
+        })
+
+        if (error) {
+          return {
+            error: inviteRequestError('create the invitation', error),
+            state: 'error',
+          }
+        }
+
+        const row: CreatedChallengeInviteRow | null = data?.[0] ?? null
+        if (!row) return { data: null, state: 'empty' }
+
+        return {
+          data: {
+            invite: {
+              challengeId: row.challenge_id,
+              createdAt: new Date().toISOString(),
+              expiresAt: row.expires_at,
+              id: row.invite_id,
+            },
+            token: row.token,
+          },
+          state: 'success',
+        }
+      },
+      async listForChallenge(challengeId) {
+        const { data, error } = await client.rpc('list_challenge_invites', {
+          target_challenge_id: challengeId,
+        })
+
+        return error
+          ? {
+              error: inviteRequestError('load the invitations', error),
+              state: 'error',
+            }
+          : mapList(data, mapChallengeInvite, 'invitation')
+      },
+      async preview(token) {
+        const { data, error } = await client.rpc('preview_challenge_invite', {
+          invite_token: token,
+        })
+
+        return error
+          ? {
+              error: inviteRequestError('load the invitation', error),
+              state: 'error',
+            }
+          : mapSingle(
+              data?.[0] ?? null,
+              mapChallengeInvitePreview,
+              'invitation',
+            )
+      },
+      async revoke(id) {
+        const { data, error } = await client.rpc('revoke_challenge_invite', {
+          target_invite_id: id,
+        })
+
+        if (error) {
+          return {
+            error: inviteRequestError('revoke the invitation', error),
+            state: 'error',
+          }
+        }
+
+        return data
+          ? { data: true, state: 'success' }
+          : { data: null, state: 'empty' }
       },
     },
     weighIns: {

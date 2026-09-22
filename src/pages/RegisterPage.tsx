@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState, type FormEvent } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import {
   Button,
@@ -8,6 +8,7 @@ import {
   StatusPill,
   TextInput,
 } from '../components/ui'
+import { safeInternalPath } from '../auth/authRedirects'
 import { useAuth } from '../auth/useAuth'
 import { getAuthenticationEnvironmentLabel } from '../auth/supabaseConfig'
 import { isValidEmail } from './authValidation'
@@ -54,6 +55,14 @@ function validateRegistration(
 
 export function RegisterPage() {
   const { signUp, state } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (state.status === 'signed-in' && location.state) {
+      navigate(safeInternalPath(location.state), { replace: true })
+    }
+  }, [location.state, navigate, state.status])
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -169,7 +178,11 @@ export function RegisterPage() {
 
         <p className="mt-6 text-sm leading-6 text-slate-600">
           Already have an account?{' '}
-          <Link className="text-emerald-700 underline" to="/login">
+          <Link
+            className="text-emerald-700 underline"
+            state={location.state}
+            to="/login"
+          >
             Sign in
           </Link>
         </p>
@@ -193,6 +206,7 @@ export function RegisterPage() {
         {state.status === 'verification-pending' ? (
           <Link
             className="mt-4 inline-block text-sm text-emerald-700 underline"
+            state={location.state}
             to="/login"
           >
             Return to sign in after verification

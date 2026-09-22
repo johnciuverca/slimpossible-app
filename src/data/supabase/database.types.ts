@@ -144,6 +144,27 @@ export type Database = {
     }
     Views: Record<string, never>
     Functions: {
+      accept_challenge_invite: {
+        Args: {
+          invite_token: string
+          participant_display_name: string
+          participant_starting_weight_kg: number
+          participant_target_weight_kg: number
+        }
+        Returns: Database['public']['Tables']['participants']['Row']
+      }
+      create_challenge_invite: {
+        Args: {
+          target_challenge_id: string
+          target_expires_at: string
+        }
+        Returns: {
+          challenge_id: string
+          expires_at: string
+          invite_id: string
+          token: string
+        }[]
+      }
       get_challenge_progress_summary: {
         Args: { target_challenge_id: string }
         Returns: {
@@ -153,6 +174,31 @@ export type Database = {
           participants_with_recorded_weight_count: number
           total_weigh_in_count: number
         }[]
+      }
+      list_challenge_invites: {
+        Args: { target_challenge_id: string }
+        Returns: {
+          challenge_id: string
+          created_at: string
+          expires_at: string
+          invite_id: string
+          revoked_at: string | null
+        }[]
+      }
+      preview_challenge_invite: {
+        Args: { invite_token: string }
+        Returns: {
+          challenge_id: string
+          challenge_name: string
+          expires_at: string
+          invite_id: string
+          revoked_at: string | null
+          status: string
+        }[]
+      }
+      revoke_challenge_invite: {
+        Args: { target_invite_id: string }
+        Returns: boolean
       }
     }
     Enums: Record<string, never>

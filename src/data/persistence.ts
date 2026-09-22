@@ -5,9 +5,16 @@ import {
 } from './supabase/client'
 import type { Challenge } from '../models/challenge'
 import type { Participant } from '../models/participant'
+import {
+  getChallengeInviteStatus,
+  type ChallengeInvite,
+  type ChallengeInvitePreview,
+} from '../models/challengeInvite'
 import type { WeighIn } from '../models/weighIn'
 import type {
   ChallengeRepository,
+  ChallengeInviteRepository,
+  CreatedChallengeInvite,
   ChallengeWriteInput,
   ParticipantRepository,
   ParticipantWriteInput,
@@ -25,7 +32,7 @@ export const remotePersistenceUnavailableMessage =
 
 export type PersistenceRepositories = Pick<
   Repositories,
-  'challenges' | 'participants' | 'profiles' | 'weighIns'
+  'challenges' | 'invites' | 'participants' | 'profiles' | 'weighIns'
 >
 
 export type ChallengeParticipantRepositories = Pick<
@@ -43,9 +50,22 @@ export type Persistence =
       mode: 'unavailable'
     }
 
+export type InvitePersistence =
+  | {
+      mode: 'local' | 'remote'
+      repositories: Pick<Repositories, 'invites'>
+    }
+  | {
+      message: string
+      mode: 'unavailable'
+    }
+
 const challengesStorageKey = 'slimpossible.local.challenges'
 const participantsStorageKey = 'slimpossible.local.participants'
 const weighInsStorageKey = 'slimpossible.local.weigh-ins'
+const invitesStorageKey = 'slimpossible.local.challenge-invites'
+
+type LocalChallengeInvite = ChallengeInvite & { token: string }
 
 function createLocalId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -213,6 +233,145 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
     },
   }
 
+  const invites: ChallengeInviteRepository = {
+    async accept(token, input, localUserId) {
+      if (!localUserId) {
+        return {
+          error: {
+            kind: 'request',
+            message: 'Sign in before accepting an invitation.',
+          },
+          state: 'error',
+        }
+      }
+
+      const invite = readList<LocalChallengeInvite>(
+        storage,
+        invitesStorageKey,
+      ).find((value) => value.token === token)
+      if (!invite) {
+        return {
+          error: { kind: 'request', message: 'This invitation is invalid.' },
+          state: 'error',
+        }
+      }
+
+      const status = getChallengeInviteStatus(invite)
+      if (status === 'revoked') {
+        return {
+          error: {
+            kind: 'request',
+            message: 'This invitation has been revoked.',
+          },
+          state: 'error',
+        }
+      }
+      if (status === 'expired') {
+        return {
+          error: { kind: 'request', message: 'This invitation has expired.' },
+          state: 'error',
+        }
+      }
+
+      const values = readList<Participant>(storage, participantsStorageKey)
+      const existing = values.find(
+        (value) =>
+          value.challengeId === invite.challengeId &&
+          value.userId === localUserId,
+      )
+      if (existing) return { data: existing, state: 'success' }
+
+      const participant: Participant = {
+        challengeId: invite.challengeId,
+        displayName: input.displayName,
+        id: createLocalId('participant'),
+        joinedAt: new Date().toISOString(),
+        status: 'active',
+        startingWeightKg: input.startingWeightKg,
+        targetWeightKg: input.targetWeightKg,
+        userId: localUserId,
+      }
+      if (
+        !writeList(storage, participantsStorageKey, [participant, ...values])
+      ) {
+        return localStorageError()
+      }
+      return { data: participant, state: 'success' }
+    },
+    async create(challengeId, expiresAt) {
+      const now = new Date().toISOString()
+      const invite: LocalChallengeInvite = {
+        challengeId,
+        createdAt: now,
+        expiresAt,
+        id: createLocalId('invite'),
+        token: createLocalId('invite-token'),
+      }
+      const values = readList<LocalChallengeInvite>(storage, invitesStorageKey)
+      if (!writeList(storage, invitesStorageKey, [invite, ...values])) {
+        return localStorageError()
+      }
+      const result: CreatedChallengeInvite = {
+        invite: {
+          challengeId: invite.challengeId,
+          createdAt: invite.createdAt,
+          expiresAt: invite.expiresAt,
+          id: invite.id,
+        },
+        token: invite.token,
+      }
+      return { data: result, state: 'success' }
+    },
+    async listForChallenge(challengeId) {
+      const values = readList<LocalChallengeInvite>(storage, invitesStorageKey)
+        .filter((value) => value.challengeId === challengeId)
+        .map(({ challengeId, createdAt, expiresAt, id, revokedAt }) => ({
+          challengeId,
+          createdAt,
+          expiresAt,
+          id,
+          ...(revokedAt ? { revokedAt } : {}),
+        }))
+      return values.length > 0
+        ? { data: values, state: 'success' }
+        : { data: [], state: 'empty' }
+    },
+    async preview(token) {
+      const invite = readList<LocalChallengeInvite>(
+        storage,
+        invitesStorageKey,
+      ).find((value) => value.token === token)
+      if (!invite) {
+        return { data: null, state: 'empty' }
+      }
+
+      const challenge = readList<Challenge>(storage, challengesStorageKey).find(
+        (value) => value.id === invite.challengeId,
+      )
+      if (!challenge) return { data: null, state: 'empty' }
+
+      const preview: ChallengeInvitePreview = {
+        challengeId: invite.challengeId,
+        challengeName: challenge.name,
+        expiresAt: invite.expiresAt,
+        id: invite.id,
+        ...(invite.revokedAt ? { revokedAt: invite.revokedAt } : {}),
+        status: getChallengeInviteStatus(invite),
+      }
+      return { data: preview, state: 'success' }
+    },
+    async revoke(id) {
+      const values = readList<LocalChallengeInvite>(storage, invitesStorageKey)
+      const index = values.findIndex((value) => value.id === id)
+      if (index < 0) return { data: null, state: 'empty' }
+      values[index] = { ...values[index], revokedAt: new Date().toISOString() }
+      if (!writeList(storage, invitesStorageKey, values)) {
+        return localStorageError()
+      }
+      return { data: true, state: 'success' }
+    },
+  }
+
   const weighIns: WeighInRepository = {
     async create(input: WeighInWriteInput) {
       const weighIn: WeighIn = {
@@ -291,7 +450,7 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
     },
   }
 
-  return { challenges, participants, profiles, weighIns }
+  return { challenges, invites, participants, profiles, weighIns }
 }
 
 export function createPersistence(
@@ -316,6 +475,37 @@ export function createPersistence(
   return {
     mode: 'remote',
     repositories: createRepositories(clientResult.client),
+  }
+}
+
+/**
+ * Invite previews are safe to load before authentication. Acceptance and all
+ * owner actions remain authorized by Supabase RPCs using auth.uid().
+ */
+export function createInvitePersistence(
+  authState: AuthState,
+  storage: Storage = window.localStorage,
+  environment?: SupabaseEnvironment,
+): InvitePersistence {
+  const clientResult = createSupabaseBrowserClient(environment)
+
+  if (clientResult.state === 'missing-configuration') {
+    return {
+      mode: 'local',
+      repositories: {
+        invites: createLocalRepositories(storage).invites,
+      },
+    }
+  }
+
+  if (clientResult.state !== 'configured') {
+    return { message: clientResult.message, mode: 'unavailable' }
+  }
+
+  void authState
+  return {
+    mode: 'remote',
+    repositories: { invites: createRepositories(clientResult.client).invites },
   }
 }
 
