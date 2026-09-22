@@ -177,6 +177,15 @@ describe('Supabase repositories', () => {
     expect(requestUrl).toContain('owner_id=eq.owner-1')
   })
 
+  it('scopes participant listing to the authenticated user', async () => {
+    stubResponse([])
+
+    await createRepositories(client).participants.listForUser('member-1')
+
+    const requestUrl = String(vi.mocked(fetch).mock.calls[0]?.[0])
+    expect(requestUrl).toContain('user_id=eq.member-1')
+  })
+
   it('returns an explicit empty state for an empty participant list', async () => {
     stubResponse([])
 
