@@ -9,6 +9,13 @@ const migration = readFileSync(
   ),
   'utf8',
 )
+const hardeningMigration = readFileSync(
+  resolve(
+    process.cwd(),
+    'supabase/migrations/20260922000000_harden_rls_authorization.sql',
+  ),
+  'utf8',
+)
 
 describe('row-level security migration contract', () => {
   it('enables RLS on every application table', () => {
@@ -46,5 +53,22 @@ describe('row-level security migration contract', () => {
     expect(summaryFunction).not.toContain('w.weight_kg')
     expect(summaryFunction).not.toContain('w.note')
     expect(summaryFunction).not.toContain('p.display_name')
+  })
+
+  it('hardens member visibility and membership reassignment', () => {
+    expect(hardeningMigration).toContain(
+      'create or replace function public.is_challenge_member',
+    )
+    expect(hardeningMigration).toContain(
+      'create policy challenges_select_owned_or_member',
+    )
+    expect(hardeningMigration).toContain(
+      'create or replace function public.prevent_participant_user_reassignment',
+    )
+    expect(hardeningMigration).toContain(
+      'create trigger prevent_participant_user_reassignment',
+    )
+    expect(hardeningMigration).toContain('weigh_ins.participant_id = old.id')
+    expect(hardeningMigration).toContain("errcode = '42501'")
   })
 })
