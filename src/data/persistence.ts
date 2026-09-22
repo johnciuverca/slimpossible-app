@@ -179,6 +179,15 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
         ? { data: values, state: 'success' }
         : { data: [], state: 'empty' }
     },
+    async listForUser(userId: string) {
+      const values = readList<Participant>(
+        storage,
+        participantsStorageKey,
+      ).filter((value) => value.userId === userId)
+      return values.length > 0
+        ? { data: values, state: 'success' }
+        : { data: [], state: 'empty' }
+    },
     async update(id: string, input: ParticipantWriteInput) {
       const values = readList<Participant>(storage, participantsStorageKey)
       const index = values.findIndex((value) => value.id === id)

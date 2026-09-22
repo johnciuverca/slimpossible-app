@@ -5,14 +5,17 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 
+import { AuthProvider } from '../auth/AuthContext'
 import { DailyWeighInFormPage } from './DailyWeighInFormPage'
 
 afterEach(() => {
   cleanup()
   window.localStorage.clear()
+  vi.unstubAllEnvs()
+  vi.unstubAllGlobals()
 })
 
 function renderPage() {
@@ -27,6 +30,33 @@ function dateOffset(offset: number) {
   const date = new Date()
   date.setUTCDate(date.getUTCDate() + offset)
   return date.toISOString().slice(0, 10)
+}
+
+function response(body: unknown) {
+  return new Response(JSON.stringify(body), {
+    headers: { 'Content-Type': 'application/json' },
+    status: 200,
+  })
+}
+
+function renderRemotePage(fetchMock: ReturnType<typeof vi.fn>) {
+  vi.stubEnv('VITE_SUPABASE_URL', 'https://weigh-ins-project.supabase.co')
+  vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-anon-key')
+  vi.stubGlobal('fetch', fetchMock)
+
+  render(
+    <AuthProvider
+      initialState={{
+        error: null,
+        status: 'signed-in',
+        user: { email: 'member@example.com', id: 'member-1' },
+      }}
+    >
+      <MemoryRouter>
+        <DailyWeighInFormPage />
+      </MemoryRouter>
+    </AuthProvider>,
+  )
 }
 
 describe('DailyWeighInFormPage', () => {
@@ -100,6 +130,133 @@ describe('DailyWeighInFormPage', () => {
     expect(screen.getByText(/91.5 kg/)).toBeInTheDocument()
     expect(screen.queryByText(/91.8 kg/)).not.toBeInTheDocument()
     expect(screen.getAllByRole('listitem')).toHaveLength(1)
+  })
+
+  it('uses the authenticated saved participant for remote refresh and same-date correction', async () => {
+    const today = dateOffset(0)
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        response([
+          {
+            challenge_id: 'challenge-real',
+            created_at: '2026-09-17T10:00:00.000Z',
+            display_name: 'Another member',
+            id: 'participant-other',
+            joined_at: '2026-09-17T10:00:00.000Z',
+            starting_weight_kg: 86,
+            status: 'active',
+            target_weight_kg: 75,
+            updated_at: '2026-09-17T10:00:00.000Z',
+            user_id: 'other-member',
+          },
+          {
+            challenge_id: 'challenge-real',
+            created_at: '2026-09-17T10:00:00.000Z',
+            display_name: 'Saved member',
+            id: 'participant-real',
+            joined_at: '2026-09-17T10:00:00.000Z',
+            starting_weight_kg: 90,
+            status: 'active',
+            target_weight_kg: 80,
+            updated_at: '2026-09-17T10:00:00.000Z',
+            user_id: 'member-1',
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        response([
+          {
+            created_at: '2026-09-17T10:00:00.000Z',
+            id: 'weigh-in-real',
+            note: 'Saved note',
+            participant_id: 'participant-real',
+            recorded_date: today,
+            updated_at: '2026-09-17T10:00:00.000Z',
+            weight_kg: 90.5,
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        response({
+          created_at: '2026-09-17T10:00:00.000Z',
+          id: 'weigh-in-real',
+          note: 'Corrected note',
+          participant_id: 'participant-real',
+          recorded_date: today,
+          updated_at: '2026-09-17T11:00:00.000Z',
+          weight_kg: 90.1,
+        }),
+      )
+
+    renderRemotePage(fetchMock)
+
+    await waitFor(() => {
+      expect(screen.getByText('Saved member')).toBeInTheDocument()
+    })
+    expect(screen.queryByText('Alex Participant')).not.toBeInTheDocument()
+    expect(screen.queryByText('Another member')).not.toBeInTheDocument()
+    expect(screen.getByText(/90.5 kg/)).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Weight in kg'), {
+      target: { value: '90.1' },
+    })
+    fireEvent.change(screen.getByLabelText('Note (optional)'), {
+      target: { value: 'Corrected note' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Weigh-in saved remotely.')).toBeInTheDocument()
+    })
+    expect(screen.getAllByRole('listitem')).toHaveLength(1)
+    expect(screen.getByText(/90.1 kg/)).toBeInTheDocument()
+    expect(screen.queryByText(/90.5 kg/)).not.toBeInTheDocument()
+
+    const participantRequest = fetchMock.mock.calls[0]
+    expect(String(participantRequest?.[0])).toContain('user_id=eq.member-1')
+
+    const upsertRequest = fetchMock.mock.calls[2]
+    expect(String(upsertRequest?.[0])).toContain('/weigh_ins')
+    expect(String(upsertRequest?.[1]?.body)).toContain('participant-real')
+    expect(String(upsertRequest?.[1]?.body)).not.toContain('participant-other')
+  })
+
+  it('does not show a form or write attempt when the signed-in user lacks a saved participant', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      response([
+        {
+          challenge_id: 'challenge-real',
+          created_at: '2026-09-17T10:00:00.000Z',
+          display_name: 'Another member',
+          id: 'participant-other',
+          joined_at: '2026-09-17T10:00:00.000Z',
+          starting_weight_kg: 86,
+          status: 'active',
+          target_weight_kg: 75,
+          updated_at: '2026-09-17T10:00:00.000Z',
+          user_id: 'other-member',
+        },
+      ]),
+    )
+
+    renderRemotePage(fetchMock)
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/No saved participant is available/),
+      ).toBeInTheDocument()
+    })
+    expect(
+      screen.queryByRole('form', { name: 'Daily weigh-in form' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: 'Set up a challenge' }),
+    ).toHaveAttribute('href', '/challenge/setup')
+    expect(
+      screen.getByRole('link', { name: 'Enroll a participant' }),
+    ).toHaveAttribute('href', '/challenge/participants/enroll')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
   it('orders history, keeps missing days absent, and edits an existing entry', async () => {

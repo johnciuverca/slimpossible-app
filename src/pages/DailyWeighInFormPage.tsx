@@ -5,6 +5,7 @@ import { participantFixture } from '../models/fixtures'
 import { sortWeighInsByDate, upsertWeighIn } from '../models/weighInStore'
 import type { WeighInValidationField } from '../models/weighIn'
 import type { WeighIn } from '../models/weighIn'
+import type { Participant } from '../models/participant'
 import {
   Button,
   Card,
@@ -53,9 +54,14 @@ export function DailyWeighInFormPage() {
   const persistence = useMemo(() => createPersistence(authState), [authState])
   const [values, setValues] = useState(initialValues)
   const [weighIns, setWeighIns] = useState<WeighIn[]>([])
+  const [participant, setParticipant] = useState<Participant | null>(() =>
+    persistence.mode === 'local' ? participantFixture : null,
+  )
   const [errors, setErrors] = useState<WeighInFormErrors>({})
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(persistence.mode !== 'local')
   const [isSaving, setIsSaving] = useState(false)
+  const [hasNoEligibleParticipant, setHasNoEligibleParticipant] =
+    useState(false)
   const [editingDate, setEditingDate] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
@@ -64,6 +70,31 @@ export function DailyWeighInFormPage() {
     let isCurrent = true
 
     async function loadWeighIns() {
+      if (persistence.mode === 'local') {
+        const result =
+          await persistence.repositories.weighIns.listForParticipant(
+            participantFixture.id,
+          )
+        if (!isCurrent) {
+          return
+        }
+
+        setParticipant(participantFixture)
+        if (result.state === 'error') {
+          setSubmitError(result.error.message)
+        } else if (result.state === 'success') {
+          setWeighIns(result.data)
+        }
+        setIsLoading(false)
+        return
+      }
+
+      setIsLoading(true)
+      setParticipant(null)
+      setWeighIns([])
+      setHasNoEligibleParticipant(false)
+      setSubmitError('')
+
       if (persistence.mode === 'unavailable') {
         if (isCurrent) {
           setSubmitError(persistence.message)
@@ -72,13 +103,51 @@ export function DailyWeighInFormPage() {
         return
       }
 
+      const authenticatedUserId = authState.user?.id
+      if (!authenticatedUserId) {
+        if (isCurrent) {
+          setSubmitError(
+            'A signed-in account is required to load saved weigh-ins.',
+          )
+          setIsLoading(false)
+        }
+        return
+      }
+
+      const participants =
+        await persistence.repositories.participants.listForUser(
+          authenticatedUserId,
+        )
+      if (!isCurrent) {
+        return
+      }
+
+      if (participants.state === 'error') {
+        setSubmitError(participants.error.message)
+        setIsLoading(false)
+        return
+      }
+
+      const savedParticipant = participants.data.find(
+        (candidate) =>
+          candidate.userId === authenticatedUserId &&
+          candidate.status === 'active',
+      )
+
+      if (!savedParticipant) {
+        setHasNoEligibleParticipant(true)
+        setIsLoading(false)
+        return
+      }
+
       const result = await persistence.repositories.weighIns.listForParticipant(
-        participantFixture.id,
+        savedParticipant.id,
       )
       if (!isCurrent) {
         return
       }
 
+      setParticipant(savedParticipant)
       if (result.state === 'error') {
         setSubmitError(result.error.message)
       } else if (result.state === 'success') {
@@ -91,7 +160,7 @@ export function DailyWeighInFormPage() {
     return () => {
       isCurrent = false
     }
-  }, [persistence])
+  }, [authState.user?.id, persistence])
 
   function updateValue(field: WeighInFormField, value: string) {
     setValues((currentValues) => ({ ...currentValues, [field]: value }))
@@ -123,10 +192,14 @@ export function DailyWeighInFormPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
+    if (!participant) {
+      return
+    }
+
     const input = {
       date: values.date,
       note: values.note.trim() || undefined,
-      participantId: participantFixture.id,
+      participantId: participant.id,
       weightKg: Number(values.weightKg),
     }
     const result = upsertWeighIn(weighIns, input)
@@ -190,7 +263,11 @@ export function DailyWeighInFormPage() {
       <div className="grid w-full gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]">
         <Card className="p-8 sm:p-10">
           <PageHeader
-            description="Record today’s weight for the local preview participant."
+            description={
+              persistence.mode === 'local'
+                ? 'Record today’s weight for the local preview participant.'
+                : 'Record today’s weight for your saved participant.'
+            }
             title="Daily weigh-in."
             titleId="daily-weigh-in-title"
           >
@@ -204,99 +281,138 @@ export function DailyWeighInFormPage() {
           </PageHeader>
 
           <p className="mt-6 text-sm text-slate-600">
-            Participant: <strong>{participantFixture.displayName}</strong>
+            Participant:{' '}
+            <strong>{participant?.displayName ?? 'Not available'}</strong>
           </p>
 
-          <form
-            aria-label="Daily weigh-in form"
-            className="mt-8 space-y-5"
-            noValidate
-            onSubmit={handleSubmit}
-          >
-            <TextInput
-              error={errors.date}
-              id="daily-weigh-in-date"
-              label="Date"
-              max={todayAsDateOnly()}
-              onChange={(event) => updateValue('date', event.target.value)}
-              readOnly={editingDate !== null}
-              type="date"
-              value={values.date}
-            />
-            <TextInput
-              error={errors.weightKg}
-              id="daily-weigh-in-weight"
-              inputMode="decimal"
-              label="Weight in kg"
-              min="0"
-              onChange={(event) => updateValue('weightKg', event.target.value)}
-              step="0.1"
-              type="number"
-              value={values.weightKg}
-            />
-
-            <div>
-              <label
-                className="text-sm font-semibold text-slate-700"
-                htmlFor="daily-weigh-in-note"
-              >
-                Note{' '}
-                <span className="font-normal text-slate-500">(optional)</span>
-              </label>
-              <textarea
-                aria-describedby={
-                  errors.note ? 'daily-weigh-in-note-error' : undefined
-                }
-                aria-invalid={errors.note ? true : undefined}
-                className="mt-2 block min-h-24 w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-                id="daily-weigh-in-note"
-                onChange={(event) => updateValue('note', event.target.value)}
-                value={values.note}
-              />
-              {errors.note ? (
-                <p
-                  className="mt-2 text-sm text-red-700"
-                  id="daily-weigh-in-note-error"
-                >
-                  {errors.note}
-                </p>
-              ) : null}
-            </div>
-
-            {submitError ? (
+          {isLoading ? (
+            <p
+              aria-live="polite"
+              className="mt-8 text-sm text-slate-600"
+              role="status"
+            >
+              Loading saved participant…
+            </p>
+          ) : hasNoEligibleParticipant ? (
+            <div className="mt-8 space-y-4">
               <p
                 aria-live="polite"
-                className="text-sm text-red-700"
-                role="alert"
-              >
-                {submitError}
-              </p>
-            ) : null}
-            {successMessage ? (
-              <p
-                aria-live="polite"
-                className="text-sm text-emerald-800"
+                className="text-sm text-slate-600"
                 role="status"
               >
-                {successMessage}
+                No saved participant is available for this account. Set up a
+                challenge and enroll yourself before recording a weigh-in.
               </p>
-            ) : null}
-
-            <div className="flex flex-wrap gap-3">
-              <Button disabled={isSaving} type="submit">
-                {editingDate ? 'Update weigh-in' : 'Save weigh-in'}
-              </Button>
-              {editingDate ? (
-                <Button
-                  onClick={cancelEditing}
-                  type="button"
-                  variant="secondary"
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  className="text-sm text-emerald-700 underline"
+                  to="/challenge/setup"
                 >
-                  Cancel edit
-                </Button>
-              ) : null}
+                  Set up a challenge
+                </Link>
+                <Link
+                  className="text-sm text-emerald-700 underline"
+                  to="/challenge/participants/enroll"
+                >
+                  Enroll a participant
+                </Link>
+              </div>
             </div>
-          </form>
+          ) : participant ? (
+            <form
+              aria-label="Daily weigh-in form"
+              className="mt-8 space-y-5"
+              noValidate
+              onSubmit={handleSubmit}
+            >
+              <TextInput
+                error={errors.date}
+                id="daily-weigh-in-date"
+                label="Date"
+                max={todayAsDateOnly()}
+                onChange={(event) => updateValue('date', event.target.value)}
+                readOnly={editingDate !== null}
+                type="date"
+                value={values.date}
+              />
+              <TextInput
+                error={errors.weightKg}
+                id="daily-weigh-in-weight"
+                inputMode="decimal"
+                label="Weight in kg"
+                min="0"
+                onChange={(event) =>
+                  updateValue('weightKg', event.target.value)
+                }
+                step="0.1"
+                type="number"
+                value={values.weightKg}
+              />
+
+              <div>
+                <label
+                  className="text-sm font-semibold text-slate-700"
+                  htmlFor="daily-weigh-in-note"
+                >
+                  Note{' '}
+                  <span className="font-normal text-slate-500">(optional)</span>
+                </label>
+                <textarea
+                  aria-describedby={
+                    errors.note ? 'daily-weigh-in-note-error' : undefined
+                  }
+                  aria-invalid={errors.note ? true : undefined}
+                  className="mt-2 block min-h-24 w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                  id="daily-weigh-in-note"
+                  onChange={(event) => updateValue('note', event.target.value)}
+                  value={values.note}
+                />
+                {errors.note ? (
+                  <p
+                    className="mt-2 text-sm text-red-700"
+                    id="daily-weigh-in-note-error"
+                  >
+                    {errors.note}
+                  </p>
+                ) : null}
+              </div>
+
+              {successMessage ? (
+                <p
+                  aria-live="polite"
+                  className="text-sm text-emerald-800"
+                  role="status"
+                >
+                  {successMessage}
+                </p>
+              ) : null}
+
+              <div className="flex flex-wrap gap-3">
+                <Button disabled={isSaving} type="submit">
+                  {editingDate ? 'Update weigh-in' : 'Save weigh-in'}
+                </Button>
+                {editingDate ? (
+                  <Button
+                    onClick={cancelEditing}
+                    type="button"
+                    variant="secondary"
+                  >
+                    Cancel edit
+                  </Button>
+                ) : null}
+              </div>
+            </form>
+          ) : null}
+
+          {submitError ? (
+            <p
+              aria-live="polite"
+              className="mt-8 text-sm text-red-700"
+              role="alert"
+            >
+              {submitError}
+            </p>
+          ) : null}
 
           <Link
             className="mt-6 inline-block text-sm text-emerald-700 underline"
@@ -306,13 +422,13 @@ export function DailyWeighInFormPage() {
           </Link>
         </Card>
 
-        <Card aria-labelledby="local-weigh-ins-title" className="p-8 sm:p-10">
+        <Card aria-labelledby="saved-weigh-ins-title" className="p-8 sm:p-10">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">
-            Local preview
+            {persistence.mode === 'remote' ? 'Saved data' : 'Local preview'}
           </p>
           <h2
             className="mt-4 text-2xl font-bold tracking-tight text-slate-950"
-            id="local-weigh-ins-title"
+            id="saved-weigh-ins-title"
           >
             Saved weigh-ins
           </h2>
