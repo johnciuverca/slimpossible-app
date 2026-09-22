@@ -62,6 +62,32 @@ describe('MilestoneProgress', () => {
     )
   })
 
+  it.each([
+    [0, [0, 12.5, 37.5, 62.5, 87.5]],
+    [25, [0, 12.5, 37.5, 62.5, 87.5]],
+    [50, [33.33333333333333, 12.5, 37.5, 62.5, 87.5]],
+    [75, [66.66666666666666, 12.5, 37.5, 62.5, 87.5]],
+    [100, [100, 12.5, 37.5, 62.5, 87.5]],
+  ])(
+    'keeps the progress track and markers aligned at %s percent',
+    (completionPercentage, [expectedFill, ...markerPositions]) => {
+      const { container } = render(
+        <MilestoneProgress
+          milestones={availableMilestones(completionPercentage)}
+        />,
+      )
+
+      expect(
+        container.querySelector('[data-testid="milestone-track-fill"]'),
+      ).toHaveStyle({ width: `${expectedFill}%` })
+      expect(
+        Array.from(container.querySelectorAll('[data-milestone-marker]')).map(
+          (marker) => (marker as HTMLElement).style.left,
+        ),
+      ).toEqual(markerPositions.map((left) => `${left}%`))
+    },
+  )
+
   it('explains unavailable milestone progress without a misleading progress bar', () => {
     const unavailableMilestones: ParticipantMilestones = {
       challengeId: 'challenge-1',
