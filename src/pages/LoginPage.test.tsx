@@ -8,6 +8,7 @@ import {
 import { afterEach, describe, expect, it } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 
+import { safeInternalPath } from '../auth/authRedirects'
 import { LoginPage } from './LoginPage'
 import { AuthProvider } from '../auth/AuthContext'
 
@@ -74,5 +75,18 @@ describe('LoginPage', () => {
       ).toBeInTheDocument(),
     )
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeEnabled()
+  })
+
+  it('keeps post-authentication redirects on an internal route', () => {
+    expect(
+      safeInternalPath({
+        from: { pathname: '//outside.example', search: '?next=1' },
+      }),
+    ).toBe('/today')
+    expect(
+      safeInternalPath({
+        from: { hash: '#chart', pathname: '/progress', search: '?week=1' },
+      }),
+    ).toBe('/progress?week=1#chart')
   })
 })

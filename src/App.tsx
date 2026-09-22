@@ -5,9 +5,11 @@ import { ProtectedRoute } from './auth/ProtectedRoute'
 import { AppLayout } from './layout/AppLayout'
 import { ChallengeSetupPage } from './pages/ChallengeSetupPage'
 import { DailyWeighInFormPage } from './pages/DailyWeighInFormPage'
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { LoginPage } from './pages/LoginPage'
 import { ParticipantEnrollmentPage } from './pages/ParticipantEnrollmentPage'
 import { RegisterPage } from './pages/RegisterPage'
+import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import {
   GoalsPage,
   HomePage,
@@ -34,6 +36,8 @@ function App() {
             <Route index element={<HomePage />} />
             <Route path="login" element={<LoginPage />} />
             <Route path="register" element={<RegisterPage />} />
+            <Route path="forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="reset-password" element={<ResetPasswordPage />} />
             <Route path="challenge/setup" element={<ChallengeSetupPage />} />
             <Route path="weigh-ins" element={<DailyWeighInFormPage />} />
             <Route

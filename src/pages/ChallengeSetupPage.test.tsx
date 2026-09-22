@@ -200,6 +200,8 @@ describe('ChallengeSetupPage', () => {
           resolveSession = resolve
         }),
       onAuthStateChange: () => () => undefined,
+      requestPasswordRecovery: async () => undefined,
+      resetPassword: async () => undefined,
       signIn: async () => ({ email: 'owner@example.com', id: 'owner-1' }),
       signOut: async () => undefined,
       signUp: async () => ({ needsVerification: false, user: null }),
@@ -483,6 +485,8 @@ describe('ChallengeSetupPage', () => {
         emitAuthStateChange = callback
         return () => undefined
       },
+      requestPasswordRecovery: async () => undefined,
+      resetPassword: async () => undefined,
       signIn: async () => user,
       signOut: async () => undefined,
       signUp: async () => ({ needsVerification: false, user: null }),

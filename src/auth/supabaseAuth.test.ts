@@ -31,4 +31,19 @@ describe('mapSupabaseAuthError', () => {
       'We could not create your account. Check your details and try again.',
     )
   })
+
+  it('keeps recovery requests account-neutral and explains expired reset links', () => {
+    expect(
+      mapSupabaseAuthError(
+        { message: 'User not found; email=person@example.com' },
+        'password-recovery',
+      ),
+    ).toBe('We could not request a recovery link. Try again.')
+    expect(
+      mapSupabaseAuthError(
+        { message: 'Recovery session has expired' },
+        'password-update',
+      ),
+    ).toBe('This recovery link is invalid or expired. Request a new link.')
+  })
 })
