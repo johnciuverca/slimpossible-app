@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
 import {
@@ -10,6 +10,9 @@ import {
 } from '../components/ui'
 import { MilestoneProgress } from '../components/MilestoneProgress'
 import type { ParticipantMilestones } from '../models/participantMilestones'
+import { useOptionalAuth } from '../auth/useAuth'
+import { createPersistence } from '../data/persistence'
+import type { Challenge } from '../models/challenge'
 
 type PlaceholderPageProps = {
   children?: ReactNode
@@ -67,6 +70,163 @@ function PlaceholderPage({
 }
 
 export function HomePage() {
+  const { state: authState } = useOptionalAuth()
+  const ownerId = authState.user?.id
+  const persistence = useMemo(() => createPersistence(authState), [authState])
+  const [challenges, setChallenges] = useState<Challenge[]>([])
+  const [selectedChallengeId, setSelectedChallengeId] = useState('')
+  const [isLoading, setIsLoading] = useState(authState.status === 'signed-in')
+  const [loadError, setLoadError] = useState('')
+
+  useEffect(() => {
+    let isCurrent = true
+
+    async function loadChallenges() {
+      if (authState.status !== 'signed-in' || !ownerId) {
+        setChallenges([])
+        setSelectedChallengeId('')
+        setIsLoading(false)
+        setLoadError('')
+        return
+      }
+
+      if (persistence.mode === 'unavailable') {
+        setLoadError(persistence.message)
+        setIsLoading(false)
+        return
+      }
+
+      setIsLoading(true)
+      const result =
+        await persistence.repositories.challenges.listOwned(ownerId)
+      if (!isCurrent) return
+
+      if (result.state === 'error') {
+        setLoadError(result.error.message)
+        setChallenges([])
+      } else {
+        const nextChallenges = result.state === 'success' ? result.data : []
+        setChallenges(nextChallenges)
+        setSelectedChallengeId((currentId) =>
+          nextChallenges.some(({ id }) => id === currentId)
+            ? currentId
+            : (nextChallenges[0]?.id ?? ''),
+        )
+        setLoadError('')
+      }
+      setIsLoading(false)
+    }
+
+    void loadChallenges()
+    return () => {
+      isCurrent = false
+    }
+  }, [authState.status, ownerId, persistence])
+
+  if (authState.status === 'signed-in') {
+    const selectedChallenge = challenges.find(
+      ({ id }) => id === selectedChallengeId,
+    )
+    const challengeQuery = selectedChallenge
+      ? `?challenge=${encodeURIComponent(selectedChallenge.id)}`
+      : ''
+
+    return (
+      <section className="w-full" aria-labelledby="home-title">
+        <Card className="mx-auto max-w-4xl p-8 sm:p-12">
+          <PageHeader
+            description={
+              selectedChallenge
+                ? 'Continue with the challenge selected for this account.'
+                : 'Set up your first challenge to begin recording progress.'
+            }
+            title="Welcome back."
+            titleId="home-title"
+          >
+            <StatusPill tone="success">Signed in</StatusPill>
+          </PageHeader>
+
+          <p className="mt-6 text-sm text-slate-600">
+            Signed in as <strong>{authState.user.email}</strong>
+          </p>
+
+          {isLoading ? (
+            <p
+              aria-live="polite"
+              className="mt-8 text-sm text-slate-600"
+              role="status"
+            >
+              Loading your saved challenges…
+            </p>
+          ) : loadError ? (
+            <p
+              aria-live="polite"
+              className="mt-8 text-sm text-red-700"
+              role="alert"
+            >
+              {loadError}
+            </p>
+          ) : challenges.length === 0 ? (
+            <div className="mt-8 space-y-4">
+              <p className="text-sm leading-6 text-slate-600">
+                No saved challenge is available for this account yet.
+              </p>
+              <Link
+                className="inline-block rounded-xl bg-emerald-700 px-5 py-3 text-sm font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+                to="/challenge/setup"
+              >
+                Set up a challenge
+              </Link>
+            </div>
+          ) : (
+            <div className="mt-8 space-y-6">
+              <div>
+                <label
+                  className="text-sm font-semibold text-slate-700"
+                  htmlFor="selected-challenge"
+                >
+                  Selected challenge
+                </label>
+                <select
+                  className="mt-2 block w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-slate-900 focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                  id="selected-challenge"
+                  onChange={(event) =>
+                    setSelectedChallengeId(event.target.value)
+                  }
+                  value={selectedChallengeId}
+                >
+                  {challenges.map((challenge) => (
+                    <option key={challenge.id} value={challenge.id}>
+                      {challenge.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <nav aria-label="Selected challenge navigation">
+                <ul className="grid gap-3 sm:grid-cols-3">
+                  {[
+                    ['Today', '/today'],
+                    ['Progress', '/progress'],
+                    ['Goals', '/goals'],
+                  ].map(([label, path]) => (
+                    <li key={path}>
+                      <Link
+                        className="inline-block w-full rounded-xl border border-stone-300 px-4 py-3 text-center text-sm font-semibold text-emerald-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+                        to={`${path}${challengeQuery}`}
+                      >
+                        {label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            </div>
+          )}
+        </Card>
+      </section>
+    )
+  }
+
   return (
     <section className="w-full" aria-labelledby="welcome-title">
       <Card className="mx-auto grid max-w-4xl overflow-hidden p-0 md:grid-cols-[1.2fr_0.8fr]">
@@ -76,7 +236,7 @@ export function HomePage() {
             title="Your challenge starts here."
             titleId="welcome-title"
           >
-            <StatusPill tone="success">Tailwind is working</StatusPill>
+            <StatusPill tone="success">Public preview</StatusPill>
             <Link
               className="mt-4 inline-block text-sm font-semibold text-emerald-700 underline"
               to="/challenge/setup"
