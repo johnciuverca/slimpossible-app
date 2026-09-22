@@ -23,7 +23,7 @@ describe('App foundation screen', () => {
     expect(
       screen.getByRole('heading', { name: 'Your challenge starts here.' }),
     ).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('Tailwind is working')
+    expect(screen.getByRole('status')).toHaveTextContent('Public preview')
   })
 
   it('redirects signed-out users from protected pages to login', async () => {
