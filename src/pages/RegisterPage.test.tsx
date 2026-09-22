@@ -80,4 +80,25 @@ describe('RegisterPage', () => {
     )
     expect(screen.getByRole('button', { name: 'Create account' })).toBeEnabled()
   })
+
+  it('keeps the password-recovery and home links separate and individually targeted', () => {
+    render(
+      <AuthProvider
+        initialState={{ error: null, status: 'signed-out', user: null }}
+      >
+        <MemoryRouter>
+          <RegisterPage />
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+
+    const recoveryLink = screen.getByRole('link', {
+      name: 'Forgot your password?',
+    })
+    const homeLink = screen.getByRole('link', { name: 'Back to home' })
+    expect(recoveryLink).toHaveAttribute('href', '/forgot-password')
+    expect(homeLink).toHaveAttribute('href', '/')
+    expect(recoveryLink).toHaveClass('mt-6', 'inline-block')
+    expect(homeLink).toHaveClass('mt-6', 'inline-block')
+  })
 })

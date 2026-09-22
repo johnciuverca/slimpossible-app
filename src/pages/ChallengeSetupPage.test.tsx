@@ -609,5 +609,10 @@ describe('ChallengeSetupPage', () => {
 
     enrollmentLink.focus()
     expect(enrollmentLink).toHaveFocus()
+
+    const homeLink = screen.getByRole('link', { name: 'Back to home' })
+    expect(homeLink).toHaveAttribute('href', '/')
+    expect(homeLink).toHaveClass('mt-6', 'inline-block')
+    expect(enrollmentLink).toHaveClass('mt-6', 'inline-block')
   })
 })

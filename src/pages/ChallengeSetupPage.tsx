@@ -481,7 +481,7 @@ export function ChallengeSetupPage() {
           Back to home
         </Link>
         <Link
-          className="mt-3 inline-block text-sm text-emerald-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+          className="mt-6 inline-block text-sm text-emerald-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
           to="/challenge/participants/enroll"
         >
           Enroll participants

@@ -9,7 +9,7 @@ export function AuthSessionUI() {
 
   async function handleLogout() {
     await signOut()
-    navigate('/', { replace: true })
+    navigate('/login', { replace: true })
   }
 
   if (state.status === 'loading') {
