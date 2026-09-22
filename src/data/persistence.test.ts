@@ -31,7 +31,7 @@ describe('challenge and participant persistence', () => {
       return
     }
 
-    await first.repositories.participants.create({
+    const firstParticipant = await first.repositories.participants.create({
       challengeId: challenge.data.id,
       displayName: 'Alex Participant',
       joinedAt: '2026-10-01T08:00:00.000Z',
@@ -40,17 +40,42 @@ describe('challenge and participant persistence', () => {
       targetWeightKg: 80,
       userId: 'alex-1',
     })
+    expect(firstParticipant.state).toBe('success')
+    if (firstParticipant.state !== 'success') {
+      return
+    }
+
+    const secondParticipant = await first.repositories.participants.create({
+      challengeId: challenge.data.id,
+      displayName: 'Sam Participant',
+      joinedAt: '2026-10-01T08:00:00.000Z',
+      startingWeightKg: 86.2,
+      status: 'active',
+      targetWeightKg: 76,
+      userId: 'sam-1',
+    })
+    expect(secondParticipant.state).toBe('success')
+    if (secondParticipant.state !== 'success') {
+      return
+    }
+
     await first.repositories.weighIns.upsert({
       date: '2026-10-01',
       note: 'Morning reading.',
-      participantId: 'participant-1',
+      participantId: firstParticipant.data.id,
       weightKg: 91.8,
     })
     await first.repositories.weighIns.upsert({
       date: '2026-10-01',
       note: 'Corrected reading.',
-      participantId: 'participant-1',
+      participantId: firstParticipant.data.id,
       weightKg: 91.5,
+    })
+    await first.repositories.weighIns.upsert({
+      date: '2026-10-01',
+      note: 'Second participant private note.',
+      participantId: secondParticipant.data.id,
+      weightKg: 85.7,
     })
 
     const second = createPersistence(signedOutState)
@@ -66,16 +91,34 @@ describe('challenge and participant persistence', () => {
     })
     await expect(
       second.repositories.participants.listForChallenge(challenge.data.id),
-    ).resolves.toMatchObject({ state: 'success' })
+    ).resolves.toEqual({
+      data: [secondParticipant.data, firstParticipant.data],
+      state: 'success',
+    })
     await expect(
-      second.repositories.weighIns.listForParticipant('participant-1'),
+      second.repositories.weighIns.listForParticipant(firstParticipant.data.id),
     ).resolves.toEqual({
       data: [
         {
           date: '2026-10-01',
           note: 'Corrected reading.',
-          participantId: 'participant-1',
+          participantId: firstParticipant.data.id,
           weightKg: 91.5,
+        },
+      ],
+      state: 'success',
+    })
+    await expect(
+      second.repositories.weighIns.listForParticipant(
+        secondParticipant.data.id,
+      ),
+    ).resolves.toEqual({
+      data: [
+        {
+          date: '2026-10-01',
+          note: 'Second participant private note.',
+          participantId: secondParticipant.data.id,
+          weightKg: 85.7,
         },
       ],
       state: 'success',
