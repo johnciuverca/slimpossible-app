@@ -609,5 +609,14 @@ describe('ChallengeSetupPage', () => {
 
     enrollmentLink.focus()
     expect(enrollmentLink).toHaveFocus()
+
+    const homeLink = screen.getByRole('link', { name: 'Back to home' })
+    const actionGroup = screen.getByRole('navigation', {
+      name: 'Challenge actions',
+    })
+    expect(homeLink).toHaveAttribute('href', '/')
+    expect(homeLink).toHaveClass('inline-block')
+    expect(enrollmentLink).toHaveClass('inline-block')
+    expect(actionGroup).toHaveClass('flex', 'flex-col', 'gap-4')
   })
 })

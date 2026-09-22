@@ -89,4 +89,29 @@ describe('LoginPage', () => {
       }),
     ).toBe('/progress?week=1#chart')
   })
+
+  it('keeps the password-recovery and home links separate and individually targeted', () => {
+    render(
+      <AuthProvider
+        initialState={{ error: null, status: 'signed-out', user: null }}
+      >
+        <MemoryRouter>
+          <LoginPage />
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+
+    const recoveryLink = screen.getByRole('link', {
+      name: 'Forgot your password?',
+    })
+    const homeLink = screen.getByRole('link', { name: 'Back to home' })
+    const linkGroup = screen.getByRole('navigation', {
+      name: 'Authentication links',
+    })
+    expect(recoveryLink).toHaveAttribute('href', '/forgot-password')
+    expect(homeLink).toHaveAttribute('href', '/')
+    expect(recoveryLink).toHaveClass('inline-block')
+    expect(homeLink).toHaveClass('inline-block')
+    expect(linkGroup).toHaveClass('flex', 'flex-col', 'gap-4')
+  })
 })

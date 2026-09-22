@@ -474,18 +474,23 @@ export function ChallengeSetupPage() {
           </Button>
         </form>
 
-        <Link
-          className="mt-6 inline-block text-sm text-emerald-700 underline"
-          to="/"
+        <nav
+          aria-label="Challenge actions"
+          className="mt-6 flex flex-col items-start gap-4"
         >
-          Back to home
-        </Link>
-        <Link
-          className="mt-3 inline-block text-sm text-emerald-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
-          to="/challenge/participants/enroll"
-        >
-          Enroll participants
-        </Link>
+          <Link
+            className="inline-block text-sm text-emerald-700 underline"
+            to="/"
+          >
+            Back to home
+          </Link>
+          <Link
+            className="inline-block text-sm text-emerald-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+            to="/challenge/participants/enroll"
+          >
+            Enroll participants
+          </Link>
+        </nav>
       </Card>
     </section>
   )
