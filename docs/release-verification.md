@@ -58,11 +58,18 @@ Use a dedicated Supabase project and test mailbox. The owner should:
      `display_name`; email is read from Auth and is not duplicated in profiles;
    - a challenge, participant linked to the authenticated profile ID, and
      weigh-in remain present after sign-out and a new sign-in;
+   - correcting the same participant's same-date weigh-in leaves exactly one
+     record, and its private note is not shown after switching to a different
+     test user;
    - a second authenticated user cannot read or edit the first user's profile,
      participant, challenge, or weigh-in rows; anonymous requests cannot access
      account-owned rows.
 
-5. Remove or rotate the dedicated test account and project data after the
+5. Record the dated, redacted results using
+   [the live acceptance evidence template](live-acceptance-evidence-template.md).
+   A mocked suite, CI run, or unexecuted checklist is not live evidence.
+
+6. Remove or rotate the dedicated test account and project data after the
    verification run if the project is not retained for staging.
 
 Never put a password, service-role key, database credential, project token, or
