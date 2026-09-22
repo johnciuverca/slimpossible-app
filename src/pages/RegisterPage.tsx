@@ -173,6 +173,14 @@ export function RegisterPage() {
             Sign in
           </Link>
         </p>
+        {state.status === 'verification-pending' ? (
+          <Link
+            className="mt-4 inline-block text-sm text-emerald-700 underline"
+            to="/login"
+          >
+            Return to sign in after verification
+          </Link>
+        ) : null}
       </Card>
     </section>
   )

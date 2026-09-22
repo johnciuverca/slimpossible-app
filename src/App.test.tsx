@@ -57,7 +57,7 @@ describe('App foundation screen', () => {
     )
   })
 
-  it('keeps authentication routes public', () => {
+  it('keeps authentication and recovery routes public', () => {
     window.history.pushState({}, '', '/login')
     render(<App />)
 
@@ -71,6 +71,22 @@ describe('App foundation screen', () => {
 
     expect(
       screen.getByRole('heading', { name: 'Create your account.' }),
+    ).toBeInTheDocument()
+
+    cleanup()
+    window.history.pushState({}, '', '/forgot-password')
+    render(<App />)
+
+    expect(
+      screen.getByRole('heading', { name: 'Reset your password' }),
+    ).toBeInTheDocument()
+
+    cleanup()
+    window.history.pushState({}, '', '/reset-password')
+    render(<App />)
+
+    expect(
+      screen.getByRole('heading', { name: 'Choose a new password' }),
     ).toBeInTheDocument()
   })
 

@@ -9,6 +9,8 @@ const signedOutGateway: AuthGateway = {
   ensureProfile: async () => undefined,
   getSession: async () => null,
   onAuthStateChange: () => () => undefined,
+  requestPasswordRecovery: async () => undefined,
+  resetPassword: async () => undefined,
   signIn: async () => ({ email: 'person@example.com', id: 'user-1' }),
   signOut: async () => undefined,
   signUp: async () => ({ needsVerification: false, user: null }),
@@ -110,6 +112,37 @@ describe('AuthContext', () => {
     })
 
     expect(screen.getByText('verification-pending')).toBeInTheDocument()
+    expect(ensureProfile).not.toHaveBeenCalled()
+  })
+
+  it('treats a password recovery event as a recovery-only session', async () => {
+    vi.useFakeTimers()
+    const ensureProfile = vi.fn(async () => undefined)
+    const user = { email: 'person@example.com', id: 'user-1' }
+    let emitAuthEvent:
+      ((nextUser: typeof user | null, event?: string) => void) | undefined
+
+    render(
+      <AuthProvider
+        authGateway={createGateway({
+          ensureProfile,
+          onAuthStateChange: (callback) => {
+            emitAuthEvent = callback
+            return () => undefined
+          },
+        })}
+      >
+        <AuthHarness />
+      </AuthProvider>,
+    )
+
+    await act(async () => {
+      vi.runOnlyPendingTimers()
+      await Promise.resolve()
+      emitAuthEvent?.(user, 'PASSWORD_RECOVERY')
+    })
+
+    expect(screen.getByText('recovery-ready')).toBeInTheDocument()
     expect(ensureProfile).not.toHaveBeenCalled()
   })
 

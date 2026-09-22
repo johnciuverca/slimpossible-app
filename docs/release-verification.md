@@ -43,6 +43,14 @@ Use a dedicated Supabase project and test mailbox. The owner should:
 4. Start the app with `npm run dev` and use a dedicated test email to verify:
    - sign-up creates the account and shows verification-pending when email
      confirmation is required;
+   - opening the verification email returns to `/login`, establishes a usable
+     authenticated flow, and does not expose a token in UI feedback;
+   - password recovery gives the same confirmation for a known and an unknown
+     dedicated test email;
+   - a valid recovery link accepts a new password, signs the browser out, then
+     rejects the old password and accepts the new password;
+   - an expired or already-used recovery link shows retry guidance and does not
+     render the new-password form;
    - verified sign-in restores the session after a page refresh;
    - sign-out ends the session and protected routes redirect to `/login` with
      the original path, query, and hash preserved;

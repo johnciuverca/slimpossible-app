@@ -82,3 +82,36 @@ the service's secret store or ignored local files, and avoid committing real
 values. A browser-safe publishable key may be exposed only when the provider's
 documentation explicitly permits it; privileged keys must never enter the
 client bundle.
+
+## Email verification and password recovery
+
+Issue #147 adds public `/forgot-password` and `/reset-password` routes. A
+recovery request always shows the same confirmation for a valid email address,
+whether or not Supabase has an account for it. The reset form is available only
+after Supabase supplies a recovery session; invalid or expired links direct the
+person to request another link. A completed reset signs the browser out and
+returns it to the public sign-in route.
+
+The owner configures these flows in the Supabase project; do not add values to
+source, chat, CI logs, or issue comments:
+
+1. In **Authentication → URL Configuration**, set the production **Site URL**
+   to the final app origin and add the exact redirect URLs used for testing and
+   deployment:
+   - `http://localhost:5173/login`
+   - `http://localhost:5173/reset-password`
+   - the exact Vercel preview or deployed origin followed by `/login`
+   - the same exact origin followed by `/reset-password`
+2. In **Authentication → Providers → Email**, enable the Email provider and
+   choose the intended confirmation policy. Keep the confirmation and recovery
+   templates on Supabase's managed delivery path unless the owner deliberately
+   configures a mail provider outside this issue.
+3. In Vercel, add only `VITE_SUPABASE_URL` and
+   `VITE_SUPABASE_ANON_KEY` to the owner-managed Preview and Production
+   environments that should support remote auth. Redeploy after changing them.
+   Never add a password, service-role key, database credential, or project
+   token to a Vercel browser variable.
+
+The app uses fixed same-origin destinations: verification links return to
+`/login`, and recovery links return to `/reset-password`. The browser never
+accepts an arbitrary redirect URL from form input or navigation state.

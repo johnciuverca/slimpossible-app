@@ -8,6 +8,7 @@ import {
   StatusPill,
   TextInput,
 } from '../components/ui'
+import { safeInternalPath } from '../auth/authRedirects'
 import { useAuth } from '../auth/useAuth'
 import { getAuthenticationEnvironmentLabel } from '../auth/supabaseConfig'
 
@@ -47,15 +48,7 @@ export function LoginPage() {
   useEffect(() => {
     if (state.status !== 'signed-in') return
 
-    const from = (
-      location.state as {
-        from?: { pathname?: string; search?: string; hash?: string }
-      } | null
-    )?.from
-    const destination = from
-      ? `${from.pathname ?? '/'}${from.search ?? ''}${from.hash ?? ''}`
-      : '/'
-    navigate(destination, { replace: true })
+    navigate(safeInternalPath(location.state), { replace: true })
   }, [location.state, navigate, state.status])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -123,6 +116,12 @@ export function LoginPage() {
               Signed in successfully.
             </p>
           ) : null}
+          {(location.state as { passwordReset?: boolean } | null)
+            ?.passwordReset ? (
+            <p aria-live="polite" className="text-sm text-emerald-700">
+              Your password was updated. Sign in with your new password.
+            </p>
+          ) : null}
 
           <Button className="w-full" disabled={isSubmitting} type="submit">
             {isSubmitting ? 'Signing in…' : 'Sign in'}
@@ -137,6 +136,12 @@ export function LoginPage() {
         </p>
         <Link
           className="mt-4 inline-block text-sm text-emerald-700 underline"
+          to="/forgot-password"
+        >
+          Forgot your password?
+        </Link>
+        <Link
+          className="mt-3 inline-block text-sm text-emerald-700 underline"
           to="/"
         >
           Back to home

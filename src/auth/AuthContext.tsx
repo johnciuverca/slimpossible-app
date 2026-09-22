@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { getRecoveryRedirectUrl, isRecoveryCallback } from './authRedirects'
 import { AuthContext, type AuthProviderProps, type AuthState } from './context'
 import { createSupabaseAuthGateway } from './supabaseAuth'
 
@@ -34,7 +35,14 @@ export function AuthProvider({
   const [state, setState] = useState<AuthState>(initialState ?? loadingState)
   const operationGeneration = useRef(0)
   const currentUserKey = useRef(
-    initialState?.status === 'signed-in' ? userKey(initialState.user) : null,
+    initialState?.status === 'signed-in' ||
+      initialState?.status === 'recovery-ready'
+      ? userKey(initialState.user)
+      : null,
+  )
+  const recoveryIntent = useRef(
+    initialState?.status === 'recovery-ready' ||
+      (!initialState && isRecoveryCallback(window.location)),
   )
   const blockedUserKey = useRef<string | null>(null)
   const initializedProfiles = useRef(new Set<string>())
@@ -129,6 +137,27 @@ export function AuthProvider({
     [ensureProfileOnce],
   )
 
+  const applyRecoveryReady = useCallback(
+    (
+      user: NonNullable<
+        Extract<AuthState, { status: 'recovery-ready' }>['user']
+      >,
+      generation: number,
+    ) => {
+      if (
+        generation !== operationGeneration.current ||
+        blockedUserKey.current === userKey(user)
+      ) {
+        return
+      }
+
+      recoveryIntent.current = true
+      currentUserKey.current = userKey(user)
+      setState({ error: null, status: 'recovery-ready', user })
+    },
+    [],
+  )
+
   const restoreSession = useCallback(() => {
     const generation = operationGeneration.current
     let cancelled = false
@@ -143,7 +172,13 @@ export function AuthProvider({
           // back out.
           if (!user && currentUserKey.current) return
           if (user) {
-            applySignedIn(user, generation)
+            if (recoveryIntent.current) {
+              applyRecoveryReady(user, generation)
+            } else {
+              applySignedIn(user, generation)
+            }
+          } else if (recoveryIntent.current) {
+            setState({ error: null, status: 'recovery-invalid', user: null })
           } else {
             applySignedOut(generation)
           }
@@ -171,24 +206,41 @@ export function AuthProvider({
       cancelled = true
       window.clearTimeout(timerId)
     }
-  }, [applySignedIn, applySignedOut, authGateway])
+  }, [applyRecoveryReady, applySignedIn, applySignedOut, authGateway])
 
   useEffect(() => {
     if (initialState) return
 
     let active = true
-    const unsubscribe = authGateway.onAuthStateChange((user) => {
+    const unsubscribe = authGateway.onAuthStateChange((user, event) => {
       if (!active) return
 
       const generation = operationGeneration.current
+      if (event === 'PASSWORD_RECOVERY') {
+        recoveryIntent.current = true
+        if (user) {
+          applyRecoveryReady(user, generation)
+        } else {
+          setState({ error: null, status: 'recovery-invalid', user: null })
+        }
+        return
+      }
       if (!user) {
+        if (recoveryIntent.current) {
+          setState({ error: null, status: 'recovery-invalid', user: null })
+          return
+        }
         applySignedOut(generation)
         return
       }
 
       // This callback only updates React state. applySignedIn defers profile
       // I/O until after the provider callback has returned to Supabase.
-      applySignedIn(user, generation)
+      if (recoveryIntent.current) {
+        applyRecoveryReady(user, generation)
+      } else {
+        applySignedIn(user, generation)
+      }
     })
     const cancelRestore = restoreSession()
 
@@ -198,12 +250,20 @@ export function AuthProvider({
       cancelRestore()
       unsubscribe()
     }
-  }, [applySignedIn, applySignedOut, authGateway, initialState, restoreSession])
+  }, [
+    applyRecoveryReady,
+    applySignedIn,
+    applySignedOut,
+    authGateway,
+    initialState,
+    restoreSession,
+  ])
 
   const retrySession = useCallback(() => {
     operationGeneration.current += 1
     blockedUserKey.current = null
     currentUserKey.current = null
+    recoveryIntent.current = isRecoveryCallback(window.location)
     setState(loadingState)
     restoreSession()
   }, [restoreSession])
@@ -211,6 +271,7 @@ export function AuthProvider({
   const signOut = useCallback(async () => {
     const generation = operationGeneration.current + 1
     operationGeneration.current = generation
+    recoveryIntent.current = false
     blockedUserKey.current = currentUserKey.current
     currentUserKey.current = null
     setState(signedOutState)
@@ -235,6 +296,7 @@ export function AuthProvider({
     async (email: string, password: string) => {
       const generation = operationGeneration.current + 1
       operationGeneration.current = generation
+      recoveryIntent.current = false
       blockedUserKey.current = null
       currentUserKey.current = null
       setState(loadingState)
@@ -260,6 +322,7 @@ export function AuthProvider({
     async (name: string, email: string, password: string) => {
       const generation = operationGeneration.current + 1
       operationGeneration.current = generation
+      recoveryIntent.current = false
       blockedUserKey.current = null
       currentUserKey.current = null
       setState(loadingState)
@@ -290,9 +353,92 @@ export function AuthProvider({
     [applySignedIn, authGateway],
   )
 
+  const requestPasswordRecovery = useCallback(
+    async (email: string) => {
+      const generation = operationGeneration.current + 1
+      operationGeneration.current = generation
+      recoveryIntent.current = false
+      blockedUserKey.current = null
+      currentUserKey.current = null
+      setState(loadingState)
+
+      try {
+        await authGateway.requestPasswordRecovery(
+          email.trim(),
+          getRecoveryRedirectUrl(),
+        )
+        if (generation === operationGeneration.current) {
+          setState({ error: null, status: 'recovery-requested', user: null })
+        }
+      } catch (error) {
+        if (generation !== operationGeneration.current) return
+        setState({
+          error: errorMessage(
+            error,
+            'We could not request a recovery link. Try again.',
+          ),
+          status: 'error',
+          user: null,
+        })
+      }
+    },
+    [authGateway],
+  )
+
+  const resetPassword = useCallback(
+    async (password: string) => {
+      if (state.status !== 'recovery-ready') {
+        setState({ error: null, status: 'recovery-invalid', user: null })
+        return false
+      }
+
+      const generation = operationGeneration.current + 1
+      operationGeneration.current = generation
+
+      try {
+        await authGateway.resetPassword(password)
+        recoveryIntent.current = false
+        await authGateway.signOut()
+        if (generation !== operationGeneration.current) return false
+        currentUserKey.current = null
+        blockedUserKey.current = null
+        setState(signedOutState)
+        return true
+      } catch (error) {
+        if (generation !== operationGeneration.current) return false
+        setState({
+          error: errorMessage(
+            error,
+            'We could not update your password. Request a new recovery link.',
+          ),
+          status: 'error',
+          user: null,
+        })
+        return false
+      }
+    },
+    [authGateway, state.status],
+  )
+
   const value = useMemo(
-    () => ({ retrySession, signIn, signOut, signUp, state }),
-    [retrySession, signIn, signOut, signUp, state],
+    () => ({
+      requestPasswordRecovery,
+      resetPassword,
+      retrySession,
+      signIn,
+      signOut,
+      signUp,
+      state,
+    }),
+    [
+      requestPasswordRecovery,
+      resetPassword,
+      retrySession,
+      signIn,
+      signOut,
+      signUp,
+      state,
+    ],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

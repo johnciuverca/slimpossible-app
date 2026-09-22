@@ -1,5 +1,6 @@
 import { createSupabaseBrowserClient } from '../data/supabase/client'
 import { createRepositories } from '../data/supabase/repositories'
+import { getVerificationRedirectUrl } from './authRedirects'
 import type { AuthGateway, AuthUser } from './context'
 
 function mapUser(user: {
@@ -19,7 +20,7 @@ function mapUser(user: {
 
 export function mapSupabaseAuthError(
   error: { message?: string; status?: number } | null,
-  operation: 'sign-in' | 'sign-up',
+  operation: 'password-recovery' | 'password-update' | 'sign-in' | 'sign-up',
 ) {
   const message = error?.message?.toLowerCase() ?? ''
 
@@ -28,6 +29,14 @@ export function mapSupabaseAuthError(
   }
   if (operation === 'sign-in' && message.includes('invalid login')) {
     return 'The email or password is incorrect. Check them and try again.'
+  }
+  if (
+    operation === 'password-update' &&
+    (message.includes('expired') ||
+      message.includes('invalid') ||
+      message.includes('session'))
+  ) {
+    return 'This recovery link is invalid or expired. Request a new link.'
   }
   if (
     operation === 'sign-up' &&
@@ -39,9 +48,16 @@ export function mapSupabaseAuthError(
   if (error?.status === undefined && message.includes('fetch')) {
     return 'We could not reach authentication. Check your connection and try again.'
   }
-  return operation === 'sign-in'
-    ? 'We could not sign you in. Check your details and try again.'
-    : 'We could not create your account. Check your details and try again.'
+  if (operation === 'sign-in') {
+    return 'We could not sign you in. Check your details and try again.'
+  }
+  if (operation === 'sign-up') {
+    return 'We could not create your account. Check your details and try again.'
+  }
+  if (operation === 'password-recovery') {
+    return 'We could not request a recovery link. Try again.'
+  }
+  return 'We could not update your password. Request a new recovery link.'
 }
 
 export function createSupabaseAuthGateway(): AuthGateway {
@@ -73,11 +89,28 @@ export function createSupabaseAuthGateway(): AuthGateway {
     onAuthStateChange(callback) {
       if (clientResult.state !== 'configured') return () => undefined
       const { data } = clientResult.client.auth.onAuthStateChange(
-        (_event, session) => {
-          callback(session?.user ? mapUser(session.user) : null)
+        (event, session) => {
+          callback(session?.user ? mapUser(session.user) : null, event)
         },
       )
       return () => data.subscription.unsubscribe()
+    },
+    async requestPasswordRecovery(email, redirectTo) {
+      const { error } = await getConfiguredClient().auth.resetPasswordForEmail(
+        email,
+        { redirectTo },
+      )
+      if (error) {
+        throw new Error(mapSupabaseAuthError(error, 'password-recovery'))
+      }
+    },
+    async resetPassword(password) {
+      const { error } = await getConfiguredClient().auth.updateUser({
+        password,
+      })
+      if (error) {
+        throw new Error(mapSupabaseAuthError(error, 'password-update'))
+      }
     },
     async signIn(email, password) {
       const { data, error } =
@@ -94,7 +127,10 @@ export function createSupabaseAuthGateway(): AuthGateway {
       const { data, error } = await getConfiguredClient().auth.signUp({
         email,
         password,
-        options: { data: { display_name: name.trim() } },
+        options: {
+          data: { display_name: name.trim() },
+          emailRedirectTo: getVerificationRedirectUrl(),
+        },
       })
       if (error) throw new Error(mapSupabaseAuthError(error, 'sign-up'))
       return {

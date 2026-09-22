@@ -61,6 +61,23 @@ a reason to invent credentials or fall back to a fake signed-in account. Local
 form validation may remain available for the MVP, but it must never claim that
 an account, session, verification, or password recovery was created remotely.
 
+## Issue #147 implementation
+
+Issue #147 implements the documented recovery routes and provider calls. The
+recovery request uses a fixed same-origin `/reset-password` redirect and always
+returns the same account-neutral confirmation. The reset page accepts a new
+password only after a Supabase `PASSWORD_RECOVERY` event or a recovery callback
+with a valid session; it gives retry guidance for invalid or expired links.
+
+Verification redirects return to the fixed `/login` route. Once Supabase
+creates a session from a valid verification link, the ordinary signed-in flow
+continues to an internal app route. Recovery completion signs the browser out
+before returning to sign-in, so the new password is required next time.
+
+Live email delivery, link expiry, old-password rejection, and new-password
+sign-in remain owner-run checks using a dedicated non-production mailbox. The
+repository tests mock the provider boundary and do not claim live completion.
+
 ## Explicit exclusions
 
 Issue #122 does not implement Supabase sign-up/sign-in/recovery calls (#123),
