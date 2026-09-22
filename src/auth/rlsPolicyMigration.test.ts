@@ -85,7 +85,10 @@ describe('row-level security migration contract', () => {
       'create or replace function public.create_challenge_invite',
     )
     expect(inviteMigration).toContain(
-      "encode(digest(raw_token, 'sha256'), 'hex')",
+      "encode(extensions.digest(raw_token, 'sha256'), 'hex')",
+    )
+    expect(inviteMigration).toContain(
+      "encode(extensions.gen_random_bytes(32), 'hex')",
     )
     expect(inviteMigration).toContain(
       'create or replace function public.accept_challenge_invite',
