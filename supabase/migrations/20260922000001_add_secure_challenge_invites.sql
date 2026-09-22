@@ -64,7 +64,7 @@ begin
       message = 'Invitation expiry must be in the next 30 days.';
   end if;
 
-  raw_token := encode(gen_random_bytes(32), 'hex');
+  raw_token := encode(extensions.gen_random_bytes(32), 'hex');
 
   insert into public.challenge_invites (
     challenge_id,
@@ -74,7 +74,7 @@ begin
   ) values (
     target_challenge_id,
     auth.uid(),
-    encode(digest(raw_token, 'sha256'), 'hex'),
+    encode(extensions.digest(raw_token, 'sha256'), 'hex'),
     target_expires_at
   )
   returning id into created_invite_id;
@@ -114,7 +114,10 @@ as $$
     end
   from public.challenge_invites as i
   join public.challenges as c on c.id = i.challenge_id
-  where i.token_hash = encode(digest(trim(invite_token), 'sha256'), 'hex');
+  where i.token_hash = encode(
+    extensions.digest(trim(invite_token), 'sha256'),
+    'hex'
+  );
 $$;
 
 revoke all on function public.preview_challenge_invite(text) from public;
@@ -198,7 +201,10 @@ begin
 
   select i.* into invite_row
   from public.challenge_invites as i
-  where i.token_hash = encode(digest(trim(invite_token), 'sha256'), 'hex');
+  where i.token_hash = encode(
+    extensions.digest(trim(invite_token), 'sha256'),
+    'hex'
+  );
 
   if not found then
     raise exception using errcode = 'P0004', message = 'Invitation is invalid.';
