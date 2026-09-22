@@ -261,6 +261,130 @@ describe('Supabase repositories', () => {
     })
   })
 
+  it('creates an invite through the owner RPC without persisting a raw identity', async () => {
+    stubResponse([
+      {
+        challenge_id: 'challenge-1',
+        expires_at: '2026-09-29T23:59:59.000Z',
+        invite_id: 'invite-1',
+        token: 'one-time-token',
+      },
+    ])
+
+    const result = await createRepositories(client).invites.create(
+      'challenge-1',
+      '2026-09-29T23:59:59.000Z',
+    )
+
+    expect(result).toMatchObject({
+      data: {
+        invite: {
+          challengeId: 'challenge-1',
+          expiresAt: '2026-09-29T23:59:59.000Z',
+          id: 'invite-1',
+        },
+        token: 'one-time-token',
+      },
+      state: 'success',
+    })
+    const requestBody = String(vi.mocked(fetch).mock.calls[0]?.[1]?.body)
+    expect(requestBody).toContain('target_challenge_id')
+    expect(requestBody).not.toContain('user_id')
+  })
+
+  it('accepts an invite through the server-bound RPC', async () => {
+    stubResponse({
+      challenge_id: 'challenge-1',
+      created_at: '2026-09-22T10:00:00.000Z',
+      display_name: 'Accepted member',
+      id: 'participant-1',
+      joined_at: '2026-09-22T10:00:00.000Z',
+      starting_weight_kg: 92.5,
+      status: 'active',
+      target_weight_kg: 80,
+      updated_at: '2026-09-22T10:00:00.000Z',
+      user_id: 'auth-bound-user',
+    })
+
+    const result = await createRepositories(client).invites.accept(
+      'one-time-token',
+      {
+        displayName: 'Accepted member',
+        startingWeightKg: 92.5,
+        targetWeightKg: 80,
+      },
+      'user-entered-value-that-must-be-ignored',
+    )
+
+    expect(result).toMatchObject({
+      data: { id: 'participant-1', userId: 'auth-bound-user' },
+      state: 'success',
+    })
+    const requestBody = String(vi.mocked(fetch).mock.calls[0]?.[1]?.body)
+    expect(requestBody).not.toContain('user-entered-value-that-must-be-ignored')
+  })
+
+  it('maps expired and revoked preview states for the UI', async () => {
+    stubResponse([
+      {
+        challenge_id: 'challenge-1',
+        challenge_name: 'Autumn challenge',
+        expires_at: '2026-09-20T23:59:59.000Z',
+        invite_id: 'invite-1',
+        revoked_at: null,
+        status: 'expired',
+      },
+    ])
+
+    const expired = await createRepositories(client).invites.preview('expired')
+    expect(expired).toMatchObject({
+      data: { status: 'expired' },
+      state: 'success',
+    })
+
+    stubResponse([
+      {
+        challenge_id: 'challenge-1',
+        challenge_name: 'Autumn challenge',
+        expires_at: '2026-09-29T23:59:59.000Z',
+        invite_id: 'invite-1',
+        revoked_at: '2026-09-22T12:00:00.000Z',
+        status: 'revoked',
+      },
+    ])
+    const revoked = await createRepositories(client).invites.preview('revoked')
+    expect(revoked).toMatchObject({
+      data: { status: 'revoked' },
+      state: 'success',
+    })
+  })
+
+  it('turns server revocation errors into safe invitation feedback', async () => {
+    stubResponse(
+      {
+        code: 'P0003',
+        details: 'internal invitation details',
+        hint: null,
+        message: 'Invitation is expired.',
+      },
+      400,
+    )
+
+    const result = await createRepositories(client).invites.accept(
+      'expired-token',
+      { displayName: 'Member', startingWeightKg: 90, targetWeightKg: 80 },
+    )
+
+    expect(result).toEqual({
+      error: {
+        code: 'P0003',
+        kind: 'request',
+        message: 'This invitation has expired.',
+      },
+      state: 'error',
+    })
+  })
+
   it('returns a safe request error without exposing the server message', async () => {
     stubResponse(
       {

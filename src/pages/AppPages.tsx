@@ -350,6 +350,7 @@ export function HomePage() {
                     ['Today', '/today'],
                     ['Progress', '/progress'],
                     ['Goals', '/goals'],
+                    ['Invite participants', '/challenge/invites'],
                   ].map(([label, path]) => (
                     <li key={path}>
                       <Link
