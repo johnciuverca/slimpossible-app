@@ -180,6 +180,20 @@ begin
 
   select count(*)::integer
     into row_count
+  from public.challenges as c
+  where c.owner_id = member_id;
+  insert into slimpossible_rls_results
+  values ('member_test_user_owns_no_challenges', row_count = 0, 'ownerless fixture account');
+
+  select count(*)::integer
+    into row_count
+  from public.challenges as c
+  where c.id = challenge_id and c.owner_id <> member_id;
+  insert into slimpossible_rls_results
+  values ('member_can_list_joined_challenge_without_owned_challenges', row_count = 1, 'joined challenge visible');
+
+  select count(*)::integer
+    into row_count
   from public.participants as p
   where p.id = v_participant_id;
   insert into slimpossible_rls_results

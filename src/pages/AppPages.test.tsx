@@ -38,7 +38,7 @@ function renderSignedIn(fetchMock: ReturnType<typeof vi.fn>) {
   )
 }
 
-function dashboardResponses() {
+function dashboardResponses(challengeOwnerId = 'member-1') {
   return [
     response([
       {
@@ -48,7 +48,7 @@ function dashboardResponses() {
         end_date: '2026-10-01',
         id: 'challenge-1',
         name: 'Autumn challenge',
-        owner_id: 'member-1',
+        owner_id: challengeOwnerId,
         start_date: '2026-09-17',
         status: 'active',
         target_weight_kg: null,
@@ -191,9 +191,40 @@ describe('HomePage', () => {
       'href',
       '/goals?challenge=challenge-2',
     )
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('owner_id=eq.member-1'),
-      expect.anything(),
+    const challengeRequest = fetchMock.mock.calls.find(([url]) =>
+      String(url).includes('/challenges?'),
+    )
+    expect(String(challengeRequest?.[0])).not.toContain('owner_id=')
+  })
+
+  it('shows a joined challenge even when the signed-in member does not own it', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      response([
+        {
+          created_at: '2026-09-17T10:00:00.000Z',
+          created_by: 'owner-1',
+          description: null,
+          end_date: '2026-10-01',
+          id: 'joined-challenge',
+          name: 'Owner hosted challenge',
+          owner_id: 'owner-1',
+          start_date: '2026-09-17',
+          status: 'active',
+          target_weight_kg: null,
+          updated_at: '2026-09-17T10:00:00.000Z',
+        },
+      ]),
+    )
+    renderSignedIn(fetchMock)
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('option', { name: 'Owner hosted challenge' }),
+      ).toBeInTheDocument(),
+    )
+    expect(screen.getByRole('link', { name: 'Today' })).toHaveAttribute(
+      'href',
+      '/today?challenge=joined-challenge',
     )
   })
 
@@ -256,4 +287,32 @@ describe('HomePage', () => {
       ).toBeInTheDocument(),
     )
   })
+
+  it.each([
+    ['Today', <TodayPage />],
+    ['Progress', <ProgressPage />],
+    ['Goals', <GoalsPage />],
+  ])(
+    'loads a joined challenge with no owned challenge on %s',
+    async (_, page) => {
+      const fetchMock = vi.fn()
+      dashboardResponses('owner-1').forEach((item) =>
+        fetchMock.mockResolvedValueOnce(item),
+      )
+      renderDashboard(page, fetchMock)
+
+      await waitFor(() =>
+        expect(screen.getByText('Autumn challenge')).toBeInTheDocument(),
+      )
+      expect(
+        fetchMock.mock.calls.some(([url]) =>
+          String(url).includes('participant_id=eq.participant-1'),
+        ),
+      ).toBe(true)
+      const challengeRequest = fetchMock.mock.calls.find(([url]) =>
+        String(url).includes('/challenges?'),
+      )
+      expect(String(challengeRequest?.[0])).not.toContain('owner_id=')
+    },
+  )
 })

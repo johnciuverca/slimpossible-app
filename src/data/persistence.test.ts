@@ -13,6 +13,60 @@ afterEach(() => {
 })
 
 describe('challenge and participant persistence', () => {
+  it('shows owners and active members only in the local challenge preview', async () => {
+    const persistence = createPersistence(signedOutState)
+    if (persistence.mode !== 'local') {
+      throw new Error('Expected local persistence without public configuration')
+    }
+
+    const createChallenge = async (ownerId: string, name: string) => {
+      const result = await persistence.repositories.challenges.create({
+        createdBy: ownerId,
+        endDate: '2026-11-01',
+        name,
+        ownerId,
+        startDate: '2026-10-01',
+      })
+      if (result.state !== 'success')
+        throw new Error('Challenge creation failed')
+      return result.data
+    }
+
+    const owned = await createChallenge('member-1', 'Owned')
+    const joined = await createChallenge('owner-1', 'Joined')
+    const unrelated = await createChallenge('other-user', 'Unrelated')
+    const inactive = await createChallenge('owner-2', 'Inactive membership')
+
+    await persistence.repositories.participants.create({
+      challengeId: joined.id,
+      displayName: 'Member',
+      startingWeightKg: 90,
+      targetWeightKg: 80,
+      userId: 'member-1',
+      status: 'active',
+    })
+    await persistence.repositories.participants.create({
+      challengeId: inactive.id,
+      displayName: 'Member',
+      startingWeightKg: 90,
+      targetWeightKg: 80,
+      userId: 'member-1',
+      status: 'invited',
+    })
+    await persistence.repositories.participants.create({
+      challengeId: unrelated.id,
+      displayName: 'Other user',
+      startingWeightKg: 90,
+      targetWeightKg: 80,
+      userId: 'other-user',
+      status: 'active',
+    })
+
+    await expect(
+      persistence.repositories.challenges.listVisibleToUser('member-1'),
+    ).resolves.toEqual({ data: [joined, owned], state: 'success' })
+  })
+
   it('keeps the local MVP data after a new persistence instance is created', async () => {
     const first = createPersistence(signedOutState)
     if (first.mode !== 'local') {
