@@ -86,11 +86,13 @@ function usePersonalDashboard() {
   const [data, setData] = useState<PersonalDashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(authState.status === 'signed-in')
   const [message, setMessage] = useState('')
+  const [isMissingChallenge, setIsMissingChallenge] = useState(false)
 
   useEffect(() => {
     let isCurrent = true
 
     async function loadDashboard() {
+      setIsMissingChallenge(false)
       if (authState.status !== 'signed-in' || !ownerId) {
         setData(null)
         setMessage('Sign in to view your saved dashboard.')
@@ -122,6 +124,7 @@ function usePersonalDashboard() {
       if (!challenge) {
         setData(null)
         setMessage('Set up a challenge before viewing your dashboard.')
+        setIsMissingChallenge(true)
         setIsLoading(false)
         return
       }
@@ -182,17 +185,19 @@ function usePersonalDashboard() {
     }
   }, [authState.status, challengeParam, ownerId, persistence])
 
-  return { data, isLoading, message }
+  return { data, isLoading, isMissingChallenge, message }
 }
 
 function DashboardState({
   children,
   isLoading,
   message,
+  messageContent,
 }: {
   children: ReactNode
   isLoading: boolean
   message: string
+  messageContent?: ReactNode
 }) {
   if (isLoading) {
     return (
@@ -202,6 +207,7 @@ function DashboardState({
     )
   }
   if (message) {
+    if (messageContent) return <>{messageContent}</>
     return (
       <p aria-live="polite" className="text-sm text-slate-600" role="status">
         {message}
@@ -405,7 +411,8 @@ export function HomePage() {
 }
 
 export function TodayPage() {
-  const { data, isLoading, message } = usePersonalDashboard()
+  const { data, isLoading, isMissingChallenge, message } =
+    usePersonalDashboard()
   const challengeQuery = data
     ? `?challenge=${encodeURIComponent(data.challenge.id)}`
     : ''
@@ -422,7 +429,29 @@ export function TodayPage() {
             {data?.challenge.name ?? 'Personal dashboard'}
           </StatusPill>
         </PageHeader>
-        <DashboardState isLoading={isLoading} message={message}>
+        <DashboardState
+          isLoading={isLoading}
+          message={message}
+          messageContent={
+            isMissingChallenge ? (
+              <div className="mt-8 space-y-4">
+                <h2 className="text-lg font-semibold text-slate-900">
+                  No challenge yet
+                </h2>
+                <p className="text-sm leading-6 text-slate-600">
+                  There is no saved challenge for this account yet. Set one up
+                  to start tracking your progress.
+                </p>
+                <Link
+                  className="inline-block rounded-xl bg-emerald-700 px-5 py-3 text-sm font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+                  to="/challenge/setup"
+                >
+                  Set up a challenge
+                </Link>
+              </div>
+            ) : undefined
+          }
+        >
           {data ? (
             <div className="mt-8 grid gap-4 sm:grid-cols-3">
               <Card className="border border-stone-200 p-5 shadow-none">

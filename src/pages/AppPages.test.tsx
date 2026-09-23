@@ -255,6 +255,26 @@ describe('HomePage', () => {
     expect(
       screen.getByText('You are 10 kg away from your target weight.'),
     ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { name: 'No challenge yet' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: 'Set up a challenge' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('shows a keyboard-accessible setup action on Today when no challenge exists', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response([]))
+    renderDashboard(<TodayPage />, fetchMock)
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('heading', { name: 'No challenge yet' }),
+      ).toBeInTheDocument(),
+    )
+    const setupLink = screen.getByRole('link', { name: 'Set up a challenge' })
+    expect(setupLink).toHaveAttribute('href', '/challenge/setup')
+    expect(setupLink).toHaveProperty('tabIndex', 0)
   })
 
   it('renders saved history and trend on Progress', async () => {
