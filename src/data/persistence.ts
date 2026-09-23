@@ -140,6 +140,23 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
         ? { data: values, state: 'success' }
         : { data: [], state: 'empty' }
     },
+    async listVisibleToUser(userId: string) {
+      const joinedChallengeIds = new Set(
+        readList<Participant>(storage, participantsStorageKey)
+          .filter(
+            (participant) =>
+              participant.userId === userId && participant.status === 'active',
+          )
+          .map((participant) => participant.challengeId),
+      )
+      const values = readList<Challenge>(storage, challengesStorageKey).filter(
+        (challenge) =>
+          challenge.ownerId === userId || joinedChallengeIds.has(challenge.id),
+      )
+      return values.length > 0
+        ? { data: values, state: 'success' }
+        : { data: [], state: 'empty' }
+    },
     async update(id: string, input: ChallengeWriteInput) {
       const values = readList<Challenge>(storage, challengesStorageKey)
       const index = values.findIndex((value) => value.id === id)

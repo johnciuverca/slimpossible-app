@@ -177,6 +177,16 @@ describe('Supabase repositories', () => {
     expect(requestUrl).toContain('owner_id=eq.owner-1')
   })
 
+  it('lists challenges without a caller-supplied owner filter for RLS to scope', async () => {
+    stubResponse([])
+
+    await createRepositories(client).challenges.listVisibleToUser('member-1')
+
+    const requestUrl = String(vi.mocked(fetch).mock.calls[0]?.[0])
+    expect(requestUrl).toContain('/challenges?select=*')
+    expect(requestUrl).not.toContain('owner_id=')
+  })
+
   it('scopes participant listing to the authenticated user', async () => {
     stubResponse([])
 

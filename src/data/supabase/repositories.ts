@@ -48,6 +48,10 @@ export type ChallengeRepository = {
     ownerId?: string,
     options?: { signal?: AbortSignal },
   ) => Promise<RepositoryListResult<Challenge>>
+  listVisibleToUser: (
+    userId: string,
+    options?: { signal?: AbortSignal },
+  ) => Promise<RepositoryListResult<Challenge>>
   update: (
     id: string,
     input: ChallengeWriteInput,
@@ -345,6 +349,22 @@ export function createRepositories(client: DatabaseClient): Repositories {
           .select('*')
           .order('created_at', { ascending: false })
         if (ownerId) query = query.eq('owner_id', ownerId)
+        if (options?.signal) query = query.abortSignal(options.signal)
+        const { data, error } = await query
+
+        return error
+          ? {
+              error: requestError('load the challenges', error),
+              state: 'error',
+            }
+          : mapList(data, mapChallenge, 'challenge')
+      },
+      async listVisibleToUser(_userId, options) {
+        // Challenge RLS scopes this query to auth.uid()'s owned or joined rows.
+        let query = client
+          .from('challenges')
+          .select('*')
+          .order('created_at', { ascending: false })
         if (options?.signal) query = query.abortSignal(options.signal)
         const { data, error } = await query
 

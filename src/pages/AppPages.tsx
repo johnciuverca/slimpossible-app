@@ -106,7 +106,7 @@ function usePersonalDashboard() {
 
       setIsLoading(true)
       const challenges =
-        await persistence.repositories.challenges.listOwned(ownerId)
+        await persistence.repositories.challenges.listVisibleToUser(ownerId)
       if (!isCurrent) return
       if (challenges.state === 'error') {
         setData(null)
@@ -240,7 +240,7 @@ export function HomePage() {
 
       setIsLoading(true)
       const result =
-        await persistence.repositories.challenges.listOwned(ownerId)
+        await persistence.repositories.challenges.listVisibleToUser(ownerId)
       if (!isCurrent) return
 
       if (result.state === 'error') {
