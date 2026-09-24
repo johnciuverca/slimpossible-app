@@ -87,12 +87,16 @@ function usePersonalDashboard() {
   const [isLoading, setIsLoading] = useState(authState.status === 'signed-in')
   const [message, setMessage] = useState('')
   const [isMissingChallenge, setIsMissingChallenge] = useState(false)
+  const [isMissingMembership, setIsMissingMembership] = useState(false)
+  const [enrollmentChallengeId, setEnrollmentChallengeId] = useState('')
 
   useEffect(() => {
     let isCurrent = true
 
     async function loadDashboard() {
       setIsMissingChallenge(false)
+      setIsMissingMembership(false)
+      setEnrollmentChallengeId('')
       if (authState.status !== 'signed-in' || !ownerId) {
         setData(null)
         setMessage('Sign in to view your saved dashboard.')
@@ -118,13 +122,19 @@ function usePersonalDashboard() {
       }
       const savedChallenges =
         challenges.state === 'success' ? challenges.data : []
-      const challenge =
-        savedChallenges.find(({ id }) => id === challengeParam) ??
-        savedChallenges[0]
+      const challenge = challengeParam
+        ? savedChallenges.find(({ id }) => id === challengeParam)
+        : savedChallenges[0]
       if (!challenge) {
         setData(null)
-        setMessage('Set up a challenge before viewing your dashboard.')
-        setIsMissingChallenge(true)
+        setMessage(
+          savedChallenges.length === 0
+            ? 'Set up a challenge before viewing your dashboard.'
+            : challengeParam
+              ? 'The selected challenge is unavailable for this account.'
+              : 'Set up a challenge before viewing your dashboard.',
+        )
+        setIsMissingChallenge(savedChallenges.length === 0)
         setIsLoading(false)
         return
       }
@@ -138,13 +148,17 @@ function usePersonalDashboard() {
         setIsLoading(false)
         return
       }
-      const participant = participants.data.find(
+      const participantRows =
+        participants.state === 'success' ? participants.data : []
+      const participant = participantRows.find(
         (candidate) =>
           candidate.challengeId === challenge.id &&
           candidate.status === 'active',
       )
       if (!participant) {
         setData(null)
+        setEnrollmentChallengeId(challenge.id)
+        setIsMissingMembership(true)
         setMessage(
           'Enroll yourself in the selected challenge before viewing your dashboard.',
         )
@@ -185,7 +199,14 @@ function usePersonalDashboard() {
     }
   }, [authState.status, challengeParam, ownerId, persistence])
 
-  return { data, isLoading, isMissingChallenge, message }
+  return {
+    data,
+    enrollmentChallengeId,
+    isLoading,
+    isMissingChallenge,
+    isMissingMembership,
+    message,
+  }
 }
 
 function DashboardState({
@@ -411,8 +432,14 @@ export function HomePage() {
 }
 
 export function TodayPage() {
-  const { data, isLoading, isMissingChallenge, message } =
-    usePersonalDashboard()
+  const {
+    data,
+    enrollmentChallengeId,
+    isLoading,
+    isMissingChallenge,
+    isMissingMembership,
+    message,
+  } = usePersonalDashboard()
   const challengeQuery = data
     ? `?challenge=${encodeURIComponent(data.challenge.id)}`
     : ''
@@ -447,6 +474,22 @@ export function TodayPage() {
                   to="/challenge/setup"
                 >
                   Set up a challenge
+                </Link>
+              </div>
+            ) : isMissingMembership && enrollmentChallengeId ? (
+              <div className="mt-8 space-y-4">
+                <p
+                  aria-live="polite"
+                  className="text-sm leading-6 text-slate-600"
+                  role="status"
+                >
+                  {message}
+                </p>
+                <Link
+                  className="inline-block rounded-xl bg-emerald-700 px-5 py-3 text-sm font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+                  to={`/challenge/participants/enroll?challenge=${encodeURIComponent(enrollmentChallengeId)}`}
+                >
+                  Enroll yourself
                 </Link>
               </div>
             ) : undefined
