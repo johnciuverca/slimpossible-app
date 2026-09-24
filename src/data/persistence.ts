@@ -16,6 +16,7 @@ import type {
   ChallengeInviteRepository,
   CreatedChallengeInvite,
   ChallengeWriteInput,
+  GroupProgressRepository,
   ParticipantRepository,
   ParticipantWriteInput,
   RepositoryListResult,
@@ -32,7 +33,12 @@ export const remotePersistenceUnavailableMessage =
 
 export type PersistenceRepositories = Pick<
   Repositories,
-  'challenges' | 'invites' | 'participants' | 'profiles' | 'weighIns'
+  | 'challenges'
+  | 'groupProgress'
+  | 'invites'
+  | 'participants'
+  | 'profiles'
+  | 'weighIns'
 >
 
 export type ChallengeParticipantRepositories = Pick<
@@ -467,7 +473,26 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
     },
   }
 
-  return { challenges, invites, participants, profiles, weighIns }
+  const groupProgress: GroupProgressRepository = {
+    async getForChallenge() {
+      return {
+        error: {
+          kind: 'request',
+          message: 'Shared group progress requires a signed-in server session.',
+        },
+        state: 'error',
+      }
+    },
+  }
+
+  return {
+    challenges,
+    groupProgress,
+    invites,
+    participants,
+    profiles,
+    weighIns,
+  }
 }
 
 export function createPersistence(

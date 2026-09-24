@@ -8,6 +8,7 @@ import type {
   InviteAcceptanceValues,
 } from '../../models/challengeInvite'
 import type { WeighIn } from '../../models/weighIn'
+import type { GroupProgressSummary } from '../../models/groupProgress'
 import type { Database } from './database.types'
 
 export type RepositoryError = {
@@ -37,6 +38,8 @@ type ChallengeInvitePreviewRow =
   Database['public']['Functions']['preview_challenge_invite']['Returns'][number]
 type CreatedChallengeInviteRow =
   Database['public']['Functions']['create_challenge_invite']['Returns'][number]
+type GroupProgressRow =
+  Database['public']['Functions']['get_group_progress_summary']['Returns'][number]
 
 export type ChallengeRepository = {
   create: (input: ChallengeWriteInput) => Promise<RepositoryResult<Challenge>>
@@ -96,6 +99,13 @@ export type WeighInRepository = {
   upsert: (input: WeighInWriteInput) => Promise<RepositoryResult<WeighIn>>
 }
 
+export type GroupProgressRepository = {
+  getForChallenge: (
+    challengeId: string,
+    currentSunday: string,
+  ) => Promise<RepositoryResult<GroupProgressSummary>>
+}
+
 export type CreatedChallengeInvite = {
   invite: ChallengeInvite
   token: string
@@ -120,6 +130,7 @@ export type ChallengeInviteRepository = {
 
 export type Repositories = {
   challenges: ChallengeRepository
+  groupProgress: GroupProgressRepository
   participants: ParticipantRepository
   profiles: ProfileRepository
   invites: ChallengeInviteRepository
@@ -246,6 +257,47 @@ function mapChallengeInvitePreview(
     id: row.invite_id,
     ...(row.revoked_at === null ? {} : { revokedAt: row.revoked_at }),
     status: row.status,
+  }
+}
+
+function mapGroupProgress(row: GroupProgressRow): GroupProgressSummary {
+  const counts = [
+    row.active_participant_count,
+    row.participants_with_recorded_weight_count,
+    row.participants_with_progress_count,
+    row.reached_target_count,
+    row.eligible_participant_count,
+    row.weekly_winner_count,
+  ]
+  if (
+    typeof row.challenge_id !== 'string' ||
+    typeof row.current_sunday !== 'string' ||
+    typeof row.previous_sunday !== 'string' ||
+    counts.some((count) => !Number.isInteger(count) || count < 0) ||
+    (row.average_completion_percentage !== null &&
+      (!Number.isFinite(row.average_completion_percentage) ||
+        row.average_completion_percentage < 0 ||
+        row.average_completion_percentage > 100)) ||
+    !Array.isArray(row.weekly_winner_names) ||
+    row.weekly_winner_names.some((name) => typeof name !== 'string') ||
+    row.weekly_winner_count !== row.weekly_winner_names.length
+  ) {
+    throw new Error('Invalid group progress response')
+  }
+
+  return {
+    activeParticipantCount: row.active_participant_count,
+    averageCompletionPercentage: row.average_completion_percentage,
+    challengeId: row.challenge_id,
+    currentSunday: row.current_sunday,
+    eligibleParticipantCount: row.eligible_participant_count,
+    participantsWithProgressCount: row.participants_with_progress_count,
+    participantsWithRecordedWeightCount:
+      row.participants_with_recorded_weight_count,
+    previousSunday: row.previous_sunday,
+    reachedTargetCount: row.reached_target_count,
+    weeklyWinnerCount: row.weekly_winner_count,
+    weeklyWinnerNames: [...row.weekly_winner_names],
   }
 }
 
@@ -401,6 +453,38 @@ export function createRepositories(client: DatabaseClient): Repositories {
               state: 'error',
             }
           : mapSingle(data, mapChallenge, 'challenge')
+      },
+    },
+    groupProgress: {
+      async getForChallenge(challengeId, currentSunday) {
+        const { data, error } = await client.rpc('get_group_progress_summary', {
+          target_challenge_id: challengeId,
+          target_current_sunday: currentSunday,
+        })
+
+        if (error) {
+          return {
+            error: requestError('load shared group progress', error),
+            state: 'error',
+          }
+        }
+
+        const result = mapSingle(
+          data?.[0] ?? null,
+          mapGroupProgress,
+          'shared group progress',
+        )
+        if (
+          result.state === 'success' &&
+          (result.data.challengeId !== challengeId ||
+            result.data.currentSunday !== currentSunday)
+        ) {
+          return {
+            error: mappingError('shared group progress'),
+            state: 'error',
+          }
+        }
+        return result
       },
     },
     participants: {

@@ -14,6 +14,10 @@ import { createPersistence } from '../data/persistence'
 import type { Challenge } from '../models/challenge'
 import type { Participant } from '../models/participant'
 import type { WeighIn } from '../models/weighIn'
+import {
+  mostRecentSunday,
+  type GroupProgressSummary,
+} from '../models/groupProgress'
 
 type PlaceholderPageProps = {
   children?: ReactNode
@@ -75,6 +79,11 @@ type PersonalDashboardData = {
   flow: ParticipantDashboardFlow
   participant: Participant
   weighIns: WeighIn[]
+}
+
+type GroupDashboardData = {
+  challenge: Challenge
+  summary: GroupProgressSummary
 }
 
 function usePersonalDashboard() {
@@ -372,10 +381,11 @@ export function HomePage() {
                 </select>
               </div>
               <nav aria-label="Selected challenge navigation">
-                <ul className="grid gap-3 sm:grid-cols-3">
+                <ul className="grid gap-3 sm:grid-cols-2">
                   {[
                     ['Today', '/today'],
                     ['Progress', '/progress'],
+                    ['Group', '/group'],
                     ['Goals', '/goals'],
                     ['Invite participants', '/challenge/invites'],
                   ].map(([label, path]) => (
@@ -526,6 +536,234 @@ export function TodayPage() {
                   Record a weigh-in
                 </Link>
               </div>
+            </div>
+          ) : null}
+        </DashboardState>
+      </Card>
+    </section>
+  )
+}
+
+export function GroupDashboardPage() {
+  const { state: authState } = useOptionalAuth()
+  const ownerId = authState.user?.id
+  const [searchParams, setSearchParams] = useSearchParams()
+  const challengeParam = searchParams.get('challenge')
+  const persistence = useMemo(() => createPersistence(authState), [authState])
+  const [data, setData] = useState<GroupDashboardData | null>(null)
+  const [challenges, setChallenges] = useState<Challenge[]>([])
+  const [isLoading, setIsLoading] = useState(authState.status === 'signed-in')
+  const [message, setMessage] = useState('')
+  const [reloadKey, setReloadKey] = useState(0)
+
+  useEffect(() => {
+    let isCurrent = true
+
+    async function loadGroupDashboard() {
+      if (authState.status !== 'signed-in' || !ownerId) {
+        setData(null)
+        setChallenges([])
+        setMessage(
+          'Sign in as an active challenge member to view group progress.',
+        )
+        setIsLoading(false)
+        return
+      }
+      if (persistence.mode === 'unavailable') {
+        setData(null)
+        setChallenges([])
+        setMessage('Shared group progress requires a signed-in server session.')
+        setIsLoading(false)
+        return
+      }
+
+      setIsLoading(true)
+      setMessage('')
+      const challengeResult =
+        await persistence.repositories.challenges.listVisibleToUser(ownerId)
+      if (!isCurrent) return
+      if (challengeResult.state === 'error') {
+        setData(null)
+        setChallenges([])
+        setMessage('Unable to load the selected group challenge.')
+        setIsLoading(false)
+        return
+      }
+
+      const visibleChallenges =
+        challengeResult.state === 'success' ? challengeResult.data : []
+      setChallenges(visibleChallenges)
+      const challenge = challengeParam
+        ? visibleChallenges.find(({ id }) => id === challengeParam)
+        : visibleChallenges[0]
+      if (!challenge) {
+        setData(null)
+        setMessage(
+          visibleChallenges.length === 0
+            ? 'No challenge is available for this account.'
+            : 'The selected challenge is unavailable for this account.',
+        )
+        setIsLoading(false)
+        return
+      }
+
+      const result =
+        await persistence.repositories.groupProgress.getForChallenge(
+          challenge.id,
+          mostRecentSunday(),
+        )
+      if (!isCurrent) return
+      if (result.state !== 'success') {
+        setData(null)
+        setMessage(
+          'Shared progress is available to active members only, or could not be loaded. Try refreshing.',
+        )
+      } else {
+        setData({ challenge, summary: result.data })
+        setMessage('')
+      }
+      setIsLoading(false)
+    }
+
+    void loadGroupDashboard()
+    return () => {
+      isCurrent = false
+    }
+  }, [authState.status, challengeParam, ownerId, persistence, reloadKey])
+
+  const summary = data?.summary
+  const challengeQuery = data
+    ? `?challenge=${encodeURIComponent(data.challenge.id)}`
+    : ''
+
+  return (
+    <section className="mx-auto w-full max-w-4xl" aria-labelledby="group-title">
+      <Card className="p-8 sm:p-12">
+        <PageHeader
+          description="Shared group progress and weekly winners. Individual weigh-in histories and private notes stay private."
+          title="Group dashboard"
+          titleId="group-title"
+        >
+          <StatusPill>{data?.challenge.name ?? 'Shared progress'}</StatusPill>
+        </PageHeader>
+        <div className="mt-6 flex flex-wrap items-end gap-4">
+          {data ? (
+            <label className="min-w-56 flex-1 text-sm font-semibold text-slate-700">
+              Selected challenge
+              <select
+                className="mt-2 block w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-slate-900 focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                onChange={(event) => {
+                  const nextParams = new URLSearchParams(searchParams)
+                  nextParams.set('challenge', event.target.value)
+                  setSearchParams(nextParams)
+                }}
+                value={data.challenge.id}
+              >
+                {challenges.map((challenge) => (
+                  <option key={challenge.id} value={challenge.id}>
+                    {challenge.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          <button
+            className="rounded-xl border border-stone-300 px-4 py-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+            onClick={() => setReloadKey((value) => value + 1)}
+            type="button"
+          >
+            Refresh shared progress
+          </button>
+        </div>
+        <DashboardState isLoading={isLoading} message={message}>
+          {summary ? (
+            <div className="mt-8 space-y-8">
+              <section aria-labelledby="group-progress-heading">
+                <h2 className="text-xl font-bold" id="group-progress-heading">
+                  Group progress
+                </h2>
+                <p className="mt-2 text-sm text-slate-600">
+                  {summary.participantsWithRecordedWeightCount} of{' '}
+                  {summary.activeParticipantCount} active participants have a
+                  recorded weigh-in. These are aggregate counts only.
+                </p>
+                <div className="mt-5 grid gap-4 sm:grid-cols-3">
+                  <Card className="border border-stone-200 p-5 shadow-none">
+                    <p className="text-sm text-slate-600">Active members</p>
+                    <p className="mt-2 text-2xl font-bold">
+                      {summary.activeParticipantCount}
+                    </p>
+                  </Card>
+                  <Card className="border border-stone-200 p-5 shadow-none">
+                    <p className="text-sm text-slate-600">
+                      Average goal progress
+                    </p>
+                    <p className="mt-2 text-2xl font-bold">
+                      {summary.averageCompletionPercentage === null
+                        ? '—'
+                        : `${summary.averageCompletionPercentage}%`}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Across {summary.participantsWithProgressCount} members
+                      with a recorded weight
+                    </p>
+                  </Card>
+                  <Card className="border border-stone-200 p-5 shadow-none">
+                    <p className="text-sm text-slate-600">Goals reached</p>
+                    <p className="mt-2 text-2xl font-bold">
+                      {summary.reachedTargetCount}
+                    </p>
+                  </Card>
+                </div>
+              </section>
+
+              <section
+                aria-labelledby="weekly-winners-heading"
+                className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5"
+              >
+                <h2 className="text-xl font-bold" id="weekly-winners-heading">
+                  Weekly winners
+                </h2>
+                <p className="mt-2 text-sm text-slate-700">
+                  Based on consecutive Sunday weigh-ins:{' '}
+                  {summary.previousSunday} to {summary.currentSunday}.
+                </p>
+                {summary.weeklyWinnerCount === 0 ? (
+                  <p className="mt-4 text-sm text-slate-700">
+                    No weekly result is available until members have both Sunday
+                    weigh-ins.
+                  </p>
+                ) : (
+                  <>
+                    <p className="mt-4 text-sm font-semibold text-slate-900">
+                      {summary.weeklyWinnerCount === 1
+                        ? 'Weekly winner'
+                        : 'Shared weekly winners'}
+                      {summary.eligibleParticipantCount <
+                      summary.activeParticipantCount
+                        ? ` — based on ${summary.eligibleParticipantCount} of ${summary.activeParticipantCount} active members`
+                        : ''}
+                    </p>
+                    <ul className="mt-2 list-inside list-disc text-slate-800">
+                      {summary.weeklyWinnerNames.map((name, index) => (
+                        <li key={`${name}-${index}`}>{name}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </section>
+
+              <p className="text-xs leading-5 text-slate-500">
+                Winner results are recalculated from saved Sunday entries
+                whenever this view refreshes. Private notes and individual
+                weigh-in histories are not included in the group response.
+              </p>
+              <Link
+                className="inline-block text-sm font-semibold text-emerald-700 underline"
+                to={`/challenge/invites${challengeQuery}`}
+              >
+                Invite participants
+              </Link>
             </div>
           ) : null}
         </DashboardState>

@@ -26,6 +26,81 @@ afterEach(() => {
 })
 
 describe('Supabase repositories', () => {
+  it('maps only aggregate group fields from the authorized RPC response', async () => {
+    stubResponse([
+      {
+        active_participant_count: 3,
+        average_completion_percentage: 47.5,
+        challenge_id: 'challenge-1',
+        current_sunday: '2026-09-20',
+        eligible_participant_count: 2,
+        participants_with_progress_count: 2,
+        participants_with_recorded_weight_count: 3,
+        previous_sunday: '2026-09-13',
+        reached_target_count: 1,
+        weekly_winner_count: 1,
+        weekly_winner_names: ['Ava'],
+        note: 'private note must not escape the mapper',
+        raw_history: [{ weight_kg: 95 }],
+      },
+    ])
+
+    const result = await createRepositories(
+      client,
+    ).groupProgress.getForChallenge('challenge-1', '2026-09-20')
+
+    expect(result).toEqual({
+      data: {
+        activeParticipantCount: 3,
+        averageCompletionPercentage: 47.5,
+        challengeId: 'challenge-1',
+        currentSunday: '2026-09-20',
+        eligibleParticipantCount: 2,
+        participantsWithProgressCount: 2,
+        participantsWithRecordedWeightCount: 3,
+        previousSunday: '2026-09-13',
+        reachedTargetCount: 1,
+        weeklyWinnerCount: 1,
+        weeklyWinnerNames: ['Ava'],
+      },
+      state: 'success',
+    })
+    expect(JSON.stringify(result)).not.toContain('private note')
+    expect(JSON.stringify(result)).not.toContain('raw_history')
+    const request = vi.mocked(fetch).mock.calls[0]
+    expect(String(request?.[0])).toContain('/rpc/get_group_progress_summary')
+    expect(JSON.parse(String(request?.[1]?.body))).toEqual({
+      target_challenge_id: 'challenge-1',
+      target_current_sunday: '2026-09-20',
+    })
+  })
+
+  it('returns a safe denial for callers without active group membership', async () => {
+    stubResponse(
+      {
+        code: '42501',
+        details: 'private table detail',
+        hint: null,
+        message: 'Group membership required.',
+      },
+      403,
+    )
+
+    const result = await createRepositories(
+      client,
+    ).groupProgress.getForChallenge('challenge-1', '2026-09-20')
+
+    expect(result).toEqual({
+      error: {
+        code: '42501',
+        kind: 'request',
+        message: 'Unable to load shared group progress.',
+      },
+      state: 'error',
+    })
+    expect(JSON.stringify(result)).not.toContain('private table detail')
+  })
+
   it('loads an existing profile without overwriting its display name', async () => {
     stubResponse({
       created_at: '2026-09-17T10:00:00.000Z',

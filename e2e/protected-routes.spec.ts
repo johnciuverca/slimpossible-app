@@ -12,6 +12,20 @@ test('redirects signed-out users from protected routes to public login', async (
   await expect(page.getByRole('textbox', { name: 'Email' })).toBeVisible()
 })
 
+test('keeps the group dashboard behind the authenticated route boundary', async ({
+  page,
+}) => {
+  await page.goto('/group?challenge=challenge-1')
+
+  await expect(page).toHaveURL(/\/login$/)
+  await expect(
+    page.getByRole('heading', { name: 'Welcome back.' }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: 'Group dashboard' }),
+  ).not.toBeVisible()
+})
+
 test('keeps login and registration navigation public', async ({ page }) => {
   await page.goto('/login')
   await expect(

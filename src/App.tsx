@@ -13,6 +13,7 @@ import { InviteAcceptancePage } from './pages/InviteAcceptancePage'
 import { RegisterPage } from './pages/RegisterPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import {
+  GroupDashboardPage,
   GoalsPage,
   HomePage,
   MilestonePreviewPage,
@@ -54,6 +55,7 @@ function App() {
             <Route element={<ProtectedRoute />}>
               <Route path="today" element={<TodayPage />} />
               <Route path="progress" element={<ProgressPage />} />
+              <Route path="group" element={<GroupDashboardPage />} />
               <Route path="goals" element={<GoalsPage />} />
               <Route
                 path="challenge/invites"
