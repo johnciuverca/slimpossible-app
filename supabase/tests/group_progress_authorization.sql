@@ -81,6 +81,10 @@ begin
     and not (summary ? 'weight_kg')
     and not (summary ? 'participant_id'));
 
+  perform set_config('request.jwt.claim.sub', unrelated_id::text, true);
+  if auth.uid() is distinct from unrelated_id then
+    raise exception 'Unrelated-user denial check has the wrong JWT subject.';
+  end if;
   begin
     perform * from public.get_group_progress_summary(challenge_id, '2026-09-20');
     insert into slimpossible_group_progress_checks values

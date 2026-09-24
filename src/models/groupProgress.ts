@@ -14,7 +14,11 @@ export type GroupProgressSummary = {
 
 export function mostRecentSunday(date = new Date()) {
   const sunday = new Date(date)
-  sunday.setUTCHours(0, 0, 0, 0)
-  sunday.setUTCDate(sunday.getUTCDate() - sunday.getUTCDay())
-  return sunday.toISOString().slice(0, 10)
+  sunday.setHours(0, 0, 0, 0)
+  sunday.setDate(sunday.getDate() - sunday.getDay())
+
+  const year = sunday.getFullYear()
+  const month = String(sunday.getMonth() + 1).padStart(2, '0')
+  const day = String(sunday.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }

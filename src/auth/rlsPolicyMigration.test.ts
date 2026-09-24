@@ -149,6 +149,9 @@ describe('row-level security migration contract', () => {
     expect(groupProgressAuthorizationCheck).toContain(
       "('unrelated_user_is_denied', true)",
     )
+    expect(groupProgressAuthorizationCheck).toMatch(
+      /set_config\('request\.jwt\.claim\.sub', unrelated_id::text, true\);\s*if auth\.uid\(\) is distinct from unrelated_id then[\s\S]*?begin\s*perform \* from public\.get_group_progress_summary\(challenge_id, '2026-09-20'\);\s*insert into slimpossible_group_progress_checks values\s*\('unrelated_user_is_denied', false\)/,
+    )
     expect(groupProgressAuthorizationCheck).toContain(
       "('late_sunday_entry_recomputes_shared_result',",
     )
