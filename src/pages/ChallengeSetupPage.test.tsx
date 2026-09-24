@@ -69,10 +69,6 @@ describe('ChallengeSetupPage', () => {
     fireEvent.change(screen.getByLabelText('End date'), {
       target: { value: '2026-11-01' },
     })
-    fireEvent.change(screen.getByLabelText('Target weight in kg (optional)'), {
-      target: { value: '80' },
-    })
-
     resolveFetch(
       new Response(
         JSON.stringify([
@@ -107,9 +103,9 @@ describe('ChallengeSetupPage', () => {
     )
     expect(screen.getByLabelText('Start date')).toHaveValue('2026-10-01')
     expect(screen.getByLabelText('End date')).toHaveValue('2026-11-01')
-    expect(screen.getByLabelText('Target weight in kg (optional)')).toHaveValue(
-      80,
-    )
+    expect(
+      screen.queryByLabelText('Target weight in kg (optional)'),
+    ).not.toBeInTheDocument()
   })
 
   it('restores an untouched saved challenge after refresh', async () => {
@@ -149,9 +145,9 @@ describe('ChallengeSetupPage', () => {
     )
     expect(screen.getByLabelText('Start date')).toHaveValue('2026-09-01')
     expect(screen.getByLabelText('End date')).toHaveValue('2026-12-01')
-    expect(screen.getByLabelText('Target weight in kg (optional)')).toHaveValue(
-      85,
-    )
+    expect(
+      screen.queryByLabelText('Target weight in kg (optional)'),
+    ).not.toBeInTheDocument()
   })
 
   it('preserves typed fields when session restoration reloads multiple challenges', async () => {
@@ -228,10 +224,6 @@ describe('ChallengeSetupPage', () => {
     fireEvent.change(screen.getByLabelText('End date'), {
       target: { value: '2026-12-01' },
     })
-    fireEvent.change(screen.getByLabelText('Target weight in kg (optional)'), {
-      target: { value: '79' },
-    })
-
     await act(async () => {
       resolveSession({ email: 'owner@example.com', id: 'owner-1' })
       await Promise.resolve()
@@ -253,9 +245,9 @@ describe('ChallengeSetupPage', () => {
     )
     expect(screen.getByLabelText('Start date')).toHaveValue('2026-11-01')
     expect(screen.getByLabelText('End date')).toHaveValue('2026-12-01')
-    expect(screen.getByLabelText('Target weight in kg (optional)')).toHaveValue(
-      79,
-    )
+    expect(
+      screen.queryByLabelText('Target weight in kg (optional)'),
+    ).not.toBeInTheDocument()
   })
 
   it('reports required and date-order errors accessibly', () => {
@@ -309,15 +301,67 @@ describe('ChallengeSetupPage', () => {
     fireEvent.change(screen.getByLabelText('End date'), {
       target: { value: '2026-11-01' },
     })
-    fireEvent.change(screen.getByLabelText('Target weight in kg (optional)'), {
-      target: { value: '80' },
-    })
     fireEvent.click(screen.getByRole('button', { name: 'Save challenge' }))
 
     await waitFor(() => {
       expect(
         screen.getByText(/Nothing has been saved remotely\./),
       ).toBeInTheDocument()
+    })
+    const savedChallenges = JSON.parse(
+      window.localStorage.getItem('slimpossible.local.challenges') ?? '[]',
+    ) as Array<Record<string, unknown>>
+    expect(savedChallenges[0]).not.toHaveProperty('targetWeightKg')
+    expect(
+      screen.queryByLabelText('Target weight in kg (optional)'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('preserves a legacy challenge target when editing a saved challenge', async () => {
+    window.localStorage.setItem(
+      'slimpossible.local.challenges',
+      JSON.stringify([
+        {
+          createdAt: '2026-09-17T10:00:00.000Z',
+          createdBy: 'local-owner',
+          endDate: '2026-12-01',
+          id: 'legacy-challenge',
+          name: 'Legacy challenge',
+          ownerId: 'local-owner',
+          startDate: '2026-09-01',
+          status: 'draft',
+          targetWeightKg: 85,
+          updatedAt: '2026-09-17T10:00:00.000Z',
+        },
+      ]),
+    )
+    renderPage()
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('option', { name: 'Legacy challenge' }),
+      ).toBeInTheDocument()
+    })
+    fireEvent.change(screen.getByLabelText('Saved challenge'), {
+      target: { value: 'legacy-challenge' },
+    })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Challenge name' }), {
+      target: { value: 'Updated legacy challenge' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Update challenge' }))
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Nothing has been saved remotely\./),
+      ).toBeInTheDocument()
+    })
+    const [savedChallenge] = JSON.parse(
+      window.localStorage.getItem('slimpossible.local.challenges') ?? '[]',
+    ) as Array<Record<string, unknown>>
+    expect(savedChallenge).toMatchObject({
+      id: 'legacy-challenge',
+      name: 'Updated legacy challenge',
+      targetWeightKg: 85,
     })
   })
 
@@ -421,47 +465,6 @@ describe('ChallengeSetupPage', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Saved challenges took too long to load.',
     )
-  })
-
-  it('validates a negative target weight while remote loading is pending', () => {
-    vi.stubEnv('VITE_SUPABASE_URL', 'https://negative-project.supabase.co')
-    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-anon-key')
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => new Promise<Response>(() => undefined)),
-    )
-
-    render(
-      <AuthProvider
-        initialState={{
-          error: null,
-          status: 'signed-in',
-          user: { email: 'owner@example.com', id: 'owner-1' },
-        }}
-      >
-        <MemoryRouter>
-          <ChallengeSetupPage />
-        </MemoryRouter>
-      </AuthProvider>,
-    )
-
-    fireEvent.change(screen.getByRole('textbox', { name: 'Challenge name' }), {
-      target: { value: 'Negative target check' },
-    })
-    fireEvent.change(screen.getByLabelText('Start date'), {
-      target: { value: '2026-10-01' },
-    })
-    fireEvent.change(screen.getByLabelText('End date'), {
-      target: { value: '2026-11-01' },
-    })
-    fireEvent.change(screen.getByLabelText('Target weight in kg (optional)'), {
-      target: { value: '-10' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Save challenge' }))
-
-    expect(
-      screen.getByText('Target weight must be greater than zero.'),
-    ).toBeInTheDocument()
   })
 
   it('does not query remote challenges again for the same auth notification', async () => {
