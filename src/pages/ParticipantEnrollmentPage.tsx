@@ -53,6 +53,7 @@ export function ParticipantEnrollmentPage() {
   const { state: authState } = useOptionalAuth()
   const [searchParams] = useSearchParams()
   const challengeParam = searchParams.get('challenge')
+  const isOwnerSelfEnrollment = searchParams.get('self') === 'owner'
   const persistence = useMemo(() => createPersistence(authState), [authState])
   const [values, setValues] = useState(initialValues)
   const [participants, setParticipants] = useState<Participant[]>([])
@@ -62,6 +63,9 @@ export function ParticipantEnrollmentPage() {
   const [successMessage, setSuccessMessage] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [challengeId, setChallengeId] = useState(localChallengeId)
+  const [ownerBoundUserId, setOwnerBoundUserId] = useState('')
+  const [existingOwnerMembership, setExistingOwnerMembership] =
+    useState<Participant | null>(null)
 
   useEffect(() => {
     let isCurrent = true
@@ -77,6 +81,8 @@ export function ParticipantEnrollmentPage() {
       }
 
       setIsLoading(true)
+      setOwnerBoundUserId('')
+      setExistingOwnerMembership(null)
       setSubmitError('')
       if (persistence.mode === 'remote') {
         setParticipants([])
@@ -97,7 +103,7 @@ export function ParticipantEnrollmentPage() {
 
       const ownerId =
         persistence.mode === 'remote' && authState.status === 'signed-in'
-          ? authState.user.id
+          ? (authState.user.id ?? '')
           : undefined
       const challenges =
         await persistence.repositories.challenges.listOwned(ownerId)
@@ -145,7 +151,14 @@ export function ParticipantEnrollmentPage() {
       }
 
       const nextChallengeId = selectedChallenge?.id ?? localChallengeId
+      const nextOwnerBoundUserId =
+        persistence.mode === 'remote' && authState.status === 'signed-in'
+          ? (authState.user.id ?? '')
+          : isOwnerSelfEnrollment
+            ? (selectedChallenge?.ownerId ?? '')
+            : ''
       setChallengeId(nextChallengeId)
+      setOwnerBoundUserId(nextOwnerBoundUserId)
       const result =
         await persistence.repositories.participants.listForChallenge(
           nextChallengeId,
@@ -158,6 +171,16 @@ export function ParticipantEnrollmentPage() {
         setSubmitError(result.error.message)
       } else if (result.state === 'success') {
         setParticipants(result.data)
+        setExistingOwnerMembership(
+          nextOwnerBoundUserId
+            ? (result.data.find(
+                ({ userId }) => userId === nextOwnerBoundUserId,
+              ) ?? null)
+            : null,
+        )
+      } else {
+        setParticipants([])
+        setExistingOwnerMembership(null)
       }
       setIsLoading(false)
     }
@@ -166,7 +189,7 @@ export function ParticipantEnrollmentPage() {
     return () => {
       isCurrent = false
     }
-  }, [authState, challengeParam, persistence])
+  }, [authState, challengeParam, isOwnerSelfEnrollment, persistence])
 
   function updateValue(field: EnrollmentField, value: string) {
     setValues((currentValues) => ({ ...currentValues, [field]: value }))
@@ -177,6 +200,7 @@ export function ParticipantEnrollmentPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (existingOwnerMembership) return
 
     if (authState.status === 'loading' && persistence.mode === 'unavailable') {
       return
@@ -195,7 +219,7 @@ export function ParticipantEnrollmentPage() {
       status: 'active',
       startingWeightKg: Number(values.startingWeightKg),
       targetWeightKg: Number(values.targetWeightKg),
-      userId: authenticatedUserId ?? values.userId.trim(),
+      userId: ownerBoundUserId || authenticatedUserId || values.userId.trim(),
     }
     const result = validateParticipant(candidate)
 
@@ -239,6 +263,9 @@ export function ParticipantEnrollmentPage() {
       ...currentParticipants,
       saved.data,
     ])
+    if (ownerBoundUserId && saved.data.userId === ownerBoundUserId) {
+      setExistingOwnerMembership(saved.data)
+    }
     setValues(initialValues)
     setSuccessMessage(
       persistence.mode === 'remote'
@@ -268,98 +295,133 @@ export function ParticipantEnrollmentPage() {
             </StatusPill>
           </PageHeader>
 
-          <form
-            aria-label="Participant enrollment form"
-            className="mt-8 space-y-5"
-            noValidate
-            onSubmit={handleSubmit}
-          >
-            <TextInput
-              autoComplete="off"
-              error={errors.displayName}
-              id="participant-display-name"
-              label="Display name"
-              onChange={(event) =>
-                updateValue('displayName', event.target.value)
-              }
-              type="text"
-              value={values.displayName}
-            />
-            {persistence.mode === 'remote' &&
-            authState.status === 'signed-in' ? (
-              <p className="text-sm leading-6 text-slate-600">
-                This membership will be linked to your signed-in account.
+          {existingOwnerMembership ? (
+            <div
+              aria-live="polite"
+              className="mt-8 space-y-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-5"
+              role="status"
+            >
+              <h2 className="text-lg font-bold text-slate-950">
+                {successMessage
+                  ? 'You’re enrolled.'
+                  : 'You’re already participating.'}
+              </h2>
+              <p className="text-sm leading-6 text-slate-700">
+                {successMessage ||
+                  `${existingOwnerMembership.displayName} is already enrolled in this challenge, so no duplicate membership was created.`}
               </p>
-            ) : (
+              <div className="flex flex-wrap gap-4">
+                <Link
+                  className="text-sm font-semibold text-emerald-700 underline"
+                  to={`/today?challenge=${encodeURIComponent(challengeId)}`}
+                >
+                  Go to Today
+                </Link>
+                <Link
+                  className="text-sm font-semibold text-emerald-700 underline"
+                  to={`/challenge/invites?challenge=${encodeURIComponent(challengeId)}`}
+                >
+                  Invite participants
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <form
+              aria-label="Participant enrollment form"
+              className="mt-8 space-y-5"
+              noValidate
+              onSubmit={handleSubmit}
+            >
               <TextInput
                 autoComplete="off"
-                error={errors.userId}
-                id="participant-user-id"
-                label="Participant identifier"
-                onChange={(event) => updateValue('userId', event.target.value)}
+                error={errors.displayName}
+                id="participant-display-name"
+                label="Display name"
+                onChange={(event) =>
+                  updateValue('displayName', event.target.value)
+                }
                 type="text"
-                value={values.userId}
+                value={values.displayName}
               />
-            )}
-            <TextInput
-              error={errors.startingWeightKg}
-              id="participant-starting-weight"
-              inputMode="decimal"
-              label="Starting weight in kg"
-              min="0"
-              onChange={(event) =>
-                updateValue('startingWeightKg', event.target.value)
-              }
-              step="0.1"
-              type="number"
-              value={values.startingWeightKg}
-            />
-            <TextInput
-              error={errors.targetWeightKg}
-              id="participant-target-weight"
-              inputMode="decimal"
-              label="Target weight in kg"
-              min="0"
-              onChange={(event) =>
-                updateValue('targetWeightKg', event.target.value)
-              }
-              step="0.1"
-              type="number"
-              value={values.targetWeightKg}
-            />
+              {ownerBoundUserId ? (
+                <p className="text-sm leading-6 text-slate-600">
+                  {persistence.mode === 'remote'
+                    ? 'This membership will be linked to your signed-in account.'
+                    : 'This preview membership will be linked to the challenge owner.'}
+                </p>
+              ) : (
+                <TextInput
+                  autoComplete="off"
+                  error={errors.userId}
+                  id="participant-user-id"
+                  label="Participant identifier"
+                  onChange={(event) =>
+                    updateValue('userId', event.target.value)
+                  }
+                  type="text"
+                  value={values.userId}
+                />
+              )}
+              <TextInput
+                error={errors.startingWeightKg}
+                id="participant-starting-weight"
+                inputMode="decimal"
+                label="Starting weight in kg"
+                min="0"
+                onChange={(event) =>
+                  updateValue('startingWeightKg', event.target.value)
+                }
+                step="0.1"
+                type="number"
+                value={values.startingWeightKg}
+              />
+              <TextInput
+                error={errors.targetWeightKg}
+                id="participant-target-weight"
+                inputMode="decimal"
+                label="Target weight in kg"
+                min="0"
+                onChange={(event) =>
+                  updateValue('targetWeightKg', event.target.value)
+                }
+                step="0.1"
+                type="number"
+                value={values.targetWeightKg}
+              />
 
-            {submitError ? (
-              <p
-                aria-live="polite"
-                className="text-sm text-red-700"
-                role="alert"
-              >
-                {submitError}
-              </p>
-            ) : null}
-            {successMessage ? (
-              <p
-                aria-live="polite"
-                className="text-sm text-emerald-800"
-                role="status"
-              >
-                {successMessage}
-              </p>
-            ) : null}
+              {submitError ? (
+                <p
+                  aria-live="polite"
+                  className="text-sm text-red-700"
+                  role="alert"
+                >
+                  {submitError}
+                </p>
+              ) : null}
+              {successMessage ? (
+                <p
+                  aria-live="polite"
+                  className="text-sm text-emerald-800"
+                  role="status"
+                >
+                  {successMessage}
+                </p>
+              ) : null}
 
-            <Button
-              className="w-full"
-              disabled={
-                isSaving ||
-                persistence.mode === 'unavailable' ||
-                (isLoading && persistence.mode === 'remote') ||
-                (persistence.mode === 'remote' && !challengeId)
-              }
-              type="submit"
-            >
-              {isSaving ? 'Saving participant…' : 'Enroll participant'}
-            </Button>
-          </form>
+              <Button
+                className="w-full"
+                disabled={
+                  isSaving ||
+                  persistence.mode === 'unavailable' ||
+                  (isLoading && persistence.mode === 'remote') ||
+                  (persistence.mode === 'remote' && !challengeId)
+                }
+                type="submit"
+              >
+                {isSaving ? 'Saving participant…' : 'Enroll participant'}
+              </Button>
+            </form>
+          )}
 
           <Link
             className="mt-6 inline-block text-sm text-emerald-700 underline"

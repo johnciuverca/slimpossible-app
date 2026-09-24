@@ -7,10 +7,11 @@ import {
   waitFor,
 } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
 import { AuthProvider } from '../auth/AuthContext'
 import type { AuthGateway } from '../auth/context'
+import { ParticipantEnrollmentPage } from './ParticipantEnrollmentPage'
 import { ChallengeSetupPage } from './ChallengeSetupPage'
 
 afterEach(() => {
@@ -314,6 +315,178 @@ describe('ChallengeSetupPage', () => {
     expect(savedChallenges[0]).not.toHaveProperty('targetWeightKg')
     expect(
       screen.queryByLabelText('Target weight in kg (optional)'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('offers self-enrollment for the newly saved challenge and keeps it on back navigation', async () => {
+    window.localStorage.setItem(
+      'slimpossible.local.challenges',
+      JSON.stringify([
+        {
+          createdAt: '2026-09-17T10:00:00.000Z',
+          createdBy: 'local-owner',
+          endDate: '2026-12-01',
+          id: 'older-challenge',
+          name: 'Older challenge',
+          ownerId: 'local-owner',
+          startDate: '2026-09-01',
+          status: 'draft',
+          updatedAt: '2026-09-17T10:00:00.000Z',
+        },
+      ]),
+    )
+    render(
+      <MemoryRouter initialEntries={['/challenge/setup']}>
+        <Routes>
+          <Route element={<ChallengeSetupPage />} path="/challenge/setup" />
+          <Route
+            element={<ParticipantEnrollmentPage />}
+            path="/challenge/participants/enroll"
+          />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('option', { name: 'Older challenge' }),
+      ).toBeInTheDocument()
+    })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Challenge name' }), {
+      target: { value: 'New challenge' },
+    })
+    fireEvent.change(screen.getByLabelText('Start date'), {
+      target: { value: '2026-10-01' },
+    })
+    fireEvent.change(screen.getByLabelText('End date'), {
+      target: { value: '2026-11-01' },
+    })
+    expect(
+      screen.queryByText('Will you participate too?'),
+    ).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save challenge' }))
+
+    expect(
+      await screen.findByText('Will you participate too?'),
+    ).toBeInTheDocument()
+    const savedChallenges = JSON.parse(
+      window.localStorage.getItem('slimpossible.local.challenges') ?? '[]',
+    ) as Array<Record<string, unknown>>
+    const newChallenge = savedChallenges.find(
+      ({ name }) => name === 'New challenge',
+    )
+    expect(newChallenge).toBeDefined()
+    const challengeId = String(newChallenge?.id)
+    const yesLink = screen.getByRole('link', {
+      name: 'Yes, I’ll participate',
+    })
+    expect(yesLink).toHaveAttribute(
+      'href',
+      `/challenge/participants/enroll?challenge=${challengeId}&self=owner`,
+    )
+    fireEvent.click(yesLink)
+
+    expect(
+      await screen.findByRole('form', { name: 'Participant enrollment form' }),
+    ).toBeInTheDocument()
+    expect(screen.getByLabelText('Display name')).toBeInTheDocument()
+    expect(screen.getByLabelText('Starting weight in kg')).toBeInTheDocument()
+    expect(screen.getByLabelText('Target weight in kg')).toBeInTheDocument()
+    expect(
+      screen.queryByLabelText('Participant identifier'),
+    ).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Display name'), {
+      target: { value: 'Local owner' },
+    })
+    fireEvent.change(screen.getByLabelText('Starting weight in kg'), {
+      target: { value: '92' },
+    })
+    fireEvent.change(screen.getByLabelText('Target weight in kg'), {
+      target: { value: '80' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Enroll participant' }))
+
+    expect(
+      await screen.findByText(
+        'Local owner was enrolled in the local challenge.',
+      ),
+    ).toBeInTheDocument()
+    const participants = JSON.parse(
+      window.localStorage.getItem('slimpossible.local.participants') ?? '[]',
+    ) as Array<Record<string, unknown>>
+    expect(participants).toHaveLength(1)
+    expect(participants[0]).toMatchObject({
+      challengeId,
+      startingWeightKg: 92,
+      targetWeightKg: 80,
+      userId: 'local-owner',
+    })
+
+    fireEvent.click(
+      screen.getByRole('link', { name: 'Back to challenge setup' }),
+    )
+    expect(
+      await screen.findByRole('option', { name: 'New challenge' }),
+    ).toBeInTheDocument()
+    expect(
+      JSON.parse(
+        window.localStorage.getItem('slimpossible.local.challenges') ?? '[]',
+      ),
+    ).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: challengeId })]),
+    )
+  })
+
+  it('lets the owner choose organizer-only and offers challenge-specific next steps', async () => {
+    renderPage()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Challenge name' }), {
+      target: { value: 'Organizer challenge' },
+    })
+    fireEvent.change(screen.getByLabelText('Start date'), {
+      target: { value: '2026-10-01' },
+    })
+    fireEvent.change(screen.getByLabelText('End date'), {
+      target: { value: '2026-11-01' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save challenge' }))
+
+    expect(
+      await screen.findByText('Will you participate too?'),
+    ).toBeInTheDocument()
+    const [savedChallenge] = JSON.parse(
+      window.localStorage.getItem('slimpossible.local.challenges') ?? '[]',
+    ) as Array<Record<string, unknown>>
+    const challengeId = String(savedChallenge.id)
+    fireEvent.click(
+      screen.getByRole('button', { name: 'No, I’ll organize only' }),
+    )
+
+    expect(screen.getByText(/You’re the organizer only/)).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: 'Invite participants' }),
+    ).toHaveAttribute('href', `/challenge/invites?challenge=${challengeId}`)
+    expect(
+      screen.getByRole('link', { name: 'Join later from Today' }),
+    ).toHaveAttribute('href', `/today?challenge=${challengeId}`)
+    expect(window.localStorage.getItem('slimpossible.local.participants')).toBe(
+      null,
+    )
+
+    fireEvent.change(screen.getByLabelText('Saved challenge'), {
+      target: { value: challengeId },
+    })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Challenge name' }), {
+      target: { value: 'Organizer challenge updated' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Update challenge' }))
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Nothing has been saved remotely\./),
+      ).toBeInTheDocument()
+    })
+    expect(
+      screen.queryByText('Will you participate too?'),
     ).not.toBeInTheDocument()
   })
 
