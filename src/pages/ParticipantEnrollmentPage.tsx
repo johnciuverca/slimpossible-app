@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 
 import type {
   Participant,
@@ -51,6 +51,8 @@ function mapValidationErrors(
 
 export function ParticipantEnrollmentPage() {
   const { state: authState } = useOptionalAuth()
+  const [searchParams] = useSearchParams()
+  const challengeParam = searchParams.get('challenge')
   const persistence = useMemo(() => createPersistence(authState), [authState])
   const [values, setValues] = useState(initialValues)
   const [participants, setParticipants] = useState<Participant[]>([])
@@ -76,6 +78,10 @@ export function ParticipantEnrollmentPage() {
 
       setIsLoading(true)
       setSubmitError('')
+      if (persistence.mode === 'remote') {
+        setParticipants([])
+        setChallengeId('')
+      }
 
       if (persistence.mode === 'unavailable') {
         if (isCurrent) {
@@ -89,7 +95,12 @@ export function ParticipantEnrollmentPage() {
         return
       }
 
-      const challenges = await persistence.repositories.challenges.listOwned()
+      const ownerId =
+        persistence.mode === 'remote' && authState.status === 'signed-in'
+          ? authState.user.id
+          : undefined
+      const challenges =
+        await persistence.repositories.challenges.listOwned(ownerId)
       if (!isCurrent) {
         return
       }
@@ -100,15 +111,40 @@ export function ParticipantEnrollmentPage() {
         return
       }
 
-      const savedChallengeId =
-        challenges.state === 'success' ? challenges.data[0]?.id : undefined
-      if (persistence.mode === 'remote' && !savedChallengeId) {
+      const ownedChallenges =
+        challenges.state === 'success' ? challenges.data : []
+      if (persistence.mode === 'remote' && ownedChallenges.length === 0) {
         setSubmitError('Create a challenge before enrolling participants.')
         setIsLoading(false)
         return
       }
 
-      const nextChallengeId = savedChallengeId ?? localChallengeId
+      if (persistence.mode === 'remote' && !challengeParam) {
+        setSubmitError(
+          'Choose a challenge from Today before enrolling yourself.',
+        )
+        setIsLoading(false)
+        return
+      }
+
+      const selectedChallenge = challengeParam
+        ? ownedChallenges.find(({ id }) => id === challengeParam)
+        : ownedChallenges[0]
+      if (
+        challengeParam &&
+        (!selectedChallenge ||
+          (persistence.mode === 'remote' &&
+            selectedChallenge.ownerId !== ownerId))
+      ) {
+        setChallengeId('')
+        setSubmitError(
+          'The selected challenge is unavailable or is not owned by this account. Return to Today and choose one of your challenges.',
+        )
+        setIsLoading(false)
+        return
+      }
+
+      const nextChallengeId = selectedChallenge?.id ?? localChallengeId
       setChallengeId(nextChallengeId)
       const result =
         await persistence.repositories.participants.listForChallenge(
@@ -130,7 +166,7 @@ export function ParticipantEnrollmentPage() {
     return () => {
       isCurrent = false
     }
-  }, [authState, persistence])
+  }, [authState, challengeParam, persistence])
 
   function updateValue(field: EnrollmentField, value: string) {
     setValues((currentValues) => ({ ...currentValues, [field]: value }))
@@ -316,7 +352,8 @@ export function ParticipantEnrollmentPage() {
               disabled={
                 isSaving ||
                 persistence.mode === 'unavailable' ||
-                (isLoading && persistence.mode === 'remote')
+                (isLoading && persistence.mode === 'remote') ||
+                (persistence.mode === 'remote' && !challengeId)
               }
               type="submit"
             >

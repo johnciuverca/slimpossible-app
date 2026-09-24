@@ -22,10 +22,13 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-function renderPage(authValue?: AuthContextValue) {
+function renderPage(
+  authValue?: AuthContextValue,
+  initialEntry = '/challenge/participants/enroll',
+) {
   return render(
     <AuthContext.Provider value={authValue}>
-      <MemoryRouter initialEntries={['/challenge/participants/enroll']}>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <ParticipantEnrollmentPage />
       </MemoryRouter>
     </AuthContext.Provider>,
@@ -161,6 +164,19 @@ describe('ParticipantEnrollmentPage', () => {
         if (url.includes('/challenges?')) {
           return jsonResponse([
             {
+              created_at: '2026-09-24T07:00:00.000Z',
+              created_by: ownerId,
+              description: null,
+              end_date: '2026-11-01',
+              id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+              name: 'First owned challenge',
+              owner_id: ownerId,
+              start_date: '2026-08-01',
+              status: 'active',
+              target_weight_kg: null,
+              updated_at: '2026-09-24T07:00:00.000Z',
+            },
+            {
               created_at: '2026-09-24T08:00:00.000Z',
               created_by: ownerId,
               description: null,
@@ -188,6 +204,7 @@ describe('ParticipantEnrollmentPage', () => {
 
     const view = renderPage(
       makeAuthValue({ error: null, status: 'loading', user: null }),
+      `/challenge/participants/enroll?challenge=${existingMember.challenge_id}`,
     )
 
     expect(screen.getByText('Restoring your session…')).toBeInTheDocument()
@@ -201,7 +218,11 @@ describe('ParticipantEnrollmentPage', () => {
           user: { email: 'owner@example.test', id: ownerId },
         })}
       >
-        <MemoryRouter initialEntries={['/challenge/participants/enroll']}>
+        <MemoryRouter
+          initialEntries={[
+            `/challenge/participants/enroll?challenge=${existingMember.challenge_id}`,
+          ]}
+        >
           <ParticipantEnrollmentPage />
         </MemoryRouter>
       </AuthContext.Provider>,
@@ -242,6 +263,12 @@ describe('ParticipantEnrollmentPage', () => {
       challenge_id: existingMember.challenge_id,
       user_id: ownerId,
     })
+    const participantListCall = fetchMock.mock.calls.find(([url]) =>
+      String(url).includes('/participants?'),
+    )
+    expect(String(participantListCall?.[0])).toContain(
+      `challenge_id=eq.${existingMember.challenge_id}`,
+    )
     expect(screen.getByText('Existing member')).toBeInTheDocument()
     expect(screen.getByText('90 kg → 82 kg')).toBeInTheDocument()
     expect(
@@ -268,4 +295,80 @@ describe('ParticipantEnrollmentPage', () => {
       screen.getByRole('button', { name: 'Enroll participant' }),
     ).toBeDisabled()
   })
+
+  it.each([
+    ['missing', '/challenge/participants/enroll'],
+    [
+      'unknown',
+      '/challenge/participants/enroll?challenge=99999999-9999-4999-8999-999999999999',
+    ],
+    [
+      'not owned by the signed-in user',
+      '/challenge/participants/enroll?challenge=88888888-8888-4888-8888-888888888888',
+    ],
+  ])(
+    'blocks remote enrollment when the challenge selection is %s',
+    async (_, initialEntry) => {
+      vi.stubEnv('VITE_SUPABASE_URL', 'https://staging-project.supabase.co')
+      vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-anon-key')
+      const ownedChallenge = {
+        created_at: '2026-09-24T08:00:00.000Z',
+        created_by: '11111111-1111-4111-8111-111111111111',
+        description: null,
+        end_date: '2026-12-01',
+        id: '22222222-2222-4222-8222-222222222222',
+        name: 'Owned challenge',
+        owner_id: '11111111-1111-4111-8111-111111111111',
+        start_date: '2026-09-01',
+        status: 'active',
+        target_weight_kg: null,
+        updated_at: '2026-09-24T08:00:00.000Z',
+      }
+      const otherOwnersChallenge = {
+        ...ownedChallenge,
+        id: '88888888-8888-4888-8888-888888888888',
+        name: 'Another account challenge',
+        owner_id: '77777777-7777-4777-8777-777777777777',
+      }
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(
+          jsonResponse(
+            initialEntry.includes(otherOwnersChallenge.id)
+              ? [ownedChallenge, otherOwnersChallenge]
+              : [ownedChallenge],
+          ),
+        )
+      vi.stubGlobal('fetch', fetchMock)
+
+      renderPage(
+        makeAuthValue({
+          error: null,
+          status: 'signed-in',
+          user: {
+            email: 'owner@example.test',
+            id: '11111111-1111-4111-8111-111111111111',
+          },
+        }),
+        initialEntry,
+      )
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        initialEntry.includes('?challenge=')
+          ? 'The selected challenge is unavailable or is not owned by this account.'
+          : 'Choose a challenge from Today before enrolling yourself.',
+      )
+      expect(
+        screen.getByRole('button', { name: 'Enroll participant' }),
+      ).toBeDisabled()
+      expect(
+        fetchMock.mock.calls.some(([url]) =>
+          String(url).includes('/participants?'),
+        ),
+      ).toBe(false)
+      expect(
+        fetchMock.mock.calls.some(([, init]) => init?.method === 'POST'),
+      ).toBe(false)
+    },
+  )
 })

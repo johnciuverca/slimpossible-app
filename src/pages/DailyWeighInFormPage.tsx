@@ -315,7 +315,11 @@ export function DailyWeighInFormPage() {
                 </Link>
                 <Link
                   className="text-sm text-emerald-700 underline"
-                  to="/challenge/participants/enroll"
+                  to={
+                    challengeParam
+                      ? `/challenge/participants/enroll?challenge=${encodeURIComponent(challengeParam)}`
+                      : '/challenge/participants/enroll'
+                  }
                 >
                   Enroll a participant
                 </Link>
