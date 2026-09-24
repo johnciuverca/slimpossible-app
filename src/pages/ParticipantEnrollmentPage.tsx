@@ -65,9 +65,25 @@ export function ParticipantEnrollmentPage() {
     let isCurrent = true
 
     async function loadParticipants() {
+      if (
+        authState.status === 'loading' &&
+        persistence.mode === 'unavailable'
+      ) {
+        setSubmitError('')
+        setIsLoading(true)
+        return
+      }
+
+      setIsLoading(true)
+      setSubmitError('')
+
       if (persistence.mode === 'unavailable') {
         if (isCurrent) {
-          setSubmitError(persistence.message)
+          setSubmitError(
+            authState.status === 'error'
+              ? authState.error
+              : persistence.message,
+          )
           setIsLoading(false)
         }
         return
@@ -114,7 +130,7 @@ export function ParticipantEnrollmentPage() {
     return () => {
       isCurrent = false
     }
-  }, [persistence])
+  }, [authState, persistence])
 
   function updateValue(field: EnrollmentField, value: string) {
     setValues((currentValues) => ({ ...currentValues, [field]: value }))
@@ -126,6 +142,15 @@ export function ParticipantEnrollmentPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
+    if (authState.status === 'loading' && persistence.mode === 'unavailable') {
+      return
+    }
+
+    const authenticatedUserId =
+      persistence.mode === 'remote' && authState.status === 'signed-in'
+        ? authState.user.id
+        : undefined
+
     const candidate: Participant = {
       challengeId,
       displayName: values.displayName.trim(),
@@ -134,7 +159,7 @@ export function ParticipantEnrollmentPage() {
       status: 'active',
       startingWeightKg: Number(values.startingWeightKg),
       targetWeightKg: Number(values.targetWeightKg),
-      userId: values.userId.trim(),
+      userId: authenticatedUserId ?? values.userId.trim(),
     }
     const result = validateParticipant(candidate)
 
@@ -224,15 +249,22 @@ export function ParticipantEnrollmentPage() {
               type="text"
               value={values.displayName}
             />
-            <TextInput
-              autoComplete="off"
-              error={errors.userId}
-              id="participant-user-id"
-              label="Participant identifier"
-              onChange={(event) => updateValue('userId', event.target.value)}
-              type="text"
-              value={values.userId}
-            />
+            {persistence.mode === 'remote' &&
+            authState.status === 'signed-in' ? (
+              <p className="text-sm leading-6 text-slate-600">
+                This membership will be linked to your signed-in account.
+              </p>
+            ) : (
+              <TextInput
+                autoComplete="off"
+                error={errors.userId}
+                id="participant-user-id"
+                label="Participant identifier"
+                onChange={(event) => updateValue('userId', event.target.value)}
+                type="text"
+                value={values.userId}
+              />
+            )}
             <TextInput
               error={errors.startingWeightKg}
               id="participant-starting-weight"
@@ -279,7 +311,15 @@ export function ParticipantEnrollmentPage() {
               </p>
             ) : null}
 
-            <Button className="w-full" disabled={isSaving} type="submit">
+            <Button
+              className="w-full"
+              disabled={
+                isSaving ||
+                persistence.mode === 'unavailable' ||
+                (isLoading && persistence.mode === 'remote')
+              }
+              type="submit"
+            >
               {isSaving ? 'Saving participant…' : 'Enroll participant'}
             </Button>
           </form>
@@ -313,7 +353,10 @@ export function ParticipantEnrollmentPage() {
               className="mt-5 text-sm text-slate-600"
               role="status"
             >
-              Loading saved participants…
+              {authState.status === 'loading' &&
+              persistence.mode === 'unavailable'
+                ? 'Restoring your session…'
+                : 'Loading saved participants…'}
             </p>
           ) : null}
           {!isLoading && participants.length === 0 ? (
