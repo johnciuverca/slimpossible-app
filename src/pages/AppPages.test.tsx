@@ -263,6 +263,25 @@ describe('HomePage', () => {
     ).not.toBeInTheDocument()
   })
 
+  it('offers an owner a direct enrollment action for the selected Today challenge', async () => {
+    const fetchMock = vi.fn()
+    fetchMock.mockResolvedValueOnce(dashboardResponses()[0])
+    fetchMock.mockResolvedValueOnce(response([]))
+    renderDashboard(<TodayPage />, fetchMock)
+
+    expect(
+      await screen.findByText(
+        'Enroll yourself in the selected challenge before viewing your dashboard.',
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: 'Enroll yourself' }),
+    ).toHaveAttribute(
+      'href',
+      '/challenge/participants/enroll?challenge=challenge-1',
+    )
+  })
+
   it('shows a keyboard-accessible setup action on Today when no challenge exists', async () => {
     const fetchMock = vi.fn().mockResolvedValue(response([]))
     renderDashboard(<TodayPage />, fetchMock)
