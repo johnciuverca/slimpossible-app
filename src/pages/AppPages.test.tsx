@@ -9,12 +9,19 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { AuthProvider } from '../auth/AuthContext'
-import { GoalsPage, HomePage, ProgressPage, TodayPage } from './AppPages'
+import {
+  GoalsPage,
+  GroupDashboardPage,
+  HomePage,
+  ProgressPage,
+  TodayPage,
+} from './AppPages'
+import { mostRecentSunday } from '../models/groupProgress'
 
-function response(body: unknown) {
+function response(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     headers: { 'Content-Type': 'application/json' },
-    status: 200,
+    status,
   })
 }
 
@@ -95,6 +102,7 @@ function dashboardResponses(challengeOwnerId = 'member-1') {
 function renderDashboard(
   page: React.ReactNode,
   fetchMock: ReturnType<typeof vi.fn>,
+  initialEntry = '/today?challenge=challenge-1',
 ) {
   vi.stubEnv('VITE_SUPABASE_URL', 'https://home-project.supabase.co')
   vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-anon-key')
@@ -107,9 +115,7 @@ function renderDashboard(
         user: { email: 'member@example.com', id: 'member-1' },
       }}
     >
-      <MemoryRouter initialEntries={['/today?challenge=challenge-1']}>
-        {page}
-      </MemoryRouter>
+      <MemoryRouter initialEntries={[initialEntry]}>{page}</MemoryRouter>
     </AuthProvider>,
   )
 }
@@ -190,6 +196,10 @@ describe('HomePage', () => {
     expect(screen.getByRole('link', { name: 'Goals' })).toHaveAttribute(
       'href',
       '/goals?challenge=challenge-2',
+    )
+    expect(screen.getByRole('link', { name: 'Group' })).toHaveAttribute(
+      'href',
+      '/group?challenge=challenge-2',
     )
     const challengeRequest = fetchMock.mock.calls.find(([url]) =>
       String(url).includes('/challenges?'),
@@ -354,4 +364,151 @@ describe('HomePage', () => {
       expect(String(challengeRequest?.[0])).not.toContain('owner_id=')
     },
   )
+})
+
+describe('GroupDashboardPage', () => {
+  it('renders only aggregate progress and weekly winners returned by the RPC', async () => {
+    const currentSunday = mostRecentSunday()
+    const previousSundayDate = new Date(`${currentSunday}T00:00:00.000Z`)
+    previousSundayDate.setUTCDate(previousSundayDate.getUTCDate() - 7)
+    const previousSunday = previousSundayDate.toISOString().slice(0, 10)
+    const challengePayload = [
+      {
+        created_at: '2026-09-17T10:00:00.000Z',
+        created_by: 'owner-1',
+        description: null,
+        end_date: '2026-10-01',
+        id: 'challenge-1',
+        name: 'Autumn challenge',
+        owner_id: 'owner-1',
+        start_date: '2026-09-17',
+        status: 'active',
+        target_weight_kg: null,
+        updated_at: '2026-09-17T10:00:00.000Z',
+      },
+    ]
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(response(challengePayload))
+      .mockResolvedValueOnce(
+        response([
+          {
+            active_participant_count: 3,
+            average_completion_percentage: 48.5,
+            challenge_id: 'challenge-1',
+            current_sunday: currentSunday,
+            eligible_participant_count: 2,
+            participants_with_progress_count: 2,
+            participants_with_recorded_weight_count: 3,
+            previous_sunday: previousSunday,
+            reached_target_count: 1,
+            weekly_winner_count: 2,
+            weekly_winner_names: ['Ava', 'Ben'],
+            private_note: 'do not render private notes',
+            raw_weigh_ins: [{ weight_kg: 91.5 }],
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(response(challengePayload))
+      .mockResolvedValueOnce(
+        response([
+          {
+            active_participant_count: 3,
+            average_completion_percentage: 48.5,
+            challenge_id: 'challenge-1',
+            current_sunday: currentSunday,
+            eligible_participant_count: 3,
+            participants_with_progress_count: 2,
+            participants_with_recorded_weight_count: 3,
+            previous_sunday: previousSunday,
+            reached_target_count: 1,
+            weekly_winner_count: 1,
+            weekly_winner_names: ['Casey'],
+          },
+        ]),
+      )
+
+    renderDashboard(
+      <GroupDashboardPage />,
+      fetchMock,
+      '/group?challenge=challenge-1',
+    )
+
+    expect(
+      await screen.findByRole('heading', { name: 'Weekly winners' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('48.5%')).toBeInTheDocument()
+    expect(screen.getByText(/Shared weekly winners/)).toBeInTheDocument()
+    expect(
+      screen.getByText(/based on 2 of 3 active members/),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Ava')).toBeInTheDocument()
+    expect(screen.getByText('Ben')).toBeInTheDocument()
+    expect(
+      screen.queryByText('do not render private notes'),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText('91.5')).not.toBeInTheDocument()
+    expect(
+      fetchMock.mock.calls.some(([url]) => String(url).includes('/weigh_ins')),
+    ).toBe(false)
+
+    const rpcRequest = fetchMock.mock.calls.find(([url]) =>
+      String(url).includes('/rpc/get_group_progress_summary'),
+    )
+    expect(JSON.parse(String(rpcRequest?.[1]?.body))).toEqual({
+      target_challenge_id: 'challenge-1',
+      target_current_sunday: currentSunday,
+    })
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Refresh shared progress' }),
+    )
+    expect(await screen.findByText('Casey')).toBeInTheDocument()
+    expect(screen.queryByText('Ava')).not.toBeInTheDocument()
+  })
+
+  it('does not render group data when the membership-checked RPC denies access', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        response([
+          {
+            created_at: '2026-09-17T10:00:00.000Z',
+            created_by: 'owner-1',
+            description: null,
+            end_date: '2026-10-01',
+            id: 'challenge-1',
+            name: 'Autumn challenge',
+            owner_id: 'owner-1',
+            start_date: '2026-09-17',
+            status: 'active',
+            target_weight_kg: null,
+            updated_at: '2026-09-17T10:00:00.000Z',
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        response(
+          {
+            code: '42501',
+            details: 'internal row detail',
+            hint: null,
+            message: 'Group membership required.',
+          },
+          403,
+        ),
+      )
+
+    renderDashboard(
+      <GroupDashboardPage />,
+      fetchMock,
+      '/group?challenge=challenge-1',
+    )
+
+    expect(
+      await screen.findByText(/available to active members only/),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Weekly winners')).not.toBeInTheDocument()
+    expect(screen.queryByText('internal row detail')).not.toBeInTheDocument()
+  })
 })

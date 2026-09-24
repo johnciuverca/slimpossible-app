@@ -175,6 +175,22 @@ export type Database = {
           total_weigh_in_count: number
         }[]
       }
+      get_group_progress_summary: {
+        Args: { target_challenge_id: string; target_current_sunday: string }
+        Returns: {
+          active_participant_count: number
+          average_completion_percentage: number | null
+          challenge_id: string
+          current_sunday: string
+          eligible_participant_count: number
+          participants_with_progress_count: number
+          participants_with_recorded_weight_count: number
+          previous_sunday: string
+          reached_target_count: number
+          weekly_winner_count: number
+          weekly_winner_names: string[]
+        }[]
+      }
       list_challenge_invites: {
         Args: { target_challenge_id: string }
         Returns: {

@@ -23,6 +23,17 @@ const inviteMigration = readFileSync(
   ),
   'utf8',
 )
+const groupProgressMigration = readFileSync(
+  resolve(
+    process.cwd(),
+    'supabase/migrations/20260924000000_add_privacy_safe_group_progress.sql',
+  ),
+  'utf8',
+)
+const groupProgressAuthorizationCheck = readFileSync(
+  resolve(process.cwd(), 'supabase/tests/group_progress_authorization.sql'),
+  'utf8',
+)
 
 describe('row-level security migration contract', () => {
   it('enables RLS on every application table', () => {
@@ -105,6 +116,47 @@ describe('row-level security migration contract', () => {
     )
     expect(inviteMigration).toContain(
       'revoke all on table public.challenge_invites from anon, authenticated',
+    )
+  })
+
+  it('exposes group progress only through a membership-checked safe RPC', () => {
+    expect(groupProgressMigration).toContain(
+      'create or replace function public.get_group_progress_summary',
+    )
+    expect(groupProgressMigration).toContain('security definer')
+    expect(groupProgressMigration).toContain('member.user_id = auth.uid()')
+    expect(groupProgressMigration).toContain("member.status = 'active'")
+    expect(groupProgressMigration).toContain("errcode = '42501'")
+    expect(groupProgressMigration).toContain(
+      'extract(dow from target_current_sunday) <> 0',
+    )
+    expect(groupProgressMigration).toContain(
+      'current_record.weight_kg - previous_record.weight_kg as weight_change',
+    )
+    expect(groupProgressMigration).toContain('min(candidate.weight_change)')
+    expect(groupProgressMigration).toContain(
+      'grant execute on function public.get_group_progress_summary(uuid, date) to authenticated',
+    )
+    expect(groupProgressMigration).toContain('from public, anon, authenticated')
+
+    const returnedColumns = groupProgressMigration
+      .slice(
+        groupProgressMigration.indexOf('returns table ('),
+        groupProgressMigration.indexOf('language plpgsql'),
+      )
+      .toLowerCase()
+    expect(returnedColumns).not.toMatch(/note|weight_kg|participant_id|user_id/)
+    expect(groupProgressAuthorizationCheck).toContain(
+      "('unrelated_user_is_denied', true)",
+    )
+    expect(groupProgressAuthorizationCheck).toMatch(
+      /set_config\('request\.jwt\.claim\.sub', unrelated_id::text, true\);\s*if auth\.uid\(\) is distinct from unrelated_id then[\s\S]*?begin\s*perform \* from public\.get_group_progress_summary\(challenge_id, '2026-09-20'\);\s*insert into slimpossible_group_progress_checks values\s*\('unrelated_user_is_denied', false\)/,
+    )
+    expect(groupProgressAuthorizationCheck).toContain(
+      "('late_sunday_entry_recomputes_shared_result',",
+    )
+    expect(groupProgressAuthorizationCheck).toContain(
+      "('corrected_sunday_entry_recomputes_winner',",
     )
   })
 })

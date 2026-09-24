@@ -10,6 +10,7 @@ type AppLayoutProps = {
 const navigationItems = [
   { label: 'Today', to: '/today' },
   { label: 'Progress', to: '/progress' },
+  { label: 'Group', to: '/group' },
   { label: 'Goals', to: '/goals' },
 ]
 
