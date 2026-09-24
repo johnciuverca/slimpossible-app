@@ -101,6 +101,8 @@ export function ChallengeSetupPage() {
   const [errors, setErrors] = useState<ChallengeSetupErrors>({})
   const [isLoading, setIsLoading] = useState(true)
   const [isSaved, setIsSaved] = useState(false)
+  const [newlyCreatedChallengeId, setNewlyCreatedChallengeId] = useState('')
+  const [choseOrganizerOnly, setChoseOrganizerOnly] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const previousOwnerId = useRef(ownerId)
@@ -212,6 +214,8 @@ export function ChallengeSetupPage() {
     )
     setErrors({})
     setIsSaved(false)
+    setNewlyCreatedChallengeId('')
+    setChoseOrganizerOnly(false)
     setSubmitError('')
   }
 
@@ -222,6 +226,8 @@ export function ChallengeSetupPage() {
   function updateValue(field: keyof ChallengeSetupValues, value: string) {
     setValues((currentValues) => ({ ...currentValues, [field]: value }))
     setIsSaved(false)
+    setNewlyCreatedChallengeId('')
+    setChoseOrganizerOnly(false)
     setSubmitError('')
   }
 
@@ -257,6 +263,7 @@ export function ChallengeSetupPage() {
       ownerId,
       startDate: values.startDate,
     }
+    const isCreatingChallenge = !selectedChallengeId
     const result = selectedChallengeId
       ? await persistence.repositories.challenges.update(
           selectedChallengeId,
@@ -288,6 +295,8 @@ export function ChallengeSetupPage() {
     })
     setSelectedChallengeId(result.data.id)
     setIsSaved(true)
+    setNewlyCreatedChallengeId(isCreatingChallenge ? result.data.id : '')
+    setChoseOrganizerOnly(false)
   }
 
   return (
@@ -297,7 +306,7 @@ export function ChallengeSetupPage() {
     >
       <Card className="w-full p-8 sm:p-10">
         <PageHeader
-          description="Set the dates and target for a shared, sustainable challenge."
+          description="Set the dates and details for a shared, sustainable challenge."
           title="Set up your challenge."
           titleId="challenge-setup-title"
         >
@@ -430,6 +439,67 @@ export function ChallengeSetupPage() {
                 ? 'Challenge was saved remotely.'
                 : 'Challenge was saved in local preview. Nothing has been saved remotely.'}
             </p>
+          ) : null}
+
+          {isSaved && newlyCreatedChallengeId === selectedChallengeId ? (
+            <section
+              aria-labelledby="challenge-participation-question"
+              className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5"
+              role="group"
+            >
+              <h2
+                className="text-lg font-bold text-slate-950"
+                id="challenge-participation-question"
+              >
+                Will you participate too?
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-slate-700">
+                Creating this challenge makes you its organizer, but does not
+                enroll you. If you join, you’ll enter your own starting and
+                target weights.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Link
+                  className="inline-flex items-center justify-center rounded-full bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+                  to={`/challenge/participants/enroll?challenge=${encodeURIComponent(newlyCreatedChallengeId)}&self=owner`}
+                >
+                  Yes, I’ll participate
+                </Link>
+                <Button
+                  onClick={() => setChoseOrganizerOnly(true)}
+                  type="button"
+                  variant="secondary"
+                >
+                  No, I’ll organize only
+                </Button>
+              </div>
+              {choseOrganizerOnly ? (
+                <div
+                  aria-live="polite"
+                  className="mt-4 rounded-xl bg-white p-4"
+                  role="status"
+                >
+                  <p className="text-sm leading-6 text-slate-700">
+                    You’re the organizer only. You can invite people now or join
+                    this challenge later from Today.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-4">
+                    <Link
+                      className="text-sm font-semibold text-emerald-700 underline"
+                      to={`/challenge/invites?challenge=${encodeURIComponent(newlyCreatedChallengeId)}`}
+                    >
+                      Invite participants
+                    </Link>
+                    <Link
+                      className="text-sm font-semibold text-emerald-700 underline"
+                      to={`/today?challenge=${encodeURIComponent(newlyCreatedChallengeId)}`}
+                    >
+                      Join later from Today
+                    </Link>
+                  </div>
+                </div>
+              ) : null}
+            </section>
           ) : null}
 
           <Button
