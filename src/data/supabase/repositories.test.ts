@@ -126,6 +126,46 @@ describe('Supabase repositories', () => {
       },
       state: 'success',
     })
+    const requestBody = JSON.parse(
+      String(vi.mocked(fetch).mock.calls[0]?.[1]?.body),
+    ) as Record<string, unknown>
+    expect(requestBody).not.toHaveProperty('target_weight_kg')
+  })
+
+  it('preserves a legacy challenge target when updating without one', async () => {
+    stubResponse({
+      created_at: '2026-09-17T10:00:00.000Z',
+      created_by: 'owner-1',
+      description: null,
+      end_date: '2026-12-01',
+      id: 'legacy-challenge',
+      name: 'Updated legacy challenge',
+      owner_id: 'owner-1',
+      start_date: '2026-09-01',
+      status: 'draft',
+      target_weight_kg: 85,
+      updated_at: '2026-09-18T10:00:00.000Z',
+    })
+
+    const result = await createRepositories(client).challenges.update(
+      'legacy-challenge',
+      {
+        createdBy: 'owner-1',
+        endDate: '2026-12-01',
+        name: 'Updated legacy challenge',
+        ownerId: 'owner-1',
+        startDate: '2026-09-01',
+      },
+    )
+
+    expect(result).toMatchObject({
+      data: { id: 'legacy-challenge', targetWeightKg: 85 },
+      state: 'success',
+    })
+    const requestBody = JSON.parse(
+      String(vi.mocked(fetch).mock.calls[0]?.[1]?.body),
+    ) as Record<string, unknown>
+    expect(requestBody).not.toHaveProperty('target_weight_kg')
   })
 
   it('maps a database challenge row to the domain shape', async () => {

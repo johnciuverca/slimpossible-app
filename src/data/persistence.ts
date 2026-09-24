@@ -175,7 +175,7 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
         startDate: input.startDate,
         status: input.status ?? current.status,
         ...(input.targetWeightKg === undefined
-          ? { targetWeightKg: undefined }
+          ? {}
           : { targetWeightKg: input.targetWeightKg }),
         updatedAt: new Date().toISOString(),
       }

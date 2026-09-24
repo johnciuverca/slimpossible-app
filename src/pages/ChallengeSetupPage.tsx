@@ -16,7 +16,6 @@ type ChallengeSetupErrors = {
   endDate?: string
   name?: string
   startDate?: string
-  targetWeightKg?: string
 }
 
 type ChallengeSetupValues = {
@@ -24,7 +23,6 @@ type ChallengeSetupValues = {
   endDate: string
   name: string
   startDate: string
-  targetWeightKg: string
 }
 
 const challengeLoadTimeoutMs = 10_000
@@ -43,7 +41,6 @@ const initialValues: ChallengeSetupValues = {
   endDate: '',
   name: '',
   startDate: '',
-  targetWeightKg: '',
 }
 
 function isValidDate(value: string) {
@@ -61,7 +58,6 @@ function validateChallengeSetup({
   endDate,
   name,
   startDate,
-  targetWeightKg,
 }: ChallengeSetupValues): ChallengeSetupErrors {
   const errors: ChallengeSetupErrors = {}
 
@@ -81,13 +77,6 @@ function validateChallengeSetup({
     errors.endDate = 'Enter a valid end date.'
   } else if (isValidDate(startDate) && endDate < startDate) {
     errors.endDate = 'End date must be on or after the start date.'
-  }
-
-  if (targetWeightKg) {
-    const target = Number(targetWeightKg)
-    if (!Number.isFinite(target) || target <= 0) {
-      errors.targetWeightKg = 'Target weight must be greater than zero.'
-    }
   }
 
   return errors
@@ -218,7 +207,6 @@ export function ChallengeSetupPage() {
             endDate: challenge.endDate,
             name: challenge.name,
             startDate: challenge.startDate,
-            targetWeightKg: challenge.targetWeightKg?.toString() ?? '',
           }
         : initialValues,
     )
@@ -268,9 +256,6 @@ export function ChallengeSetupPage() {
       name: values.name.trim(),
       ownerId,
       startDate: values.startDate,
-      targetWeightKg: values.targetWeightKg
-        ? Number(values.targetWeightKg)
-        : undefined,
     }
     const result = selectedChallengeId
       ? await persistence.repositories.challenges.update(
@@ -418,20 +403,6 @@ export function ChallengeSetupPage() {
               value={values.endDate}
             />
           </div>
-
-          <TextInput
-            error={errors.targetWeightKg}
-            id="challenge-target-weight"
-            inputMode="decimal"
-            label="Target weight in kg (optional)"
-            min="0"
-            onChange={(event) =>
-              updateValue('targetWeightKg', event.target.value)
-            }
-            step="0.1"
-            type="number"
-            value={values.targetWeightKg}
-          />
 
           {isLoading ? (
             <p
