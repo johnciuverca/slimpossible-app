@@ -62,6 +62,7 @@ begin
   insert into public.weigh_ins (participant_id, recorded_date, weight_kg, note)
   values
     (owner_participant_id, '2026-09-13', 80, 'private owner note'),
+    (owner_participant_id, '2026-09-15', 80, 'private same-day note'),
     (member_participant_id, '2026-09-13', 100, 'private member note'),
     (member_participant_id, '2026-09-20', 98, 'correctable private note');
 
@@ -81,6 +82,20 @@ begin
     and not (summary ? 'weight_kg')
     and not (summary ? 'participant_id'));
 
+  select to_jsonb(result) into summary
+  from public.get_provisional_group_leader_summary(challenge_id, '2026-09-15') as result;
+  insert into slimpossible_group_progress_checks
+  values ('provisional_summary_excludes_future_dated_current_week_records',
+    summary ->> 'current_week_start' = '2026-09-14'
+    and summary ->> 'current_week_end' = '2026-09-20'
+    and summary ->> 'previous_sunday' = '2026-09-13'
+    and summary ->> 'eligible_participant_count' = '1'
+    and summary -> 'leader_names' = '["Owner"]'::jsonb
+    and summary -> 'leader_latest_dates' = '["2026-09-15"]'::jsonb
+    and not (summary ? 'note')
+    and not (summary ? 'weight_kg')
+    and not (summary ? 'participant_id'));
+
   perform set_config('request.jwt.claim.sub', unrelated_id::text, true);
   if auth.uid() is distinct from unrelated_id then
     raise exception 'Unrelated-user denial check has the wrong JWT subject.';
@@ -92,6 +107,14 @@ begin
   exception when insufficient_privilege then
     insert into slimpossible_group_progress_checks values
       ('unrelated_user_is_denied', true);
+  end;
+  begin
+    perform * from public.get_provisional_group_leader_summary(challenge_id, '2026-09-15');
+    insert into slimpossible_group_progress_checks values
+      ('unrelated_user_cannot_read_provisional_leader', false);
+  exception when insufficient_privilege then
+    insert into slimpossible_group_progress_checks values
+      ('unrelated_user_cannot_read_provisional_leader', true);
   end;
 
   execute 'set local role authenticated';

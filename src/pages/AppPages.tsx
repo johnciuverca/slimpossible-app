@@ -22,6 +22,10 @@ import {
   mostRecentSunday,
   type GroupProgressSummary,
 } from '../models/groupProgress'
+import {
+  localDateOnly,
+  type ProvisionalGroupLeaderSummary,
+} from '../models/provisionalGroupLeader'
 import { createSavedWeeklyWinCelebration } from '../models/weeklyCelebrations'
 
 type PlaceholderPageProps = {
@@ -790,6 +794,43 @@ export function GroupDashboardPage() {
 
 export function ProgressPage() {
   const { data, isLoading, message } = usePersonalDashboard()
+  const { state: authState } = useOptionalAuth()
+  const persistence = useMemo(() => createPersistence(authState), [authState])
+  const [provisionalSummary, setProvisionalSummary] =
+    useState<ProvisionalGroupLeaderSummary | null>(null)
+  const [provisionalMessage, setProvisionalMessage] = useState('')
+  const [refreshVersion, setRefreshVersion] = useState(0)
+
+  useEffect(() => {
+    let isCurrent = true
+    setProvisionalSummary(null)
+    setProvisionalMessage('')
+    if (!data || persistence.mode !== 'remote') return
+
+    persistence.repositories.groupProgress
+      .getProvisionalLeader(data.challenge.id, localDateOnly())
+      .then((result) => {
+        if (!isCurrent) return
+        if (result.state === 'success') setProvisionalSummary(result.data)
+        else if (result.state === 'error') {
+          setProvisionalMessage(
+            'Provisional group progress is unavailable right now.',
+          )
+        }
+      })
+      .catch(() => {
+        if (isCurrent) {
+          setProvisionalMessage(
+            'Provisional group progress is unavailable right now.',
+          )
+        }
+      })
+
+    return () => {
+      isCurrent = false
+    }
+  }, [data, persistence, refreshVersion])
+
   return (
     <section
       className="mx-auto w-full max-w-4xl"
@@ -808,6 +849,77 @@ export function ProgressPage() {
         <DashboardState isLoading={isLoading} message={message}>
           {data ? (
             <div className="mt-8 space-y-6">
+              {persistence.mode === 'remote' &&
+              provisionalSummary?.state !== 'solo-challenge' ? (
+                <section
+                  aria-labelledby="provisional-leader-title"
+                  className="rounded-xl border border-emerald-200 bg-emerald-50 p-5"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h2
+                        className="text-lg font-bold"
+                        id="provisional-leader-title"
+                      >
+                        This week’s provisional leader
+                      </h2>
+                      {provisionalSummary ? (
+                        <p className="mt-1 text-sm text-slate-600">
+                          Comparing saved check-ins since{' '}
+                          {provisionalSummary.previousSunday}; current week{' '}
+                          {provisionalSummary.currentWeekStart}–
+                          {provisionalSummary.currentWeekEnd}.
+                        </p>
+                      ) : null}
+                    </div>
+                    <button
+                      className="text-sm font-semibold text-emerald-800 underline"
+                      onClick={() =>
+                        setRefreshVersion((version) => version + 1)
+                      }
+                      type="button"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                  {provisionalSummary?.state === 'leaders' ? (
+                    <>
+                      <ul className="mt-3 list-inside list-disc text-slate-800">
+                        {provisionalSummary.leaderNames.map((name, index) => (
+                          <li key={`${name}-${index}`}>
+                            {name}{' '}
+                            <span className="text-sm text-slate-600">
+                              (latest check-in{' '}
+                              {provisionalSummary.leaderLatestDates[index]})
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="mt-2 text-sm text-slate-600">
+                        {provisionalSummary.eligibleParticipantCount} of{' '}
+                        {provisionalSummary.activeParticipantCount} active
+                        participants have both comparison check-ins. Ties are
+                        shared.
+                      </p>
+                    </>
+                  ) : provisionalSummary?.state === 'no-eligible-candidates' ? (
+                    <p className="mt-3 text-sm text-slate-700">
+                      No one has both a saved check-in on{' '}
+                      {provisionalSummary.previousSunday} and one during this
+                      week yet. The provisional leader updates as entries are
+                      saved.
+                    </p>
+                  ) : provisionalMessage ? (
+                    <p className="mt-3 text-sm text-slate-600" role="status">
+                      {provisionalMessage}
+                    </p>
+                  ) : (
+                    <p className="mt-3 text-sm text-slate-600" role="status">
+                      Loading this week’s group update…
+                    </p>
+                  )}
+                </section>
+              ) : null}
               <ProgressBar
                 label="Progress toward target"
                 value={data.flow.dashboard.completionPercentage ?? 0}

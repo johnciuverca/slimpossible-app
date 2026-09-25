@@ -191,6 +191,21 @@ export type Database = {
           weekly_winner_names: string[]
         }[]
       }
+      get_provisional_group_leader_summary: {
+        Args: { target_challenge_id: string; target_current_date: string }
+        Returns: {
+          active_participant_count: number
+          challenge_id: string
+          current_week_end: string
+          current_week_start: string
+          eligible_participant_count: number
+          leader_count: number
+          leader_latest_dates: string[]
+          leader_names: string[]
+          previous_sunday: string
+          state: string
+        }[]
+      }
       list_challenge_invites: {
         Args: { target_challenge_id: string }
         Returns: {

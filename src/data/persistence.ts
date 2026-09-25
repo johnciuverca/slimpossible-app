@@ -483,6 +483,15 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
         state: 'error',
       }
     },
+    async getProvisionalLeader() {
+      return {
+        error: {
+          kind: 'request',
+          message: 'Shared group progress requires a signed-in server session.',
+        },
+        state: 'error',
+      }
+    },
   }
 
   return {

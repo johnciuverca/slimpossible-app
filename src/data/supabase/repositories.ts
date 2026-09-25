@@ -9,6 +9,7 @@ import type {
 } from '../../models/challengeInvite'
 import type { WeighIn } from '../../models/weighIn'
 import type { GroupProgressSummary } from '../../models/groupProgress'
+import type { ProvisionalGroupLeaderSummary } from '../../models/provisionalGroupLeader'
 import type { Database } from './database.types'
 
 export type RepositoryError = {
@@ -40,6 +41,8 @@ type CreatedChallengeInviteRow =
   Database['public']['Functions']['create_challenge_invite']['Returns'][number]
 type GroupProgressRow =
   Database['public']['Functions']['get_group_progress_summary']['Returns'][number]
+type ProvisionalGroupLeaderRow =
+  Database['public']['Functions']['get_provisional_group_leader_summary']['Returns'][number]
 
 export type ChallengeRepository = {
   create: (input: ChallengeWriteInput) => Promise<RepositoryResult<Challenge>>
@@ -104,6 +107,10 @@ export type GroupProgressRepository = {
     challengeId: string,
     currentSunday: string,
   ) => Promise<RepositoryResult<GroupProgressSummary>>
+  getProvisionalLeader: (
+    challengeId: string,
+    currentDate: string,
+  ) => Promise<RepositoryResult<ProvisionalGroupLeaderSummary>>
 }
 
 export type CreatedChallengeInvite = {
@@ -301,6 +308,44 @@ function mapGroupProgress(row: GroupProgressRow): GroupProgressSummary {
   }
 }
 
+function mapProvisionalGroupLeader(
+  row: ProvisionalGroupLeaderRow,
+): ProvisionalGroupLeaderSummary {
+  if (
+    typeof row.challenge_id !== 'string' ||
+    typeof row.current_week_start !== 'string' ||
+    typeof row.current_week_end !== 'string' ||
+    typeof row.previous_sunday !== 'string' ||
+    ![
+      row.active_participant_count,
+      row.eligible_participant_count,
+      row.leader_count,
+    ].every((count) => Number.isInteger(count) && count >= 0) ||
+    !Array.isArray(row.leader_names) ||
+    row.leader_names.some((name) => typeof name !== 'string') ||
+    !Array.isArray(row.leader_latest_dates) ||
+    row.leader_latest_dates.some((date) => typeof date !== 'string') ||
+    row.leader_names.length !== row.leader_latest_dates.length ||
+    row.leader_count !== row.leader_names.length ||
+    !['leaders', 'no-eligible-candidates', 'solo-challenge'].includes(row.state)
+  ) {
+    throw new Error('Invalid provisional group leader response')
+  }
+
+  return {
+    activeParticipantCount: row.active_participant_count,
+    challengeId: row.challenge_id,
+    currentWeekEnd: row.current_week_end,
+    currentWeekStart: row.current_week_start,
+    eligibleParticipantCount: row.eligible_participant_count,
+    leaderCount: row.leader_count,
+    leaderLatestDates: [...row.leader_latest_dates],
+    leaderNames: [...row.leader_names],
+    previousSunday: row.previous_sunday,
+    state: row.state as ProvisionalGroupLeaderSummary['state'],
+  }
+}
+
 function inviteRequestError(
   operation: string,
   error: unknown,
@@ -481,6 +526,38 @@ export function createRepositories(client: DatabaseClient): Repositories {
         ) {
           return {
             error: mappingError('shared group progress'),
+            state: 'error',
+          }
+        }
+        return result
+      },
+      async getProvisionalLeader(challengeId, currentDate) {
+        const { data, error } = await client.rpc(
+          'get_provisional_group_leader_summary',
+          {
+            target_challenge_id: challengeId,
+            target_current_date: currentDate,
+          },
+        )
+
+        if (error) {
+          return {
+            error: requestError('load the provisional group leader', error),
+            state: 'error',
+          }
+        }
+
+        const result = mapSingle(
+          data?.[0] ?? null,
+          mapProvisionalGroupLeader,
+          'provisional group leader',
+        )
+        if (
+          result.state === 'success' &&
+          result.data.challengeId !== challengeId
+        ) {
+          return {
+            error: mappingError('provisional group leader'),
             state: 'error',
           }
         }
