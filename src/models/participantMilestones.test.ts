@@ -99,6 +99,31 @@ describe('createParticipantMilestones', () => {
     })
   })
 
+  it('recomputes reached milestones when the latest saved weigh-in is corrected', () => {
+    const participant = createParticipantFixture({
+      id: 'participant-ava',
+      startingWeightKg: 100,
+      targetWeightKg: 80,
+    })
+
+    const beforeCorrection = createParticipantMilestones(
+      createDashboard(participant, 90),
+    )
+    const afterCorrection = createParticipantMilestones(
+      createDashboard(participant, 95),
+    )
+
+    expect(beforeCorrection).toMatchObject({ completionPercentage: 50 })
+    expect(afterCorrection).toMatchObject({ completionPercentage: 25 })
+    expect(
+      afterCorrection.state === 'available'
+        ? afterCorrection.milestones
+            .filter(({ state }) => state === 'reached')
+            .map(({ thresholdPercentage }) => thresholdPercentage)
+        : [],
+    ).toEqual([25])
+  })
+
   it('returns stable unique entries on repeated evaluation instead of duplicates', () => {
     const participant = createParticipantFixture({
       id: 'participant-ava',

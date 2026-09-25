@@ -335,6 +335,89 @@ describe('HomePage', () => {
         }),
       ).toBeInTheDocument(),
     )
+    expect(screen.getByText('Weight-loss goal')).toBeInTheDocument()
+  })
+
+  it.each([
+    {
+      current: 90,
+      directionLabel: 'Weight-loss goal',
+      expected: 50,
+      starting: 100,
+      target: 80,
+    },
+    {
+      current: 75,
+      directionLabel: 'Weight-gain goal',
+      expected: 50,
+      starting: 70,
+      target: 80,
+    },
+    {
+      current: 80,
+      directionLabel: 'Maintenance goal',
+      expected: 100,
+      starting: 80,
+      target: 80,
+    },
+  ])(
+    'renders bounded saved progress for $directionLabel',
+    async ({ current, directionLabel, expected, starting, target }) => {
+      const [challengeResponse, participantResponse] = dashboardResponses()
+      const challenge = await challengeResponse.json()
+      const participant = await participantResponse.json()
+      participant[0].starting_weight_kg = starting
+      participant[0].target_weight_kg = target
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(response(challenge))
+        .mockResolvedValueOnce(response(participant))
+        .mockResolvedValueOnce(
+          response([
+            {
+              created_at: '2026-09-18T10:00:00.000Z',
+              id: 'weigh-in-latest',
+              note: null,
+              participant_id: 'participant-1',
+              recorded_date: '2026-09-18',
+              updated_at: '2026-09-18T10:00:00.000Z',
+              weight_kg: current,
+            },
+          ]),
+        )
+
+      renderDashboard(<GoalsPage />, fetchMock)
+
+      const progress = await screen.findByRole('progressbar', {
+        name: `Milestone progress: ${expected}% complete`,
+      })
+      expect(progress).toHaveAttribute('aria-valuenow', `${expected}`)
+      expect(screen.getByText(directionLabel)).toBeInTheDocument()
+      expect(progress).not.toHaveAttribute('aria-valuenow', 'NaN')
+    },
+  )
+
+  it('announces newly reached milestones based on saved weigh-ins', async () => {
+    const viewerId = 'member-1'
+    const key = [
+      'slimpossible',
+      'progress-celebrations',
+      'v1',
+      'milestones',
+      encodeURIComponent(viewerId),
+      encodeURIComponent('challenge-1'),
+      encodeURIComponent('participant-1'),
+    ].join(':')
+    window.localStorage.setItem(key, JSON.stringify([]))
+    const fetchMock = vi.fn()
+    dashboardResponses().forEach((item) =>
+      fetchMock.mockResolvedValueOnce(item),
+    )
+    renderDashboard(<GoalsPage />, fetchMock)
+
+    expect(
+      await screen.findByText('Milestone reached: 25%, 50% of your goal.'),
+    ).toBeInTheDocument()
   })
 
   it.each([
@@ -427,6 +510,24 @@ describe('GroupDashboardPage', () => {
           },
         ]),
       )
+      .mockResolvedValueOnce(response(challengePayload))
+      .mockResolvedValueOnce(
+        response([
+          {
+            active_participant_count: 3,
+            average_completion_percentage: 48.5,
+            challenge_id: 'challenge-1',
+            current_sunday: currentSunday,
+            eligible_participant_count: 3,
+            participants_with_progress_count: 2,
+            participants_with_recorded_weight_count: 3,
+            previous_sunday: previousSunday,
+            reached_target_count: 1,
+            weekly_winner_count: 1,
+            weekly_winner_names: ['Casey'],
+          },
+        ]),
+      )
 
     renderDashboard(
       <GroupDashboardPage />,
@@ -465,6 +566,18 @@ describe('GroupDashboardPage', () => {
     )
     expect(await screen.findByText('Casey')).toBeInTheDocument()
     expect(screen.queryByText('Ava')).not.toBeInTheDocument()
+    expect(
+      await screen.findByText('Weekly result updated: Casey.'),
+    ).toHaveAttribute('role', 'status')
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Refresh shared progress' }),
+    )
+    await waitFor(() =>
+      expect(
+        screen.queryByText('Weekly result updated: Casey.'),
+      ).not.toBeInTheDocument(),
+    )
   })
 
   it('does not render group data when the membership-checked RPC denies access', async () => {

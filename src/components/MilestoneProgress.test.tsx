@@ -63,6 +63,27 @@ describe('MilestoneProgress', () => {
   })
 
   it.each([
+    ['loss', 'Weight-loss goal'],
+    ['maintain', 'Maintenance goal'],
+    ['gain', 'Weight-gain goal'],
+  ] as const)(
+    'labels %s progress and respects reduced motion',
+    (direction, label) => {
+      const { container } = render(
+        <MilestoneProgress
+          direction={direction}
+          milestones={availableMilestones(50)}
+        />,
+      )
+
+      expect(screen.getByText(label)).toBeInTheDocument()
+      expect(
+        container.querySelector('[data-testid="milestone-track-fill"]'),
+      ).toHaveClass('motion-reduce:transition-none')
+    },
+  )
+
+  it.each([
     [0, [0, 12.5, 37.5, 62.5, 87.5]],
     [25, [0, 12.5, 37.5, 62.5, 87.5]],
     [50, [33.33333333333333, 12.5, 37.5, 62.5, 87.5]],
