@@ -2,6 +2,7 @@ import type {
   MilestoneThreshold,
   ParticipantMilestones,
 } from './participantMilestones'
+import type { GroupProgressSummary } from './groupProgress'
 import type { WeeklyProgressEligibility } from './weeklyProgressEligibility'
 import type { WeeklyWinners } from './weeklyWinners'
 
@@ -21,7 +22,11 @@ export type MilestoneCelebrationContext =
       challengeId: string
       milestones: []
       participantId: string | null
-      reason: 'no-records' | 'no-target' | 'participant-not-found'
+      reason:
+        | 'invalid-progress'
+        | 'no-records'
+        | 'no-target'
+        | 'participant-not-found'
       state: 'unavailable'
     }
 
@@ -43,6 +48,17 @@ export type WeeklyCelebrationsInput = {
   eligibility: WeeklyProgressEligibility
   participantMilestones: readonly ParticipantMilestones[]
   winners: WeeklyWinners
+}
+
+export type SavedWeeklyWinCelebration = {
+  activeParticipantCount: number
+  challengeId: string
+  currentSunday: string
+  eligibleParticipantCount: number
+  message: string
+  previousSunday: string
+  state: 'no-eligible-candidates' | 'shared-winners' | 'single-winner'
+  winnerNames: string[]
 }
 
 function participation(
@@ -108,6 +124,47 @@ function createWeeklyWinCelebration(
     winnerParticipantIds: winners.winners.map(
       ({ participantId }) => participantId,
     ),
+  }
+}
+
+export function createSavedWeeklyWinCelebration(
+  summary: GroupProgressSummary,
+): SavedWeeklyWinCelebration {
+  const participationMessage =
+    summary.eligibleParticipantCount === summary.activeParticipantCount
+      ? ''
+      : ` based on ${summary.eligibleParticipantCount} of ${summary.activeParticipantCount} active members.`
+  const winnerNames = [...summary.weeklyWinnerNames]
+  const base = {
+    activeParticipantCount: summary.activeParticipantCount,
+    challengeId: summary.challengeId,
+    currentSunday: summary.currentSunday,
+    eligibleParticipantCount: summary.eligibleParticipantCount,
+    previousSunday: summary.previousSunday,
+    winnerNames,
+  }
+
+  if (summary.weeklyWinnerCount === 0 || winnerNames.length === 0) {
+    return {
+      ...base,
+      message:
+        'No weekly result is available until participants record both Sunday weigh-ins.',
+      state: 'no-eligible-candidates',
+    }
+  }
+
+  if (summary.weeklyWinnerCount > 1) {
+    return {
+      ...base,
+      message: `${summary.weeklyWinnerCount} shared weekly winners are ready.${participationMessage}`,
+      state: 'shared-winners',
+    }
+  }
+
+  return {
+    ...base,
+    message: `1 weekly winner is ready.${participationMessage}`,
+    state: 'single-winner',
   }
 }
 

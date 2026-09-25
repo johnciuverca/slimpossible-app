@@ -47,6 +47,19 @@ describe('shared UI primitives', () => {
     ).toHaveAttribute('aria-valuenow', '25')
   })
 
+  it('keeps a non-finite saved percentage out of the visual progress value', () => {
+    const { container } = render(
+      <ProgressBar label="Maintenance progress" value={Number.NaN} />,
+    )
+
+    expect(
+      screen.getByRole('progressbar', { name: 'Maintenance progress' }),
+    ).toHaveAttribute('aria-valuenow', '0')
+    expect(container.querySelector('[role="progressbar"] > div')).toHaveStyle({
+      width: '0%',
+    })
+  })
+
   it('connects an input label and validation message', () => {
     render(
       <TextInput

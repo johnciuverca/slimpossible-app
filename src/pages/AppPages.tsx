@@ -6,6 +6,10 @@ import { MilestoneProgress } from '../components/MilestoneProgress'
 import type { ParticipantMilestones } from '../models/participantMilestones'
 import { createParticipantMilestones } from '../models/participantMilestones'
 import {
+  reconcileMilestoneCelebration,
+  reconcileWeeklyWinCelebration,
+} from '../models/progressCelebrations'
+import {
   createParticipantDashboardFlow,
   type ParticipantDashboardFlow,
 } from '../models/participantDashboardFlow'
@@ -18,6 +22,7 @@ import {
   mostRecentSunday,
   type GroupProgressSummary,
 } from '../models/groupProgress'
+import { createSavedWeeklyWinCelebration } from '../models/weeklyCelebrations'
 
 type PlaceholderPageProps = {
   children?: ReactNode
@@ -78,6 +83,7 @@ type PersonalDashboardData = {
   challenge: Challenge
   flow: ParticipantDashboardFlow
   participant: Participant
+  viewerId: string
   weighIns: WeighIn[]
 }
 
@@ -196,6 +202,7 @@ function usePersonalDashboard() {
           weighIns: records,
         }),
         participant,
+        viewerId: ownerId,
         weighIns: records,
       })
       setMessage('')
@@ -555,6 +562,7 @@ export function GroupDashboardPage() {
   const [isLoading, setIsLoading] = useState(authState.status === 'signed-in')
   const [message, setMessage] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
+  const [weeklyAnnouncement, setWeeklyAnnouncement] = useState('')
 
   useEffect(() => {
     let isCurrent = true
@@ -615,11 +623,16 @@ export function GroupDashboardPage() {
       if (!isCurrent) return
       if (result.state !== 'success') {
         setData(null)
+        setWeeklyAnnouncement('')
         setMessage(
           'Shared progress is available to active members only, or could not be loaded. Try refreshing.',
         )
       } else {
+        const weeklyCelebration = createSavedWeeklyWinCelebration(result.data)
         setData({ challenge, summary: result.data })
+        setWeeklyAnnouncement(
+          reconcileWeeklyWinCelebration(ownerId, weeklyCelebration),
+        )
         setMessage('')
       }
       setIsLoading(false)
@@ -632,6 +645,9 @@ export function GroupDashboardPage() {
   }, [authState.status, challengeParam, ownerId, persistence, reloadKey])
 
   const summary = data?.summary
+  const weeklyCelebration = summary
+    ? createSavedWeeklyWinCelebration(summary)
+    : null
   const challengeQuery = data
     ? `?challenge=${encodeURIComponent(data.challenge.id)}`
     : ''
@@ -728,29 +744,29 @@ export function GroupDashboardPage() {
                   Based on consecutive Sunday weigh-ins:{' '}
                   {summary.previousSunday} to {summary.currentSunday}.
                 </p>
-                {summary.weeklyWinnerCount === 0 ? (
-                  <p className="mt-4 text-sm text-slate-700">
-                    No weekly result is available until members have both Sunday
-                    weigh-ins.
+                {weeklyAnnouncement ? (
+                  <p aria-live="polite" className="sr-only" role="status">
+                    {weeklyAnnouncement}
                   </p>
-                ) : (
-                  <>
-                    <p className="mt-4 text-sm font-semibold text-slate-900">
-                      {summary.weeklyWinnerCount === 1
-                        ? 'Weekly winner'
-                        : 'Shared weekly winners'}
-                      {summary.eligibleParticipantCount <
-                      summary.activeParticipantCount
-                        ? ` — based on ${summary.eligibleParticipantCount} of ${summary.activeParticipantCount} active members`
-                        : ''}
-                    </p>
-                    <ul className="mt-2 list-inside list-disc text-slate-800">
-                      {summary.weeklyWinnerNames.map((name, index) => (
-                        <li key={`${name}-${index}`}>{name}</li>
-                      ))}
-                    </ul>
-                  </>
-                )}
+                ) : null}
+                <p className="mt-4 text-sm font-semibold text-slate-900">
+                  {weeklyCelebration?.state === 'shared-winners'
+                    ? 'Shared weekly winners'
+                    : weeklyCelebration?.state === 'single-winner'
+                      ? 'Weekly winner'
+                      : 'Weekly result'}
+                </p>
+                <p className="mt-4 text-sm text-slate-700">
+                  {weeklyCelebration?.message}
+                </p>
+                {weeklyCelebration &&
+                weeklyCelebration.state !== 'no-eligible-candidates' ? (
+                  <ul className="mt-2 list-inside list-disc text-slate-800">
+                    {weeklyCelebration.winnerNames.map((name, index) => (
+                      <li key={`${name}-${index}`}>{name}</li>
+                    ))}
+                  </ul>
+                ) : null}
               </section>
 
               <p className="text-xs leading-5 text-slate-500">
@@ -833,6 +849,22 @@ export function ProgressPage() {
 
 export function GoalsPage() {
   const { data, isLoading, message } = usePersonalDashboard()
+  const [celebrationAnnouncement, setCelebrationAnnouncement] = useState('')
+
+  useEffect(() => {
+    if (!data) {
+      setCelebrationAnnouncement('')
+      return
+    }
+
+    setCelebrationAnnouncement(
+      reconcileMilestoneCelebration(
+        data.viewerId,
+        createParticipantMilestones(data.flow.dashboard),
+      ),
+    )
+  }, [data])
+
   return (
     <section className="mx-auto w-full max-w-4xl" aria-labelledby="goals-title">
       <Card className="p-8 sm:p-12">
@@ -848,6 +880,8 @@ export function GoalsPage() {
         <DashboardState isLoading={isLoading} message={message}>
           {data ? (
             <MilestoneProgress
+              celebrationAnnouncement={celebrationAnnouncement}
+              direction={data.flow.dashboard.progressState.direction}
               milestones={createParticipantMilestones(data.flow.dashboard)}
             />
           ) : null}

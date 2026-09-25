@@ -2,8 +2,11 @@ import type {
   ParticipantMilestone,
   ParticipantMilestones,
 } from '../models/participantMilestones'
+import type { GoalDirection } from '../models/targetProgress'
 
 type MilestoneProgressProps = {
+  celebrationAnnouncement?: string
+  direction?: GoalDirection | null
   milestones: ParticipantMilestones
   title?: string
 }
@@ -29,8 +32,13 @@ function trackProgressPercentage(completionPercentage: number) {
 }
 
 function unavailableCopy(
-  reason: 'no-records' | 'no-target' | 'participant-not-found',
+  reason:
+    'invalid-progress' | 'no-records' | 'no-target' | 'participant-not-found',
 ) {
+  if (reason === 'invalid-progress') {
+    return 'Saved progress is not a valid percentage yet. Refresh after checking your saved weigh-ins.'
+  }
+
   if (reason === 'no-records') {
     return 'Record your first weigh-in to see milestone progress.'
   }
@@ -43,6 +51,8 @@ function unavailableCopy(
 }
 
 export function MilestoneProgress({
+  celebrationAnnouncement = '',
+  direction = null,
   milestones,
   title = 'Milestone progress',
 }: MilestoneProgressProps) {
@@ -82,7 +92,18 @@ export function MilestoneProgress({
       (milestone) =>
         milestones.completionPercentage <= milestone.thresholdPercentage,
     )?.thresholdPercentage ?? milestones.milestones.at(-1)!.thresholdPercentage
-  const trackProgress = trackProgressPercentage(milestones.completionPercentage)
+  const completionPercentage = Number.isFinite(milestones.completionPercentage)
+    ? Math.max(0, Math.min(100, milestones.completionPercentage))
+    : 0
+  const trackProgress = trackProgressPercentage(completionPercentage)
+  const directionLabel =
+    direction === 'loss'
+      ? 'Weight-loss goal'
+      : direction === 'gain'
+        ? 'Weight-gain goal'
+        : direction === 'maintain'
+          ? 'Maintenance goal'
+          : null
 
   return (
     <section
@@ -110,21 +131,26 @@ export function MilestoneProgress({
       </div>
 
       <div className="mt-8">
+        {directionLabel ? (
+          <p className="mb-3 text-sm font-semibold text-slate-700">
+            {directionLabel}
+          </p>
+        ) : null}
         <div className="flex items-end justify-between gap-4">
           <p className="text-sm font-semibold text-slate-700">
             Target completion
           </p>
           <p className="text-3xl font-black tracking-tight text-emerald-800">
-            {milestones.completionPercentage}%
+            {completionPercentage}%
           </p>
         </div>
         <div className="relative mt-4 h-5">
           <div
-            aria-label={`${title}: ${milestones.completionPercentage}% complete`}
+            aria-label={`${title}: ${completionPercentage}% complete`}
             aria-valuemax={100}
             aria-valuemin={0}
-            aria-valuenow={milestones.completionPercentage}
-            aria-valuetext={`${milestones.completionPercentage}% complete. ${reachedCount} of ${milestones.milestones.length} milestones reached.`}
+            aria-valuenow={completionPercentage}
+            aria-valuetext={`${completionPercentage}% complete. ${reachedCount} of ${milestones.milestones.length} milestones reached.`}
             className="absolute left-[12.5%] right-[12.5%] top-1/2 h-5 -translate-y-1/2 rounded-full bg-emerald-100 shadow-inner shadow-emerald-950/10"
             data-testid="milestone-track"
             role="progressbar"
@@ -183,6 +209,11 @@ export function MilestoneProgress({
           )
         })}
       </ol>
+      {celebrationAnnouncement ? (
+        <p aria-live="polite" className="sr-only" role="status">
+          {celebrationAnnouncement}
+        </p>
+      ) : null}
     </section>
   )
 }

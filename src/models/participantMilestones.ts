@@ -23,7 +23,11 @@ export type ParticipantMilestones =
       completionPercentage: null
       milestones: []
       participantId: string | null
-      reason: 'no-records' | 'no-target' | 'participant-not-found'
+      reason:
+        | 'invalid-progress'
+        | 'no-records'
+        | 'no-target'
+        | 'participant-not-found'
       state: 'unavailable'
     }
 
@@ -32,7 +36,8 @@ export function createParticipantMilestones(
 ): ParticipantMilestones {
   const participantId = dashboard.participant?.id ?? null
   const unavailable = (
-    reason: 'no-records' | 'no-target' | 'participant-not-found',
+    reason:
+      'invalid-progress' | 'no-records' | 'no-target' | 'participant-not-found',
   ): ParticipantMilestones => ({
     challengeId: dashboard.challenge.id,
     completionPercentage: null,
@@ -57,7 +62,14 @@ export function createParticipantMilestones(
     return unavailable('no-target')
   }
 
-  const completionPercentage = dashboard.progress.completionPercentage
+  if (!Number.isFinite(dashboard.progress.completionPercentage)) {
+    return unavailable('invalid-progress')
+  }
+
+  const completionPercentage = Math.max(
+    0,
+    Math.min(100, dashboard.progress.completionPercentage),
+  )
 
   return {
     challengeId: dashboard.challenge.id,
