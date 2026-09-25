@@ -30,6 +30,13 @@ const groupProgressMigration = readFileSync(
   ),
   'utf8',
 )
+const provisionalLeaderMigration = readFileSync(
+  resolve(
+    process.cwd(),
+    'supabase/migrations/20260925000000_add_provisional_group_leader_summary.sql',
+  ),
+  'utf8',
+)
 const groupProgressAuthorizationCheck = readFileSync(
   resolve(process.cwd(), 'supabase/tests/group_progress_authorization.sql'),
   'utf8',
@@ -157,6 +164,36 @@ describe('row-level security migration contract', () => {
     )
     expect(groupProgressAuthorizationCheck).toContain(
       "('corrected_sunday_entry_recomputes_winner',",
+    )
+  })
+
+  it('exposes provisional leaders through a separate privacy-safe member RPC', () => {
+    expect(provisionalLeaderMigration).toContain(
+      'create or replace function public.get_provisional_group_leader_summary',
+    )
+    expect(provisionalLeaderMigration).toContain('security definer')
+    expect(provisionalLeaderMigration).toContain('member.user_id = auth.uid()')
+    expect(provisionalLeaderMigration).toContain("member.status = 'active'")
+    expect(provisionalLeaderMigration).toContain(
+      'weigh_in.recorded_date between week_start and week_end',
+    )
+    expect(provisionalLeaderMigration).toContain(
+      'baseline.recorded_date = baseline_date',
+    )
+    expect(provisionalLeaderMigration).toContain('min(candidate.weight_change)')
+    expect(provisionalLeaderMigration).toContain("then 'solo-challenge'")
+    expect(provisionalLeaderMigration).toContain(
+      'grant execute on function public.get_provisional_group_leader_summary(uuid, date)\n  to authenticated',
+    )
+    const returnedColumns = provisionalLeaderMigration
+      .slice(
+        provisionalLeaderMigration.indexOf('returns table ('),
+        provisionalLeaderMigration.indexOf('language plpgsql'),
+      )
+      .toLowerCase()
+    expect(returnedColumns).not.toMatch(/weight|note|participant_id|user_id/)
+    expect(groupProgressMigration).not.toContain(
+      'get_provisional_group_leader_summary',
     )
   })
 })

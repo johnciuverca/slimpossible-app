@@ -26,6 +26,55 @@ afterEach(() => {
 })
 
 describe('Supabase repositories', () => {
+  it('maps only names, comparison dates, and counts for provisional leaders', async () => {
+    stubResponse([
+      {
+        active_participant_count: 3,
+        challenge_id: 'challenge-1',
+        current_week_end: '2026-09-20',
+        current_week_start: '2026-09-14',
+        eligible_participant_count: 2,
+        leader_count: 2,
+        leader_latest_dates: ['2026-09-20', '2026-09-18'],
+        leader_names: ['Ava', 'Ben'],
+        previous_sunday: '2026-09-13',
+        state: 'leaders',
+        raw_history: [{ weight_kg: 95 }],
+        note: 'private note',
+      },
+    ])
+
+    const result = await createRepositories(
+      client,
+    ).groupProgress.getProvisionalLeader('challenge-1', '2026-09-15')
+
+    expect(result).toEqual({
+      data: {
+        activeParticipantCount: 3,
+        challengeId: 'challenge-1',
+        currentWeekEnd: '2026-09-20',
+        currentWeekStart: '2026-09-14',
+        eligibleParticipantCount: 2,
+        leaderCount: 2,
+        leaderLatestDates: ['2026-09-20', '2026-09-18'],
+        leaderNames: ['Ava', 'Ben'],
+        previousSunday: '2026-09-13',
+        state: 'leaders',
+      },
+      state: 'success',
+    })
+    expect(JSON.stringify(result)).not.toContain('private note')
+    expect(JSON.stringify(result)).not.toContain('raw_history')
+    const request = vi.mocked(fetch).mock.calls[0]
+    expect(String(request?.[0])).toContain(
+      '/rpc/get_provisional_group_leader_summary',
+    )
+    expect(JSON.parse(String(request?.[1]?.body))).toEqual({
+      target_challenge_id: 'challenge-1',
+      target_current_date: '2026-09-15',
+    })
+  })
+
   it('maps only aggregate group fields from the authorized RPC response', async () => {
     stubResponse([
       {

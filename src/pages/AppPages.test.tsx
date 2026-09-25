@@ -17,6 +17,7 @@ import {
   TodayPage,
 } from './AppPages'
 import { mostRecentSunday } from '../models/groupProgress'
+import { localDateOnly } from '../models/provisionalGroupLeader'
 
 function response(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -311,6 +312,7 @@ describe('HomePage', () => {
     dashboardResponses().forEach((item) =>
       fetchMock.mockResolvedValueOnce(item),
     )
+    fetchMock.mockResolvedValueOnce(response([]))
     renderDashboard(<ProgressPage />, fetchMock)
 
     await waitFor(() => {
@@ -319,6 +321,113 @@ describe('HomePage', () => {
       expect(historyItems[1]).toHaveTextContent('2026-09-17: 95 kg')
     })
     expect(screen.getByText('Trend: -5 kg')).toBeInTheDocument()
+  })
+
+  it('shows the provisional shared leader from the authorized RPC only', async () => {
+    const fetchMock = vi.fn()
+    dashboardResponses().forEach((item) =>
+      fetchMock.mockResolvedValueOnce(item),
+    )
+    fetchMock.mockResolvedValueOnce(
+      response([
+        {
+          active_participant_count: 3,
+          challenge_id: 'challenge-1',
+          current_week_end: '2026-09-20',
+          current_week_start: '2026-09-14',
+          eligible_participant_count: 2,
+          leader_count: 2,
+          leader_latest_dates: ['2026-09-20', '2026-09-18'],
+          leader_names: ['Ava', 'Ben'],
+          previous_sunday: '2026-09-13',
+          state: 'leaders',
+        },
+      ]),
+    )
+    renderDashboard(
+      <ProgressPage />,
+      fetchMock,
+      '/progress?challenge=challenge-1',
+    )
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'This week’s provisional leader',
+      }),
+    ).toBeInTheDocument()
+    expect(await screen.findByText(/Ava/)).toHaveTextContent(
+      'latest check-in 2026-09-20',
+    )
+    expect(await screen.findByText(/Ben/)).toHaveTextContent(
+      'latest check-in 2026-09-18',
+    )
+    expect(screen.getByText(/2 of 3 active participants/)).toBeInTheDocument()
+    const rpcRequest = fetchMock.mock.calls.find(([url]) =>
+      String(url).includes('/rpc/get_provisional_group_leader_summary'),
+    )
+    expect(JSON.parse(String(rpcRequest?.[1]?.body))).toEqual({
+      target_challenge_id: 'challenge-1',
+      target_current_date: localDateOnly(),
+    })
+    expect(
+      fetchMock.mock.calls.filter(([url]) =>
+        String(url).includes('/weigh_ins?'),
+      ),
+    ).toHaveLength(1)
+  })
+
+  it('explains missing comparison check-ins and hides a solo challenge', async () => {
+    const fetchMock = vi.fn()
+    dashboardResponses().forEach((item) =>
+      fetchMock.mockResolvedValueOnce(item),
+    )
+    fetchMock.mockResolvedValueOnce(
+      response([
+        {
+          active_participant_count: 2,
+          challenge_id: 'challenge-1',
+          current_week_end: '2026-09-20',
+          current_week_start: '2026-09-14',
+          eligible_participant_count: 0,
+          leader_count: 0,
+          leader_latest_dates: [],
+          leader_names: [],
+          previous_sunday: '2026-09-13',
+          state: 'no-eligible-candidates',
+        },
+      ]),
+    )
+    renderDashboard(<ProgressPage />, fetchMock, '/progress')
+    expect(
+      await screen.findByText(/No one has both a saved check-in/),
+    ).toBeInTheDocument()
+    cleanup()
+
+    const soloFetch = vi.fn()
+    dashboardResponses().forEach((item) =>
+      soloFetch.mockResolvedValueOnce(item),
+    )
+    soloFetch.mockResolvedValueOnce(
+      response([
+        {
+          active_participant_count: 1,
+          challenge_id: 'challenge-1',
+          current_week_end: '2026-09-20',
+          current_week_start: '2026-09-14',
+          eligible_participant_count: 1,
+          leader_count: 0,
+          leader_latest_dates: [],
+          leader_names: [],
+          previous_sunday: '2026-09-13',
+          state: 'solo-challenge',
+        },
+      ]),
+    )
+    renderDashboard(<ProgressPage />, soloFetch, '/progress')
+    await waitFor(() => expect(soloFetch.mock.calls.length).toBeGreaterThan(3))
+    expect(
+      screen.queryByRole('heading', { name: 'This week’s provisional leader' }),
+    ).not.toBeInTheDocument()
   })
 
   it('renders milestones from saved target progress on Goals', async () => {
@@ -431,6 +540,7 @@ describe('HomePage', () => {
       dashboardResponses('owner-1').forEach((item) =>
         fetchMock.mockResolvedValueOnce(item),
       )
+      if (_ === 'Progress') fetchMock.mockResolvedValueOnce(response([]))
       renderDashboard(page, fetchMock)
 
       await waitFor(() =>
