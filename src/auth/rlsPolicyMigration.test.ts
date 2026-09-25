@@ -178,6 +178,9 @@ describe('row-level security migration contract', () => {
       'weigh_in.recorded_date between week_start and week_end',
     )
     expect(provisionalLeaderMigration).toContain(
+      'weigh_in.recorded_date <= target_current_date',
+    )
+    expect(provisionalLeaderMigration).toContain(
       'baseline.recorded_date = baseline_date',
     )
     expect(provisionalLeaderMigration).toContain('min(candidate.weight_change)')

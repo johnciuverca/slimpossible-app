@@ -62,6 +62,7 @@ begin
     from public.weigh_ins as weigh_in
     join active_participants as participant on participant.id = weigh_in.participant_id
     where weigh_in.recorded_date between week_start and week_end
+      and weigh_in.recorded_date <= target_current_date
     order by weigh_in.participant_id, weigh_in.recorded_date desc
   ), candidates as (
     select participant.display_name,
