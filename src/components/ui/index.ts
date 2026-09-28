@@ -1,5 +1,6 @@
 export { Button } from './Button'
 export { Card } from './Card'
+export { FeedbackPanel, type FeedbackTone } from './FeedbackPanel'
 export { PageHeader } from './PageHeader'
 export { ProgressBar } from './ProgressBar'
 export { StatusPill } from './StatusPill'

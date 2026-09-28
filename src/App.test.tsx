@@ -30,7 +30,7 @@ describe('App foundation screen', () => {
     vi.useFakeTimers()
     render(<App />)
 
-    fireEvent.click(screen.getByRole('link', { name: 'Progress' }))
+    fireEvent.click(screen.getByRole('link', { name: 'My progress' }))
 
     expect(window.location.pathname).toBe('/progress')
     await act(async () => {

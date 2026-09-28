@@ -7,9 +7,9 @@ type StatusPillProps = PropsWithChildren<
 >
 
 const toneClasses = {
-  neutral: 'bg-stone-100 text-slate-700',
-  success: 'bg-emerald-100 text-emerald-800',
-  warning: 'bg-amber-100 text-amber-800',
+  neutral: 'border border-line bg-page text-ink-muted',
+  success: 'border border-forest-700/25 bg-forest-100 text-forest-800',
+  warning: 'border border-warning-800/25 bg-warning-50 text-warning-800',
 }
 
 export function StatusPill({

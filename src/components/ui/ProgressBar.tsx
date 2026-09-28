@@ -17,11 +17,11 @@ export function ProgressBar({ label, max = 100, value }: ProgressBarProps) {
       aria-valuemax={safeMax}
       aria-valuemin={0}
       aria-valuenow={safeValue}
-      className="h-3 w-full overflow-hidden rounded-full bg-emerald-100 motion-reduce:transition-none"
+      className="h-3 w-full overflow-hidden rounded-full bg-forest-100 motion-reduce:transition-none"
       role="progressbar"
     >
       <div
-        className="h-full rounded-full bg-emerald-700 motion-safe:transition-[width] motion-reduce:transition-none"
+        className="h-full rounded-full bg-forest-700 motion-safe:transition-[width] motion-reduce:transition-none"
         style={{ width: `${percentage}%` }}
       />
     </div>
