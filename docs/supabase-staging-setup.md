@@ -29,6 +29,14 @@ In the owner-managed test project:
 4. Apply, in order, the checked-in migrations:
    - `20260917000000_create_core_schema.sql`
    - `20260917000001_add_rls_policies.sql`
+   - `20260922000000_harden_rls_authorization.sql`
+   - `20260922000001_add_secure_challenge_invites.sql`
+   - `20260924000000_add_privacy_safe_group_progress.sql`
+   - `20260925000000_add_provisional_group_leader_summary.sql`
+
+   Apply each migration once, in timestamp order, through the owner's approved
+   non-production workflow. The list describes the current repository state;
+   it does not claim that all six migrations have been applied to staging.
 
 The owner should use the Supabase SQL Editor or an owner-approved migration
 workflow and retain redacted execution evidence: project/environment name,
@@ -56,7 +64,7 @@ should receive `SUPABASE_URL` and `SUPABASE_ANON_KEY` Actions secrets.
 After owner setup, record separately whether each item is **verified live**,
 **blocked**, or **not run**:
 
-- both migrations succeed on the fresh test database;
+- all six checked-in migrations succeed on the fresh test database;
 - tables, constraints, and RLS policies exist;
 - local and preview builds point at the intended test project;
 - sign-up, verification, sign-in, refresh, sign-out, profile initialization,

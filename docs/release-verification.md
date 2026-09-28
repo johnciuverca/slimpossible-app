@@ -6,6 +6,9 @@ Supabase project and must never use personal production data.
 
 ## CI and local verification
 
+For the Chapter 14 solo/group staging matrix and owner release gates, see the
+[14.7 connected release checklist](14-7-connected-release-checklist.md).
+
 Run the complete suite from the repository root:
 
 ```text
