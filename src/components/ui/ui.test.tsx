@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   Button,
   Card,
+  FeedbackPanel,
   PageHeader,
   ProgressBar,
   StatusPill,
@@ -23,7 +24,9 @@ describe('shared UI primitives', () => {
     )
 
     expect(screen.getByRole('button', { name: 'Save progress' })).toBeDisabled()
-    expect(screen.getByRole('button').parentElement).toHaveClass('rounded-3xl')
+    expect(screen.getByRole('button').parentElement).toHaveClass(
+      'rounded-panel',
+    )
   })
 
   it('renders a page header and status pill', () => {
@@ -37,6 +40,27 @@ describe('shared UI primitives', () => {
       screen.getByRole('heading', { name: 'Example page' }),
     ).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('Ready')
+  })
+
+  it.each([
+    ['loading', 'Loading', 'status'],
+    ['empty', 'No data', 'status'],
+    ['error', 'Error', 'alert'],
+    ['info', 'Notice', 'status'],
+  ] as const)('labels the %s feedback state', (tone, label, role) => {
+    render(<FeedbackPanel tone={tone}>State details</FeedbackPanel>)
+
+    expect(screen.getByRole(role)).toHaveTextContent(label)
+    expect(screen.getByRole(role)).toHaveTextContent('State details')
+    if (tone === 'loading') {
+      expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true')
+    }
+    if (tone === 'error') {
+      expect(screen.getByRole('alert')).toHaveAttribute(
+        'aria-live',
+        'assertive',
+      )
+    }
   })
 
   it('reports progress with accessible values', () => {

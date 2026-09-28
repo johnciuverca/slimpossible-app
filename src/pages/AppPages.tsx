@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 
-import { Card, PageHeader, ProgressBar, StatusPill } from '../components/ui'
+import {
+  Card,
+  FeedbackPanel,
+  PageHeader,
+  ProgressBar,
+  StatusPill,
+  type FeedbackTone,
+} from '../components/ui'
 import { MilestoneProgress } from '../components/MilestoneProgress'
 import type { ParticipantMilestones } from '../models/participantMilestones'
 import { createParticipantMilestones } from '../models/participantMilestones'
@@ -105,6 +112,7 @@ function usePersonalDashboard() {
   const [data, setData] = useState<PersonalDashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(authState.status === 'signed-in')
   const [message, setMessage] = useState('')
+  const [messageTone, setMessageTone] = useState<FeedbackTone>('info')
   const [isMissingChallenge, setIsMissingChallenge] = useState(false)
   const [isMissingMembership, setIsMissingMembership] = useState(false)
   const [enrollmentChallengeId, setEnrollmentChallengeId] = useState('')
@@ -119,23 +127,27 @@ function usePersonalDashboard() {
       if (authState.status !== 'signed-in' || !ownerId) {
         setData(null)
         setMessage('Sign in to view your saved dashboard.')
+        setMessageTone('info')
         setIsLoading(false)
         return
       }
       if (persistence.mode === 'unavailable') {
         setData(null)
         setMessage(persistence.message)
+        setMessageTone('info')
         setIsLoading(false)
         return
       }
 
       setIsLoading(true)
+      setMessageTone('info')
       const challenges =
         await persistence.repositories.challenges.listVisibleToUser(ownerId)
       if (!isCurrent) return
       if (challenges.state === 'error') {
         setData(null)
         setMessage(challenges.error.message)
+        setMessageTone('error')
         setIsLoading(false)
         return
       }
@@ -154,6 +166,7 @@ function usePersonalDashboard() {
               : 'Set up a challenge before viewing your dashboard.',
         )
         setIsMissingChallenge(savedChallenges.length === 0)
+        setMessageTone('empty')
         setIsLoading(false)
         return
       }
@@ -164,6 +177,7 @@ function usePersonalDashboard() {
       if (participants.state === 'error') {
         setData(null)
         setMessage(participants.error.message)
+        setMessageTone('error')
         setIsLoading(false)
         return
       }
@@ -181,6 +195,7 @@ function usePersonalDashboard() {
         setMessage(
           'Enroll yourself in the selected challenge before viewing your dashboard.',
         )
+        setMessageTone('info')
         setIsLoading(false)
         return
       }
@@ -193,6 +208,7 @@ function usePersonalDashboard() {
       if (weighIns.state === 'error') {
         setData(null)
         setMessage(weighIns.error.message)
+        setMessageTone('error')
         setIsLoading(false)
         return
       }
@@ -210,6 +226,7 @@ function usePersonalDashboard() {
         weighIns: records,
       })
       setMessage('')
+      setMessageTone('info')
       setIsLoading(false)
     }
 
@@ -226,6 +243,7 @@ function usePersonalDashboard() {
     isMissingChallenge,
     isMissingMembership,
     message,
+    messageTone,
   }
 }
 
@@ -234,25 +252,27 @@ function DashboardState({
   isLoading,
   message,
   messageContent,
+  messageTone = 'info',
 }: {
   children: ReactNode
   isLoading: boolean
   message: string
   messageContent?: ReactNode
+  messageTone?: FeedbackTone
 }) {
   if (isLoading) {
     return (
-      <p aria-live="polite" className="text-sm text-slate-600" role="status">
+      <FeedbackPanel className="mt-8" tone="loading">
         Loading your saved dashboard…
-      </p>
+      </FeedbackPanel>
     )
   }
   if (message) {
     if (messageContent) return <>{messageContent}</>
     return (
-      <p aria-live="polite" className="text-sm text-slate-600" role="status">
+      <FeedbackPanel className="mt-8" tone={messageTone}>
         {message}
-      </p>
+      </FeedbackPanel>
     )
   }
   return <>{children}</>
@@ -565,6 +585,7 @@ export function GroupDashboardPage() {
   const [challenges, setChallenges] = useState<Challenge[]>([])
   const [isLoading, setIsLoading] = useState(authState.status === 'signed-in')
   const [message, setMessage] = useState('')
+  const [messageTone, setMessageTone] = useState<FeedbackTone>('info')
   const [reloadKey, setReloadKey] = useState(0)
   const [weeklyAnnouncement, setWeeklyAnnouncement] = useState('')
 
@@ -578,6 +599,7 @@ export function GroupDashboardPage() {
         setMessage(
           'Sign in as an active challenge member to view group progress.',
         )
+        setMessageTone('info')
         setIsLoading(false)
         return
       }
@@ -585,12 +607,14 @@ export function GroupDashboardPage() {
         setData(null)
         setChallenges([])
         setMessage('Shared group progress requires a signed-in server session.')
+        setMessageTone('info')
         setIsLoading(false)
         return
       }
 
       setIsLoading(true)
       setMessage('')
+      setMessageTone('info')
       const challengeResult =
         await persistence.repositories.challenges.listVisibleToUser(ownerId)
       if (!isCurrent) return
@@ -598,6 +622,7 @@ export function GroupDashboardPage() {
         setData(null)
         setChallenges([])
         setMessage('Unable to load the selected group challenge.')
+        setMessageTone('error')
         setIsLoading(false)
         return
       }
@@ -615,6 +640,7 @@ export function GroupDashboardPage() {
             ? 'No challenge is available for this account.'
             : 'The selected challenge is unavailable for this account.',
         )
+        setMessageTone('empty')
         setIsLoading(false)
         return
       }
@@ -631,6 +657,7 @@ export function GroupDashboardPage() {
         setMessage(
           'Shared progress is available to active members only, or could not be loaded. Try refreshing.',
         )
+        setMessageTone('error')
       } else {
         const weeklyCelebration = createSavedWeeklyWinCelebration(result.data)
         setData({ challenge, summary: result.data })
@@ -638,6 +665,7 @@ export function GroupDashboardPage() {
           reconcileWeeklyWinCelebration(ownerId, weeklyCelebration),
         )
         setMessage('')
+        setMessageTone('info')
       }
       setIsLoading(false)
     }
@@ -695,7 +723,11 @@ export function GroupDashboardPage() {
             Refresh shared progress
           </button>
         </div>
-        <DashboardState isLoading={isLoading} message={message}>
+        <DashboardState
+          isLoading={isLoading}
+          message={message}
+          messageTone={messageTone}
+        >
           {summary ? (
             <div className="mt-8 space-y-8">
               <section aria-labelledby="group-progress-heading">
@@ -793,7 +825,7 @@ export function GroupDashboardPage() {
 }
 
 export function ProgressPage() {
-  const { data, isLoading, message } = usePersonalDashboard()
+  const { data, isLoading, message, messageTone } = usePersonalDashboard()
   const { state: authState } = useOptionalAuth()
   const persistence = useMemo(() => createPersistence(authState), [authState])
   const [provisionalSummary, setProvisionalSummary] =
@@ -846,7 +878,11 @@ export function ProgressPage() {
             {data?.challenge.name ?? 'Personal dashboard'}
           </StatusPill>
         </PageHeader>
-        <DashboardState isLoading={isLoading} message={message}>
+        <DashboardState
+          isLoading={isLoading}
+          message={message}
+          messageTone={messageTone}
+        >
           {data ? (
             <div className="mt-8 space-y-6">
               {persistence.mode === 'remote' &&
@@ -960,7 +996,7 @@ export function ProgressPage() {
 }
 
 export function GoalsPage() {
-  const { data, isLoading, message } = usePersonalDashboard()
+  const { data, isLoading, message, messageTone } = usePersonalDashboard()
   const [celebrationAnnouncement, setCelebrationAnnouncement] = useState('')
 
   useEffect(() => {
@@ -989,7 +1025,11 @@ export function GoalsPage() {
             {data?.challenge.name ?? 'Personal dashboard'}
           </StatusPill>
         </PageHeader>
-        <DashboardState isLoading={isLoading} message={message}>
+        <DashboardState
+          isLoading={isLoading}
+          message={message}
+          messageTone={messageTone}
+        >
           {data ? (
             <MilestoneProgress
               celebrationAnnouncement={celebrationAnnouncement}

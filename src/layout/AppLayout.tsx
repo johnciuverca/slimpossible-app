@@ -2,61 +2,84 @@ import type { ReactNode } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 
 import { AuthSessionUI } from '../auth/AuthSessionUI'
+import { Button } from '../components/ui'
 
 type AppLayoutProps = {
   children: ReactNode
 }
 
 const navigationItems = [
+  { label: 'Overview', to: '/' },
   { label: 'Today', to: '/today' },
-  { label: 'Progress', to: '/progress' },
+  { label: 'My progress', to: '/progress' },
   { label: 'Group', to: '/group' },
   { label: 'Goals', to: '/goals' },
+  { label: 'Weigh-in', to: '/weigh-ins' },
 ]
 
-/** Shared shell with a content slot for future routed pages. */
+/** Shared live shell; route guards and each page's real data remain unchanged. */
 export function AppLayout({ children }: AppLayoutProps) {
   return (
-    <div className="flex min-h-screen flex-col bg-stone-100 text-slate-900">
-      <header className="border-b border-stone-200 bg-white">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-6 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-10">
+    <div className="flex min-h-screen flex-col bg-page text-ink">
+      <header className="border-b border-line bg-panel">
+        <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-4 px-4 py-4 sm:px-8 xl:flex-row xl:items-center xl:justify-between">
           <Link
-            className="text-lg font-bold tracking-tight text-emerald-800"
+            className="w-fit shrink-0 rounded-md text-lg font-extrabold tracking-tight text-forest-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest-700"
             to="/"
           >
             Slimpossible
           </Link>
 
-          <div className="flex flex-wrap items-center gap-5">
-            <nav aria-label="Primary navigation" className="overflow-x-auto">
-              <ul className="flex min-w-max items-center gap-5 text-sm font-semibold text-slate-600">
+          <div className="flex min-w-0 flex-col gap-3 xl:flex-1 xl:flex-row xl:items-center xl:justify-end xl:gap-5">
+            <nav
+              aria-label="Primary navigation"
+              className="app-nav-scroll min-w-0 max-w-full overflow-x-auto"
+            >
+              <ul className="flex w-max min-w-full items-center gap-1 py-1 text-sm font-semibold">
                 {navigationItems.map(({ label, to }) => (
-                  <li key={to}>
+                  <li className="shrink-0" key={to}>
                     <NavLink
                       className={({ isActive }) =>
-                        `transition hover:text-emerald-700 ${
-                          isActive ? 'text-emerald-700' : ''
-                        }`
+                        isActive
+                          ? 'inline-flex min-h-10 items-center rounded-xl border border-forest-800 bg-forest-50 px-3 py-2 font-bold text-forest-900 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700 sm:px-4'
+                          : 'inline-flex min-h-10 items-center rounded-xl border border-transparent px-3 py-2 text-ink-muted transition-colors hover:border-line hover:bg-page hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700 sm:px-4'
                       }
+                      end={to === '/'}
                       to={to}
                     >
                       {label}
                     </NavLink>
                   </li>
                 ))}
+                <li className="shrink-0">
+                  <Button
+                    aria-label="Group history, coming soon"
+                    className="min-h-10 gap-2 rounded-xl border-dashed px-3 py-2 text-ink-muted sm:px-4"
+                    disabled
+                    type="button"
+                    variant="ghost"
+                  >
+                    <span>Group history</span>
+                    <span className="rounded-full border border-line bg-panel px-2 py-0.5 text-xs font-bold uppercase tracking-wide">
+                      Coming soon
+                    </span>
+                  </Button>
+                </li>
               </ul>
             </nav>
-            <AuthSessionUI />
+            <div className="shrink-0">
+              <AuthSessionUI />
+            </div>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-6xl flex-1 px-6 py-8 sm:px-10 sm:py-12">
+      <main className="mx-auto flex w-full max-w-7xl flex-1 px-4 py-7 sm:px-8 sm:py-10">
         {children}
       </main>
 
-      <footer className="border-t border-stone-200 bg-white">
-        <div className="mx-auto w-full max-w-6xl px-6 py-5 text-sm text-slate-500 sm:px-10">
+      <footer className="border-t border-line bg-panel">
+        <div className="mx-auto w-full max-w-7xl px-4 py-5 text-sm text-ink-muted sm:px-8">
           Build sustainable progress, one day at a time.
         </div>
       </footer>
