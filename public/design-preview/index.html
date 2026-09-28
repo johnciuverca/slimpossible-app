@@ -1,0 +1,1524 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Slimpossible · Screen concepts</title>
+    <style>
+      :root {
+        font-family:
+          Inter,
+          ui-sans-serif,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        color: #19241f;
+        background: #f4f7f4;
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+        --g: #087756;
+        --gd: #075c43;
+        --gs: #e3f3e9;
+        --ink: #19241f;
+        --muted: #66756d;
+        --line: #dfe7e1;
+        --surface: #fff;
+        --blue: #5776bf;
+        --orange: #c27b40;
+        --purple: #9366aa;
+      }
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      body {
+        min-width: 320px;
+        margin: 0;
+        background:
+          radial-gradient(ellipse at 12% 0%, #e0f3e955, transparent 37rem),
+          #f4f7f4;
+      }
+      button,
+      input,
+      textarea {
+        font: inherit;
+      }
+      button {
+        cursor: pointer;
+      }
+      button:focus-visible,
+      input:focus-visible,
+      textarea:focus-visible {
+        outline: 3px solid #73c7a7;
+        outline-offset: 3px;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      .header {
+        position: sticky;
+        z-index: 2;
+        top: 0;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        min-height: 70px;
+        padding: 10px max(20px, calc((100vw - 1120px) / 2));
+        border-bottom: 1px solid var(--line);
+        background: #fffffff2;
+        backdrop-filter: blur(12px);
+      }
+      .brand {
+        display: flex;
+        flex: none;
+        align-items: center;
+        gap: 9px;
+        font-size: 16px;
+        font-weight: 750;
+        letter-spacing: -0.03em;
+      }
+      .mark {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        border-radius: 11px;
+        background: var(--g);
+        color: white;
+        font-size: 12px;
+      }
+      .nav {
+        display: flex;
+        flex: 1;
+        gap: 4px;
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+      .nav::-webkit-scrollbar {
+        display: none;
+      }
+      .nav button {
+        flex: none;
+        min-height: 40px;
+        padding: 0 11px;
+        border: 0;
+        border-radius: 9px;
+        background: none;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 650;
+      }
+      .nav button:hover,
+      .nav button[aria-selected='true'] {
+        background: var(--gs);
+        color: var(--gd);
+      }
+      .avatar {
+        display: grid;
+        flex: none;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        border: 1px solid #cfe5d7;
+        border-radius: 50%;
+        background: var(--gs);
+        color: var(--gd);
+        font-size: 10px;
+        font-weight: 800;
+      }
+      .page {
+        width: min(1120px, calc(100% - 40px));
+        margin: auto;
+        padding: 18px 0 44px;
+      }
+      .notice {
+        display: flex;
+        gap: 11px;
+        padding: 13px 15px;
+        border: 1px solid #ead9b8;
+        border-radius: 13px;
+        background: #fffaf0;
+        color: #65502c;
+      }
+      .notice b {
+        display: block;
+        margin-bottom: 3px;
+        font-size: 12px;
+      }
+      .notice p {
+        margin: 0;
+        font-size: 10px;
+        line-height: 1.5;
+      }
+      .notice i {
+        display: grid;
+        flex: none;
+        width: 24px;
+        height: 24px;
+        place-items: center;
+        border: 1px solid #d6b776;
+        border-radius: 50%;
+        font-style: normal;
+        font-weight: 800;
+      }
+      .contexts {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        padding: 15px 0 7px;
+      }
+      .context {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 50px;
+        padding: 5px 11px 5px 5px;
+        border: 1px solid var(--line);
+        border-radius: 11px;
+        background: white;
+        color: var(--ink);
+        text-align: left;
+      }
+      .context:hover {
+        border-color: #78b99b;
+      }
+      .context i {
+        display: grid;
+        width: 35px;
+        height: 35px;
+        place-items: center;
+        border-radius: 9px;
+        background: var(--gs);
+        color: var(--gd);
+        font-style: normal;
+      }
+      .context strong,
+      .context small {
+        display: block;
+      }
+      .context strong {
+        font-size: 10px;
+      }
+      .context small,
+      .sample {
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 9px;
+      }
+      .sample {
+        margin: 0 0 0 auto;
+      }
+      .screen {
+        display: grid;
+        gap: 14px;
+        padding-top: 10px;
+      }
+      .heading,
+      .section-head {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .eyebrow {
+        margin: 0 0 8px;
+        color: var(--g);
+        font-size: 9px;
+        font-weight: 800;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+      h1 {
+        margin-bottom: 7px;
+        font-size: clamp(29px, 4vw, 40px);
+        line-height: 1.08;
+        letter-spacing: -0.055em;
+      }
+      h1 em {
+        color: var(--g);
+        font-style: normal;
+      }
+      h2 {
+        margin-bottom: 7px;
+        font-size: 18px;
+        line-height: 1.2;
+        letter-spacing: -0.03em;
+      }
+      h3 {
+        margin-bottom: 6px;
+        font-size: 14px;
+      }
+      .lead,
+      .muted {
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 1.55;
+      }
+      .lead {
+        max-width: 620px;
+        margin: 0;
+      }
+      .muted {
+        margin: 0;
+      }
+      .panel,
+      .stat,
+      .member {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 15px;
+        background: white;
+      }
+      .panel {
+        padding: 18px;
+      }
+      .grid2,
+      .grid3,
+      .grid4 {
+        display: grid;
+        gap: 12px;
+      }
+      .grid2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .grid3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .grid4 {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+      .hero-grid {
+        grid-template-columns: 1.4fr 1fr;
+      }
+      .hero {
+        display: flex;
+        min-height: 240px;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: space-between;
+        padding: 25px;
+        border: 1px solid #d4e7db;
+        border-radius: 16px;
+        background:
+          radial-gradient(circle at 100% 0%, #fff9, transparent 15rem),
+          linear-gradient(130deg, #e4f3e9, #f5faf6);
+      }
+      .hero h1 {
+        font-size: clamp(32px, 4.5vw, 46px);
+      }
+      .hero .lead {
+        max-width: 370px;
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 18px;
+      }
+      .btn {
+        display: inline-flex;
+        min-height: 40px;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: #fff;
+        color: var(--ink);
+        font-size: 10px;
+        font-weight: 700;
+      }
+      .btn:hover {
+        border-color: #88b99d;
+      }
+      .primary {
+        border-color: var(--g);
+        background: var(--g);
+        color: white;
+      }
+      .primary:hover {
+        background: var(--gd);
+      }
+      .btn:disabled {
+        cursor: not-allowed;
+        opacity: 0.58;
+      }
+      .weight {
+        margin: 12px 0 5px;
+        font-size: 44px;
+        font-weight: 760;
+        line-height: 1;
+        letter-spacing: -0.06em;
+      }
+      .weight small {
+        color: var(--muted);
+        font-size: 15px;
+        font-weight: 500;
+        letter-spacing: 0;
+      }
+      .private {
+        margin: 14px 0 4px;
+        padding: 12px;
+        border-radius: 10px;
+        background: #f7faf7;
+      }
+      .private p {
+        margin: 6px 0 4px;
+        font-size: 10px;
+        line-height: 1.5;
+      }
+      .private small {
+        color: var(--muted);
+        font-size: 9px;
+      }
+      .tag,
+      .pill {
+        color: var(--gd);
+        font-size: 9px;
+        font-weight: 800;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+      }
+      .stat {
+        display: grid;
+        min-height: 96px;
+        align-content: space-between;
+        gap: 7px;
+        padding: 14px;
+      }
+      .stat span {
+        color: var(--muted);
+        font-size: 9px;
+      }
+      .stat strong {
+        font-size: 22px;
+        letter-spacing: -0.04em;
+      }
+      .stat em {
+        color: var(--g);
+        font-size: 9px;
+        font-style: normal;
+        font-weight: 700;
+      }
+      .challenge {
+        display: grid;
+        min-height: 136px;
+        gap: 7px;
+        padding: 17px;
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        background: white;
+      }
+      .challenge strong {
+        font-size: 14px;
+      }
+      .challenge p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 1.5;
+      }
+      .challenge-foot {
+        display: flex;
+        justify-content: space-between;
+        gap: 7px;
+        margin-top: 3px;
+        padding-top: 9px;
+        border-top: 1px solid var(--line);
+        color: var(--gd);
+        font-size: 9px;
+        font-weight: 700;
+      }
+      .privacy {
+        display: flex;
+        gap: 9px;
+        padding: 12px;
+        border-radius: 10px;
+        background: var(--gs);
+        color: var(--gd);
+      }
+      .privacy strong,
+      .privacy small {
+        display: block;
+      }
+      .privacy strong {
+        margin-bottom: 3px;
+        font-size: 10px;
+      }
+      .privacy small {
+        font-size: 9px;
+        line-height: 1.5;
+      }
+      .leader {
+        background: linear-gradient(145deg, #fff, #f3faf5);
+      }
+      .person {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 13px 0;
+      }
+      .person .avatar {
+        width: 38px;
+        height: 38px;
+      }
+      .person strong,
+      .person small {
+        display: block;
+      }
+      .person small {
+        margin-top: 3px;
+        color: var(--g);
+        font-size: 9px;
+      }
+      .chart {
+        display: block;
+        width: 100%;
+        height: auto;
+        margin-top: 11px;
+      }
+      .chart-grid line {
+        stroke: var(--line);
+      }
+      .labels {
+        fill: var(--muted);
+        font-size: 9px;
+      }
+      .line-g,
+      .line-b,
+      .line-o,
+      .line-p {
+        fill: none;
+        stroke-width: 2.6;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .line-g {
+        stroke: var(--g);
+      }
+      .line-b {
+        stroke: var(--blue);
+      }
+      .line-o {
+        stroke: var(--orange);
+      }
+      .line-p {
+        stroke: var(--purple);
+      }
+      .legend {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 9px;
+      }
+      .legend i {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        margin-right: 5px;
+        border-radius: 50%;
+        background: var(--g);
+      }
+      .legend .b {
+        background: var(--blue);
+      }
+      .legend .o {
+        background: var(--orange);
+      }
+      .legend .p {
+        background: var(--purple);
+      }
+      .member {
+        display: grid;
+        gap: 5px;
+        padding: 13px;
+      }
+      .member strong {
+        font-size: 10px;
+      }
+      .member span {
+        font-size: 18px;
+        font-weight: 730;
+      }
+      .member small {
+        color: var(--muted);
+        font-size: 9px;
+      }
+      .table-wrap {
+        width: 100%;
+        overflow-x: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+        font-size: 10px;
+      }
+      th,
+      td {
+        padding: 9px 7px;
+        border-bottom: 1px solid var(--line);
+        white-space: nowrap;
+      }
+      th {
+        color: var(--muted);
+        font-size: 8px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      tr:last-child td {
+        border: 0;
+      }
+      .positive {
+        color: var(--g);
+        font-weight: 700;
+      }
+      .scope-layout {
+        grid-template-columns: minmax(0, 1.15fr) minmax(240px, 0.85fr);
+      }
+      .field {
+        display: grid;
+        gap: 7px;
+        margin-bottom: 12px;
+      }
+      .field > label,
+      .field-label {
+        font-size: 10px;
+        font-weight: 700;
+      }
+      .field input[type='text'],
+      .field textarea {
+        width: 100%;
+        min-height: 40px;
+        padding: 9px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #f7faf7;
+        color: var(--ink);
+        font-size: 10px;
+      }
+      .field textarea {
+        min-height: 72px;
+      }
+      .checks {
+        display: grid;
+        gap: 7px;
+      }
+      .check {
+        display: flex;
+        gap: 9px;
+        padding: 10px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+      }
+      .check input {
+        width: 16px;
+        height: 16px;
+        margin: 1px 0 0;
+        accent-color: var(--g);
+      }
+      .check strong,
+      .check small {
+        display: block;
+      }
+      .check strong {
+        font-size: 10px;
+      }
+      .check small {
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 9px;
+        line-height: 1.4;
+      }
+      .scope {
+        align-self: start;
+        border-color: #d4e7db;
+        background: linear-gradient(150deg, #fff, #f5faf6);
+      }
+      .summary {
+        min-height: 52px;
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 1.5;
+      }
+      .pair {
+        display: flex;
+        justify-content: space-between;
+        gap: 9px;
+        padding: 8px 0;
+        border-top: 1px solid var(--line);
+        font-size: 10px;
+      }
+      .pair span {
+        color: var(--muted);
+      }
+      .pair strong {
+        text-align: right;
+      }
+      .progress {
+        height: 9px;
+        overflow: hidden;
+        border-radius: 20px;
+        background: #e8eee9;
+      }
+      .progress div {
+        width: 29%;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #087756, #42b184);
+      }
+      .progress-labels {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 9px;
+      }
+      .footer {
+        margin-top: 21px;
+        padding-top: 13px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 9px;
+        line-height: 1.5;
+        text-align: center;
+      }
+      @media (max-width: 820px) {
+        .header {
+          gap: 10px;
+        }
+        .grid4 {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      @media (max-width: 640px) {
+        .header {
+          position: static;
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 6px 9px;
+          padding: 9px 13px 6px;
+        }
+        .nav {
+          grid-column: 1/-1;
+          grid-row: 2;
+          width: calc(100vw - 26px);
+        }
+        .nav button {
+          min-height: 38px;
+          padding: 0 9px;
+          font-size: 10px;
+        }
+        .page {
+          width: calc(100% - 24px);
+          padding-top: 12px;
+        }
+        .sample {
+          width: 100%;
+          margin-left: 0;
+        }
+        .grid2,
+        .grid3,
+        .grid4,
+        .hero-grid,
+        .scope-layout {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .screen {
+          gap: 11px;
+          padding-top: 8px;
+        }
+        .hero {
+          min-height: 220px;
+          padding: 20px;
+        }
+        .hero h1 {
+          font-size: 35px;
+        }
+        .panel {
+          padding: 15px;
+        }
+        .heading {
+          align-items: flex-start;
+        }
+        .heading > .btn {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="header">
+      <div class="brand">
+        <span class="mark" aria-hidden="true">SP</span>Slimpossible
+      </div>
+      <nav class="nav" role="tablist" aria-label="Screen concepts">
+        <button
+          id="tab-overview"
+          role="tab"
+          aria-controls="panel-overview"
+          aria-selected="true"
+          data-view="overview"
+        >
+          Overview</button
+        ><button
+          id="tab-today"
+          role="tab"
+          aria-controls="panel-today"
+          aria-selected="false"
+          data-view="today"
+        >
+          Today</button
+        ><button
+          id="tab-progress"
+          role="tab"
+          aria-controls="panel-progress"
+          aria-selected="false"
+          data-view="progress"
+        >
+          My progress</button
+        ><button
+          id="tab-group"
+          role="tab"
+          aria-controls="panel-group"
+          aria-selected="false"
+          data-view="group"
+        >
+          Group</button
+        ><button
+          id="tab-goals"
+          role="tab"
+          aria-controls="panel-goals"
+          aria-selected="false"
+          data-view="goals"
+        >
+          Goals</button
+        ><button
+          id="tab-weigh-in"
+          role="tab"
+          aria-controls="panel-weigh-in"
+          aria-selected="false"
+          data-view="weigh-in"
+        >
+          Weigh-in
+        </button>
+      </nav>
+      <div class="avatar" aria-label="Sample profile">AM</div>
+    </header>
+    <main class="page" id="design-preview">
+      <aside class="notice" role="note" aria-label="Design concept notice">
+        <i aria-hidden="true">i</i>
+        <div>
+          <b>Design concept · sample data · not implemented</b>
+          <p>
+            Fictional names, dates, weights, and notes illustrate a proposed
+            experience and privacy model. This preview does not connect to the
+            app, save entries, or share information.
+          </p>
+        </div>
+      </aside>
+      <div class="contexts" aria-label="Sample challenges">
+        <button class="context" data-view="progress">
+          <i>↗</i
+          ><span
+            ><strong>My steady goal</strong
+            ><small>Personal challenge</small></span
+          ></button
+        ><button class="context" data-view="group">
+          <i>◎</i
+          ><span
+            ><strong>Autumn Reset</strong
+            ><small>Group challenge · 4 sample members</small></span
+          ></button
+        ><span class="sample">Illustrative snapshot · 28 September 2026</span>
+      </div>
+
+      <section
+        id="panel-overview"
+        class="screen"
+        role="tabpanel"
+        aria-labelledby="tab-overview"
+        data-screen="overview"
+      >
+        <div class="grid2 hero-grid">
+          <div class="hero">
+            <div>
+              <p class="eyebrow">MONDAY · 28 SEPTEMBER</p>
+              <h1>Keep showing up.<br /><em>It adds up.</em></h1>
+              <p class="lead">
+                A calm place to see your progress and choose what, if anything,
+                to share with your group.
+              </p>
+            </div>
+            <div class="actions">
+              <button class="btn primary" data-view="weigh-in">
+                Record a weigh-in ↗</button
+              ><button class="btn" data-view="progress">
+                View my progress
+              </button>
+            </div>
+          </div>
+          <article class="panel">
+            <p class="eyebrow">YOUR LATEST · PRIVATE VIEW</p>
+            <div class="weight">91.8 <small>kg</small></div>
+            <p class="muted">28 September · sample entry</p>
+            <div class="private">
+              <span class="tag">Private note · only you</span>
+              <p>Felt good after the weekend walk. Keeping a steady routine.</p>
+              <small>Notes stay outside the group view in this concept.</small>
+            </div>
+          </article>
+        </div>
+        <div class="grid3">
+          <div class="stat">
+            <span>Personal target progress</span><strong>29%</strong
+            ><em>2.4 kg toward your goal</em>
+          </div>
+          <div class="stat">
+            <span>Since last Sunday</span><strong>−0.4 kg</strong
+            ><em>Personal sample trend</em>
+          </div>
+          <div class="stat">
+            <span>Group check-ins</span><strong>3 of 4</strong
+            ><em>Illustrative, provisional</em>
+          </div>
+        </div>
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">YOUR CHALLENGES</p>
+            <h2>Two ways to keep going</h2>
+          </div>
+        </div>
+        <div class="grid2">
+          <article class="challenge">
+            <span class="pill">Personal challenge</span
+            ><strong>My steady goal</strong>
+            <p>
+              From 94.2 kg toward 86.0 kg. Personal progress and notes stay in
+              your view.
+            </p>
+            <div class="challenge-foot">
+              <span>29% of target</span><span>See progress →</span>
+            </div>
+          </article>
+          <article class="challenge">
+            <span class="pill">Group challenge</span
+            ><strong>Autumn Reset</strong>
+            <p>
+              Follow group progress and see shared weigh-in dates and weights.
+              Personal notes stay private.
+            </p>
+            <div class="challenge-foot">
+              <span>4 sample members</span><span>Open group →</span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section
+        id="panel-today"
+        class="screen"
+        role="tabpanel"
+        aria-labelledby="tab-today"
+        data-screen="today"
+        hidden
+      >
+        <div class="heading">
+          <div>
+            <p class="eyebrow">YOUR DAILY CHECK-IN</p>
+            <h1>Today</h1>
+            <p class="lead">
+              Your personal check-in, with a glimpse of the group challenge.
+            </p>
+          </div>
+          <button class="btn primary" data-view="weigh-in">
+            Record a weigh-in ↗
+          </button>
+        </div>
+        <div class="grid2">
+          <article class="panel">
+            <p class="eyebrow">LATEST PERSONAL ENTRY</p>
+            <div class="weight">91.8 <small>kg</small></div>
+            <p class="muted">28 September · sample only</p>
+            <div class="private">
+              <span class="tag">Private note</span>
+              <p>Felt good after the weekend walk. Keeping a steady routine.</p>
+              <small>Only you can see this note.</small>
+            </div>
+            <button class="btn" data-view="progress">See your history →</button>
+          </article>
+          <article class="panel leader">
+            <p class="eyebrow">AUTUMN RESET · THIS WEEK</p>
+            <h2>Maya leads in this sample</h2>
+            <p class="muted">
+              Provisional concept · 3 of 4 members have a qualifying comparison.
+            </p>
+            <div class="person">
+              <span class="avatar">MY</span
+              ><span
+                ><strong>Maya</strong
+                ><small>−0.7 kg since last Sunday</small></span
+              >
+            </div>
+            <button class="btn" data-view="group">See group progress →</button>
+          </article>
+        </div>
+        <div class="privacy">
+          <span>ⓘ</span
+          ><span
+            ><strong>Sharing is a choice in this concept</strong
+            ><small
+              >A sample weigh-in can count in a personal challenge, group
+              challenge, or both.</small
+            ></span
+          >
+        </div>
+      </section>
+
+      <section
+        id="panel-progress"
+        class="screen"
+        role="tabpanel"
+        aria-labelledby="tab-progress"
+        data-screen="progress"
+        hidden
+      >
+        <div class="heading">
+          <div>
+            <p class="eyebrow">PERSONAL DASHBOARD</p>
+            <h1>My progress</h1>
+            <p class="lead">
+              Your own weigh-ins, trend, and private notes—separate from the
+              group view.
+            </p>
+          </div>
+          <span class="pill">Private sample view</span>
+        </div>
+        <div class="grid4">
+          <div class="stat">
+            <span>Latest weight</span><strong>91.8 kg</strong
+            ><em>28 September</em>
+          </div>
+          <div class="stat">
+            <span>Change this week</span><strong>−0.4 kg</strong
+            ><em>Sample comparison</em>
+          </div>
+          <div class="stat">
+            <span>Since starting</span><strong>−2.4 kg</strong
+            ><em>From 94.2 kg</em>
+          </div>
+          <div class="stat">
+            <span>Personal goal</span><strong>86.0 kg</strong
+            ><em>5.8 kg to go</em>
+          </div>
+        </div>
+        <article class="panel">
+          <p class="eyebrow">PERSONAL WEIGHT HISTORY</p>
+          <h2>A steady trend</h2>
+          <p class="muted">Fictional sample values · last four weeks</p>
+          <svg
+            class="chart"
+            viewBox="0 0 720 220"
+            role="img"
+            aria-label="Sample personal weight trend from 94.2 to 91.8 kilograms"
+          >
+            <g class="chart-grid">
+              <line x1="50" y1="35" x2="700" y2="35" />
+              <line x1="50" y1="80" x2="700" y2="80" />
+              <line x1="50" y1="125" x2="700" y2="125" />
+              <line x1="50" y1="170" x2="700" y2="170" />
+            </g>
+            <g class="labels">
+              <text x="2" y="39">95 kg</text>
+              <text x="2" y="84">94 kg</text>
+              <text x="2" y="129">93 kg</text>
+              <text x="2" y="174">92 kg</text>
+              <text x="50" y="205">7 Sep</text>
+              <text x="250" y="205">14 Sep</text>
+              <text x="450" y="205">21 Sep</text>
+              <text x="650" y="205">28 Sep</text>
+            </g>
+            <path
+              class="line-g"
+              d="M52 72 C110 77 120 81 160 88 S235 101 270 108 S340 112 380 124 S450 137 490 145 S565 151 605 163 S660 171 698 181"
+            />
+            <circle
+              cx="698"
+              cy="181"
+              r="5"
+              fill="#087756"
+              stroke="white"
+              stroke-width="2"
+            />
+          </svg>
+        </article>
+        <article class="panel">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">PRIVATE HISTORY</p>
+              <h2>Recent weigh-ins</h2>
+            </div>
+            <span class="pill">Notes visible only to you</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Weight</th>
+                  <th>Change</th>
+                  <th>Your note · private</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>28 Sep</td>
+                  <td>91.8 kg</td>
+                  <td class="positive">−0.4 kg</td>
+                  <td>Weekend walk felt good</td>
+                </tr>
+                <tr>
+                  <td>27 Sep</td>
+                  <td>92.2 kg</td>
+                  <td class="positive">−0.4 kg</td>
+                  <td>Rest day</td>
+                </tr>
+                <tr>
+                  <td>21 Sep</td>
+                  <td>92.6 kg</td>
+                  <td class="positive">−0.3 kg</td>
+                  <td>—</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section
+        id="panel-group"
+        class="screen"
+        role="tabpanel"
+        aria-labelledby="tab-group"
+        data-screen="group"
+        aria-label="Sample group challenge view"
+        hidden
+      >
+        <div class="heading">
+          <div>
+            <p class="eyebrow">AUTUMN RESET · GROUP CHALLENGE CONCEPT</p>
+            <h1>Progress together</h1>
+            <p class="lead">
+              A group view for shared progress. The proposed boundary shows
+              weigh-in dates and weights, not personal notes.
+            </p>
+          </div>
+          <span class="btn">4 sample members</span>
+        </div>
+        <div class="grid2">
+          <article class="panel leader">
+            <p class="eyebrow">THIS WEEK'S PROVISIONAL LEADER</p>
+            <div class="person">
+              <span class="avatar">MY</span
+              ><span
+                ><strong>Maya</strong
+                ><small>−0.7 kg since last Sunday</small></span
+              >
+            </div>
+            <p class="muted">
+              3 of 4 sample members have a qualifying comparison. Illustrative
+              result only.
+            </p>
+          </article>
+          <article class="panel">
+            <p class="eyebrow">WEEKLY HIGHLIGHTS · SAMPLE</p>
+            <h2>Past Sundays</h2>
+            <div class="pair">
+              <span>27 Sep</span><strong>Alex &amp; Maya · shared win</strong>
+            </div>
+            <div class="pair">
+              <span>20 Sep</span><strong>Sam · −0.8 kg</strong>
+            </div>
+            <div class="pair">
+              <span>13 Sep</span><strong>Maya · −0.6 kg</strong>
+            </div>
+          </article>
+        </div>
+        <article class="panel">
+          <p class="eyebrow">GROUP GRAPHIC</p>
+          <h2>How everyone is progressing</h2>
+          <p class="muted">Change from starting weight · sample only</p>
+          <svg
+            class="chart"
+            viewBox="0 0 720 210"
+            role="img"
+            aria-label="Sample group chart with progress lines for four members"
+          >
+            <g class="chart-grid">
+              <line x1="50" y1="35" x2="700" y2="35" />
+              <line x1="50" y1="80" x2="700" y2="80" />
+              <line x1="50" y1="125" x2="700" y2="125" />
+              <line x1="50" y1="170" x2="700" y2="170" />
+            </g>
+            <g class="labels">
+              <text x="1" y="39">+1 kg</text>
+              <text x="12" y="84">0 kg</text>
+              <text x="1" y="129">−1 kg</text>
+              <text x="1" y="174">−2 kg</text>
+              <text x="50" y="202">7 Sep</text>
+              <text x="250" y="202">14 Sep</text>
+              <text x="450" y="202">21 Sep</text>
+              <text x="650" y="202">28 Sep</text>
+            </g>
+            <path
+              class="line-g"
+              d="M52 78 C120 82 145 98 215 103 S325 119 380 129 S490 143 545 154 S645 166 698 177"
+            />
+            <path
+              class="line-b"
+              d="M52 76 C120 82 150 92 215 96 S320 109 380 113 S485 127 545 133 S640 143 698 150"
+            />
+            <path
+              class="line-o"
+              d="M52 72 C120 76 150 82 215 88 S320 98 380 108 S485 118 545 129 S640 133 698 138"
+            />
+            <path
+              class="line-p"
+              d="M52 79 C120 82 150 87 215 91 S320 106 380 111 S485 123 545 127 S640 133 698 137"
+            />
+          </svg>
+          <div class="legend">
+            <span><i></i>Alex</span><span><i class="b"></i>Maya</span
+            ><span><i class="o"></i>Sam</span><span><i class="p"></i>Jo</span>
+          </div>
+        </article>
+        <div class="grid4">
+          <article class="member">
+            <strong>Alex</strong><span>91.8 kg</span
+            ><small class="positive">−0.4 kg · sample</small>
+          </article>
+          <article class="member">
+            <strong>Maya</strong><span>76.2 kg</span
+            ><small class="positive">−0.7 kg · sample</small>
+          </article>
+          <article class="member">
+            <strong>Sam</strong><span>82.1 kg</span
+            ><small>+0.2 kg · sample</small>
+          </article>
+          <article class="member">
+            <strong>Jo</strong><span>68.4 kg</span
+            ><small class="positive">−0.3 kg · sample</small>
+          </article>
+        </div>
+        <article class="panel">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">GROUP-SHARED FIELDS</p>
+              <h2>Recent group entries</h2>
+              <p class="muted">
+                Proposed history without private notes or reflections.
+              </p>
+            </div>
+            <span class="pill">Dates and weights only</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Member</th>
+                  <th>Weight</th>
+                  <th>Since previous Sunday</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>28 Sep</td>
+                  <td>Maya</td>
+                  <td>76.2 kg</td>
+                  <td class="positive">−0.7 kg</td>
+                </tr>
+                <tr>
+                  <td>28 Sep</td>
+                  <td>Alex</td>
+                  <td>91.8 kg</td>
+                  <td class="positive">−0.4 kg</td>
+                </tr>
+                <tr>
+                  <td>28 Sep</td>
+                  <td>Sam</td>
+                  <td>82.1 kg</td>
+                  <td>+0.2 kg</td>
+                </tr>
+                <tr data-extra hidden>
+                  <td>27 Sep</td>
+                  <td>Maya</td>
+                  <td>76.9 kg</td>
+                  <td>—</td>
+                </tr>
+                <tr data-extra hidden>
+                  <td>27 Sep</td>
+                  <td>Alex</td>
+                  <td>92.2 kg</td>
+                  <td>—</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <button
+            class="btn"
+            id="toggle-history"
+            aria-expanded="false"
+            style="margin-top: 10px"
+          >
+            Show earlier sample entries
+          </button>
+        </article>
+      </section>
+
+      <section
+        id="panel-goals"
+        class="screen"
+        role="tabpanel"
+        aria-labelledby="tab-goals"
+        data-screen="goals"
+        hidden
+      >
+        <div class="heading">
+          <div>
+            <p class="eyebrow">PERSONAL GOALS</p>
+            <h1>Your path forward</h1>
+            <p class="lead">
+              A clear view of your personal target and milestones, distinct from
+              the group challenge.
+            </p>
+          </div>
+        </div>
+        <article class="panel">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">YOUR PERSONAL TARGET · SAMPLE</p>
+              <h2>From 94.2 kg to 86.0 kg</h2>
+            </div>
+            <span class="pill">29% complete</span>
+          </div>
+          <div
+            class="progress"
+            role="progressbar"
+            aria-label="Sample progress toward personal target"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="29"
+          >
+            <div></div>
+          </div>
+          <div class="progress-labels">
+            <span>2.4 kg achieved</span><span>5.8 kg remaining</span>
+          </div>
+        </article>
+        <div class="grid3">
+          <article class="panel">
+            <p class="eyebrow">REACHED · SAMPLE</p>
+            <h3>First kilogram</h3>
+            <p class="muted">A good start deserves to be noticed.</p>
+          </article>
+          <article class="panel">
+            <p class="eyebrow">NEXT MILESTONE</p>
+            <h3>3 kg down</h3>
+            <p class="muted">0.6 kg to this illustrative milestone.</p>
+          </article>
+          <article class="panel">
+            <p class="eyebrow">GROUP HIGHLIGHT</p>
+            <h3>One shared win</h3>
+            <p class="muted">
+              A sample result, separate from the personal goal.
+            </p>
+          </article>
+        </div>
+        <div class="privacy">
+          <span>ⓘ</span
+          ><span
+            ><strong>Personal goals remain personal in this concept</strong
+            ><small
+              >Group charts use the group-sharing selection; a personal note is
+              not included in group history.</small
+            ></span
+          >
+        </div>
+      </section>
+
+      <section
+        id="panel-weigh-in"
+        class="screen"
+        role="tabpanel"
+        aria-labelledby="tab-weigh-in"
+        data-screen="weigh-in"
+        hidden
+      >
+        <div class="heading">
+          <div>
+            <p class="eyebrow">DAILY CHECK-IN · CONCEPT</p>
+            <h1>Record a weigh-in</h1>
+            <p class="lead">
+              Choose where this sample entry would count. Both destinations are
+              checked by default in this mockup.
+            </p>
+          </div>
+        </div>
+        <div class="grid2 scope-layout">
+          <article class="panel">
+            <div class="field">
+              <span class="field-label" id="destination-label"
+                >Use this weigh-in for</span
+              >
+              <div
+                class="checks"
+                role="group"
+                aria-labelledby="destination-label"
+              >
+                <label class="check"
+                  ><input id="send-personal" type="checkbox" checked /><span
+                    ><strong>My steady goal</strong
+                    ><small>Personal challenge · private progress</small></span
+                  ></label
+                ><label class="check"
+                  ><input id="send-group" type="checkbox" checked /><span
+                    ><strong>Autumn Reset</strong
+                    ><small
+                      >Group challenge · shared date and weight</small
+                    ></span
+                  ></label
+                >
+              </div>
+            </div>
+            <div class="field">
+              <label for="entry-date">Date</label
+              ><input
+                id="entry-date"
+                type="text"
+                value="28 September 2026"
+                readonly
+              />
+            </div>
+            <div class="field">
+              <label for="entry-weight">Weight in kg</label
+              ><input id="entry-weight" type="text" value="91.8" readonly />
+            </div>
+            <div class="field">
+              <label for="entry-note">Note · optional</label
+              ><textarea id="entry-note" readonly>
+Felt good after the weekend walk. Keeping a steady routine.</textarea
+              ><small class="muted"
+                >Only you can see this note in the proposed model.</small
+              >
+            </div>
+            <button class="btn primary" disabled>Save weigh-in</button>
+            <p class="muted" style="margin-top: 8px">
+              Preview only · nothing is saved.
+            </p>
+          </article>
+          <aside class="panel scope" aria-label="Sharing preview">
+            <p class="eyebrow">PROPOSED PRIVACY MODEL</p>
+            <h2 id="scope-title">One weigh-in can count in both challenges</h2>
+            <p
+              id="scope-summary"
+              class="summary"
+              aria-live="polite"
+              data-testid="scope-summary"
+            >
+              Personal progress updates. Autumn Reset members can see this
+              sample date and weight.
+            </p>
+            <div class="pair">
+              <span>Date and weight</span
+              ><strong id="scope-audience">You and group members</strong>
+            </div>
+            <div class="pair">
+              <span>Your note</span><strong>Only you</strong>
+            </div>
+            <div class="pair">
+              <span>Outside these challenges</span><strong>No access</strong>
+            </div>
+          </aside>
+        </div>
+      </section>
+      <footer class="footer">
+        Standalone visual concept · fictional sample data · no app routes,
+        account, API, or database connection · interactions do not persist.
+      </footer>
+    </main>
+    <script>
+      ;(() => {
+        const tabs = [...document.querySelectorAll('[role="tab"][data-view]')],
+          panels = [...document.querySelectorAll('[data-screen]')]
+        document.addEventListener('click', (event) => {
+          const button = event.target.closest('[data-view]')
+          if (!button) return
+          const view = button.dataset.view
+          panels.forEach(
+            (panel) => (panel.hidden = panel.dataset.screen !== view),
+          )
+          tabs.forEach((tab) => {
+            const selected = tab.dataset.view === view
+            tab.setAttribute('aria-selected', String(selected))
+            tab.tabIndex = selected ? 0 : -1
+          })
+        })
+        const personal = document.querySelector('#send-personal'),
+          group = document.querySelector('#send-group'),
+          title = document.querySelector('#scope-title'),
+          summary = document.querySelector('#scope-summary'),
+          audience = document.querySelector('#scope-audience')
+        function updateScope() {
+          if (personal.checked && group.checked) {
+            title.textContent = 'One weigh-in can count in both challenges'
+            summary.textContent =
+              'Personal progress updates. Autumn Reset members can see this sample date and weight.'
+            audience.textContent = 'You and group members'
+          } else if (personal.checked) {
+            title.textContent = 'Personal challenge only'
+            summary.textContent =
+              'This sample date, weight, and note stay in your personal view.'
+            audience.textContent = 'Only you'
+          } else if (group.checked) {
+            title.textContent = 'Group challenge only'
+            summary.textContent =
+              'Autumn Reset members can see the sample date and weight. Your note remains private.'
+            audience.textContent = 'You and group members'
+          } else {
+            title.textContent = 'Choose at least one challenge'
+            summary.textContent =
+              'Select a destination to see how this sample entry would be scoped.'
+            audience.textContent = 'No destination selected'
+          }
+        }
+        personal.addEventListener('change', updateScope)
+        group.addEventListener('change', updateScope)
+        const toggle = document.querySelector('#toggle-history'),
+          rows = [...document.querySelectorAll('[data-extra]')]
+        toggle.addEventListener('click', () => {
+          const open = toggle.getAttribute('aria-expanded') !== 'true'
+          toggle.setAttribute('aria-expanded', String(open))
+          rows.forEach((row) => (row.hidden = !open))
+          toggle.textContent = open
+            ? 'Hide earlier sample entries'
+            : 'Show earlier sample entries'
+        })
+      })()
+    </script>
+  </body>
+</html>
