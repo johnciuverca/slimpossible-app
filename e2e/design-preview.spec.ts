@@ -1,6 +1,10 @@
 import { expect, test } from '@playwright/test'
 
-const previewUrl = process.env.DESIGN_PREVIEW_URL ?? '/design-preview/'
+// Vite's dev-server SPA fallback serves the React shell for directory URLs.
+// Address the static file explicitly here; Vercel serves /design-preview/ from
+// this same index.html, as verified on the PR Preview deployment.
+const previewUrl =
+  process.env.DESIGN_PREVIEW_URL ?? '/design-preview/index.html'
 
 test.describe('standalone design preview', () => {
   test('serves a labeled concept and navigable group screen', async ({
