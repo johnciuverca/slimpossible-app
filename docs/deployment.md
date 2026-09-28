@@ -17,13 +17,20 @@ npm run build
 ```
 
 The build writes the static site to `dist/`, including `dist/index.html`. No
-backend, serverless function, environment variable, or secret is required for
-the current local-only app. When a later remote-auth issue is ready, the owner
-must add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to that Vercel
-project's environment settings for the intended preview and production scopes.
-Those values are public browser configuration; service-role keys, database
+serverless function is required. The connected app uses Supabase Auth and
+repositories when the owner supplies `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_ANON_KEY` to the intended local, Preview, or Production scope.
+These are public browser configuration values; service-role keys, database
 passwords, and other privileged values must never be added to Vercel client
-environment variables.
+environment variables. This repository does not reveal or independently
+verify the current Vercel environment values.
+
+Database migrations are a separate owner-managed change. A frontend deploy
+does not apply them. Review the current migration order in
+[`supabase-staging-setup.md`](supabase-staging-setup.md), verify the target
+project before applying anything, and test the full migration chain in a
+dedicated non-production project first. Never use production personal data for
+acceptance tests.
 
 ## Client-side routes
 
@@ -39,6 +46,9 @@ existing build command and `dist` output directory. This GitHub Flow transition
 does not change any Vercel setting or create a preview or production deployment.
 `development` remains a historical branch and is not a release branch.
 
-If a later remote service needs configuration, keep secrets in Vercel's project
-environment settings or ignored local files. Never commit secrets or privileged
-values to this repository.
+For the Chapter 14 release gate, follow the
+[`14.7 connected release checklist`](14-7-connected-release-checklist.md).
+It separates local/mock evidence from owner-run staging acceptance and records
+the production configuration, migration, smoke, stop, and rollback gates. No
+preview or production deployment is started by that checklist. Never commit
+secrets or privileged values to this repository.

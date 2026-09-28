@@ -31,6 +31,14 @@ describe('Supabase staging setup contract', () => {
     expect(guide).toContain('non-production')
     expect(guide).toContain('20260917000000_create_core_schema.sql')
     expect(guide).toContain('20260917000001_add_rls_policies.sql')
+    for (const migration of [
+      '20260922000000_harden_rls_authorization.sql',
+      '20260922000001_add_secure_challenge_invites.sql',
+      '20260924000000_add_privacy_safe_group_progress.sql',
+      '20260925000000_add_provisional_group_leader_summary.sql',
+    ]) {
+      expect(guide).toContain(migration)
+    }
     expect(guide).toContain('VITE_SUPABASE_URL')
     expect(guide).toContain('VITE_SUPABASE_ANON_KEY')
     expect(guide).toContain('not evidence')
