@@ -51,7 +51,10 @@ function renderSignedIn(
   )
 }
 
-function dashboardResponses(challengeOwnerId = 'member-1') {
+function dashboardResponses(
+  challengeOwnerId = 'member-1',
+  latestNote: string | null = null,
+) {
   return [
     response([
       {
@@ -95,7 +98,7 @@ function dashboardResponses(challengeOwnerId = 'member-1') {
       {
         created_at: '2026-09-18T10:00:00.000Z',
         id: 'weigh-in-2',
-        note: null,
+        note: latestNote,
         participant_id: 'participant-1',
         recorded_date: '2026-09-18',
         updated_at: '2026-09-18T10:00:00.000Z',
@@ -103,6 +106,27 @@ function dashboardResponses(challengeOwnerId = 'member-1') {
       },
     ]),
   ]
+}
+
+function groupProgressResponse(challengeId = 'challenge-1') {
+  const currentSunday = mostRecentSunday()
+  const previousSundayDate = new Date(`${currentSunday}T00:00:00.000Z`)
+  previousSundayDate.setUTCDate(previousSundayDate.getUTCDate() - 7)
+  return response([
+    {
+      active_participant_count: 3,
+      average_completion_percentage: 40,
+      challenge_id: challengeId,
+      current_sunday: currentSunday,
+      eligible_participant_count: 2,
+      participants_with_progress_count: 3,
+      participants_with_recorded_weight_count: 3,
+      previous_sunday: previousSundayDate.toISOString().slice(0, 10),
+      reached_target_count: 1,
+      weekly_winner_count: 1,
+      weekly_winner_names: ['Private sample winner'],
+    },
+  ])
 }
 
 function renderDashboard(
@@ -124,6 +148,22 @@ function renderDashboard(
       <MemoryRouter initialEntries={[initialEntry]}>{page}</MemoryRouter>
     </AuthProvider>,
   )
+}
+
+function authContextValue(userId: string): AuthContextValue {
+  return {
+    requestPasswordRecovery: vi.fn(),
+    resetPassword: vi.fn().mockResolvedValue(false),
+    retrySession: vi.fn(),
+    signIn: vi.fn(),
+    signOut: vi.fn().mockResolvedValue(undefined),
+    signUp: vi.fn().mockResolvedValue(undefined),
+    state: {
+      error: null,
+      status: 'signed-in',
+      user: { email: `${userId}@example.com`, id: userId },
+    },
+  }
 }
 
 afterEach(() => {
@@ -309,7 +349,11 @@ describe('HomePage', () => {
       await screen.findByRole('button', { name: /Owner hosted challenge/ }),
     ).toHaveAttribute('aria-pressed', 'true')
     expect(await screen.findByText('90 kg')).toBeInTheDocument()
-    expect(screen.getByText('2 / 3')).toBeInTheDocument()
+    expect(
+      screen.getByText((_, element) =>
+        /^2\s*\/\s*3$/.test(element?.textContent?.trim() ?? ''),
+      ),
+    ).toBeInTheDocument()
     expect(screen.queryByText('Private note content')).not.toBeInTheDocument()
     expect(screen.queryByText('Not shown on Home')).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Today' })).toHaveAttribute(
@@ -405,17 +449,39 @@ describe('HomePage', () => {
 
   it('renders Today from the selected participant and saved weigh-ins', async () => {
     const fetchMock = vi.fn()
-    dashboardResponses().forEach((item) =>
-      fetchMock.mockResolvedValueOnce(item),
-    )
+    dashboardResponses(
+      'owner-1',
+      'A private note for this participant.',
+    ).forEach((item) => fetchMock.mockResolvedValueOnce(item))
+    fetchMock.mockResolvedValueOnce(groupProgressResponse())
     renderDashboard(<TodayPage />, fetchMock)
 
-    await waitFor(() => expect(screen.getByText('90 kg')).toBeInTheDocument())
-    expect(screen.getByText('100 kg')).toBeInTheDocument()
-    expect(screen.getByText('80 kg')).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: 'Your latest weigh-in' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('90 kg')).toBeInTheDocument()
+    expect(
+      screen.getByText('A private note for this participant.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Private note · only you can see this'),
+    ).toBeInTheDocument()
+    await waitFor(() =>
+      expect(
+        screen.getByRole('article', { name: 'This week’s check-ins' }),
+      ).toHaveTextContent(/2\s*\/\s*3/),
+    )
     expect(
       screen.getByText('You are 10 kg away from your target weight.'),
     ).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: 'Record a weigh-in' }),
+    ).toHaveAttribute('href', '/weigh-ins?challenge=challenge-1')
+    expect(
+      screen.getByRole('link', { name: 'See group progress' }),
+    ).toHaveAttribute('href', '/group?challenge=challenge-1')
+    expect(screen.queryByText('Private sample winner')).not.toBeInTheDocument()
+    expect(screen.getByText(/Coming in Chapter 16/)).toBeInTheDocument()
     expect(
       screen.queryByRole('heading', { name: 'No challenge yet' }),
     ).not.toBeInTheDocument()
@@ -431,20 +497,18 @@ describe('HomePage', () => {
     renderDashboard(<TodayPage />, fetchMock)
 
     expect(
-      await screen.findByText(
-        'Enroll yourself in the selected challenge before viewing your dashboard.',
-      ),
+      await screen.findByText('You have not enrolled in this challenge yet.'),
     ).toBeInTheDocument()
     expect(
       screen.getByRole('link', { name: 'Enroll yourself' }),
     ).toHaveAttribute(
       'href',
-      '/challenge/participants/enroll?challenge=challenge-1',
+      '/challenge/participants/enroll?challenge=challenge-1&self=owner',
     )
   })
 
   it('shows a keyboard-accessible setup action on Today when no challenge exists', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(response([]))
+    const fetchMock = vi.fn().mockImplementation(() => response([]))
     renderDashboard(<TodayPage />, fetchMock)
 
     await waitFor(() =>
@@ -455,6 +519,264 @@ describe('HomePage', () => {
     const setupLink = screen.getByRole('link', { name: 'Set up a challenge' })
     expect(setupLink).toHaveAttribute('href', '/challenge/setup')
     expect(setupLink).toHaveProperty('tabIndex', 0)
+  })
+
+  it('defaults Today to the active joined challenge instead of an owned challenge', async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo) => {
+      const url = String(input)
+      if (url.includes('/challenges?')) {
+        return response([
+          {
+            created_at: '2026-09-17T10:00:00.000Z',
+            created_by: 'member-1',
+            description: null,
+            end_date: '2026-10-01',
+            id: 'owned-challenge',
+            name: 'My unjoined challenge',
+            owner_id: 'member-1',
+            start_date: '2026-09-17',
+            status: 'active',
+            target_weight_kg: null,
+            updated_at: '2026-09-17T10:00:00.000Z',
+          },
+          {
+            created_at: '2026-09-18T10:00:00.000Z',
+            created_by: 'owner-2',
+            description: null,
+            end_date: '2026-10-01',
+            id: 'joined-challenge',
+            name: 'Challenge I joined',
+            owner_id: 'owner-2',
+            start_date: '2026-09-17',
+            status: 'active',
+            target_weight_kg: null,
+            updated_at: '2026-09-18T10:00:00.000Z',
+          },
+        ])
+      }
+      if (url.includes('/participants?')) {
+        return response([
+          {
+            challenge_id: 'joined-challenge',
+            created_at: '2026-09-18T10:00:00.000Z',
+            display_name: 'Current member',
+            id: 'joined-participant',
+            joined_at: '2026-09-18T10:00:00.000Z',
+            starting_weight_kg: 100,
+            status: 'active',
+            target_weight_kg: 80,
+            updated_at: '2026-09-18T10:00:00.000Z',
+            user_id: 'member-1',
+          },
+        ])
+      }
+      if (url.includes('/weigh_ins?')) {
+        return response([
+          {
+            created_at: '2026-09-18T10:00:00.000Z',
+            id: 'joined-weigh-in',
+            note: null,
+            participant_id: 'joined-participant',
+            recorded_date: '2026-09-18',
+            updated_at: '2026-09-18T10:00:00.000Z',
+            weight_kg: 89,
+          },
+        ])
+      }
+      return groupProgressResponse('joined-challenge')
+    })
+    renderDashboard(<TodayPage />, fetchMock, '/today')
+
+    expect(
+      await screen.findByText('Challenge I joined · Active'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('89 kg')).toBeInTheDocument()
+    expect(screen.queryByText('My unjoined challenge')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: 'Enroll yourself' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('does not offer an ownerless member a dead enrollment action', async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo) => {
+      if (String(input).includes('/challenges?')) {
+        return response([
+          {
+            created_at: '2026-09-17T10:00:00.000Z',
+            created_by: 'owner-2',
+            description: null,
+            end_date: '2026-10-01',
+            id: 'challenge-1',
+            name: 'Another owner’s challenge',
+            owner_id: 'owner-2',
+            start_date: '2026-09-17',
+            status: 'active',
+            target_weight_kg: null,
+            updated_at: '2026-09-17T10:00:00.000Z',
+          },
+        ])
+      }
+      return response([])
+    })
+    renderDashboard(<TodayPage />, fetchMock)
+
+    expect(
+      await screen.findByText(/Ask its owner for an invitation/),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: 'Enroll yourself' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: 'Choose a joined challenge' }),
+    ).toHaveAttribute('href', '/')
+  })
+
+  it('shows a distinct loading and error state on Today', async () => {
+    let finishChallenges: (result: Response) => void = () => undefined
+    const challengeResponse = new Promise<Response>((resolve) => {
+      finishChallenges = resolve
+    })
+    const fetchMock = vi
+      .fn()
+      .mockImplementation((input: RequestInfo) =>
+        String(input).includes('/challenges?')
+          ? challengeResponse
+          : response([]),
+      )
+    renderDashboard(<TodayPage />, fetchMock)
+    expect(
+      screen.getByText('Loading your saved dashboard…'),
+    ).toBeInTheDocument()
+    finishChallenges(response({ message: 'Challenge request failed' }, 500))
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Your challenges could not be loaded. Try refreshing.',
+    )
+    expect(
+      screen.queryByRole('heading', { name: 'No challenge yet' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('hides prior-account Today data while a newly selected account loads', async () => {
+    vi.stubEnv('VITE_SUPABASE_URL', 'https://home-project.supabase.co')
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-anon-key')
+    let challengeRequestCount = 0
+    let finishSecondChallenge: (result: Response) => void = () => undefined
+    const secondChallengeResponse = new Promise<Response>((resolve) => {
+      finishSecondChallenge = resolve
+    })
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo) => {
+      const url = String(input)
+      if (url.includes('/challenges?')) {
+        challengeRequestCount += 1
+        return challengeRequestCount === 1
+          ? response([
+              {
+                created_at: '2026-09-17T10:00:00.000Z',
+                created_by: 'member-1',
+                description: null,
+                end_date: '2026-10-01',
+                id: 'account-one-challenge',
+                name: 'Account one challenge',
+                owner_id: 'member-1',
+                start_date: '2026-09-17',
+                status: 'active',
+                target_weight_kg: null,
+                updated_at: '2026-09-17T10:00:00.000Z',
+              },
+            ])
+          : secondChallengeResponse
+      }
+      if (url.includes('/participants?')) {
+        const secondAccount = challengeRequestCount > 1
+        return response([
+          {
+            challenge_id: secondAccount
+              ? 'account-two-challenge'
+              : 'account-one-challenge',
+            created_at: '2026-09-17T10:00:00.000Z',
+            display_name: 'Current participant',
+            id: secondAccount ? 'participant-two' : 'participant-one',
+            joined_at: '2026-09-17T10:00:00.000Z',
+            starting_weight_kg: 100,
+            status: 'active',
+            target_weight_kg: 80,
+            updated_at: '2026-09-17T10:00:00.000Z',
+            user_id: secondAccount ? 'member-2' : 'member-1',
+          },
+        ])
+      }
+      if (url.includes('/weigh_ins?')) {
+        const secondAccount = challengeRequestCount > 1
+        return response([
+          {
+            created_at: '2026-09-17T10:00:00.000Z',
+            id: secondAccount ? 'weigh-in-two' : 'weigh-in-one',
+            note: secondAccount
+              ? 'Account two private note'
+              : 'Account one private note',
+            participant_id: secondAccount
+              ? 'participant-two'
+              : 'participant-one',
+            recorded_date: '2026-09-17',
+            updated_at: '2026-09-17T10:00:00.000Z',
+            weight_kg: secondAccount ? 70 : 90,
+          },
+        ])
+      }
+      return groupProgressResponse(
+        challengeRequestCount > 1
+          ? 'account-two-challenge'
+          : 'account-one-challenge',
+      )
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { rerender } = render(
+      <AuthContext.Provider value={authContextValue('member-1')}>
+        <MemoryRouter initialEntries={['/today']}>
+          <TodayPage />
+        </MemoryRouter>
+      </AuthContext.Provider>,
+    )
+
+    expect(
+      await screen.findByText('Account one private note'),
+    ).toBeInTheDocument()
+    rerender(
+      <AuthContext.Provider value={authContextValue('member-2')}>
+        <MemoryRouter initialEntries={['/today']}>
+          <TodayPage />
+        </MemoryRouter>
+      </AuthContext.Provider>,
+    )
+    expect(
+      screen.queryByText('Account one private note'),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByText('Loading your saved dashboard…'),
+    ).toBeInTheDocument()
+
+    finishSecondChallenge(
+      response([
+        {
+          created_at: '2026-09-18T10:00:00.000Z',
+          created_by: 'owner-2',
+          description: null,
+          end_date: '2026-10-01',
+          id: 'account-two-challenge',
+          name: 'Account two challenge',
+          owner_id: 'owner-2',
+          start_date: '2026-09-17',
+          status: 'active',
+          target_weight_kg: null,
+          updated_at: '2026-09-18T10:00:00.000Z',
+        },
+      ]),
+    )
+    expect(
+      await screen.findByText('Account two private note'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('70 kg')).toBeInTheDocument()
+    expect(screen.queryByText('Account one challenge')).not.toBeInTheDocument()
   })
 
   it('renders saved history and trend on Progress', async () => {
@@ -694,7 +1016,11 @@ describe('HomePage', () => {
       renderDashboard(page, fetchMock)
 
       await waitFor(() =>
-        expect(screen.getByText('Autumn challenge')).toBeInTheDocument(),
+        expect(
+          screen.getByText(
+            _ === 'Today' ? /Autumn challenge · Active/ : 'Autumn challenge',
+          ),
+        ).toBeInTheDocument(),
       )
       expect(
         fetchMock.mock.calls.some(([url]) =>
