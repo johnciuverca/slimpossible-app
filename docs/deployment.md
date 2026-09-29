@@ -32,6 +32,12 @@ project before applying anything, and test the full migration chain in a
 dedicated non-production project first. Never use production personal data for
 acceptance tests.
 
+For the persistent feature → staging → release PR → main workflow, branch
+scoped Preview configuration, migration promotion gates, and post-release
+branch alignment, follow the
+[staging release workflow](release-workflow.md). It does not configure Vercel
+or Supabase or run migrations.
+
 ## Client-side routes
 
 `vercel.json` rewrites non-file requests to `index.html`. React Router then
