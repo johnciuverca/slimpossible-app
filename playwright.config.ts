@@ -8,8 +8,9 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
-    command: 'npm run dev -- --host 127.0.0.1 --port 4173',
-    reuseExistingServer: !process.env.CI,
+    command:
+      "VITE_SUPABASE_URL='' VITE_SUPABASE_ANON_KEY='' npm run dev -- --host 127.0.0.1 --port 4173",
+    reuseExistingServer: false,
     url: 'http://127.0.0.1:4173',
   },
 })

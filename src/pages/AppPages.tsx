@@ -103,147 +103,207 @@ type GroupDashboardData = {
   summary: GroupProgressSummary
 }
 
-function usePersonalDashboard() {
+type PersonalDashboardSnapshot = {
+  data: PersonalDashboardData | null
+  enrollmentChallengeId: string
+  isLoading: boolean
+  isMissingChallenge: boolean
+  isMissingMembership: boolean
+  message: string
+  messageTone: FeedbackTone
+  requestKey: string
+}
+
+function usePersonalDashboard({ preferJoinedChallenge = false } = {}) {
   const { state: authState } = useOptionalAuth()
   const [searchParams] = useSearchParams()
   const challengeParam = searchParams.get('challenge')
   const ownerId = authState.user?.id
   const persistence = useMemo(() => createPersistence(authState), [authState])
-  const [data, setData] = useState<PersonalDashboardData | null>(null)
-  const [isLoading, setIsLoading] = useState(authState.status === 'signed-in')
-  const [message, setMessage] = useState('')
-  const [messageTone, setMessageTone] = useState<FeedbackTone>('info')
-  const [isMissingChallenge, setIsMissingChallenge] = useState(false)
-  const [isMissingMembership, setIsMissingMembership] = useState(false)
-  const [enrollmentChallengeId, setEnrollmentChallengeId] = useState('')
+  const requestKey = JSON.stringify([
+    authState.status,
+    ownerId ?? null,
+    challengeParam,
+    persistence.mode,
+    preferJoinedChallenge,
+  ])
+  const [snapshot, setSnapshot] = useState<PersonalDashboardSnapshot>({
+    data: null,
+    enrollmentChallengeId: '',
+    isLoading: true,
+    isMissingChallenge: false,
+    isMissingMembership: false,
+    message: '',
+    messageTone: 'info',
+    requestKey: '',
+  })
 
   useEffect(() => {
     let isCurrent = true
+    const baseSnapshot: PersonalDashboardSnapshot = {
+      data: null,
+      enrollmentChallengeId: '',
+      isLoading: false,
+      isMissingChallenge: false,
+      isMissingMembership: false,
+      message: '',
+      messageTone: 'info',
+      requestKey,
+    }
 
     async function loadDashboard() {
-      setIsMissingChallenge(false)
-      setIsMissingMembership(false)
-      setEnrollmentChallengeId('')
+      setSnapshot({ ...baseSnapshot, isLoading: true })
       if (authState.status !== 'signed-in' || !ownerId) {
-        setData(null)
-        setMessage('Sign in to view your saved dashboard.')
-        setMessageTone('info')
-        setIsLoading(false)
+        setSnapshot({
+          ...baseSnapshot,
+          message: 'Sign in to view your saved dashboard.',
+        })
         return
       }
       if (persistence.mode === 'unavailable') {
-        setData(null)
-        setMessage(persistence.message)
-        setMessageTone('info')
-        setIsLoading(false)
+        setSnapshot({ ...baseSnapshot, message: persistence.message })
         return
       }
 
-      setIsLoading(true)
-      setMessageTone('info')
-      const challenges =
-        await persistence.repositories.challenges.listVisibleToUser(ownerId)
-      if (!isCurrent) return
-      if (challenges.state === 'error') {
-        setData(null)
-        setMessage(challenges.error.message)
-        setMessageTone('error')
-        setIsLoading(false)
-        return
-      }
-      const savedChallenges =
-        challenges.state === 'success' ? challenges.data : []
-      const challenge = challengeParam
-        ? savedChallenges.find(({ id }) => id === challengeParam)
-        : savedChallenges[0]
-      if (!challenge) {
-        setData(null)
-        setMessage(
-          savedChallenges.length === 0
-            ? 'Set up a challenge before viewing your dashboard.'
-            : challengeParam
-              ? 'The selected challenge is unavailable for this account.'
-              : 'Set up a challenge before viewing your dashboard.',
-        )
-        setIsMissingChallenge(savedChallenges.length === 0)
-        setMessageTone('empty')
-        setIsLoading(false)
-        return
-      }
+      try {
+        const [challengeResult, participantResult] = await Promise.all([
+          persistence.repositories.challenges.listVisibleToUser(ownerId),
+          persistence.repositories.participants.listForUser(ownerId),
+        ])
+        if (!isCurrent) return
+        if (challengeResult.state === 'error') {
+          setSnapshot({
+            ...baseSnapshot,
+            message: 'Your challenges could not be loaded. Try refreshing.',
+            messageTone: 'error',
+          })
+          return
+        }
+        if (participantResult.state === 'error') {
+          setSnapshot({
+            ...baseSnapshot,
+            message:
+              'Your challenge memberships could not be loaded. Try refreshing.',
+            messageTone: 'error',
+          })
+          return
+        }
 
-      const participants =
-        await persistence.repositories.participants.listForUser(ownerId)
-      if (!isCurrent) return
-      if (participants.state === 'error') {
-        setData(null)
-        setMessage(participants.error.message)
-        setMessageTone('error')
-        setIsLoading(false)
-        return
-      }
-      const participantRows =
-        participants.state === 'success' ? participants.data : []
-      const participant = participantRows.find(
-        (candidate) =>
-          candidate.challengeId === challenge.id &&
-          candidate.status === 'active',
-      )
-      if (!participant) {
-        setData(null)
-        setEnrollmentChallengeId(challenge.id)
-        setIsMissingMembership(true)
-        setMessage(
-          'Enroll yourself in the selected challenge before viewing your dashboard.',
+        const savedChallenges =
+          challengeResult.state === 'success' ? challengeResult.data : []
+        const participantRows =
+          participantResult.state === 'success' ? participantResult.data : []
+        const activeParticipants = participantRows.filter(
+          (participant) => participant.status === 'active',
         )
-        setMessageTone('info')
-        setIsLoading(false)
-        return
-      }
+        const challenge = challengeParam
+          ? savedChallenges.find(({ id }) => id === challengeParam)
+          : preferJoinedChallenge
+            ? (savedChallenges.find((savedChallenge) =>
+                activeParticipants.some(
+                  ({ challengeId }) => challengeId === savedChallenge.id,
+                ),
+              ) ??
+              savedChallenges.find(
+                ({ ownerId: challengeOwnerId }) => challengeOwnerId === ownerId,
+              ) ??
+              savedChallenges[0])
+            : savedChallenges[0]
 
-      const weighIns =
-        await persistence.repositories.weighIns.listForParticipant(
-          participant.id,
+        if (!challenge) {
+          setSnapshot({
+            ...baseSnapshot,
+            isMissingChallenge: savedChallenges.length === 0,
+            message:
+              savedChallenges.length === 0
+                ? 'Set up a challenge before viewing your dashboard.'
+                : 'The selected challenge is unavailable for this account.',
+            messageTone: 'empty',
+          })
+          return
+        }
+
+        const participant = activeParticipants.find(
+          (candidate) => candidate.challengeId === challenge.id,
         )
-      if (!isCurrent) return
-      if (weighIns.state === 'error') {
-        setData(null)
-        setMessage(weighIns.error.message)
-        setMessageTone('error')
-        setIsLoading(false)
-        return
+        if (!participant) {
+          const isOwner = challenge.ownerId === ownerId
+          setSnapshot({
+            ...baseSnapshot,
+            enrollmentChallengeId: isOwner ? challenge.id : '',
+            isMissingMembership: true,
+            message: isOwner
+              ? 'You have not enrolled in this challenge yet.'
+              : 'You are not an active member of this challenge. Ask its owner for an invitation, or choose a challenge you have joined.',
+            messageTone: 'info',
+          })
+          return
+        }
+
+        const weighIns =
+          await persistence.repositories.weighIns.listForParticipant(
+            participant.id,
+          )
+        if (!isCurrent) return
+        if (weighIns.state === 'error') {
+          setSnapshot({
+            ...baseSnapshot,
+            message:
+              'Your saved weigh-ins could not be loaded. Try refreshing.',
+            messageTone: 'error',
+          })
+          return
+        }
+        const records = weighIns.state === 'success' ? weighIns.data : []
+        setSnapshot({
+          ...baseSnapshot,
+          data: {
+            challenge,
+            flow: createParticipantDashboardFlow({
+              challenge,
+              participantId: participant.id,
+              participants: [participant],
+              weighIns: records,
+            }),
+            participant,
+            viewerId: ownerId,
+            weighIns: records,
+          },
+        })
+      } catch {
+        if (!isCurrent) return
+        setSnapshot({
+          ...baseSnapshot,
+          message: 'Your saved dashboard could not be loaded. Try refreshing.',
+          messageTone: 'error',
+        })
       }
-      const records = weighIns.state === 'success' ? weighIns.data : []
-      setData({
-        challenge,
-        flow: createParticipantDashboardFlow({
-          challenge,
-          participantId: participant.id,
-          participants: [participant],
-          weighIns: records,
-        }),
-        participant,
-        viewerId: ownerId,
-        weighIns: records,
-      })
-      setMessage('')
-      setMessageTone('info')
-      setIsLoading(false)
     }
 
     void loadDashboard()
     return () => {
       isCurrent = false
     }
-  }, [authState.status, challengeParam, ownerId, persistence])
+  }, [
+    authState.status,
+    challengeParam,
+    ownerId,
+    persistence,
+    preferJoinedChallenge,
+    requestKey,
+  ])
 
+  const isCurrentSnapshot = snapshot.requestKey === requestKey
   return {
-    data,
-    enrollmentChallengeId,
-    isLoading,
-    isMissingChallenge,
-    isMissingMembership,
-    message,
-    messageTone,
+    data: isCurrentSnapshot ? snapshot.data : null,
+    enrollmentChallengeId: isCurrentSnapshot
+      ? snapshot.enrollmentChallengeId
+      : '',
+    isLoading: !isCurrentSnapshot || snapshot.isLoading,
+    isMissingChallenge: isCurrentSnapshot && snapshot.isMissingChallenge,
+    isMissingMembership: isCurrentSnapshot && snapshot.isMissingMembership,
+    message: isCurrentSnapshot ? snapshot.message : '',
+    messageTone: isCurrentSnapshot ? snapshot.messageTone : 'info',
   }
 }
 
@@ -857,6 +917,7 @@ export function HomePage() {
 }
 
 export function TodayPage() {
+  const { state: authState } = useOptionalAuth()
   const {
     data,
     enrollmentChallengeId,
@@ -864,97 +925,314 @@ export function TodayPage() {
     isMissingChallenge,
     isMissingMembership,
     message,
-  } = usePersonalDashboard()
+    messageTone,
+  } = usePersonalDashboard({ preferJoinedChallenge: true })
+  const persistence = useMemo(() => createPersistence(authState), [authState])
+  const [groupSnapshot, setGroupSnapshot] = useState<
+    | { key: string; state: 'loading' | 'unavailable' | 'error' }
+    | { key: string; state: 'success'; summary: GroupProgressSummary }
+  >({ key: '', state: 'loading' })
+  const dashboardChallengeId = data?.challenge.id ?? null
+  const dashboardViewerId = data?.viewerId ?? null
+  const groupSnapshotKey = data
+    ? JSON.stringify([data.viewerId, data.challenge.id])
+    : ''
+
+  useEffect(() => {
+    let isCurrent = true
+    if (!dashboardChallengeId || !dashboardViewerId) return
+
+    const key = JSON.stringify([dashboardViewerId, dashboardChallengeId])
+    if (persistence.mode !== 'remote') {
+      setGroupSnapshot({ key, state: 'unavailable' })
+      return
+    }
+
+    setGroupSnapshot({ key, state: 'loading' })
+    persistence.repositories.groupProgress
+      .getForChallenge(dashboardChallengeId, mostRecentSunday())
+      .then((result) => {
+        if (!isCurrent) return
+        setGroupSnapshot(
+          result.state === 'success'
+            ? { key, state: 'success', summary: result.data }
+            : { key, state: 'error' },
+        )
+      })
+      .catch(() => {
+        if (isCurrent) setGroupSnapshot({ key, state: 'error' })
+      })
+
+    return () => {
+      isCurrent = false
+    }
+  }, [dashboardChallengeId, dashboardViewerId, persistence])
+
   const challengeQuery = data
     ? `?challenge=${encodeURIComponent(data.challenge.id)}`
     : ''
+  const currentGroupSnapshot =
+    groupSnapshot.key === groupSnapshotKey ? groupSnapshot : null
+  const latestWeighIn = data?.flow.dashboard.latestWeighIn ?? null
+  const challengeStatus = data?.challenge.status
+  const challengeStatusLabel =
+    challengeStatus === 'active'
+      ? 'Active'
+      : challengeStatus === 'completed'
+        ? 'Completed'
+        : challengeStatus === 'archived'
+          ? 'Archived'
+          : 'Draft'
+
+  function formatWeight(weightKg: number) {
+    return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(weightKg)} kg`
+  }
+
+  function formatDate(date: string) {
+    const parsedDate = new Date(`${date}T00:00:00`)
+    return Number.isNaN(parsedDate.getTime())
+      ? date
+      : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(
+          parsedDate,
+        )
+  }
 
   return (
-    <section className="mx-auto w-full max-w-4xl" aria-labelledby="today-title">
-      <Card className="p-8 sm:p-12">
+    <section
+      className="mx-auto w-full max-w-6xl space-y-6"
+      aria-labelledby="today-title"
+    >
+      <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <PageHeader
-          description="Your saved weigh-ins and current challenge status."
+          description="Your personal check-in, with a privacy-safe glimpse of the selected group challenge."
           title="Today"
           titleId="today-title"
         >
-          <StatusPill>
-            {data?.challenge.name ?? 'Personal dashboard'}
+          <StatusPill className="max-w-full whitespace-normal break-words">
+            {data
+              ? `${data.challenge.name} · ${challengeStatusLabel}`
+              : 'Daily check-in'}
           </StatusPill>
         </PageHeader>
-        <DashboardState
-          isLoading={isLoading}
-          message={message}
-          messageContent={
-            isMissingChallenge ? (
-              <div className="mt-8 space-y-4">
-                <h2 className="text-lg font-semibold text-slate-900">
+        {data ? (
+          <Link
+            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-forest-800 px-5 py-3 text-sm font-bold text-white hover:bg-forest-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-800"
+            to={`/weigh-ins${challengeQuery}`}
+          >
+            Record a weigh-in
+          </Link>
+        ) : null}
+      </header>
+
+      <DashboardState
+        isLoading={isLoading}
+        message={message}
+        messageTone={messageTone}
+        messageContent={
+          isMissingChallenge ? (
+            <Card className="space-y-4 p-6 sm:p-8">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest-700">
+                  Your daily check-in
+                </p>
+                <h2 className="mt-2 text-xl font-extrabold text-ink">
                   No challenge yet
                 </h2>
-                <p className="text-sm leading-6 text-slate-600">
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-muted">
                   There is no saved challenge for this account yet. Set one up
                   to start tracking your progress.
                 </p>
-                <Link
-                  className="inline-block rounded-xl bg-emerald-700 px-5 py-3 text-sm font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
-                  to="/challenge/setup"
-                >
-                  Set up a challenge
-                </Link>
               </div>
-            ) : isMissingMembership && enrollmentChallengeId ? (
-              <div className="mt-8 space-y-4">
+              <Link
+                className="inline-flex min-h-11 items-center rounded-xl bg-forest-800 px-5 py-3 text-sm font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-800"
+                to="/challenge/setup"
+              >
+                Set up a challenge
+              </Link>
+            </Card>
+          ) : isMissingMembership ? (
+            <Card className="space-y-4 p-6 sm:p-8">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest-700">
+                  Challenge enrollment
+                </p>
+                <h2 className="mt-2 text-xl font-extrabold text-ink">
+                  You are not enrolled yet
+                </h2>
                 <p
                   aria-live="polite"
-                  className="text-sm leading-6 text-slate-600"
+                  className="mt-2 max-w-2xl text-sm leading-6 text-ink-muted"
                   role="status"
                 >
                   {message}
                 </p>
+              </div>
+              {enrollmentChallengeId ? (
                 <Link
-                  className="inline-block rounded-xl bg-emerald-700 px-5 py-3 text-sm font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
-                  to={`/challenge/participants/enroll?challenge=${encodeURIComponent(enrollmentChallengeId)}`}
+                  className="inline-flex min-h-11 items-center rounded-xl bg-forest-800 px-5 py-3 text-sm font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-800"
+                  to={`/challenge/participants/enroll?challenge=${encodeURIComponent(enrollmentChallengeId)}&self=owner`}
                 >
                   Enroll yourself
                 </Link>
-              </div>
-            ) : undefined
-          }
-        >
-          {data ? (
-            <div className="mt-8 grid gap-4 sm:grid-cols-3">
-              <Card className="border border-stone-200 p-5 shadow-none">
-                <p className="text-sm text-slate-600">Current weight</p>
-                <p className="mt-2 text-2xl font-bold">
-                  {data.flow.dashboard.currentWeightKg ?? '—'} kg
+              ) : (
+                <Link
+                  className="inline-flex min-h-11 items-center rounded-xl border border-line px-5 py-3 text-sm font-bold text-ink hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-800"
+                  to="/"
+                >
+                  Choose a joined challenge
+                </Link>
+              )}
+            </Card>
+          ) : messageTone === 'error' ? (
+            <FeedbackPanel className="w-full" tone="error">
+              {message}
+            </FeedbackPanel>
+          ) : undefined
+        }
+      >
+        {data ? (
+          <div className="space-y-5">
+            <div className="grid gap-5 lg:grid-cols-2">
+              <article
+                aria-labelledby="today-latest-entry-title"
+                className="rounded-panel border border-line/80 bg-panel p-5 shadow-panel sm:p-7"
+              >
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest-700">
+                  Latest personal entry
                 </p>
-              </Card>
-              <Card className="border border-stone-200 p-5 shadow-none">
-                <p className="text-sm text-slate-600">Starting weight</p>
-                <p className="mt-2 text-2xl font-bold">
-                  {data.flow.dashboard.startingWeightKg ?? '—'} kg
+                <h2
+                  className="mt-3 text-xl font-extrabold text-ink"
+                  id="today-latest-entry-title"
+                >
+                  {latestWeighIn ? 'Your latest weigh-in' : 'No weigh-ins yet'}
+                </h2>
+                {latestWeighIn ? (
+                  <>
+                    <p className="mt-4 text-4xl font-extrabold tracking-tight text-ink">
+                      {formatWeight(latestWeighIn.weightKg)}
+                    </p>
+                    <time
+                      className="mt-2 block text-sm text-ink-muted"
+                      dateTime={latestWeighIn.date}
+                    >
+                      {formatDate(latestWeighIn.date)}
+                    </time>
+                    {latestWeighIn.note ? (
+                      <div className="mt-5 rounded-2xl border border-line bg-canvas p-4">
+                        <p className="text-xs font-bold uppercase tracking-wide text-forest-700">
+                          Private note · only you can see this
+                        </p>
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-ink">
+                          {latestWeighIn.note}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="mt-5 text-sm text-ink-muted">
+                        No private note was saved with this entry.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="mt-3 text-sm leading-6 text-ink-muted">
+                    Record your first weigh-in to start your personal check-in.
+                  </p>
+                )}
+                <Link
+                  className="mt-6 inline-flex min-h-11 items-center text-sm font-bold text-forest-700 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-800"
+                  to={`/progress${challengeQuery}`}
+                >
+                  See your personal progress
+                </Link>
+              </article>
+
+              <article
+                aria-labelledby="today-group-summary-title"
+                className="rounded-panel border border-line/80 bg-forest-800 p-5 text-white shadow-panel sm:p-7"
+              >
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest-100">
+                  Selected challenge · shared summary
                 </p>
-              </Card>
-              <Card className="border border-stone-200 p-5 shadow-none">
-                <p className="text-sm text-slate-600">Target weight</p>
-                <p className="mt-2 text-2xl font-bold">
-                  {data.flow.dashboard.targetWeightKg ?? '—'} kg
+                <h2
+                  className="mt-3 text-xl font-extrabold"
+                  id="today-group-summary-title"
+                >
+                  This week’s check-ins
+                </h2>
+                {currentGroupSnapshot?.state === 'success' ? (
+                  <>
+                    <p className="mt-4 text-4xl font-extrabold tracking-tight">
+                      {currentGroupSnapshot.summary.eligibleParticipantCount} /{' '}
+                      {currentGroupSnapshot.summary.activeParticipantCount}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-forest-50">
+                      Members with a qualifying comparison ·{' '}
+                      {formatDate(currentGroupSnapshot.summary.previousSunday)}
+                      {' – '}
+                      {formatDate(currentGroupSnapshot.summary.currentSunday)}
+                    </p>
+                  </>
+                ) : !currentGroupSnapshot ||
+                  currentGroupSnapshot.state === 'loading' ? (
+                  <p className="mt-4 text-sm text-forest-50" role="status">
+                    Loading the permitted group summary…
+                  </p>
+                ) : (
+                  <p className="mt-4 text-sm leading-6 text-forest-50">
+                    {currentGroupSnapshot?.state === 'error'
+                      ? 'The shared summary is unavailable right now. Try refreshing.'
+                      : 'A shared summary is not available in this data mode.'}
+                  </p>
+                )}
+                <Link
+                  className="mt-6 inline-flex min-h-11 items-center text-sm font-bold text-white underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                  to={`/group${challengeQuery}`}
+                >
+                  See group progress
+                </Link>
+              </article>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <article className="rounded-panel border border-line/80 bg-panel p-5 sm:p-6">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest-700">
+                  Current status
                 </p>
-              </Card>
-              <div className="sm:col-span-3">
-                <p className="text-sm leading-6 text-slate-600">
+                <h2 className="mt-2 text-lg font-extrabold text-ink">
+                  {challengeStatusLabel} ·{' '}
+                  {data.challenge.ownerId === data.viewerId
+                    ? 'owner and active participant'
+                    : 'joined member'}
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-ink-muted">
                   {data.flow.progressSummary.message}
                 </p>
                 <Link
-                  className="mt-5 inline-block text-sm font-semibold text-emerald-700 underline"
-                  to={`/weigh-ins${challengeQuery}`}
+                  className="mt-4 inline-flex min-h-11 items-center text-sm font-bold text-forest-700 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-800"
+                  to={`/goals${challengeQuery}`}
                 >
-                  Record a weigh-in
+                  View your challenge goal
                 </Link>
+              </article>
+
+              <div
+                aria-label="Future features"
+                className="flex flex-col justify-center rounded-panel border border-dashed border-line bg-canvas p-5 sm:p-6"
+              >
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-ink-muted">
+                  Not available yet
+                </p>
+                <h2 className="mt-2 text-lg font-extrabold text-ink">
+                  Challenge history and a second challenge
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-ink-muted">
+                  Coming in Chapter 16. Your personal check-in and the current
+                  permitted group summary remain available here.
+                </p>
               </div>
             </div>
-          ) : null}
-        </DashboardState>
-      </Card>
+          </div>
+        ) : null}
+      </DashboardState>
     </section>
   )
 }

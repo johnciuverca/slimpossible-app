@@ -41,3 +41,24 @@ test('activates sign-in from Home with the keyboard', async ({ page }) => {
     page.getByRole('heading', { name: 'Welcome back.' }),
   ).toBeVisible()
 })
+
+test('direct-loads and refreshes the protected Today route while signed out', async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 800, width: 390 })
+  await page.goto('/today?challenge=direct-link-check')
+
+  await expect(page).toHaveURL(/\/login$/)
+  await expect(
+    page.getByRole('heading', { name: 'Welcome back.' }),
+  ).toBeVisible()
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+    .toBe(390)
+
+  await page.reload()
+  await expect(page).toHaveURL(/\/login$/)
+  await expect(
+    page.getByRole('heading', { name: 'Welcome back.' }),
+  ).toBeVisible()
+})
