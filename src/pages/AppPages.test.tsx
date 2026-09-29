@@ -182,6 +182,9 @@ describe('HomePage', () => {
       screen.getByRole('link', { name: 'Set up a challenge' }),
     ).toHaveAttribute('href', '/challenge/setup')
     expect(
+      screen.queryByRole('link', { name: 'Sign in to join a challenge' }),
+    ).not.toBeInTheDocument()
+    expect(
       screen.queryByRole('link', { name: 'Today' }),
     ).not.toBeInTheDocument()
   })

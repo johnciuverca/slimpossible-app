@@ -631,12 +631,6 @@ export function HomePage() {
               >
                 Set up a challenge
               </Link>
-              <Link
-                className="inline-flex min-h-11 items-center rounded-xl border border-white/50 px-5 py-3 text-sm font-bold text-white hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-                to="/login"
-              >
-                Sign in to join a challenge
-              </Link>
             </div>
           ) : null}
         </Card>
