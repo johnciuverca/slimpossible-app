@@ -280,11 +280,21 @@ function DashboardState({
 
 export function HomePage() {
   const { state: authState } = useOptionalAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const challengeParam = searchParams.get('challenge')
   const ownerId = authState.user?.id
   const persistence = useMemo(() => createPersistence(authState), [authState])
   const [challenges, setChallenges] = useState<Challenge[]>([])
-  const [selectedChallengeId, setSelectedChallengeId] = useState('')
+  const [participants, setParticipants] = useState<Participant[]>([])
+  const [overview, setOverview] = useState<{
+    challengeId: string
+    personalFlow: ParticipantDashboardFlow | null
+    personalError: boolean
+    groupSummary: GroupProgressSummary | null
+    groupError: boolean
+  } | null>(null)
   const [isLoading, setIsLoading] = useState(authState.status === 'signed-in')
+  const [isOverviewLoading, setIsOverviewLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
@@ -293,35 +303,44 @@ export function HomePage() {
     async function loadChallenges() {
       if (authState.status !== 'signed-in' || !ownerId) {
         setChallenges([])
-        setSelectedChallengeId('')
+        setParticipants([])
+        setOverview(null)
         setIsLoading(false)
         setLoadError('')
         return
       }
 
       if (persistence.mode === 'unavailable') {
+        setChallenges([])
+        setParticipants([])
+        setOverview(null)
         setLoadError(persistence.message)
         setIsLoading(false)
         return
       }
 
       setIsLoading(true)
-      const result =
-        await persistence.repositories.challenges.listVisibleToUser(ownerId)
+      setLoadError('')
+      const [challengeResult, participantResult] = await Promise.all([
+        persistence.repositories.challenges.listVisibleToUser(ownerId),
+        persistence.repositories.participants.listForUser(ownerId),
+      ])
       if (!isCurrent) return
 
-      if (result.state === 'error') {
-        setLoadError(result.error.message)
+      if (
+        challengeResult.state === 'error' ||
+        participantResult.state === 'error'
+      ) {
+        setLoadError('Your challenges could not be loaded. Try refreshing.')
         setChallenges([])
+        setParticipants([])
       } else {
-        const nextChallenges = result.state === 'success' ? result.data : []
-        setChallenges(nextChallenges)
-        setSelectedChallengeId((currentId) =>
-          nextChallenges.some(({ id }) => id === currentId)
-            ? currentId
-            : (nextChallenges[0]?.id ?? ''),
+        setChallenges(
+          challengeResult.state === 'success' ? challengeResult.data : [],
         )
-        setLoadError('')
+        setParticipants(
+          participantResult.state === 'success' ? participantResult.data : [],
+        )
       }
       setIsLoading(false)
     }
@@ -332,142 +351,513 @@ export function HomePage() {
     }
   }, [authState.status, ownerId, persistence])
 
-  if (authState.status === 'signed-in') {
-    const selectedChallenge = challenges.find(
-      ({ id }) => id === selectedChallengeId,
-    )
-    const challengeQuery = selectedChallenge
-      ? `?challenge=${encodeURIComponent(selectedChallenge.id)}`
-      : ''
+  const selectedChallenge =
+    challenges.find(({ id }) => id === challengeParam) ?? challenges[0] ?? null
+  const activeParticipant = selectedChallenge
+    ? (participants.find(
+        (participant) =>
+          participant.challengeId === selectedChallenge.id &&
+          participant.status === 'active',
+      ) ?? null)
+    : null
 
+  useEffect(() => {
+    if (isLoading || authState.status !== 'signed-in') return
+    const nextParams = new URLSearchParams(searchParams)
+
+    if (!challenges.length) {
+      if (nextParams.has('challenge')) {
+        nextParams.delete('challenge')
+        setSearchParams(nextParams, { replace: true })
+      }
+      return
+    }
+
+    if (!challenges.some(({ id }) => id === challengeParam)) {
+      nextParams.set('challenge', challenges[0].id)
+      setSearchParams(nextParams, { replace: true })
+    }
+  }, [
+    authState.status,
+    challengeParam,
+    challenges,
+    isLoading,
+    searchParams,
+    setSearchParams,
+  ])
+
+  useEffect(() => {
+    let isCurrent = true
+
+    async function loadOverview() {
+      setOverview(null)
+      setIsOverviewLoading(false)
+      if (
+        isLoading ||
+        !selectedChallenge ||
+        !activeParticipant ||
+        persistence.mode === 'unavailable'
+      ) {
+        return
+      }
+
+      setIsOverviewLoading(true)
+      try {
+        const [weighIns, groupResult] = await Promise.all([
+          persistence.repositories.weighIns.listForParticipant(
+            activeParticipant.id,
+          ),
+          persistence.repositories.groupProgress.getForChallenge(
+            selectedChallenge.id,
+            mostRecentSunday(),
+          ),
+        ])
+        if (!isCurrent) return
+
+        setOverview({
+          challengeId: selectedChallenge.id,
+          groupError: groupResult.state === 'error',
+          groupSummary:
+            groupResult.state === 'success' ? groupResult.data : null,
+          personalError: weighIns.state === 'error',
+          personalFlow:
+            weighIns.state === 'error'
+              ? null
+              : createParticipantDashboardFlow({
+                  challenge: selectedChallenge,
+                  participantId: activeParticipant.id,
+                  participants: [activeParticipant],
+                  weighIns: weighIns.state === 'success' ? weighIns.data : [],
+                }),
+        })
+      } catch {
+        if (!isCurrent) return
+        setOverview({
+          challengeId: selectedChallenge.id,
+          groupError: true,
+          groupSummary: null,
+          personalError: true,
+          personalFlow: null,
+        })
+      } finally {
+        if (isCurrent) setIsOverviewLoading(false)
+      }
+    }
+
+    void loadOverview()
+    return () => {
+      isCurrent = false
+    }
+  }, [activeParticipant, isLoading, persistence, selectedChallenge])
+
+  function selectChallenge(challengeId: string) {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set('challenge', challengeId)
+    setSearchParams(nextParams)
+  }
+
+  if (authState.status === 'loading') {
     return (
-      <section className="w-full" aria-labelledby="home-title">
-        <Card className="mx-auto max-w-4xl p-8 sm:p-12">
-          <PageHeader
-            description={
-              selectedChallenge
-                ? 'Continue with the challenge selected for this account.'
-                : 'Set up your first challenge to begin recording progress.'
-            }
-            title="Welcome back."
-            titleId="home-title"
-          >
-            <StatusPill tone="success">Signed in</StatusPill>
-          </PageHeader>
+      <section
+        className="mx-auto w-full max-w-6xl"
+        aria-labelledby="home-title"
+      >
+        <h1 className="sr-only" id="home-title">
+          Overview
+        </h1>
+        <FeedbackPanel className="w-full" tone="loading">
+          Checking your saved session…
+        </FeedbackPanel>
+      </section>
+    )
+  }
 
-          <p className="mt-6 text-sm text-slate-600">
-            Signed in as <strong>{authState.user.email}</strong>
-          </p>
-
-          {isLoading ? (
-            <p
-              aria-live="polite"
-              className="mt-8 text-sm text-slate-600"
-              role="status"
-            >
-              Loading your saved challenges…
+  if (authState.status !== 'signed-in') {
+    return (
+      <section
+        className="mx-auto w-full max-w-6xl"
+        aria-labelledby="home-title"
+      >
+        <Card className="grid overflow-hidden p-0 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="p-7 sm:p-10 lg:p-12">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest-700">
+              A steadier way forward
             </p>
-          ) : loadError ? (
-            <p
-              aria-live="polite"
-              className="mt-8 text-sm text-red-700"
-              role="alert"
+            <h1
+              className="mt-4 text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl"
+              id="home-title"
             >
-              {loadError}
+              Keep showing up. It adds up.
+            </h1>
+            <p className="mt-4 max-w-xl text-base leading-7 text-ink-muted">
+              Follow your own progress and, when you choose, see a permitted
+              group summary.
             </p>
-          ) : challenges.length === 0 ? (
-            <div className="mt-8 space-y-4">
-              <p className="text-sm leading-6 text-slate-600">
-                No saved challenge is available for this account yet.
-              </p>
+            <div className="mt-7 flex flex-wrap gap-3">
               <Link
-                className="inline-block rounded-xl bg-emerald-700 px-5 py-3 text-sm font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
-                to="/challenge/setup"
+                className="inline-flex min-h-11 items-center rounded-xl bg-forest-800 px-5 py-3 text-sm font-bold text-white hover:bg-forest-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700"
+                to="/register"
               >
-                Set up a challenge
+                Create your account
+              </Link>
+              <Link
+                className="inline-flex min-h-11 items-center rounded-xl border border-line px-5 py-3 text-sm font-bold text-forest-800 hover:bg-forest-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700"
+                to="/login"
+              >
+                Sign in
               </Link>
             </div>
-          ) : (
-            <div className="mt-8 space-y-6">
-              <div>
-                <label
-                  className="text-sm font-semibold text-slate-700"
-                  htmlFor="selected-challenge"
-                >
-                  Selected challenge
-                </label>
-                <select
-                  className="mt-2 block w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-slate-900 focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                  id="selected-challenge"
-                  onChange={(event) =>
-                    setSelectedChallengeId(event.target.value)
-                  }
-                  value={selectedChallengeId}
-                >
-                  {challenges.map((challenge) => (
-                    <option key={challenge.id} value={challenge.id}>
-                      {challenge.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <nav aria-label="Selected challenge navigation">
-                <ul className="grid gap-3 sm:grid-cols-2">
-                  {[
-                    ['Today', '/today'],
-                    ['Progress', '/progress'],
-                    ['Group', '/group'],
-                    ['Goals', '/goals'],
-                    ['Invite participants', '/challenge/invites'],
-                  ].map(([label, path]) => (
-                    <li key={path}>
-                      <Link
-                        className="inline-block w-full rounded-xl border border-stone-300 px-4 py-3 text-center text-sm font-semibold text-emerald-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
-                        to={`${path}${challengeQuery}`}
-                      >
-                        {label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
-            </div>
-          )}
+          </div>
+          <div className="flex min-h-52 items-center bg-forest-800 p-7 text-white sm:p-10 lg:p-12">
+            <p className="max-w-sm text-lg leading-7 text-forest-50">
+              Personal weigh-ins stay in your view. Only authorized, shared
+              summaries appear with a group.
+            </p>
+          </div>
         </Card>
       </section>
     )
   }
 
-  return (
-    <section className="w-full" aria-labelledby="welcome-title">
-      <Card className="mx-auto grid max-w-4xl overflow-hidden p-0 md:grid-cols-[1.2fr_0.8fr]">
-        <div className="p-8 sm:p-12">
-          <PageHeader
-            description="A calm, focused space for building sustainable progress together."
-            title="Your challenge starts here."
-            titleId="welcome-title"
-          >
-            <StatusPill tone="success">Public preview</StatusPill>
-            <Link
-              className="mt-4 inline-block text-sm font-semibold text-emerald-700 underline"
-              to="/challenge/setup"
-            >
-              Set up a challenge
-            </Link>
-          </PageHeader>
-        </div>
+  if (isLoading) {
+    return (
+      <section
+        className="mx-auto w-full max-w-6xl"
+        aria-labelledby="home-title"
+      >
+        <h1 className="sr-only" id="home-title">
+          Overview
+        </h1>
+        <FeedbackPanel className="w-full" tone="loading">
+          Loading your saved challenges…
+        </FeedbackPanel>
+      </section>
+    )
+  }
 
-        <div className="flex min-h-64 items-center justify-center bg-emerald-800 p-8 text-white md:min-h-full">
-          <div className="text-center">
-            <div className="mx-auto flex size-20 items-center justify-center rounded-full bg-emerald-700 text-4xl shadow-inner shadow-emerald-950/20">
-              ✓
-            </div>
-            <p className="mt-5 text-sm font-semibold uppercase tracking-[0.2em] text-emerald-100">
-              Foundation ready
+  if (loadError) {
+    return (
+      <section
+        className="mx-auto w-full max-w-6xl"
+        aria-labelledby="home-title"
+      >
+        <h1 className="sr-only" id="home-title">
+          Overview
+        </h1>
+        <FeedbackPanel className="w-full" tone="error">
+          {loadError}
+        </FeedbackPanel>
+      </section>
+    )
+  }
+
+  const isOwner = selectedChallenge?.ownerId === ownerId
+  const isActiveMember = Boolean(activeParticipant)
+  const challengeQuery = selectedChallenge
+    ? `?challenge=${encodeURIComponent(selectedChallenge.id)}`
+    : ''
+  const currentOverview =
+    overview?.challengeId === selectedChallenge?.id ? overview : null
+  const personalDashboard = currentOverview?.personalFlow?.dashboard ?? null
+  const latestWeighIn = personalDashboard?.latestWeighIn
+  const groupSummary = currentOverview?.groupSummary ?? null
+  const panelClass =
+    'rounded-panel border border-line/80 bg-panel p-5 shadow-panel sm:p-6'
+
+  function formatWeight(weight: number) {
+    return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(weight)} kg`
+  }
+
+  function formatChange(change: number) {
+    const sign = change > 0 ? '+' : change < 0 ? '−' : ''
+    return `${sign}${formatWeight(Math.abs(change))}`
+  }
+
+  function formatDate(date: string) {
+    const parsedDate = new Date(`${date}T00:00:00`)
+    return Number.isNaN(parsedDate.getTime())
+      ? date
+      : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(
+          parsedDate,
+        )
+  }
+
+  const availableActions: [string, string][] = isActiveMember
+    ? [
+        ['Today', `/today${challengeQuery}`],
+        ['My progress', `/progress${challengeQuery}`],
+        ['Group progress', `/group${challengeQuery}`],
+        ['Goals', `/goals${challengeQuery}`],
+        ['Record a weigh-in', `/weigh-ins${challengeQuery}`],
+      ]
+    : isOwner && selectedChallenge
+      ? [
+          [
+            'Enroll yourself',
+            `/challenge/participants/enroll?challenge=${encodeURIComponent(selectedChallenge.id)}&self=owner`,
+          ],
+          ['Invite participants', `/challenge/invites${challengeQuery}`],
+        ]
+      : []
+
+  return (
+    <section
+      className="mx-auto w-full max-w-6xl space-y-8"
+      aria-labelledby="home-title"
+    >
+      <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <Card className="flex flex-col justify-between gap-8 overflow-hidden bg-forest-800 p-7 text-white sm:p-10 lg:p-12">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest-100">
+              {selectedChallenge ? 'Your challenge' : 'Your overview'}
+            </p>
+            <h1
+              className="mt-4 max-w-2xl text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl"
+              id="home-title"
+            >
+              Keep showing up. It adds up.
+            </h1>
+            <p className="mt-4 max-w-xl text-base leading-7 text-forest-50">
+              {selectedChallenge
+                ? 'Your personal progress stays yours. Shared group information appears only when your membership allows it.'
+                : 'Set up a challenge or join one with an invitation to see your saved progress here.'}
             </p>
           </div>
-        </div>
-      </Card>
+          {!selectedChallenge ? (
+            <div className="flex flex-wrap gap-3">
+              <Link
+                className="inline-flex min-h-11 items-center rounded-xl bg-white px-5 py-3 text-sm font-bold text-forest-900 hover:bg-forest-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                to="/challenge/setup"
+              >
+                Set up a challenge
+              </Link>
+              <Link
+                className="inline-flex min-h-11 items-center rounded-xl border border-white/50 px-5 py-3 text-sm font-bold text-white hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                to="/login"
+              >
+                Sign in to join a challenge
+              </Link>
+            </div>
+          ) : null}
+        </Card>
+
+        <article className={panelClass} aria-labelledby="latest-entry-title">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest-700">
+            Private view
+          </p>
+          <h2 className="mt-2 text-lg font-bold" id="latest-entry-title">
+            Your latest weigh-in
+          </h2>
+          {isOverviewLoading ? (
+            <p className="mt-5 text-sm text-ink-muted" role="status">
+              Loading your saved entry…
+            </p>
+          ) : latestWeighIn ? (
+            <>
+              <p className="mt-4 text-4xl font-extrabold tracking-tight">
+                {formatWeight(latestWeighIn.weightKg)}
+              </p>
+              <p className="mt-2 text-sm text-ink-muted">
+                {formatDate(latestWeighIn.date)} · visible only in your personal
+                view
+              </p>
+            </>
+          ) : (
+            <p className="mt-4 text-sm leading-6 text-ink-muted">
+              {isActiveMember
+                ? currentOverview?.personalError
+                  ? 'Your personal entry is unavailable right now.'
+                  : 'No weigh-ins are saved for this challenge yet.'
+                : selectedChallenge
+                  ? 'Enroll as a participant to see your personal entries.'
+                  : 'Your saved weigh-ins will appear after you join a challenge.'}
+            </p>
+          )}
+          {latestWeighIn?.note ? (
+            <p className="mt-4 rounded-xl bg-page p-3 text-sm text-ink-muted">
+              Your personal note is private and is not shown on this overview.
+            </p>
+          ) : null}
+        </article>
+      </div>
+
+      {challenges.length ? (
+        <section aria-labelledby="challenge-picker-title">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest-700">
+                Your challenges
+              </p>
+              <h2
+                className="mt-1 text-xl font-bold"
+                id="challenge-picker-title"
+              >
+                Choose what to view
+              </h2>
+            </div>
+            {isOwner ? (
+              <Link
+                className="text-sm font-semibold text-forest-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700"
+                to="/challenge/setup"
+              >
+                Set up another challenge
+              </Link>
+            ) : null}
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {challenges.map((challenge) => {
+              const isSelected = challenge.id === selectedChallenge?.id
+              return (
+                <button
+                  aria-pressed={isSelected}
+                  className={`min-h-24 rounded-panel border p-4 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700 ${isSelected ? 'border-forest-700 bg-forest-50 shadow-panel' : 'border-line bg-panel hover:bg-page'}`}
+                  key={challenge.id}
+                  onClick={() => selectChallenge(challenge.id)}
+                  type="button"
+                >
+                  <span className="block text-xs font-bold uppercase tracking-wide text-ink-muted">
+                    {challenge.ownerId === ownerId
+                      ? 'Challenge owner'
+                      : 'Joined challenge'}
+                    {isSelected ? ' · Selected' : ''}
+                  </span>
+                  <span className="mt-2 block text-base font-bold text-ink">
+                    {challenge.name}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </section>
+      ) : (
+        <FeedbackPanel className="w-full" tone="empty">
+          No saved challenge is available for this account yet. Set up a
+          challenge or join one with an invitation.
+        </FeedbackPanel>
+      )}
+
+      {selectedChallenge ? (
+        <>
+          {isActiveMember ? (
+            <section aria-labelledby="snapshot-title">
+              <div className="mb-4">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest-700">
+                  Saved records only
+                </p>
+                <h2 className="mt-1 text-xl font-bold" id="snapshot-title">
+                  Your snapshot
+                </h2>
+              </div>
+              {isOverviewLoading ? (
+                <FeedbackPanel className="w-full" tone="loading">
+                  Loading authorized progress summaries…
+                </FeedbackPanel>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-3">
+                  <article className={panelClass}>
+                    <p className="text-sm font-semibold text-ink-muted">
+                      Personal target progress
+                    </p>
+                    <p className="mt-3 text-3xl font-extrabold">
+                      {personalDashboard?.completionPercentage == null
+                        ? '—'
+                        : `${Math.round(personalDashboard.completionPercentage)}%`}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-ink-muted">
+                      {personalDashboard?.completionPercentage == null
+                        ? 'A saved starting weight, target, and weigh-in are needed for this measure.'
+                        : 'Calculated from your own saved records.'}
+                    </p>
+                  </article>
+                  <article className={panelClass}>
+                    <p className="text-sm font-semibold text-ink-muted">
+                      Since your previous entry
+                    </p>
+                    <p className="mt-3 text-3xl font-extrabold">
+                      {personalDashboard?.dailyChangeKg == null
+                        ? '—'
+                        : formatChange(personalDashboard.dailyChangeKg)}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-ink-muted">
+                      {personalDashboard?.dailyChangeKg == null
+                        ? 'A comparison appears after two weigh-ins are saved.'
+                        : 'Difference between your two most recent saved entries.'}
+                    </p>
+                  </article>
+                  <article className={panelClass}>
+                    <p className="text-sm font-semibold text-ink-muted">
+                      Weekly group comparison
+                    </p>
+                    <p className="mt-3 text-3xl font-extrabold">
+                      {currentOverview?.groupError
+                        ? '—'
+                        : groupSummary
+                          ? `${groupSummary.eligibleParticipantCount} / ${groupSummary.activeParticipantCount}`
+                          : '—'}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-ink-muted">
+                      {currentOverview?.groupError
+                        ? 'The authorized group summary is unavailable right now.'
+                        : groupSummary
+                          ? `Eligible participants · ${groupSummary.previousSunday} to ${groupSummary.currentSunday}.`
+                          : 'No authorized group summary is available yet.'}
+                    </p>
+                  </article>
+                </div>
+              )}
+            </section>
+          ) : (
+            <FeedbackPanel className="w-full" tone="info">
+              {isOwner
+                ? 'Enroll yourself to view personal and member summaries. You can still invite participants as the owner.'
+                : 'Personal and group summaries are available after you join this challenge.'}
+            </FeedbackPanel>
+          )}
+
+          {availableActions.length ? (
+            <section aria-labelledby="actions-title">
+              <div className="mb-4">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest-700">
+                  Continue
+                </p>
+                <h2 className="mt-1 text-xl font-bold" id="actions-title">
+                  Challenge actions
+                </h2>
+              </div>
+              <nav aria-label="Selected challenge actions">
+                <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {availableActions.map(([label, href]) => (
+                    <li key={href}>
+                      <Link
+                        className="inline-flex min-h-12 w-full items-center justify-between rounded-xl border border-line bg-panel px-4 py-3 text-sm font-bold text-forest-800 hover:bg-forest-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700"
+                        to={href}
+                      >
+                        {label}
+                        <span aria-hidden="true">→</span>
+                      </Link>
+                    </li>
+                  ))}
+                  {isActiveMember ? (
+                    <li>
+                      <button
+                        aria-label="Group history, coming soon"
+                        className="inline-flex min-h-12 w-full cursor-not-allowed items-center justify-between rounded-xl border border-dashed border-line bg-page px-4 py-3 text-left text-sm font-semibold text-ink-muted opacity-70"
+                        disabled
+                        type="button"
+                      >
+                        Group history
+                        <span className="rounded-full border border-line px-2 py-0.5 text-xs font-bold uppercase tracking-wide">
+                          Coming soon
+                        </span>
+                      </button>
+                    </li>
+                  ) : null}
+                </ul>
+              </nav>
+            </section>
+          ) : null}
+        </>
+      ) : null}
     </section>
   )
 }
