@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -787,12 +788,24 @@ describe('HomePage', () => {
     fetchMock.mockResolvedValueOnce(response([]))
     renderDashboard(<ProgressPage />, fetchMock)
 
-    await waitFor(() => {
-      const historyItems = screen.getAllByRole('listitem')
-      expect(historyItems[0]).toHaveTextContent('2026-09-18: 90 kg')
-      expect(historyItems[1]).toHaveTextContent('2026-09-17: 95 kg')
+    const historyTable = await screen.findByRole('table', {
+      name: 'Your saved personal weigh-ins',
     })
-    expect(screen.getByText('Trend: -5 kg')).toBeInTheDocument()
+    const historyRows = within(historyTable).getAllByRole('row')
+    expect(historyRows[1]).toHaveTextContent('90 kg')
+    expect(historyRows[1]).toHaveTextContent('−5 kg')
+    expect(historyRows[2]).toHaveTextContent('95 kg')
+    expect(
+      screen.getByText(/Change from first to latest saved check-in: −5 kg/),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('img', { name: /2 saved weigh-ins/ }),
+    ).toHaveAttribute(
+      'aria-label',
+      expect.stringContaining(
+        '2026-09-17, 95 kilograms to 2026-09-18, 90 kilograms',
+      ),
+    )
   })
 
   it('shows the provisional shared leader from the authorized RPC only', async () => {

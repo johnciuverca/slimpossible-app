@@ -5,11 +5,11 @@ import {
   Card,
   FeedbackPanel,
   PageHeader,
-  ProgressBar,
   StatusPill,
   type FeedbackTone,
 } from '../components/ui'
 import { MilestoneProgress } from '../components/MilestoneProgress'
+import { PersonalProgressChart } from '../components/PersonalProgressChart'
 import type { ParticipantMilestones } from '../models/participantMilestones'
 import { createParticipantMilestones } from '../models/participantMilestones'
 import {
@@ -34,6 +34,8 @@ import {
   type ProvisionalGroupLeaderSummary,
 } from '../models/provisionalGroupLeader'
 import { createSavedWeeklyWinCelebration } from '../models/weeklyCelebrations'
+import { calculateDailyWeightChange } from '../models/weightChange'
+import { calculatePersonalWeeklyChange } from '../models/personalWeeklyChange'
 
 type PlaceholderPageProps = {
   children?: ReactNode
@@ -1525,14 +1527,40 @@ export function ProgressPage() {
     }
   }, [data, persistence, refreshVersion])
 
+  function formatWeight(weightKg: number) {
+    return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(weightKg)} kg`
+  }
+
+  function formatChange(changeKg: number) {
+    const sign = changeKg > 0 ? '+' : changeKg < 0 ? '−' : ''
+    return `${sign}${formatWeight(Math.abs(changeKg))}`
+  }
+
+  function formatDate(date: string) {
+    const parsedDate = new Date(`${date}T00:00:00`)
+    return Number.isNaN(parsedDate.getTime())
+      ? date
+      : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(
+          parsedDate,
+        )
+  }
+
+  const weeklyChange = data
+    ? calculatePersonalWeeklyChange(
+        data.weighIns,
+        data.participant.id,
+        localDateOnly(),
+      )
+    : null
+
   return (
     <section
-      className="mx-auto w-full max-w-4xl"
+      className="mx-auto w-full max-w-6xl"
       aria-labelledby="progress-title"
     >
-      <Card className="p-8 sm:p-12">
+      <Card className="p-5 sm:p-8 lg:p-10">
         <PageHeader
-          description="Your saved history and trend for the selected challenge."
+          description="Your saved weigh-ins, personal trend, and goal progress for the selected challenge."
           title="Progress"
           titleId="progress-title"
         >
@@ -1597,7 +1625,7 @@ export function ProgressPage() {
                         {provisionalSummary.eligibleParticipantCount} of{' '}
                         {provisionalSummary.activeParticipantCount} active
                         participants have both comparison check-ins. Ties are
-                        shared.
+                        shared. This result is provisional until the week ends.
                       </p>
                     </>
                   ) : provisionalSummary?.state === 'no-eligible-candidates' ? (
@@ -1618,37 +1646,232 @@ export function ProgressPage() {
                   )}
                 </section>
               ) : null}
-              <ProgressBar
-                label="Progress toward target"
-                value={data.flow.dashboard.completionPercentage ?? 0}
+
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <article className="min-w-0 rounded-2xl border border-stone-200 bg-white p-5">
+                  <h2 className="text-sm font-semibold text-slate-600">
+                    Latest weight
+                  </h2>
+                  <p className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
+                    {data.flow.dashboard.currentWeightKg === null
+                      ? 'No record yet'
+                      : formatWeight(data.flow.dashboard.currentWeightKg)}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {data.flow.dashboard.latestWeighIn
+                      ? formatDate(data.flow.dashboard.latestWeighIn.date)
+                      : 'Your first saved check-in will appear here.'}
+                  </p>
+                </article>
+
+                <article className="min-w-0 rounded-2xl border border-stone-200 bg-white p-5">
+                  <h2 className="text-sm font-semibold text-slate-600">
+                    Change this week
+                  </h2>
+                  <p className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
+                    {weeklyChange?.state === 'ready'
+                      ? formatChange(weeklyChange.changeKg!)
+                      : '—'}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {weeklyChange?.state === 'ready'
+                      ? `Saved check-ins: ${formatDate(weeklyChange.previousWeighIn!.date)} and ${formatDate(weeklyChange.currentWeighIn!.date)}.`
+                      : weeklyChange?.state === 'no-current-week-record'
+                        ? 'No saved check-in this week yet.'
+                        : 'A saved check-in from last week is needed for comparison.'}
+                  </p>
+                </article>
+
+                <article className="min-w-0 rounded-2xl border border-stone-200 bg-white p-5">
+                  <h2 className="text-sm font-semibold text-slate-600">
+                    Since starting
+                  </h2>
+                  <p className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
+                    {data.flow.dashboard.totalChangeKg === null
+                      ? '—'
+                      : formatChange(data.flow.dashboard.totalChangeKg)}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {data.flow.dashboard.startingWeightKg === null
+                      ? 'Starting weight unavailable.'
+                      : `From ${formatWeight(data.flow.dashboard.startingWeightKg)}.`}
+                  </p>
+                </article>
+
+                <article className="min-w-0 rounded-2xl border border-stone-200 bg-white p-5">
+                  <h2 className="text-sm font-semibold text-slate-600">
+                    Personal goal
+                  </h2>
+                  <p className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
+                    {data.flow.dashboard.targetWeightKg === null
+                      ? 'No target set'
+                      : formatWeight(data.flow.dashboard.targetWeightKg)}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {data.flow.dashboard.remainingTargetWeightKg === null
+                      ? data.flow.progressSummary.statusLabel
+                      : `${formatWeight(data.flow.dashboard.remainingTargetWeightKg)} to goal.`}
+                  </p>
+                </article>
+              </div>
+
+              <MilestoneProgress
+                direction={data.flow.dashboard.progressState.direction}
+                milestones={createParticipantMilestones(data.flow.dashboard)}
+                title="Your personal goal milestones"
               />
-              <p className="text-sm leading-6 text-slate-600">
-                {data.flow.progressSummary.message}
-              </p>
-              <h2 className="text-xl font-bold">Weight history</h2>
-              {data.flow.historyTrend.history.length === 0 ? (
-                <p className="text-sm text-slate-600">
-                  No weigh-ins saved yet.
+
+              <section
+                aria-labelledby="personal-trend-title"
+                className="rounded-3xl border border-stone-200 bg-white p-5 sm:p-7"
+              >
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">
+                  Personal weight history
                 </p>
-              ) : (
-                <ul aria-label="Saved weight history" className="space-y-3">
-                  {data.flow.historyTrend.history.map((weighIn) => (
-                    <li
-                      className="rounded-xl border border-stone-200 p-4"
-                      key={`${weighIn.participantId}-${weighIn.date}`}
+                <h2
+                  className="mt-2 text-2xl font-bold tracking-tight text-slate-950"
+                  id="personal-trend-title"
+                >
+                  Your saved trend
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Only your saved weigh-ins for this challenge are plotted.
+                  Missing dates have no estimated weights.
+                </p>
+                {data.flow.historyTrend.history.length === 0 ? (
+                  <FeedbackPanel className="mt-5" tone="empty">
+                    No weigh-ins saved yet. Your chart will appear after your
+                    first check-in.
+                  </FeedbackPanel>
+                ) : (
+                  <PersonalProgressChart
+                    weighIns={data.flow.historyTrend.history}
+                  />
+                )}
+                {data.flow.historyTrend.trendChangeKg !== null ? (
+                  <p className="mt-4 text-sm font-semibold text-slate-700">
+                    Change from first to latest saved check-in:{' '}
+                    {formatChange(data.flow.historyTrend.trendChangeKg)}.
+                  </p>
+                ) : data.flow.historyTrend.state === 'insufficient-history' ? (
+                  <p className="mt-4 text-sm text-slate-600">
+                    A trend comparison needs at least two saved weigh-ins.
+                  </p>
+                ) : null}
+              </section>
+
+              <section
+                aria-labelledby="saved-weigh-ins-title"
+                className="rounded-3xl border border-stone-200 bg-white p-5 sm:p-7"
+              >
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">
+                      Private history
+                    </p>
+                    <h2
+                      className="mt-2 text-2xl font-bold tracking-tight text-slate-950"
+                      id="saved-weigh-ins-title"
                     >
-                      <span className="font-semibold">{weighIn.date}</span>:{' '}
-                      {weighIn.weightKg} kg
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <p className="text-sm text-slate-600">
-                Trend:{' '}
-                {data.flow.historyTrend.trendChangeKg === null
-                  ? 'Not enough saved records yet.'
-                  : `${data.flow.historyTrend.trendChangeKg} kg`}
-              </p>
+                      Recent weigh-ins
+                    </h2>
+                  </div>
+                  <StatusPill>Notes visible only to you</StatusPill>
+                </div>
+                {data.flow.historyTrend.history.length === 0 ? (
+                  <p className="mt-5 text-sm text-slate-600">
+                    Saved entries will appear here after your first check-in.
+                  </p>
+                ) : (
+                  <div
+                    aria-label="Scrollable saved weigh-in table"
+                    className="mt-5 overflow-x-auto rounded-xl border border-stone-200"
+                    tabIndex={0}
+                  >
+                    <table
+                      aria-label="Your saved personal weigh-ins"
+                      className="w-full min-w-[42rem] border-collapse text-left text-sm"
+                    >
+                      <thead className="bg-stone-50 text-slate-700">
+                        <tr>
+                          <th className="px-4 py-3 font-semibold" scope="col">
+                            Date
+                          </th>
+                          <th className="px-4 py-3 font-semibold" scope="col">
+                            Weight
+                          </th>
+                          <th className="px-4 py-3 font-semibold" scope="col">
+                            Change since previous saved entry
+                          </th>
+                          <th className="px-4 py-3 font-semibold" scope="col">
+                            Private note
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-stone-200">
+                        {data.flow.historyTrend.history.map((weighIn) => {
+                          const dailyChange = calculateDailyWeightChange(
+                            data.weighIns,
+                            data.participant.id,
+                            weighIn.date,
+                          )
+
+                          return (
+                            <tr
+                              className="align-top text-slate-800"
+                              key={`${weighIn.participantId}-${weighIn.date}`}
+                            >
+                              <td className="whitespace-nowrap px-4 py-3">
+                                <time dateTime={weighIn.date}>
+                                  {formatDate(weighIn.date)}
+                                </time>
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 font-semibold">
+                                {formatWeight(weighIn.weightKg)}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3">
+                                {dailyChange === null
+                                  ? '—'
+                                  : formatChange(dailyChange)}
+                              </td>
+                              <td className="min-w-52 px-4 py-3">
+                                {weighIn.note?.trim() || '—'}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
+
+              <section
+                aria-labelledby="group-history-placeholder-title"
+                className="rounded-3xl border border-dashed border-stone-300 bg-stone-50 p-5 sm:p-7"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h2
+                    className="text-lg font-bold text-slate-800"
+                    id="group-history-placeholder-title"
+                  >
+                    Group history
+                  </h2>
+                  <StatusPill>Coming in Chapter 16</StatusPill>
+                </div>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                  Shared weigh-in history is not available yet. This page shows
+                  only your own saved records; other participants’ histories and
+                  private notes remain private.
+                </p>
+              </section>
+
+              <Link
+                className="inline-flex min-h-11 items-center rounded-xl bg-emerald-800 px-5 py-3 text-sm font-semibold text-white underline-offset-4 hover:bg-emerald-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-800"
+                to={`/weigh-ins${data ? `?challenge=${encodeURIComponent(data.challenge.id)}` : ''}`}
+              >
+                Record a weigh-in
+              </Link>
             </div>
           ) : null}
         </DashboardState>

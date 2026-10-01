@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-const fixture = (scenario: 'member' | 'owner' | 'no-challenge') =>
+const fixture = (scenario: 'member' | 'owner' | 'no-challenge' | 'progress') =>
   `/e2e/fixtures/today-harness.html?scenario=${scenario}`
 
 test('renders only the signed-in member latest weigh-in and private note', async ({
@@ -77,4 +77,35 @@ test('offers challenge setup when the signed-in account has no challenge', async
   await expect(
     page.getByRole('heading', { name: 'Set up your challenge.' }),
   ).toBeVisible()
+})
+
+test('renders private, saved Progress records accessibly at a mobile viewport', async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 844, width: 390 })
+  await page.goto(fixture('progress'))
+
+  await expect(page.getByRole('heading', { name: 'Progress' })).toBeVisible()
+  await expect(page.getByText('88.4 kg', { exact: true })).toHaveCount(2)
+  await expect(page.getByText('−1.6 kg', { exact: true })).toHaveCount(2)
+  await expect(
+    page.getByText('E2E private note for the signed-in participant.'),
+  ).toBeVisible()
+  await expect(
+    page.getByText('Other participant private note must not appear.'),
+  ).toHaveCount(0)
+  await expect(
+    page.getByRole('img', { name: /2 saved weigh-ins/ }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('table', { name: 'Your saved personal weigh-ins' }),
+  ).toBeVisible()
+
+  const groupHistory = page.getByRole('region', { name: 'Group history' })
+  await expect(groupHistory).toContainText('Coming in Chapter 16')
+  await expect(groupHistory.getByRole('link')).toHaveCount(0)
+  await expect(groupHistory.getByRole('button')).toHaveCount(0)
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+    .toBe(390)
 })
