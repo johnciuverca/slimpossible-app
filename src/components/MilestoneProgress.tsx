@@ -95,6 +95,9 @@ export function MilestoneProgress({
   const completionPercentage = Number.isFinite(milestones.completionPercentage)
     ? Math.max(0, Math.min(100, milestones.completionPercentage))
     : 0
+  const displayedCompletionPercentage = new Intl.NumberFormat(undefined, {
+    maximumFractionDigits: 1,
+  }).format(completionPercentage)
   const trackProgress = trackProgressPercentage(completionPercentage)
   const directionLabel =
     direction === 'loss'
@@ -140,17 +143,17 @@ export function MilestoneProgress({
           <p className="text-sm font-semibold text-slate-700">
             Target completion
           </p>
-          <p className="text-3xl font-black tracking-tight text-emerald-800">
-            {completionPercentage}%
+          <p className="shrink-0 text-3xl font-black tracking-tight text-emerald-800">
+            {displayedCompletionPercentage}%
           </p>
         </div>
         <div className="relative mt-4 h-5">
           <div
-            aria-label={`${title}: ${completionPercentage}% complete`}
+            aria-label={`${title}: ${displayedCompletionPercentage}% complete`}
             aria-valuemax={100}
             aria-valuemin={0}
             aria-valuenow={completionPercentage}
-            aria-valuetext={`${completionPercentage}% complete. ${reachedCount} of ${milestones.milestones.length} milestones reached.`}
+            aria-valuetext={`${displayedCompletionPercentage}% complete. ${reachedCount} of ${milestones.milestones.length} milestones reached.`}
             className="absolute left-[12.5%] right-[12.5%] top-1/2 h-5 -translate-y-1/2 rounded-full bg-emerald-100 shadow-inner shadow-emerald-950/10"
             data-testid="milestone-track"
             role="progressbar"

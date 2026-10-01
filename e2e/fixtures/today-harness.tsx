@@ -7,14 +7,23 @@ import { AppLayout } from '../../src/layout/AppLayout'
 import { ChallengeSetupPage } from '../../src/pages/ChallengeSetupPage'
 import { DailyWeighInFormPage } from '../../src/pages/DailyWeighInFormPage'
 import { ParticipantEnrollmentPage } from '../../src/pages/ParticipantEnrollmentPage'
-import { TodayPage } from '../../src/pages/AppPages'
+import { ProgressPage, TodayPage } from '../../src/pages/AppPages'
 import '../../src/index.css'
 
 const fixtureUserId = 'e2e-user'
 const scenario = new URLSearchParams(window.location.search).get('scenario')
 const challengeId = 'e2e-challenge'
-const isMember = scenario === 'member'
+const isProgress = scenario === 'progress'
+const isMember = scenario === 'member' || isProgress
 const hasChallenge = scenario !== 'no-challenge'
+
+function dateOnly(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+const currentWeekEntryDate = dateOnly(new Date())
+const previousWeekEntryDate = new Date()
+previousWeekEntryDate.setDate(previousWeekEntryDate.getDate() - 7)
 
 localStorage.setItem(
   'slimpossible.local.challenges',
@@ -74,13 +83,13 @@ localStorage.setItem(
     isMember
       ? [
           {
-            date: '2026-09-20',
+            date: isProgress ? dateOnly(previousWeekEntryDate) : '2026-09-20',
             note: 'Older fixture note',
             participantId: 'e2e-participant',
             weightKg: 90,
           },
           {
-            date: '2026-09-28',
+            date: isProgress ? currentWeekEntryDate : '2026-09-28',
             note: 'E2E private note for the signed-in participant.',
             participantId: 'e2e-participant',
             weightKg: 88.4,
@@ -113,12 +122,17 @@ const authValue: AuthContextValue = {
 createRoot(document.getElementById('root')!).render(
   <AuthContext.Provider value={authValue}>
     <MemoryRouter
-      initialEntries={[isMember ? `/today?challenge=${challengeId}` : '/today']}
+      initialEntries={
+        isProgress
+          ? [`/progress?challenge=${challengeId}`]
+          : [isMember ? `/today?challenge=${challengeId}` : '/today']
+      }
     >
       <AppLayout>
         <Routes>
           <Route element={<ProtectedRoute />}>
             <Route path="/today" element={<TodayPage />} />
+            <Route path="/progress" element={<ProgressPage />} />
           </Route>
           <Route
             path="/challenge/participants/enroll"
