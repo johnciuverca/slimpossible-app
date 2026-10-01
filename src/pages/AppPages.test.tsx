@@ -19,7 +19,10 @@ import {
   TodayPage,
 } from './AppPages'
 import { mostRecentSunday } from '../models/groupProgress'
-import { localDateOnly } from '../models/provisionalGroupLeader'
+import {
+  localDateOnly,
+  provisionalWeekDates,
+} from '../models/provisionalGroupLeader'
 
 function response(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -130,10 +133,43 @@ function groupProgressResponse(challengeId = 'challenge-1') {
   ])
 }
 
+function provisionalLeaderResponse({
+  activeParticipantCount = 3,
+  challengeId = 'challenge-1',
+  eligibleParticipantCount = 2,
+  leaderNames = ['Ava', 'Ben'],
+  state = 'leaders',
+}: {
+  activeParticipantCount?: number
+  challengeId?: string
+  eligibleParticipantCount?: number
+  leaderNames?: string[]
+  state?: 'leaders' | 'no-eligible-candidates' | 'solo-challenge'
+} = {}) {
+  const week = provisionalWeekDates(localDateOnly())
+  return response([
+    {
+      active_participant_count: activeParticipantCount,
+      challenge_id: challengeId,
+      current_week_end: week.currentWeekEnd,
+      current_week_start: week.currentWeekStart,
+      eligible_participant_count: eligibleParticipantCount,
+      leader_count: leaderNames.length,
+      leader_latest_dates: leaderNames.map(() => localDateOnly()),
+      leader_names: leaderNames,
+      previous_sunday: week.previousSunday,
+      state,
+      private_note: 'do not expose provisional notes',
+      raw_history: [{ weight_kg: 91.5 }],
+    },
+  ])
+}
+
 function renderDashboard(
   page: React.ReactNode,
   fetchMock: ReturnType<typeof vi.fn>,
   initialEntry = '/today?challenge=challenge-1',
+  userId = 'member-1',
 ) {
   vi.stubEnv('VITE_SUPABASE_URL', 'https://home-project.supabase.co')
   vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-anon-key')
@@ -143,7 +179,7 @@ function renderDashboard(
       initialState={{
         error: null,
         status: 'signed-in',
-        user: { email: 'member@example.com', id: 'member-1' },
+        user: { email: `${userId}@example.com`, id: userId },
       }}
     >
       <MemoryRouter initialEntries={[initialEntry]}>{page}</MemoryRouter>
@@ -1126,6 +1162,7 @@ describe('GroupDashboardPage', () => {
           },
         ]),
       )
+      .mockResolvedValueOnce(provisionalLeaderResponse())
       .mockResolvedValueOnce(response(challengePayload))
       .mockResolvedValueOnce(
         response([
@@ -1144,6 +1181,13 @@ describe('GroupDashboardPage', () => {
           },
         ]),
       )
+      .mockResolvedValueOnce(
+        provisionalLeaderResponse({
+          eligibleParticipantCount: 0,
+          leaderNames: [],
+          state: 'no-eligible-candidates',
+        }),
+      )
       .mockResolvedValueOnce(response(challengePayload))
       .mockResolvedValueOnce(
         response([
@@ -1161,6 +1205,13 @@ describe('GroupDashboardPage', () => {
             weekly_winner_names: ['Casey'],
           },
         ]),
+      )
+      .mockResolvedValueOnce(
+        provisionalLeaderResponse({
+          eligibleParticipantCount: 0,
+          leaderNames: [],
+          state: 'no-eligible-candidates',
+        }),
       )
 
     renderDashboard(
@@ -1170,17 +1221,44 @@ describe('GroupDashboardPage', () => {
     )
 
     expect(
-      await screen.findByRole('heading', { name: 'Weekly winners' }),
+      await screen.findByRole('heading', { name: 'Weekly result' }),
     ).toBeInTheDocument()
     expect(screen.getByText('48.5%')).toBeInTheDocument()
     expect(screen.getByText(/Shared weekly winners/)).toBeInTheDocument()
     expect(
       screen.getByText(/based on 2 of 3 active members/),
     ).toBeInTheDocument()
-    expect(screen.getByText('Ava')).toBeInTheDocument()
-    expect(screen.getByText('Ben')).toBeInTheDocument()
+    expect(screen.getAllByText('Ava')).toHaveLength(2)
+    expect(screen.getAllByText('Ben')).toHaveLength(2)
+    expect(
+      screen.getByRole('heading', { name: 'Provisional leader' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Shared provisional leaders')).toBeInTheDocument()
+    const provisionalLeaderRegion = screen.getByRole('region', {
+      name: 'Provisional leader',
+    })
+    expect(provisionalLeaderRegion).toHaveTextContent('Ties are shared')
+    const unavailableHistory = screen.getByRole('region', {
+      name: 'Group chart and weigh-in history',
+    })
+    expect(unavailableHistory).toHaveAttribute('aria-disabled', 'true')
+    expect(unavailableHistory).toHaveTextContent(
+      'Not available yet · Chapter 16',
+    )
+    expect(
+      within(unavailableHistory).queryByRole('img'),
+    ).not.toBeInTheDocument()
+    expect(
+      within(unavailableHistory).queryByRole('table'),
+    ).not.toBeInTheDocument()
+    expect(
+      within(unavailableHistory).queryByRole('button'),
+    ).not.toBeInTheDocument()
     expect(
       screen.queryByText('do not render private notes'),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('do not expose provisional notes'),
     ).not.toBeInTheDocument()
     expect(screen.queryByText('91.5')).not.toBeInTheDocument()
     expect(
@@ -1194,12 +1272,24 @@ describe('GroupDashboardPage', () => {
       target_challenge_id: 'challenge-1',
       target_current_sunday: currentSunday,
     })
+    const provisionalRequest = fetchMock.mock.calls.find(([url]) =>
+      String(url).includes('/rpc/get_provisional_group_leader_summary'),
+    )
+    expect(JSON.parse(String(provisionalRequest?.[1]?.body))).toEqual({
+      target_challenge_id: 'challenge-1',
+      target_current_date: localDateOnly(),
+    })
 
     fireEvent.click(
       screen.getByRole('button', { name: 'Refresh shared progress' }),
     )
     expect(await screen.findByText('Casey')).toBeInTheDocument()
     expect(screen.queryByText('Ava')).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(
+        screen.getByRole('region', { name: 'Provisional leader' }),
+      ).toHaveTextContent('No provisional leader is available yet'),
+    )
     expect(
       await screen.findByText('Weekly result updated: Casey.'),
     ).toHaveAttribute('role', 'status')
@@ -1214,7 +1304,7 @@ describe('GroupDashboardPage', () => {
     )
   })
 
-  it('does not render group data when the membership-checked RPC denies access', async () => {
+  it('denies an owner who does not have active membership', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
@@ -1250,6 +1340,7 @@ describe('GroupDashboardPage', () => {
       <GroupDashboardPage />,
       fetchMock,
       '/group?challenge=challenge-1',
+      'owner-1',
     )
 
     expect(
@@ -1257,5 +1348,393 @@ describe('GroupDashboardPage', () => {
     ).toBeInTheDocument()
     expect(screen.queryByText('Weekly winners')).not.toBeInTheDocument()
     expect(screen.queryByText('internal row detail')).not.toBeInTheDocument()
+    expect(
+      fetchMock.mock.calls.some(([url]) =>
+        String(url).includes('/rpc/get_provisional_group_leader_summary'),
+      ),
+    ).toBe(false)
+  })
+
+  it('allows an owner who is an active challenge member', async () => {
+    const currentSunday = mostRecentSunday()
+    const previousSundayDate = new Date(`${currentSunday}T00:00:00.000Z`)
+    previousSundayDate.setUTCDate(previousSundayDate.getUTCDate() - 7)
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        response([
+          {
+            created_at: '2026-09-17T10:00:00.000Z',
+            created_by: 'owner-1',
+            description: null,
+            end_date: '2026-10-01',
+            id: 'challenge-1',
+            name: 'Autumn challenge',
+            owner_id: 'owner-1',
+            start_date: '2026-09-17',
+            status: 'active',
+            target_weight_kg: null,
+            updated_at: '2026-09-17T10:00:00.000Z',
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        response([
+          {
+            active_participant_count: 2,
+            average_completion_percentage: 35,
+            challenge_id: 'challenge-1',
+            current_sunday: currentSunday,
+            eligible_participant_count: 1,
+            participants_with_progress_count: 1,
+            participants_with_recorded_weight_count: 1,
+            previous_sunday: previousSundayDate.toISOString().slice(0, 10),
+            reached_target_count: 0,
+            weekly_winner_count: 1,
+            weekly_winner_names: ['Owner'],
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        provisionalLeaderResponse({
+          activeParticipantCount: 2,
+          eligibleParticipantCount: 1,
+          leaderNames: ['Owner'],
+        }),
+      )
+
+    renderDashboard(
+      <GroupDashboardPage />,
+      fetchMock,
+      '/group?challenge=challenge-1',
+      'owner-1',
+    )
+
+    expect(await screen.findByText('35%')).toBeInTheDocument()
+    expect(screen.getAllByText('Owner')).toHaveLength(2)
+    expect(
+      screen.queryByText(/available to active members only/),
+    ).not.toBeInTheDocument()
+  })
+
+  it('keeps authorized summary visible when the provisional RPC fails', async () => {
+    const challengePayload = [
+      {
+        created_at: '2026-09-17T10:00:00.000Z',
+        created_by: 'owner-1',
+        description: null,
+        end_date: '2026-10-01',
+        id: 'challenge-1',
+        name: 'Autumn challenge',
+        owner_id: 'owner-1',
+        start_date: '2026-09-17',
+        status: 'active',
+        target_weight_kg: null,
+        updated_at: '2026-09-17T10:00:00.000Z',
+      },
+    ]
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(response(challengePayload))
+      .mockResolvedValueOnce(groupProgressResponse())
+      .mockResolvedValueOnce(
+        response({ message: 'Internal server error' }, 500),
+      )
+
+    renderDashboard(
+      <GroupDashboardPage />,
+      fetchMock,
+      '/group?challenge=challenge-1',
+    )
+
+    expect(await screen.findByText('40%')).toBeInTheDocument()
+    expect(
+      await screen.findByText(
+        'Provisional group progress is unavailable right now.',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Internal server error')).not.toBeInTheDocument()
+  })
+
+  it('does not render outsider data after membership RPC denial', async () => {
+    const challengePayload = [
+      {
+        created_at: '2026-09-17T10:00:00.000Z',
+        created_by: 'owner-1',
+        description: null,
+        end_date: '2026-10-01',
+        id: 'challenge-1',
+        name: 'Autumn challenge',
+        owner_id: 'owner-1',
+        start_date: '2026-09-17',
+        status: 'active',
+        target_weight_kg: null,
+        updated_at: '2026-09-17T10:00:00.000Z',
+      },
+    ]
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(response(challengePayload))
+      .mockResolvedValueOnce(
+        response({ message: 'Group membership required.' }, 403),
+      )
+
+    renderDashboard(
+      <GroupDashboardPage />,
+      fetchMock,
+      '/group?challenge=challenge-1',
+      'outsider-1',
+    )
+
+    expect(
+      await screen.findByText(/available to active members only/),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('region', { name: 'Weekly result' }),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText('Ava')).not.toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps outsider data unavailable when no challenge is visible', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(response([]))
+    renderDashboard(
+      <GroupDashboardPage />,
+      fetchMock,
+      '/group?challenge=challenge-1',
+      'outsider-1',
+    )
+
+    expect(
+      await screen.findByText('No challenge is available for this account.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { name: 'Group progress' }),
+    ).not.toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('switches and refreshes only the selected challenge summary', async () => {
+    const challenges = [
+      {
+        created_at: '2026-09-17T10:00:00.000Z',
+        created_by: 'owner-1',
+        description: null,
+        end_date: '2026-10-01',
+        id: 'challenge-1',
+        name: 'Autumn challenge',
+        owner_id: 'owner-1',
+        start_date: '2026-09-17',
+        status: 'active',
+        target_weight_kg: null,
+        updated_at: '2026-09-17T10:00:00.000Z',
+      },
+      {
+        created_at: '2026-09-17T10:00:00.000Z',
+        created_by: 'member-1',
+        description: null,
+        end_date: '2026-12-01',
+        id: 'challenge-2',
+        name: 'Winter challenge',
+        owner_id: 'member-1',
+        start_date: '2026-10-01',
+        status: 'active',
+        target_weight_kg: null,
+        updated_at: '2026-09-17T10:00:00.000Z',
+      },
+    ]
+    const currentSunday = mostRecentSunday()
+    const previousSundayDate = new Date(`${currentSunday}T00:00:00.000Z`)
+    previousSundayDate.setUTCDate(previousSundayDate.getUTCDate() - 7)
+    const previousSunday = previousSundayDate.toISOString().slice(0, 10)
+    const groupResponses = [
+      {
+        activeCount: 3,
+        average: 45.1,
+        challengeId: 'challenge-1',
+      },
+      {
+        activeCount: 5,
+        average: 61.2,
+        challengeId: 'challenge-2',
+      },
+      {
+        activeCount: 6,
+        average: 64.3,
+        challengeId: 'challenge-2',
+      },
+    ]
+    const leaderResponses = [
+      { challengeId: 'challenge-1', leaderNames: ['Ava'] },
+      { challengeId: 'challenge-2', leaderNames: ['Jamie'] },
+      { challengeId: 'challenge-2', leaderNames: ['Jo'] },
+    ]
+    const fetchMock = vi.fn((...args: Parameters<typeof fetch>) => {
+      const url = String(args[0])
+      if (url.includes('/challenges?')) return response(challenges)
+      if (url.includes('/rpc/get_group_progress_summary')) {
+        const result = groupResponses.shift()!
+        return response([
+          {
+            active_participant_count: result.activeCount,
+            average_completion_percentage: result.average,
+            challenge_id: result.challengeId,
+            current_sunday: currentSunday,
+            eligible_participant_count: 0,
+            participants_with_progress_count: result.activeCount,
+            participants_with_recorded_weight_count: result.activeCount,
+            previous_sunday: previousSunday,
+            reached_target_count: 0,
+            weekly_winner_count: 0,
+            weekly_winner_names: [],
+          },
+        ])
+      }
+      if (url.includes('/rpc/get_provisional_group_leader_summary')) {
+        const result = leaderResponses.shift()!
+        return provisionalLeaderResponse({
+          activeParticipantCount: 3,
+          challengeId: result.challengeId,
+          eligibleParticipantCount: result.leaderNames.length,
+          leaderNames: result.leaderNames,
+        })
+      }
+      return response([])
+    })
+
+    renderDashboard(
+      <GroupDashboardPage />,
+      fetchMock,
+      '/group?challenge=challenge-1',
+    )
+
+    expect(await screen.findByText('45.1%')).toBeInTheDocument()
+    const challengeSelector = screen.getByRole('combobox', {
+      name: 'Selected challenge',
+    })
+    fireEvent.change(challengeSelector, { target: { value: 'challenge-2' } })
+    expect(await screen.findByText('61.2%')).toBeInTheDocument()
+    expect(challengeSelector).toHaveValue('challenge-2')
+    expect(screen.queryByText('45.1%')).not.toBeInTheDocument()
+    expect(await screen.findByText('Jamie')).toBeInTheDocument()
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Refresh shared progress' }),
+    )
+    expect(await screen.findByText('64.3%')).toBeInTheDocument()
+    expect(screen.queryByText('61.2%')).not.toBeInTheDocument()
+    expect(await screen.findByText('Jo')).toBeInTheDocument()
+
+    const groupRequests = fetchMock.mock.calls.filter(([url]) =>
+      String(url).includes('/rpc/get_group_progress_summary'),
+    )
+    expect(
+      groupRequests.map(
+        ([, requestInit]) =>
+          JSON.parse(String(requestInit?.body)).target_challenge_id,
+      ),
+    ).toEqual(['challenge-1', 'challenge-2', 'challenge-2'])
+  })
+
+  it('shows real zero-data states without inventing group values', async () => {
+    const challengePayload = [
+      {
+        created_at: '2026-09-17T10:00:00.000Z',
+        created_by: 'owner-1',
+        description: null,
+        end_date: '2026-10-01',
+        id: 'challenge-1',
+        name: 'Autumn challenge',
+        owner_id: 'owner-1',
+        start_date: '2026-09-17',
+        status: 'active',
+        target_weight_kg: null,
+        updated_at: '2026-09-17T10:00:00.000Z',
+      },
+    ]
+    const currentSunday = mostRecentSunday()
+    const previousSundayDate = new Date(`${currentSunday}T00:00:00.000Z`)
+    previousSundayDate.setUTCDate(previousSundayDate.getUTCDate() - 7)
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(response(challengePayload))
+      .mockResolvedValueOnce(
+        response([
+          {
+            active_participant_count: 0,
+            average_completion_percentage: null,
+            challenge_id: 'challenge-1',
+            current_sunday: currentSunday,
+            eligible_participant_count: 0,
+            participants_with_progress_count: 0,
+            participants_with_recorded_weight_count: 0,
+            previous_sunday: previousSundayDate.toISOString().slice(0, 10),
+            reached_target_count: 0,
+            weekly_winner_count: 0,
+            weekly_winner_names: [],
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        provisionalLeaderResponse({
+          activeParticipantCount: 0,
+          eligibleParticipantCount: 0,
+          leaderNames: [],
+          state: 'solo-challenge',
+        }),
+      )
+
+    renderDashboard(
+      <GroupDashboardPage />,
+      fetchMock,
+      '/group?challenge=challenge-1',
+    )
+
+    expect(
+      await screen.findByText(
+        'No weekly result is available until participants record both Sunday weigh-ins.',
+      ),
+    ).toBeInTheDocument()
+    const activeMembers = screen.getByText('Active members').parentElement
+    expect(activeMembers).toHaveTextContent('0')
+    const averageProgress = screen.getByText(
+      'Average goal progress',
+    ).parentElement
+    expect(averageProgress).toHaveTextContent('—')
+    expect(
+      screen.getByText(
+        'No active members are available for a provisional result.',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/sample/i)).not.toBeInTheDocument()
+  })
+
+  it('keeps Group loading and error feedback distinct', async () => {
+    const pendingFetch = vi.fn(() => new Promise<Response>(() => undefined))
+    renderDashboard(
+      <GroupDashboardPage />,
+      pendingFetch,
+      '/group?challenge=challenge-1',
+    )
+    expect(
+      screen.getByText('Loading your saved dashboard…'),
+    ).toBeInTheDocument()
+    cleanup()
+
+    const failedFetch = vi
+      .fn()
+      .mockImplementation((input: RequestInfo) =>
+        String(input).includes('/challenges?')
+          ? response({ message: 'Request failed' }, 500)
+          : response([]),
+      )
+    renderDashboard(
+      <GroupDashboardPage />,
+      failedFetch,
+      '/group?challenge=challenge-1',
+    )
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Unable to load the selected group challenge.',
+    )
   })
 })

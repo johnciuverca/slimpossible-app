@@ -7,7 +7,12 @@ import { AppLayout } from '../../src/layout/AppLayout'
 import { ChallengeSetupPage } from '../../src/pages/ChallengeSetupPage'
 import { DailyWeighInFormPage } from '../../src/pages/DailyWeighInFormPage'
 import { ParticipantEnrollmentPage } from '../../src/pages/ParticipantEnrollmentPage'
-import { GoalsPage, ProgressPage, TodayPage } from '../../src/pages/AppPages'
+import {
+  GoalsPage,
+  GroupDashboardPage,
+  ProgressPage,
+  TodayPage,
+} from '../../src/pages/AppPages'
 import '../../src/index.css'
 
 const fixtureUserId = 'e2e-user'
@@ -15,7 +20,8 @@ const scenario = new URLSearchParams(window.location.search).get('scenario')
 const challengeId = 'e2e-challenge'
 const isProgress = scenario === 'progress'
 const isGoals = scenario?.startsWith('goals') ?? false
-const isMember = scenario === 'member' || isProgress || isGoals
+const isGroup = scenario === 'group'
+const isMember = scenario === 'member' || isProgress || isGoals || isGroup
 const hasChallenge = scenario !== 'no-challenge'
 const goalScenarios = {
   goals: { current: 88.4, starting: 92, target: 80 },
@@ -149,7 +155,9 @@ createRoot(document.getElementById('root')!).render(
           ? [`/goals?challenge=${challengeId}`]
           : isProgress
             ? [`/progress?challenge=${challengeId}`]
-            : [isMember ? `/today?challenge=${challengeId}` : '/today']
+            : isGroup
+              ? [`/group?challenge=${challengeId}`]
+              : [isMember ? `/today?challenge=${challengeId}` : '/today']
       }
     >
       <AppLayout>
@@ -158,6 +166,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="/today" element={<TodayPage />} />
             <Route path="/progress" element={<ProgressPage />} />
             <Route path="/goals" element={<GoalsPage />} />
+            <Route path="/group" element={<GroupDashboardPage />} />
           </Route>
           <Route
             path="/challenge/participants/enroll"
