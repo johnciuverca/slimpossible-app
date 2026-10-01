@@ -932,6 +932,27 @@ describe('HomePage', () => {
     expect(screen.getByText('Weight-loss goal')).toBeInTheDocument()
   })
 
+  it('keeps Goals loading and error feedback distinct', async () => {
+    const pendingFetch = vi.fn(() => new Promise<Response>(() => undefined))
+    renderDashboard(<GoalsPage />, pendingFetch, '/goals?challenge=challenge-1')
+    expect(
+      screen.getByText('Loading your saved dashboard…'),
+    ).toBeInTheDocument()
+    cleanup()
+
+    const failedFetch = vi
+      .fn()
+      .mockImplementation((input: RequestInfo) =>
+        String(input).includes('/challenges?')
+          ? response({ message: 'Request failed' }, 500)
+          : response([]),
+      )
+    renderDashboard(<GoalsPage />, failedFetch, '/goals?challenge=challenge-1')
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Your challenges could not be loaded. Try refreshing.',
+    )
+  })
+
   it.each([
     {
       current: 90,
@@ -950,13 +971,20 @@ describe('HomePage', () => {
     {
       current: 80,
       directionLabel: 'Maintenance goal',
-      expected: 100,
       starting: 80,
       target: 80,
+      maintenance: true,
     },
   ])(
     'renders bounded saved progress for $directionLabel',
-    async ({ current, directionLabel, expected, starting, target }) => {
+    async ({
+      current,
+      directionLabel,
+      expected,
+      starting,
+      target,
+      maintenance,
+    }) => {
       const [challengeResponse, participantResponse] = dashboardResponses()
       const challenge = await challengeResponse.json()
       const participant = await participantResponse.json()
@@ -982,12 +1010,19 @@ describe('HomePage', () => {
 
       renderDashboard(<GoalsPage />, fetchMock)
 
-      const progress = await screen.findByRole('progressbar', {
-        name: `Milestone progress: ${expected}% complete`,
-      })
-      expect(progress).toHaveAttribute('aria-valuenow', `${expected}`)
+      if (maintenance) {
+        expect(
+          await screen.findByText(/Normal check-in fluctuations are shown/),
+        ).toBeInTheDocument()
+        expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+      } else {
+        const progress = await screen.findByRole('progressbar', {
+          name: `Milestone progress: ${expected}% complete`,
+        })
+        expect(progress).toHaveAttribute('aria-valuenow', `${expected}`)
+        expect(progress).not.toHaveAttribute('aria-valuenow', 'NaN')
+      }
       expect(screen.getByText(directionLabel)).toBeInTheDocument()
-      expect(progress).not.toHaveAttribute('aria-valuenow', 'NaN')
     },
   )
 

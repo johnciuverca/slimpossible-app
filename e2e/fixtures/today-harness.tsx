@@ -7,15 +7,26 @@ import { AppLayout } from '../../src/layout/AppLayout'
 import { ChallengeSetupPage } from '../../src/pages/ChallengeSetupPage'
 import { DailyWeighInFormPage } from '../../src/pages/DailyWeighInFormPage'
 import { ParticipantEnrollmentPage } from '../../src/pages/ParticipantEnrollmentPage'
-import { ProgressPage, TodayPage } from '../../src/pages/AppPages'
+import { GoalsPage, ProgressPage, TodayPage } from '../../src/pages/AppPages'
 import '../../src/index.css'
 
 const fixtureUserId = 'e2e-user'
 const scenario = new URLSearchParams(window.location.search).get('scenario')
 const challengeId = 'e2e-challenge'
 const isProgress = scenario === 'progress'
-const isMember = scenario === 'member' || isProgress
+const isGoals = scenario?.startsWith('goals') ?? false
+const isMember = scenario === 'member' || isProgress || isGoals
 const hasChallenge = scenario !== 'no-challenge'
+const goalScenarios = {
+  goals: { current: 88.4, starting: 92, target: 80 },
+  'goals-gain': { current: 75, starting: 70, target: 80 },
+  'goals-maintenance': { current: 79.9, starting: 80, target: 80 },
+  'goals-beyond': { current: 75, starting: 100, target: 80 },
+  'goals-empty': { current: null, starting: 92, target: 80 },
+} as const
+const goalScenario = isGoals
+  ? goalScenarios[scenario as keyof typeof goalScenarios]
+  : null
 
 function dateOnly(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
@@ -39,7 +50,7 @@ localStorage.setItem(
             ownerId: isMember ? 'e2e-owner' : fixtureUserId,
             startDate: '2026-09-17',
             status: 'active',
-            targetWeightKg: 80,
+            targetWeightKg: isGoals ? 65 : 80,
             updatedAt: '2026-09-17T10:00:00.000Z',
           },
         ]
@@ -57,9 +68,9 @@ localStorage.setItem(
             displayName: 'E2E member',
             id: 'e2e-participant',
             joinedAt: '2026-09-17T10:00:00.000Z',
-            startingWeightKg: 92,
+            startingWeightKg: goalScenario?.starting ?? 92,
             status: 'active',
-            targetWeightKg: 80,
+            targetWeightKg: goalScenario?.target ?? 80,
             userId: fixtureUserId,
           },
           {
@@ -81,26 +92,37 @@ localStorage.setItem(
   'slimpossible.local.weigh-ins',
   JSON.stringify(
     isMember
-      ? [
-          {
-            date: isProgress ? dateOnly(previousWeekEntryDate) : '2026-09-20',
-            note: 'Older fixture note',
-            participantId: 'e2e-participant',
-            weightKg: 90,
-          },
-          {
-            date: isProgress ? currentWeekEntryDate : '2026-09-28',
-            note: 'E2E private note for the signed-in participant.',
-            participantId: 'e2e-participant',
-            weightKg: 88.4,
-          },
-          {
-            date: '2026-09-28',
-            note: 'Other participant private note must not appear.',
-            participantId: 'e2e-other-participant',
-            weightKg: 76.2,
-          },
-        ]
+      ? isGoals
+        ? goalScenario?.current === null
+          ? []
+          : [
+              {
+                date: currentWeekEntryDate,
+                note: 'E2E private goal note.',
+                participantId: 'e2e-participant',
+                weightKg: goalScenario?.current ?? 88.4,
+              },
+            ]
+        : [
+            {
+              date: isProgress ? dateOnly(previousWeekEntryDate) : '2026-09-20',
+              note: 'Older fixture note',
+              participantId: 'e2e-participant',
+              weightKg: 90,
+            },
+            {
+              date: isProgress ? currentWeekEntryDate : '2026-09-28',
+              note: 'E2E private note for the signed-in participant.',
+              participantId: 'e2e-participant',
+              weightKg: 88.4,
+            },
+            {
+              date: '2026-09-28',
+              note: 'Other participant private note must not appear.',
+              participantId: 'e2e-other-participant',
+              weightKg: 76.2,
+            },
+          ]
       : [],
   ),
 )
@@ -123,9 +145,11 @@ createRoot(document.getElementById('root')!).render(
   <AuthContext.Provider value={authValue}>
     <MemoryRouter
       initialEntries={
-        isProgress
-          ? [`/progress?challenge=${challengeId}`]
-          : [isMember ? `/today?challenge=${challengeId}` : '/today']
+        isGoals
+          ? [`/goals?challenge=${challengeId}`]
+          : isProgress
+            ? [`/progress?challenge=${challengeId}`]
+            : [isMember ? `/today?challenge=${challengeId}` : '/today']
       }
     >
       <AppLayout>
@@ -133,6 +157,7 @@ createRoot(document.getElementById('root')!).render(
           <Route element={<ProtectedRoute />}>
             <Route path="/today" element={<TodayPage />} />
             <Route path="/progress" element={<ProgressPage />} />
+            <Route path="/goals" element={<GoalsPage />} />
           </Route>
           <Route
             path="/challenge/participants/enroll"
