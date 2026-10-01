@@ -1899,10 +1899,10 @@ export function GoalsPage() {
   }, [data])
 
   return (
-    <section className="mx-auto w-full max-w-4xl" aria-labelledby="goals-title">
-      <Card className="p-8 sm:p-12">
+    <section className="mx-auto w-full max-w-6xl" aria-labelledby="goals-title">
+      <Card className="p-5 sm:p-8 lg:p-10">
         <PageHeader
-          description="Your saved challenge target and milestone progress."
+          description="Your personal starting weight, target, and milestones for the selected challenge."
           title="Goals"
           titleId="goals-title"
         >
@@ -1920,6 +1920,13 @@ export function GoalsPage() {
               celebrationAnnouncement={celebrationAnnouncement}
               direction={data.flow.dashboard.progressState.direction}
               milestones={createParticipantMilestones(data.flow.dashboard)}
+              personalGoal={{
+                currentWeightKg: data.flow.dashboard.currentWeightKg,
+                remainingWeightKg: data.flow.dashboard.remainingTargetWeightKg,
+                startingWeightKg: data.flow.dashboard.startingWeightKg,
+                statusLabel: data.flow.progressSummary.statusLabel,
+                targetWeightKg: data.flow.dashboard.targetWeightKg,
+              }}
             />
           ) : null}
         </DashboardState>
