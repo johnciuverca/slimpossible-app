@@ -288,16 +288,27 @@ describe('HomePage', () => {
     fetchMock.mockResolvedValueOnce(response([]))
     renderSignedIn(fetchMock)
 
-    const enroll = await screen.findByRole('link', {
+    const enrollLinks = await screen.findAllByRole('link', {
       name: 'Enroll yourself',
     })
-    expect(enroll).toHaveAttribute(
-      'href',
-      '/challenge/participants/enroll?challenge=challenge-1&self=owner',
+    expect(enrollLinks).toHaveLength(2)
+    enrollLinks.forEach((enrollLink) =>
+      expect(enrollLink).toHaveAttribute(
+        'href',
+        '/challenge/participants/enroll?challenge=challenge-1&self=owner',
+      ),
     )
     expect(
-      screen.getByRole('link', { name: 'Invite participants' }),
-    ).toHaveAttribute('href', '/challenge/invites?challenge=challenge-1')
+      screen.getAllByRole('link', { name: 'Invite participants' }),
+    ).toHaveLength(2)
+    screen
+      .getAllByRole('link', { name: 'Invite participants' })
+      .forEach((inviteLink) =>
+        expect(inviteLink).toHaveAttribute(
+          'href',
+          '/challenge/invites?challenge=challenge-1',
+        ),
+      )
     expect(
       screen.queryByRole('link', { name: 'Today' }),
     ).not.toBeInTheDocument()
@@ -403,6 +414,9 @@ describe('HomePage', () => {
     expect(
       screen.queryByRole('link', { name: 'Set up another challenge' }),
     ).not.toBeInTheDocument()
+    expect(screen.queryByText('My steady goal')).not.toBeInTheDocument()
+    expect(screen.queryByText('Autumn Reset')).not.toBeInTheDocument()
+    expect(screen.queryByText('91.8 kg')).not.toBeInTheDocument()
   })
 
   it('preserves a directly loaded selection and updates navigation when changed', async () => {
@@ -445,17 +459,22 @@ describe('HomePage', () => {
     })
     expect(winter).toHaveAttribute('aria-pressed', 'true')
     expect(
-      screen.getByRole('link', { name: 'Enroll yourself' }),
-    ).toHaveAttribute(
-      'href',
-      '/challenge/participants/enroll?challenge=challenge-2&self=owner',
-    )
+      screen.getAllByRole('link', { name: 'Enroll yourself' }),
+    ).toHaveLength(2)
+    screen
+      .getAllByRole('link', { name: 'Enroll yourself' })
+      .forEach((enrollLink) =>
+        expect(enrollLink).toHaveAttribute(
+          'href',
+          '/challenge/participants/enroll?challenge=challenge-2&self=owner',
+        ),
+      )
     fireEvent.click(screen.getByRole('button', { name: /Autumn challenge/ }))
     expect(
       screen.getByRole('button', { name: /Autumn challenge/ }),
     ).toHaveAttribute('aria-pressed', 'true')
     expect(
-      screen.getByRole('link', { name: 'Enroll yourself' }),
+      screen.getAllByRole('link', { name: 'Enroll yourself' })[0],
     ).toHaveAttribute(
       'href',
       '/challenge/participants/enroll?challenge=challenge-1&self=owner',
@@ -482,6 +501,29 @@ describe('HomePage', () => {
     expect(
       screen.queryByRole('link', { name: 'Set up a challenge' }),
     ).not.toBeInTheDocument()
+  })
+
+  it('keeps owner invites available when the owner is also an active member', async () => {
+    const fetchMock = vi.fn()
+    dashboardResponses().forEach((item) =>
+      fetchMock.mockResolvedValueOnce(item),
+    )
+    fetchMock.mockResolvedValueOnce(groupProgressResponse())
+    renderSignedIn(fetchMock)
+
+    await screen.findByRole('heading', { name: 'Your latest weigh-in' })
+    const actions = screen.getByRole('navigation', {
+      name: 'Selected challenge actions',
+    })
+    expect(
+      within(actions).getByRole('link', { name: 'Invite participants' }),
+    ).toHaveAttribute('href', '/challenge/invites?challenge=challenge-1')
+    expect(
+      screen.getByRole('link', { name: 'Set up another challenge' }),
+    ).toHaveAttribute('href', '/challenge/setup')
+    expect(
+      within(actions).getByRole('link', { name: 'Group progress' }),
+    ).toHaveAttribute('href', '/group?challenge=challenge-1')
   })
 
   it('renders Today from the selected participant and saved weigh-ins', async () => {
