@@ -1681,7 +1681,7 @@ export function GroupDashboardPage() {
                 aria-describedby="group-history-unavailable-copy"
                 aria-disabled="true"
                 aria-labelledby="group-history-heading"
-                className="rounded-2xl border border-dashed border-stone-300 bg-stone-50 p-5 opacity-70 sm:p-7"
+                className="rounded-2xl border border-dashed border-stone-300 bg-stone-50 p-5 sm:p-7"
               >
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-600">
                   Not available yet · Chapter 16

@@ -140,6 +140,55 @@ for (const viewport of [
     })
     await expect(historyPanel).toHaveAttribute('aria-disabled', 'true')
     await expect(historyPanel).toContainText('Not available yet · Chapter 16')
+    const contrast = await historyPanel.evaluate((panel) => {
+      const label = panel.querySelector('p')
+      const body = panel.querySelector('#group-history-unavailable-copy')
+      if (!label || !body) {
+        throw new Error('Unavailable history label or body copy is missing')
+      }
+
+      const parseRgb = (value: string) => {
+        const canvas = document.createElement('canvas')
+        const context = canvas.getContext('2d')
+        if (!context) {
+          throw new Error('Canvas context is unavailable for color contrast')
+        }
+        context.fillStyle = value
+        context.fillRect(0, 0, 1, 1)
+        return Array.from(context.getImageData(0, 0, 1, 1).data.slice(0, 3))
+      }
+      const luminance = ([red, green, blue]: number[]) => {
+        const linearize = (channel: number) => {
+          const normalized = channel / 255
+          return normalized <= 0.04045
+            ? normalized / 12.92
+            : ((normalized + 0.055) / 1.055) ** 2.4
+        }
+        return (
+          0.2126 * linearize(red) +
+          0.7152 * linearize(green) +
+          0.0722 * linearize(blue)
+        )
+      }
+      const ratio = (foreground: string, background: string) => {
+        const values = [
+          luminance(parseRgb(foreground)),
+          luminance(parseRgb(background)),
+        ]
+        const [lighter, darker] = values.sort((first, second) => second - first)
+        return (lighter + 0.05) / (darker + 0.05)
+      }
+      const background = getComputedStyle(panel).backgroundColor
+
+      return {
+        body: ratio(getComputedStyle(body).color, background),
+        label: ratio(getComputedStyle(label).color, background),
+        opacity: Number(getComputedStyle(panel).opacity),
+      }
+    })
+    expect(contrast.opacity).toBe(1)
+    expect(contrast.label).toBeGreaterThanOrEqual(4.5)
+    expect(contrast.body).toBeGreaterThanOrEqual(4.5)
     await expect(historyPanel.getByRole('img')).toHaveCount(0)
     await expect(historyPanel.getByRole('table')).toHaveCount(0)
     await expect(historyPanel.getByRole('button')).toHaveCount(0)
