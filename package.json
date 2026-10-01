@@ -10,7 +10,7 @@
     "format:check": "prettier . --check",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --config playwright.config.ts && playwright test --config playwright.group.config.ts",
     "typecheck": "tsc -b",
     "preview": "vite preview"
   },

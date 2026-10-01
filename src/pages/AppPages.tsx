@@ -102,6 +102,8 @@ type PersonalDashboardData = {
 
 type GroupDashboardData = {
   challenge: Challenge
+  provisionalLeader: ProvisionalGroupLeaderSummary | null
+  provisionalLeaderState: 'error' | 'loading' | 'ready'
   summary: GroupProgressSummary
 }
 
@@ -1257,6 +1259,8 @@ export function GroupDashboardPage() {
     let isCurrent = true
 
     async function loadGroupDashboard() {
+      setData(null)
+      setWeeklyAnnouncement('')
       if (authState.status !== 'signed-in' || !ownerId) {
         setData(null)
         setChallenges([])
@@ -1324,12 +1328,55 @@ export function GroupDashboardPage() {
         setMessageTone('error')
       } else {
         const weeklyCelebration = createSavedWeeklyWinCelebration(result.data)
-        setData({ challenge, summary: result.data })
+        setData({
+          challenge,
+          provisionalLeader: null,
+          provisionalLeaderState: 'loading',
+          summary: result.data,
+        })
         setWeeklyAnnouncement(
           reconcileWeeklyWinCelebration(ownerId, weeklyCelebration),
         )
         setMessage('')
         setMessageTone('info')
+        setIsLoading(false)
+
+        try {
+          const provisionalResult =
+            await persistence.repositories.groupProgress.getProvisionalLeader(
+              challenge.id,
+              localDateOnly(),
+            )
+          if (!isCurrent) return
+
+          if (
+            provisionalResult.state === 'success' &&
+            provisionalResult.data.challengeId === challenge.id
+          ) {
+            setData((currentData) =>
+              currentData?.challenge.id === challenge.id
+                ? {
+                    ...currentData,
+                    provisionalLeader: provisionalResult.data,
+                    provisionalLeaderState: 'ready',
+                  }
+                : currentData,
+            )
+          } else {
+            setData((currentData) =>
+              currentData?.challenge.id === challenge.id
+                ? { ...currentData, provisionalLeaderState: 'error' }
+                : currentData,
+            )
+          }
+        } catch {
+          if (!isCurrent) return
+          setData((currentData) =>
+            currentData?.challenge.id === challenge.id
+              ? { ...currentData, provisionalLeaderState: 'error' }
+              : currentData,
+          )
+        }
       }
       setIsLoading(false)
     }
@@ -1341,35 +1388,61 @@ export function GroupDashboardPage() {
   }, [authState.status, challengeParam, ownerId, persistence, reloadKey])
 
   const summary = data?.summary
+  const provisionalLeader = data?.provisionalLeader
   const weeklyCelebration = summary
     ? createSavedWeeklyWinCelebration(summary)
     : null
   const challengeQuery = data
     ? `?challenge=${encodeURIComponent(data.challenge.id)}`
     : ''
+  const selectedChallengeId =
+    (challengeParam && challenges.some(({ id }) => id === challengeParam)
+      ? challengeParam
+      : null) ??
+    data?.challenge.id ??
+    challenges[0]?.id ??
+    ''
+  const selectedChallenge = challenges.find(
+    ({ id }) => id === selectedChallengeId,
+  )
+
+  function formatDate(date: string) {
+    const parsedDate = new Date(`${date}T00:00:00`)
+    return Number.isNaN(parsedDate.getTime())
+      ? date
+      : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(
+          parsedDate,
+        )
+  }
 
   return (
-    <section className="mx-auto w-full max-w-4xl" aria-labelledby="group-title">
-      <Card className="p-8 sm:p-12">
+    <section className="mx-auto w-full max-w-6xl" aria-labelledby="group-title">
+      <Card className="p-5 sm:p-8 lg:p-10">
         <PageHeader
-          description="Shared group progress and weekly winners. Individual weigh-in histories and private notes stay private."
+          description="Shared summary, this week’s provisional leader, and Sunday-based results for the selected challenge. Individual histories and private notes stay private."
           title="Group dashboard"
           titleId="group-title"
         >
-          <StatusPill>{data?.challenge.name ?? 'Shared progress'}</StatusPill>
+          <StatusPill>
+            {selectedChallenge?.name ??
+              data?.challenge.name ??
+              'Shared progress'}
+          </StatusPill>
         </PageHeader>
         <div className="mt-6 flex flex-wrap items-end gap-4">
-          {data ? (
+          {challenges.length > 0 ? (
             <label className="min-w-56 flex-1 text-sm font-semibold text-slate-700">
               Selected challenge
               <select
                 className="mt-2 block w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-slate-900 focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-100"
                 onChange={(event) => {
+                  setData(null)
+                  setIsLoading(true)
                   const nextParams = new URLSearchParams(searchParams)
                   nextParams.set('challenge', event.target.value)
                   setSearchParams(nextParams)
                 }}
-                value={data.challenge.id}
+                value={selectedChallengeId}
               >
                 {challenges.map((challenge) => (
                   <option key={challenge.id} value={challenge.id}>
@@ -1380,7 +1453,7 @@ export function GroupDashboardPage() {
             </label>
           ) : null}
           <button
-            className="rounded-xl border border-stone-300 px-4 py-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+            className="min-h-11 rounded-xl border border-stone-300 px-4 py-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
             onClick={() => setReloadKey((value) => value + 1)}
             type="button"
           >
@@ -1393,89 +1466,244 @@ export function GroupDashboardPage() {
           messageTone={messageTone}
         >
           {summary ? (
-            <div className="mt-8 space-y-8">
+            <div className="mt-8 space-y-6">
+              <div className="grid gap-5 lg:grid-cols-2">
+                <section
+                  aria-labelledby="provisional-leader-heading"
+                  className="min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 sm:p-7"
+                >
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-800">
+                    This week
+                  </p>
+                  <h2
+                    className="mt-2 text-xl font-bold text-slate-950"
+                    id="provisional-leader-heading"
+                  >
+                    Provisional leader
+                  </h2>
+                  {data.provisionalLeaderState === 'loading' ? (
+                    <p className="mt-4 text-sm text-slate-700" role="status">
+                      Loading this week’s group update…
+                    </p>
+                  ) : data.provisionalLeaderState === 'error' ? (
+                    <p className="mt-4 text-sm text-slate-700" role="status">
+                      Provisional group progress is unavailable right now.
+                    </p>
+                  ) : provisionalLeader?.state === 'leaders' ? (
+                    <>
+                      <p className="mt-3 text-sm text-slate-700">
+                        Comparing check-ins since Sunday{' '}
+                        <time dateTime={provisionalLeader.previousSunday}>
+                          {formatDate(provisionalLeader.previousSunday)}
+                        </time>
+                        ; this week runs{' '}
+                        <time dateTime={provisionalLeader.currentWeekStart}>
+                          {formatDate(provisionalLeader.currentWeekStart)}
+                        </time>{' '}
+                        to{' '}
+                        <time dateTime={provisionalLeader.currentWeekEnd}>
+                          {formatDate(provisionalLeader.currentWeekEnd)}
+                        </time>
+                        .
+                      </p>
+                      <p className="mt-4 text-lg font-bold text-slate-950">
+                        {provisionalLeader.leaderCount > 1
+                          ? 'Shared provisional leaders'
+                          : 'Current provisional leader'}
+                      </p>
+                      <ul
+                        aria-label="Provisional leaders"
+                        className="mt-2 space-y-2"
+                      >
+                        {provisionalLeader.leaderNames.map((name, index) => (
+                          <li
+                            className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-xl bg-white/80 px-4 py-3"
+                            key={`${name}-${index}`}
+                          >
+                            <span className="font-semibold text-slate-950">
+                              {name}
+                            </span>
+                            <span className="text-sm text-slate-600">
+                              Latest check-in{' '}
+                              <time
+                                dateTime={
+                                  provisionalLeader.leaderLatestDates[index]
+                                }
+                              >
+                                {formatDate(
+                                  provisionalLeader.leaderLatestDates[index],
+                                )}
+                              </time>
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="mt-3 text-sm leading-6 text-slate-700">
+                        {provisionalLeader.eligibleParticipantCount} of{' '}
+                        {provisionalLeader.activeParticipantCount} active
+                        members have both comparison check-ins. Ties are shared;
+                        this result is provisional until Sunday.
+                      </p>
+                    </>
+                  ) : provisionalLeader?.state === 'no-eligible-candidates' ? (
+                    <p className="mt-4 text-sm leading-6 text-slate-700">
+                      No provisional leader is available yet. A member needs a
+                      saved check-in on Sunday{' '}
+                      <time dateTime={provisionalLeader.previousSunday}>
+                        {formatDate(provisionalLeader.previousSunday)}
+                      </time>{' '}
+                      and one during this week. The result updates as saved
+                      check-ins change.
+                    </p>
+                  ) : (
+                    <p className="mt-4 text-sm leading-6 text-slate-700">
+                      {provisionalLeader?.activeParticipantCount === 0
+                        ? 'No active members are available for a provisional result.'
+                        : 'At least two active members are needed for a provisional group result.'}
+                    </p>
+                  )}
+                </section>
+
+                <section
+                  aria-labelledby="weekly-winners-heading"
+                  className="min-w-0 rounded-2xl border border-stone-200 bg-white p-5 sm:p-7"
+                >
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-800">
+                    Weekly highlights
+                  </p>
+                  <h2
+                    className="mt-2 text-xl font-bold text-slate-950"
+                    id="weekly-winners-heading"
+                  >
+                    Weekly result
+                  </h2>
+                  <p className="mt-2 text-sm text-slate-600">
+                    Based on consecutive Sunday check-ins:{' '}
+                    <time dateTime={summary.previousSunday}>
+                      {formatDate(summary.previousSunday)}
+                    </time>{' '}
+                    to{' '}
+                    <time dateTime={summary.currentSunday}>
+                      {formatDate(summary.currentSunday)}
+                    </time>
+                    .
+                  </p>
+                  {weeklyAnnouncement ? (
+                    <p aria-live="polite" className="sr-only" role="status">
+                      {weeklyAnnouncement}
+                    </p>
+                  ) : null}
+                  <p className="mt-4 text-sm font-semibold text-slate-900">
+                    {weeklyCelebration?.state === 'shared-winners'
+                      ? 'Shared weekly winners'
+                      : weeklyCelebration?.state === 'single-winner'
+                        ? 'Weekly winner'
+                        : 'No weekly winner yet'}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-700">
+                    {weeklyCelebration?.message}
+                  </p>
+                  {weeklyCelebration &&
+                  weeklyCelebration.state !== 'no-eligible-candidates' ? (
+                    <ul aria-label="Weekly winners" className="mt-3 space-y-2">
+                      {weeklyCelebration.winnerNames.map((name, index) => (
+                        <li
+                          className="rounded-xl bg-emerald-50 px-4 py-3 font-semibold text-slate-900"
+                          key={`${name}-${index}`}
+                        >
+                          {name}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </section>
+              </div>
+
               <section aria-labelledby="group-progress-heading">
-                <h2 className="text-xl font-bold" id="group-progress-heading">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-800">
+                  Selected challenge
+                </p>
+                <h2
+                  className="mt-2 text-xl font-bold text-slate-950"
+                  id="group-progress-heading"
+                >
                   Group progress
                 </h2>
-                <p className="mt-2 text-sm text-slate-600">
+                <p className="mt-2 text-sm leading-6 text-slate-600">
                   {summary.participantsWithRecordedWeightCount} of{' '}
-                  {summary.activeParticipantCount} active participants have a
-                  recorded weigh-in. These are aggregate counts only.
+                  {summary.activeParticipantCount} active members have a saved
+                  weigh-in. Only permitted group totals are shown here.
                 </p>
-                <div className="mt-5 grid gap-4 sm:grid-cols-3">
-                  <Card className="border border-stone-200 p-5 shadow-none">
-                    <p className="text-sm text-slate-600">Active members</p>
-                    <p className="mt-2 text-2xl font-bold">
+                <dl className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="min-w-0 rounded-2xl border border-stone-200 bg-white p-5">
+                    <dt className="text-sm font-semibold text-slate-600">
+                      Active members
+                    </dt>
+                    <dd className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
                       {summary.activeParticipantCount}
-                    </p>
-                  </Card>
-                  <Card className="border border-stone-200 p-5 shadow-none">
-                    <p className="text-sm text-slate-600">
+                    </dd>
+                  </div>
+                  <div className="min-w-0 rounded-2xl border border-stone-200 bg-white p-5">
+                    <dt className="text-sm font-semibold text-slate-600">
                       Average goal progress
-                    </p>
-                    <p className="mt-2 text-2xl font-bold">
+                    </dt>
+                    <dd className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
                       {summary.averageCompletionPercentage === null
                         ? '—'
                         : `${summary.averageCompletionPercentage}%`}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Across {summary.participantsWithProgressCount} members
-                      with a recorded weight
-                    </p>
-                  </Card>
-                  <Card className="border border-stone-200 p-5 shadow-none">
-                    <p className="text-sm text-slate-600">Goals reached</p>
-                    <p className="mt-2 text-2xl font-bold">
+                    </dd>
+                    <dd className="mt-1 text-sm text-slate-600">
+                      {summary.averageCompletionPercentage === null
+                        ? 'Available after goal progress is recorded'
+                        : `Across ${summary.participantsWithProgressCount} members`}
+                    </dd>
+                  </div>
+                  <div className="min-w-0 rounded-2xl border border-stone-200 bg-white p-5">
+                    <dt className="text-sm font-semibold text-slate-600">
+                      Members with a saved weigh-in
+                    </dt>
+                    <dd className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
+                      {summary.participantsWithRecordedWeightCount}
+                    </dd>
+                  </div>
+                  <div className="min-w-0 rounded-2xl border border-stone-200 bg-white p-5">
+                    <dt className="text-sm font-semibold text-slate-600">
+                      Goals reached
+                    </dt>
+                    <dd className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
                       {summary.reachedTargetCount}
-                    </p>
-                  </Card>
-                </div>
+                    </dd>
+                  </div>
+                </dl>
               </section>
 
               <section
-                aria-labelledby="weekly-winners-heading"
-                className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5"
+                aria-describedby="group-history-unavailable-copy"
+                aria-disabled="true"
+                aria-labelledby="group-history-heading"
+                className="rounded-2xl border border-dashed border-stone-300 bg-stone-50 p-5 sm:p-7"
               >
-                <h2 className="text-xl font-bold" id="weekly-winners-heading">
-                  Weekly winners
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-600">
+                  Not available yet · Chapter 16
+                </p>
+                <h2
+                  className="mt-2 text-xl font-bold text-slate-800"
+                  id="group-history-heading"
+                >
+                  Group chart and weigh-in history
                 </h2>
-                <p className="mt-2 text-sm text-slate-700">
-                  Based on consecutive Sunday weigh-ins:{' '}
-                  {summary.previousSunday} to {summary.currentSunday}.
+                <p
+                  className="mt-2 max-w-3xl text-sm leading-6 text-slate-700"
+                  id="group-history-unavailable-copy"
+                >
+                  Individual weigh-in histories and chart lines are not shown.
+                  This panel stays unavailable until Chapter 16 defines the
+                  authorized group-history feature.
                 </p>
-                {weeklyAnnouncement ? (
-                  <p aria-live="polite" className="sr-only" role="status">
-                    {weeklyAnnouncement}
-                  </p>
-                ) : null}
-                <p className="mt-4 text-sm font-semibold text-slate-900">
-                  {weeklyCelebration?.state === 'shared-winners'
-                    ? 'Shared weekly winners'
-                    : weeklyCelebration?.state === 'single-winner'
-                      ? 'Weekly winner'
-                      : 'Weekly result'}
-                </p>
-                <p className="mt-4 text-sm text-slate-700">
-                  {weeklyCelebration?.message}
-                </p>
-                {weeklyCelebration &&
-                weeklyCelebration.state !== 'no-eligible-candidates' ? (
-                  <ul className="mt-2 list-inside list-disc text-slate-800">
-                    {weeklyCelebration.winnerNames.map((name, index) => (
-                      <li key={`${name}-${index}`}>{name}</li>
-                    ))}
-                  </ul>
-                ) : null}
               </section>
 
-              <p className="text-xs leading-5 text-slate-500">
-                Winner results are recalculated from saved Sunday entries
-                whenever this view refreshes. Private notes and individual
-                weigh-in histories are not included in the group response.
-              </p>
               <Link
-                className="inline-block text-sm font-semibold text-emerald-700 underline"
+                className="inline-flex min-h-11 items-center text-sm font-semibold text-emerald-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
                 to={`/challenge/invites${challengeQuery}`}
               >
                 Invite participants
