@@ -542,13 +542,13 @@ export function HomePage() {
         className="mx-auto w-full max-w-6xl"
         aria-labelledby="home-title"
       >
-        <Card className="grid overflow-hidden p-0 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="p-7 sm:p-10 lg:p-12">
+        <Card className="grid overflow-hidden border-forest-200 p-0 lg:grid-cols-[1.25fr_0.75fr]">
+          <div className="flex flex-col justify-between gap-8 bg-gradient-to-br from-forest-50 via-panel to-forest-100 p-7 sm:p-10 lg:p-12">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest-700">
               A steadier way forward
             </p>
             <h1
-              className="mt-4 text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl"
+              className="mt-4 text-3xl font-extrabold leading-tight tracking-tight text-ink sm:text-4xl"
               id="home-title"
             >
               Keep showing up. It adds up.
@@ -572,8 +572,8 @@ export function HomePage() {
               </Link>
             </div>
           </div>
-          <div className="flex min-h-52 items-center bg-forest-800 p-7 text-white sm:p-10 lg:p-12">
-            <p className="max-w-sm text-lg leading-7 text-forest-50">
+          <div className="flex min-h-52 items-center border-t border-line bg-panel p-7 sm:p-10 lg:border-l lg:border-t-0 lg:p-12">
+            <p className="max-w-sm text-lg leading-7 text-ink-muted">
               Personal weigh-ins stay in your view. Only authorized, shared
               summaries appear with a group.
             </p>
@@ -653,6 +653,11 @@ export function HomePage() {
         ['Group progress', `/group${challengeQuery}`],
         ['Goals', `/goals${challengeQuery}`],
         ['Record a weigh-in', `/weigh-ins${challengeQuery}`],
+        ...(isOwner
+          ? ([
+              ['Invite participants', `/challenge/invites${challengeQuery}`],
+            ] as [string, string][])
+          : []),
       ]
     : isOwner && selectedChallenge
       ? [
@@ -663,47 +668,71 @@ export function HomePage() {
           ['Invite participants', `/challenge/invites${challengeQuery}`],
         ]
       : []
+  const heroActions: [string, string][] = isActiveMember
+    ? [
+        ['Record a weigh-in', `/weigh-ins${challengeQuery}`],
+        ['View my progress', `/progress${challengeQuery}`],
+      ]
+    : isOwner && selectedChallenge
+      ? [
+          [
+            'Enroll yourself',
+            `/challenge/participants/enroll?challenge=${encodeURIComponent(selectedChallenge.id)}&self=owner`,
+          ],
+          ['Invite participants', `/challenge/invites${challengeQuery}`],
+        ]
+      : selectedChallenge
+        ? []
+        : [['Set up a challenge', '/challenge/setup']]
 
   return (
     <section
-      className="mx-auto w-full max-w-6xl space-y-8"
+      className="mx-auto flex w-full max-w-6xl flex-col gap-8"
       aria-labelledby="home-title"
     >
-      <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <Card className="flex flex-col justify-between gap-8 overflow-hidden bg-forest-800 p-7 text-white sm:p-10 lg:p-12">
+      <div className="order-1 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+        <Card className="flex min-h-[240px] flex-col justify-between gap-8 overflow-hidden border-forest-200 bg-gradient-to-br from-forest-50 via-panel to-forest-100 p-7 sm:p-10 lg:p-12">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest-100">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest-700">
               {selectedChallenge ? 'Your challenge' : 'Your overview'}
             </p>
             <h1
-              className="mt-4 max-w-2xl text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl"
+              className="mt-4 max-w-2xl text-3xl font-extrabold leading-tight tracking-tight text-ink sm:text-4xl"
               id="home-title"
             >
-              Keep showing up. It adds up.
+              Keep showing up.
+              <span className="block text-forest-700">It adds up.</span>
             </h1>
-            <p className="mt-4 max-w-xl text-base leading-7 text-forest-50">
+            <p className="mt-4 max-w-xl text-base leading-7 text-ink-muted">
               {selectedChallenge
                 ? 'Your personal progress stays yours. Shared group information appears only when your membership allows it.'
                 : 'Set up a challenge or join one with an invitation to see your saved progress here.'}
             </p>
           </div>
-          {!selectedChallenge ? (
+          {heroActions.length ? (
             <div className="flex flex-wrap gap-3">
-              <Link
-                className="inline-flex min-h-11 items-center rounded-xl bg-white px-5 py-3 text-sm font-bold text-forest-900 hover:bg-forest-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-                to="/challenge/setup"
-              >
-                Set up a challenge
-              </Link>
+              {heroActions.map(([label, href], index) => (
+                <Link
+                  className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-5 py-3 text-sm font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700 ${index === 0 ? 'bg-forest-800 text-white hover:bg-forest-900' : 'border border-line bg-panel text-forest-800 hover:bg-forest-50'}`}
+                  key={href}
+                  to={href}
+                >
+                  {label}
+                  <span aria-hidden="true">→</span>
+                </Link>
+              ))}
             </div>
           ) : null}
         </Card>
 
         <article className={panelClass} aria-labelledby="latest-entry-title">
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest-700">
-            Private view
+            Your latest · private view
           </p>
-          <h2 className="mt-2 text-lg font-bold" id="latest-entry-title">
+          <h2
+            className="mt-2 text-lg font-bold text-ink"
+            id="latest-entry-title"
+          >
             Your latest weigh-in
           </h2>
           {isOverviewLoading ? (
@@ -712,7 +741,7 @@ export function HomePage() {
             </p>
           ) : latestWeighIn ? (
             <>
-              <p className="mt-4 text-4xl font-extrabold tracking-tight">
+              <p className="mt-4 text-4xl font-extrabold tracking-tight text-ink">
                 {formatWeight(latestWeighIn.weightKg)}
               </p>
               <p className="mt-2 text-sm text-ink-muted">
@@ -740,7 +769,7 @@ export function HomePage() {
       </div>
 
       {challenges.length ? (
-        <section aria-labelledby="challenge-picker-title">
+        <section aria-labelledby="challenge-picker-title" className="order-3">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest-700">
@@ -768,19 +797,22 @@ export function HomePage() {
               return (
                 <button
                   aria-pressed={isSelected}
-                  className={`min-h-24 rounded-panel border p-4 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700 ${isSelected ? 'border-forest-700 bg-forest-50 shadow-panel' : 'border-line bg-panel hover:bg-page'}`}
+                  className={`flex min-h-36 w-full flex-col items-start justify-between gap-4 rounded-panel border p-5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700 ${isSelected ? 'border-forest-700 bg-forest-50 shadow-panel' : 'border-line bg-panel hover:border-forest-200 hover:bg-panel'}`}
                   key={challenge.id}
                   onClick={() => selectChallenge(challenge.id)}
                   type="button"
                 >
-                  <span className="block text-xs font-bold uppercase tracking-wide text-ink-muted">
+                  <span className="rounded-full bg-panel px-3 py-1 text-xs font-bold uppercase tracking-wide text-forest-800">
                     {challenge.ownerId === ownerId
                       ? 'Challenge owner'
                       : 'Joined challenge'}
-                    {isSelected ? ' · Selected' : ''}
                   </span>
-                  <span className="mt-2 block text-base font-bold text-ink">
+                  <span className="block text-lg font-bold text-ink">
                     {challenge.name}
+                  </span>
+                  <span className="flex w-full items-center justify-between border-t border-line pt-3 text-sm font-semibold text-forest-800">
+                    {isSelected ? 'Currently selected' : 'Select to view'}
+                    <span aria-hidden="true">→</span>
                   </span>
                 </button>
               )
@@ -788,7 +820,7 @@ export function HomePage() {
           </div>
         </section>
       ) : (
-        <FeedbackPanel className="w-full" tone="empty">
+        <FeedbackPanel className="order-3 w-full" tone="empty">
           No saved challenge is available for this account yet. Set up a
           challenge or join one with an invitation.
         </FeedbackPanel>
@@ -797,7 +829,7 @@ export function HomePage() {
       {selectedChallenge ? (
         <>
           {isActiveMember ? (
-            <section aria-labelledby="snapshot-title">
+            <section aria-labelledby="snapshot-title" className="order-2">
               <div className="mb-4">
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest-700">
                   Saved records only
@@ -865,7 +897,7 @@ export function HomePage() {
               )}
             </section>
           ) : (
-            <FeedbackPanel className="w-full" tone="info">
+            <FeedbackPanel className="order-4 w-full" tone="info">
               {isOwner
                 ? 'Enroll yourself to view personal and member summaries. You can still invite participants as the owner.'
                 : 'Personal and group summaries are available after you join this challenge.'}
@@ -873,7 +905,7 @@ export function HomePage() {
           )}
 
           {availableActions.length ? (
-            <section aria-labelledby="actions-title">
+            <section aria-labelledby="actions-title" className="order-5">
               <div className="mb-4">
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest-700">
                   Continue

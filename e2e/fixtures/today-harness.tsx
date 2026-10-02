@@ -10,6 +10,7 @@ import { ParticipantEnrollmentPage } from '../../src/pages/ParticipantEnrollment
 import {
   GoalsPage,
   GroupDashboardPage,
+  HomePage,
   ProgressPage,
   TodayPage,
 } from '../../src/pages/AppPages'
@@ -21,8 +22,34 @@ const challengeId = 'e2e-challenge'
 const isProgress = scenario === 'progress'
 const isGoals = scenario?.startsWith('goals') ?? false
 const isGroup = scenario === 'group'
-const isMember = scenario === 'member' || isProgress || isGoals || isGroup
-const hasChallenge = scenario !== 'no-challenge'
+const isHome = scenario?.startsWith('home-') ?? false
+const isHomeMulti = scenario === 'home-member-multi'
+const isHomeOwner =
+  scenario === 'home-owner' || scenario === 'home-owner-member'
+const isHomeSignedOut = scenario === 'home-signed-out'
+const homeChallengeIds = isHomeMulti
+  ? [challengeId, 'e2e-challenge-2']
+  : [challengeId]
+const initialHomeSelection = new URLSearchParams(window.location.search).get(
+  'selected',
+)
+const isMember =
+  scenario === 'member' ||
+  isProgress ||
+  isGoals ||
+  isGroup ||
+  scenario === 'home-member' ||
+  isHomeMulti ||
+  scenario === 'home-owner-member'
+const hasChallenge =
+  scenario !== 'no-challenge' &&
+  scenario !== 'home-no-challenge' &&
+  !isHomeSignedOut
+const challengeOwnerId = isHomeOwner
+  ? fixtureUserId
+  : isMember
+    ? 'e2e-owner'
+    : fixtureUserId
 const goalScenarios = {
   goals: { current: 88.4, starting: 92, target: 80 },
   'goals-gain': { current: 75, starting: 70, target: 80 },
@@ -46,20 +73,22 @@ localStorage.setItem(
   'slimpossible.local.challenges',
   JSON.stringify(
     hasChallenge
-      ? [
-          {
-            createdAt: '2026-09-17T10:00:00.000Z',
-            createdBy: isMember ? 'e2e-owner' : fixtureUserId,
-            endDate: '2026-10-17',
-            id: challengeId,
-            name: isMember ? 'E2E joined challenge' : 'E2E owner challenge',
-            ownerId: isMember ? 'e2e-owner' : fixtureUserId,
-            startDate: '2026-09-17',
-            status: 'active',
-            targetWeightKg: isGoals ? 65 : 80,
-            updatedAt: '2026-09-17T10:00:00.000Z',
-          },
-        ]
+      ? homeChallengeIds.map((id, index) => ({
+          createdAt: '2026-09-17T10:00:00.000Z',
+          createdBy: challengeOwnerId,
+          endDate: '2026-10-17',
+          id,
+          name: isHomeMulti
+            ? `E2E ${index === 0 ? 'Autumn' : 'Winter'} challenge`
+            : isMember
+              ? 'E2E joined challenge'
+              : 'E2E owner challenge',
+          ownerId: challengeOwnerId,
+          startDate: '2026-09-17',
+          status: 'active',
+          targetWeightKg: isGoals ? 65 : 80,
+          updatedAt: '2026-09-17T10:00:00.000Z',
+        }))
       : [],
   ),
 )
@@ -68,28 +97,32 @@ localStorage.setItem(
   JSON.stringify(
     isMember
       ? [
-          {
-            challengeId,
+          ...homeChallengeIds.map((currentChallengeId, index) => ({
+            challengeId: currentChallengeId,
             createdAt: '2026-09-17T10:00:00.000Z',
             displayName: 'E2E member',
-            id: 'e2e-participant',
+            id: index === 0 ? 'e2e-participant' : 'e2e-participant-2',
             joinedAt: '2026-09-17T10:00:00.000Z',
             startingWeightKg: goalScenario?.starting ?? 92,
             status: 'active',
             targetWeightKg: goalScenario?.target ?? 80,
             userId: fixtureUserId,
-          },
-          {
-            challengeId,
-            createdAt: '2026-09-17T10:00:00.000Z',
-            displayName: 'Another E2E member',
-            id: 'e2e-other-participant',
-            joinedAt: '2026-09-17T10:00:00.000Z',
-            startingWeightKg: 90,
-            status: 'active',
-            targetWeightKg: 75,
-            userId: 'e2e-other-user',
-          },
+          })),
+          ...(!isHomeMulti
+            ? [
+                {
+                  challengeId,
+                  createdAt: '2026-09-17T10:00:00.000Z',
+                  displayName: 'Another E2E member',
+                  id: 'e2e-other-participant',
+                  joinedAt: '2026-09-17T10:00:00.000Z',
+                  startingWeightKg: 90,
+                  status: 'active',
+                  targetWeightKg: 75,
+                  userId: 'e2e-other-user',
+                },
+              ]
+            : []),
         ]
       : [],
   ),
@@ -142,8 +175,10 @@ const authValue: AuthContextValue = {
   signUp: async () => undefined,
   state: {
     error: null,
-    status: 'signed-in',
-    user: { email: 'e2e-user@example.invalid', id: fixtureUserId },
+    status: isHomeSignedOut ? 'signed-out' : 'signed-in',
+    user: isHomeSignedOut
+      ? null
+      : { email: 'e2e-user@example.invalid', id: fixtureUserId },
   },
 }
 
@@ -151,17 +186,22 @@ createRoot(document.getElementById('root')!).render(
   <AuthContext.Provider value={authValue}>
     <MemoryRouter
       initialEntries={
-        isGoals
-          ? [`/goals?challenge=${challengeId}`]
-          : isProgress
-            ? [`/progress?challenge=${challengeId}`]
-            : isGroup
-              ? [`/group?challenge=${challengeId}`]
-              : [isMember ? `/today?challenge=${challengeId}` : '/today']
+        isHome
+          ? [
+              `/${initialHomeSelection ? `?challenge=${encodeURIComponent(initialHomeSelection)}` : ''}`,
+            ]
+          : isGoals
+            ? [`/goals?challenge=${challengeId}`]
+            : isProgress
+              ? [`/progress?challenge=${challengeId}`]
+              : isGroup
+                ? [`/group?challenge=${challengeId}`]
+                : [isMember ? `/today?challenge=${challengeId}` : '/today']
       }
     >
       <AppLayout>
         <Routes>
+          <Route path="/" element={<HomePage />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/today" element={<TodayPage />} />
             <Route path="/progress" element={<ProgressPage />} />
