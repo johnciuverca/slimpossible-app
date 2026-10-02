@@ -11,7 +11,7 @@ test('renders public client routes when loaded directly', async ({ page }) => {
   await page.goto('/weigh-ins')
 
   await expect(
-    page.getByRole('heading', { name: 'Daily weigh-in.' }),
+    page.getByRole('heading', { name: 'Record a weigh-in' }),
   ).toBeVisible()
   await expect(
     page.getByRole('form', { name: 'Daily weigh-in form' }),

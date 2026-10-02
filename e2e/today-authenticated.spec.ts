@@ -40,7 +40,7 @@ test('renders only the signed-in member latest weigh-in and private note', async
   await expect(recordLink).toBeFocused()
   await page.keyboard.press('Enter')
   await expect(
-    page.getByRole('heading', { name: 'Daily weigh-in.' }),
+    page.getByRole('heading', { name: 'Record a weigh-in' }),
   ).toBeVisible()
 })
 
