@@ -41,8 +41,90 @@ const groupProgressAuthorizationCheck = readFileSync(
   resolve(process.cwd(), 'supabase/tests/group_progress_authorization.sql'),
   'utf8',
 )
+const personalGroupChallengeMigration = readFileSync(
+  resolve(
+    process.cwd(),
+    'supabase/migrations/20261005000000_add_personal_group_challenge_kinds.sql',
+  ),
+  'utf8',
+)
+const personalGroupChallengeRollback = readFileSync(
+  resolve(
+    process.cwd(),
+    'supabase/rollback/20261005000000_add_personal_group_challenge_kinds.sql',
+  ),
+  'utf8',
+)
+const personalGroupChallengeAuthorizationCheck = readFileSync(
+  resolve(
+    process.cwd(),
+    'supabase/tests/personal_group_challenges_authorization.sql',
+  ),
+  'utf8',
+)
 
 describe('row-level security migration contract', () => {
+  it('adds personal/group context without rewriting legacy challenges', () => {
+    expect(personalGroupChallengeMigration).toMatch(
+      /add column challenge_kind text/i,
+    )
+    expect(personalGroupChallengeMigration).toMatch(
+      /challenge_kind is null or challenge_kind in \('personal', 'group'\)/i,
+    )
+    expect(personalGroupChallengeMigration).not.toMatch(/default\s+'group'/i)
+    expect(personalGroupChallengeMigration).not.toMatch(
+      /update\s+public\.challenges/i,
+    )
+    expect(personalGroupChallengeMigration).not.toMatch(/public\.weigh_ins/i)
+  })
+
+  it('keeps personal challenges owner-private and blocks group-sharing paths', () => {
+    expect(personalGroupChallengeMigration).toContain(
+      'personal_challenges_limit_participant_insert',
+    )
+    expect(personalGroupChallengeMigration).toContain(
+      'personal_challenges_limit_participant_update',
+    )
+    expect(personalGroupChallengeMigration).toContain('as restrictive')
+    expect(personalGroupChallengeMigration).toContain(
+      'participants.user_id <> auth.uid()',
+    )
+    expect(personalGroupChallengeMigration).toContain(
+      "challenge.challenge_kind is distinct from 'personal'",
+    )
+    expect(personalGroupChallengeMigration).toContain(
+      'personal_challenges_limit_participant_select',
+    )
+    expect(personalGroupChallengeMigration).toContain(
+      'create or replace function public.is_challenge_member',
+    )
+    expect(personalGroupChallengeMigration).toContain(
+      'prevent_challenge_kind_change',
+    )
+    expect(personalGroupChallengeMigration).toContain(
+      'prevent_personal_challenge_invites',
+    )
+    expect(personalGroupChallengeRollback).toContain(
+      "where challenge_kind = 'personal'",
+    )
+    expect(personalGroupChallengeRollback).toContain('Rollback refused')
+    expect(personalGroupChallengeRollback).toContain(
+      'create or replace function public.is_challenge_member',
+    )
+    expect(personalGroupChallengeAuthorizationCheck).toContain(
+      "('owner_creation_did_not_enroll_owner', visible_count = 0",
+    )
+    expect(personalGroupChallengeAuthorizationCheck).toContain(
+      "('member_cannot_read_personal_challenge', visible_count = 0",
+    )
+    expect(personalGroupChallengeAuthorizationCheck).toContain(
+      "('member_cannot_read_personal_participants', visible_count = 0",
+    )
+    expect(personalGroupChallengeAuthorizationCheck).toContain(
+      "('outsider_cannot_read_either_context', visible_count = 0",
+    )
+  })
+
   it('enables RLS on every application table', () => {
     expect(migration).toMatch(
       /alter table public\.profiles enable row level security/,

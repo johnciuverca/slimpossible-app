@@ -54,6 +54,21 @@ describe('AppLayout', () => {
     )
   })
 
+  it('preserves the selected challenge context on the brand and navigation links', () => {
+    renderLayout('/today?challenge=private%2Fplan', signedOut)
+
+    expect(screen.getByRole('link', { name: 'Slimpossible' })).toHaveAttribute(
+      'href',
+      '/?challenge=private%2Fplan',
+    )
+    for (const { label, path } of liveNavigation) {
+      expect(screen.getByRole('link', { name: label })).toHaveAttribute(
+        'href',
+        `${path}?challenge=private%2Fplan`,
+      )
+    }
+  })
+
   it.each(liveNavigation)(
     'identifies $label as the current page without color-only state',
     ({ label, path }) => {

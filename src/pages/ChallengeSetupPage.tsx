@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 
 import {
   Button,
@@ -10,7 +10,7 @@ import {
 } from '../components/ui'
 import { useOptionalAuth } from '../auth/useAuth'
 import { createPersistence } from '../data/persistence'
-import type { Challenge } from '../models/challenge'
+import type { Challenge, ChallengeKind } from '../models/challenge'
 
 type ChallengeSetupErrors = {
   endDate?: string
@@ -83,6 +83,9 @@ function validateChallengeSetup({
 }
 
 export function ChallengeSetupPage() {
+  const [searchParams] = useSearchParams()
+  const requestedKind: ChallengeKind =
+    searchParams.get('kind') === 'personal' ? 'personal' : 'group'
   const { state: authState } = useOptionalAuth()
   const ownerId =
     authState.status === 'signed-in' && authState.user.id
@@ -96,6 +99,7 @@ export function ChallengeSetupPage() {
     [authState.status, ownerId],
   )
   const [values, setValues] = useState(initialValues)
+  const [challengeKind, setChallengeKind] = useState(requestedKind)
   const [challenges, setChallenges] = useState<Challenge[]>([])
   const [selectedChallengeId, setSelectedChallengeId] = useState('')
   const [errors, setErrors] = useState<ChallengeSetupErrors>({})
@@ -202,6 +206,7 @@ export function ChallengeSetupPage() {
   function selectChallenge(id: string) {
     setSelectedChallengeId(id)
     const challenge = challenges.find((value) => value.id === id)
+    setChallengeKind(challenge?.kind ?? requestedKind)
     setValues(
       challenge
         ? {
@@ -269,7 +274,10 @@ export function ChallengeSetupPage() {
           selectedChallengeId,
           input,
         )
-      : await persistence.repositories.challenges.create(input)
+      : await persistence.repositories.challenges.create({
+          ...input,
+          kind: challengeKind,
+        })
 
     setIsSaving(false)
 
@@ -306,7 +314,7 @@ export function ChallengeSetupPage() {
     >
       <Card className="w-full p-8 sm:p-10">
         <PageHeader
-          description="Set the dates and details for a shared, sustainable challenge."
+          description="Create a private personal challenge or a group challenge you can organize with others."
           title="Set up your challenge."
           titleId="challenge-setup-title"
         >
@@ -365,6 +373,60 @@ export function ChallengeSetupPage() {
               No saved challenges yet. Create your first challenge below.
             </p>
           ) : null}
+
+          {!selectedChallengeId ? (
+            <fieldset className="rounded-2xl border border-stone-200 p-5">
+              <legend className="px-2 text-sm font-semibold text-slate-700">
+                Challenge context
+              </legend>
+              <div className="space-y-4">
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    checked={challengeKind === 'personal'}
+                    className="mt-1"
+                    name="challenge-kind"
+                    onChange={() => setChallengeKind('personal')}
+                    type="radio"
+                    value="personal"
+                  />
+                  <span>
+                    <span className="block font-semibold text-slate-900">
+                      Personal challenge (private)
+                    </span>
+                    <span className="mt-1 block text-sm leading-6 text-slate-600">
+                      Only you can access this challenge. Creating it does not
+                      enroll you; join explicitly to record your progress.
+                    </span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    checked={challengeKind === 'group'}
+                    className="mt-1"
+                    name="challenge-kind"
+                    onChange={() => setChallengeKind('group')}
+                    type="radio"
+                    value="group"
+                  />
+                  <span>
+                    <span className="block font-semibold text-slate-900">
+                      Group challenge
+                    </span>
+                    <span className="mt-1 block text-sm leading-6 text-slate-600">
+                      You will be the organizer. Inviting others and joining as
+                      a participant are separate, explicit actions.
+                    </span>
+                  </span>
+                </label>
+              </div>
+            </fieldset>
+          ) : (
+            <p className="text-sm text-slate-600" role="status">
+              This saved challenge is a{' '}
+              {challengeKind === 'personal' ? 'private personal' : 'group'}{' '}
+              context. Its kind cannot be changed here.
+            </p>
+          )}
 
           <TextInput
             autoComplete="off"
@@ -451,26 +513,32 @@ export function ChallengeSetupPage() {
                 className="text-lg font-bold text-slate-950"
                 id="challenge-participation-question"
               >
-                Will you participate too?
+                {challengeKind === 'personal'
+                  ? 'Enroll in your personal challenge?'
+                  : 'Will you participate too?'}
               </h2>
               <p className="mt-2 text-sm leading-6 text-slate-700">
-                Creating this challenge makes you its organizer, but does not
-                enroll you. If you join, you’ll enter your own starting and
-                target weights.
+                {challengeKind === 'personal'
+                  ? 'Creating this private challenge does not enroll you or create a participant. Enroll explicitly to save your own starting and target weights.'
+                  : 'Creating this challenge makes you its organizer, but does not enroll you. If you join, you’ll enter your own starting and target weights.'}
               </p>
               <div className="mt-4 flex flex-wrap gap-3">
                 <Link
                   className="inline-flex items-center justify-center rounded-full bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
                   to={`/challenge/participants/enroll?challenge=${encodeURIComponent(newlyCreatedChallengeId)}&self=owner`}
                 >
-                  Yes, I’ll participate
+                  {challengeKind === 'personal'
+                    ? 'Enroll me'
+                    : 'Yes, I’ll participate'}
                 </Link>
                 <Button
                   onClick={() => setChoseOrganizerOnly(true)}
                   type="button"
                   variant="secondary"
                 >
-                  No, I’ll organize only
+                  {challengeKind === 'personal'
+                    ? 'Not now'
+                    : 'No, I’ll organize only'}
                 </Button>
               </div>
               {choseOrganizerOnly ? (
@@ -480,16 +548,19 @@ export function ChallengeSetupPage() {
                   role="status"
                 >
                   <p className="text-sm leading-6 text-slate-700">
-                    You’re the organizer only. You can invite people now or join
-                    this challenge later from Today.
+                    {challengeKind === 'personal'
+                      ? 'You have not enrolled, so this private challenge cannot record weigh-ins yet. You can enroll later from Today.'
+                      : 'You’re the organizer only. You can invite people now or join this challenge later from Today.'}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-4">
-                    <Link
-                      className="text-sm font-semibold text-emerald-700 underline"
-                      to={`/challenge/invites?challenge=${encodeURIComponent(newlyCreatedChallengeId)}`}
-                    >
-                      Invite participants
-                    </Link>
+                    {challengeKind === 'group' ? (
+                      <Link
+                        className="text-sm font-semibold text-emerald-700 underline"
+                        to={`/challenge/invites?challenge=${encodeURIComponent(newlyCreatedChallengeId)}`}
+                      >
+                        Invite participants
+                      </Link>
+                    ) : null}
                     <Link
                       className="text-sm font-semibold text-emerald-700 underline"
                       to={`/today?challenge=${encodeURIComponent(newlyCreatedChallengeId)}`}

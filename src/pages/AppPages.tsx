@@ -103,6 +103,11 @@ type GroupDashboardData = {
   summary: GroupProgressSummary
 }
 
+function challengeContextName(challenge?: Challenge) {
+  if (!challenge) return 'Selected challenge'
+  return `${challenge.kind === 'personal' ? 'Personal' : 'Group'} · ${challenge.name}`
+}
+
 function usePersonalDashboard() {
   const { state: authState } = useOptionalAuth()
   const [searchParams] = useSearchParams()
@@ -281,9 +286,12 @@ function DashboardState({
 export function HomePage() {
   const { state: authState } = useOptionalAuth()
   const ownerId = authState.user?.id
+  const [searchParams, setSearchParams] = useSearchParams()
+  const challengeParam = searchParams.get('challenge')
   const persistence = useMemo(() => createPersistence(authState), [authState])
   const [challenges, setChallenges] = useState<Challenge[]>([])
-  const [selectedChallengeId, setSelectedChallengeId] = useState('')
+  const [memberships, setMemberships] = useState<Participant[]>([])
+  const [loadedOwnerId, setLoadedOwnerId] = useState('')
   const [isLoading, setIsLoading] = useState(authState.status === 'signed-in')
   const [loadError, setLoadError] = useState('')
 
@@ -293,36 +301,52 @@ export function HomePage() {
     async function loadChallenges() {
       if (authState.status !== 'signed-in' || !ownerId) {
         setChallenges([])
-        setSelectedChallengeId('')
+        setMemberships([])
+        setLoadedOwnerId('')
         setIsLoading(false)
         setLoadError('')
         return
       }
 
       if (persistence.mode === 'unavailable') {
+        setChallenges([])
+        setMemberships([])
+        setLoadedOwnerId(ownerId)
         setLoadError(persistence.message)
         setIsLoading(false)
         return
       }
 
       setIsLoading(true)
-      const result =
-        await persistence.repositories.challenges.listVisibleToUser(ownerId)
+      setChallenges([])
+      setMemberships([])
+      setLoadedOwnerId('')
+      const [challengeResult, membershipResult] = await Promise.all([
+        persistence.repositories.challenges.listVisibleToUser(ownerId),
+        persistence.repositories.participants.listForUser(ownerId),
+      ])
       if (!isCurrent) return
 
-      if (result.state === 'error') {
-        setLoadError(result.error.message)
+      const error =
+        challengeResult.state === 'error'
+          ? challengeResult.error
+          : membershipResult.state === 'error'
+            ? membershipResult.error
+            : null
+      if (error) {
+        setLoadError(error.message)
         setChallenges([])
+        setMemberships([])
       } else {
-        const nextChallenges = result.state === 'success' ? result.data : []
-        setChallenges(nextChallenges)
-        setSelectedChallengeId((currentId) =>
-          nextChallenges.some(({ id }) => id === currentId)
-            ? currentId
-            : (nextChallenges[0]?.id ?? ''),
+        setChallenges(
+          challengeResult.state === 'success' ? challengeResult.data : [],
+        )
+        setMemberships(
+          membershipResult.state === 'success' ? membershipResult.data : [],
         )
         setLoadError('')
       }
+      setLoadedOwnerId(ownerId)
       setIsLoading(false)
     }
 
@@ -332,13 +356,78 @@ export function HomePage() {
     }
   }, [authState.status, ownerId, persistence])
 
+  useEffect(() => {
+    if (
+      authState.status !== 'signed-in' ||
+      !ownerId ||
+      loadedOwnerId !== ownerId ||
+      isLoading ||
+      loadError
+    ) {
+      return
+    }
+
+    const nextChallengeId = challenges.some(({ id }) => id === challengeParam)
+      ? challengeParam
+      : (challenges[0]?.id ?? '')
+    if (nextChallengeId === (challengeParam ?? '')) return
+
+    const nextParams = new URLSearchParams(searchParams)
+    if (nextChallengeId) {
+      nextParams.set('challenge', nextChallengeId)
+    } else {
+      nextParams.delete('challenge')
+    }
+    setSearchParams(nextParams, { replace: true })
+  }, [
+    authState.status,
+    challengeParam,
+    challenges,
+    isLoading,
+    loadedOwnerId,
+    loadError,
+    ownerId,
+    searchParams,
+    setSearchParams,
+  ])
+
   if (authState.status === 'signed-in') {
-    const selectedChallenge = challenges.find(
-      ({ id }) => id === selectedChallengeId,
+    const currentChallenges = loadedOwnerId === ownerId ? challenges : []
+    const currentMemberships = loadedOwnerId === ownerId ? memberships : []
+    const personalChallenges = currentChallenges.filter(
+      ({ kind }) => kind === 'personal',
     )
+    const groupChallenges = currentChallenges.filter(
+      ({ kind }) => kind === 'group',
+    )
+    const selectedChallenge =
+      currentChallenges.find(({ id }) => id === challengeParam) ??
+      currentChallenges[0]
+    const selectedMembership = currentMemberships.find(
+      ({ challengeId }) => challengeId === selectedChallenge?.id,
+    )
+    const isActiveParticipant = selectedMembership?.status === 'active'
     const challengeQuery = selectedChallenge
       ? `?challenge=${encodeURIComponent(selectedChallenge.id)}`
       : ''
+    const navigationItems = selectedChallenge
+      ? [
+          ['Today', '/today'],
+          ...(isActiveParticipant
+            ? [
+                ['My progress', '/progress'],
+                ['Goals', '/goals'],
+              ]
+            : []),
+          ...(selectedChallenge.kind === 'group' && isActiveParticipant
+            ? [['Group', '/group']]
+            : []),
+          ...(selectedChallenge.kind === 'group' &&
+          selectedChallenge.ownerId === ownerId
+            ? [['Invite participants', '/challenge/invites']]
+            : []),
+        ]
+      : []
 
     return (
       <section className="w-full" aria-labelledby="home-title">
@@ -346,8 +435,8 @@ export function HomePage() {
           <PageHeader
             description={
               selectedChallenge
-                ? 'Continue with the challenge selected for this account.'
-                : 'Set up your first challenge to begin recording progress.'
+                ? 'Personal and group challenges stay separate. Choose a context to continue.'
+                : 'Set up a personal challenge or create or join a group challenge.'
             }
             title="Welcome back."
             titleId="home-title"
@@ -359,7 +448,7 @@ export function HomePage() {
             Signed in as <strong>{authState.user.email}</strong>
           </p>
 
-          {isLoading ? (
+          {isLoading || loadedOwnerId !== ownerId ? (
             <p
               aria-live="polite"
               className="mt-8 text-sm text-slate-600"
@@ -375,62 +464,165 @@ export function HomePage() {
             >
               {loadError}
             </p>
-          ) : challenges.length === 0 ? (
-            <div className="mt-8 space-y-4">
-              <p className="text-sm leading-6 text-slate-600">
-                No saved challenge is available for this account yet.
-              </p>
-              <Link
-                className="inline-block rounded-xl bg-emerald-700 px-5 py-3 text-sm font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
-                to="/challenge/setup"
-              >
-                Set up a challenge
-              </Link>
-            </div>
           ) : (
             <div className="mt-8 space-y-6">
-              <div>
-                <label
-                  className="text-sm font-semibold text-slate-700"
-                  htmlFor="selected-challenge"
+              <div className="grid gap-4 sm:grid-cols-2">
+                <section
+                  aria-labelledby="personal-challenge-context"
+                  className="rounded-2xl border border-stone-200 p-5"
                 >
-                  Selected challenge
-                </label>
-                <select
-                  className="mt-2 block w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-slate-900 focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                  id="selected-challenge"
-                  onChange={(event) =>
-                    setSelectedChallengeId(event.target.value)
-                  }
-                  value={selectedChallengeId}
+                  <h2
+                    className="font-bold text-slate-950"
+                    id="personal-challenge-context"
+                  >
+                    Personal challenge
+                  </h2>
+                  {personalChallenges.length > 0 ? (
+                    <ul className="mt-3 space-y-2 text-sm text-slate-700">
+                      {personalChallenges.map((challenge) => (
+                        <li key={challenge.id}>
+                          {challenge.name} ·{' '}
+                          {currentMemberships.some(
+                            (membership) =>
+                              membership.challengeId === challenge.id &&
+                              membership.status === 'active',
+                          )
+                            ? 'You are participating'
+                            : 'Not enrolled yet'}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-3 text-sm leading-6 text-slate-600">
+                      No personal challenge yet. Personal challenges stay
+                      private to this account.
+                    </p>
+                  )}
+                  {personalChallenges.length === 0 ? (
+                    <Link
+                      className="mt-4 inline-block text-sm font-semibold text-emerald-700 underline"
+                      to="/challenge/setup?kind=personal"
+                    >
+                      Create a personal challenge
+                    </Link>
+                  ) : null}
+                </section>
+                <section
+                  aria-labelledby="group-challenge-context"
+                  className="rounded-2xl border border-stone-200 p-5"
                 >
-                  {challenges.map((challenge) => (
-                    <option key={challenge.id} value={challenge.id}>
-                      {challenge.name}
-                    </option>
-                  ))}
-                </select>
+                  <h2
+                    className="font-bold text-slate-950"
+                    id="group-challenge-context"
+                  >
+                    Group challenges
+                  </h2>
+                  {groupChallenges.length > 0 ? (
+                    <ul className="mt-3 space-y-2 text-sm text-slate-700">
+                      {groupChallenges.map((challenge) => {
+                        const membership = currentMemberships.find(
+                          (item) => item.challengeId === challenge.id,
+                        )
+                        const isOwner = challenge.ownerId === ownerId
+                        const role = isOwner
+                          ? membership?.status === 'active'
+                            ? 'Organizer and participant'
+                            : 'Organizer only'
+                          : membership?.status === 'active'
+                            ? 'Participant'
+                            : 'Membership pending'
+                        return (
+                          <li key={challenge.id}>
+                            {challenge.name} · {role}
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  ) : (
+                    <p className="mt-3 text-sm leading-6 text-slate-600">
+                      No group challenges joined or organized yet.
+                    </p>
+                  )}
+                  {groupChallenges.length === 0 ? (
+                    <Link
+                      className="mt-4 inline-block text-sm font-semibold text-emerald-700 underline"
+                      to="/challenge/setup?kind=group"
+                    >
+                      Create a group challenge
+                    </Link>
+                  ) : null}
+                </section>
               </div>
-              <nav aria-label="Selected challenge navigation">
-                <ul className="grid gap-3 sm:grid-cols-2">
-                  {[
-                    ['Today', '/today'],
-                    ['Progress', '/progress'],
-                    ['Group', '/group'],
-                    ['Goals', '/goals'],
-                    ['Invite participants', '/challenge/invites'],
-                  ].map(([label, path]) => (
-                    <li key={path}>
-                      <Link
-                        className="inline-block w-full rounded-xl border border-stone-300 px-4 py-3 text-center text-sm font-semibold text-emerald-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
-                        to={`${path}${challengeQuery}`}
-                      >
-                        {label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
+              {currentChallenges.length > 0 ? (
+                <div>
+                  <label
+                    className="text-sm font-semibold text-slate-700"
+                    htmlFor="selected-challenge"
+                  >
+                    Selected context
+                  </label>
+                  <select
+                    className="mt-2 block w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-slate-900 focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                    id="selected-challenge"
+                    onChange={(event) => {
+                      setSearchParams((currentParams) => {
+                        const nextParams = new URLSearchParams(currentParams)
+                        nextParams.set('challenge', event.target.value)
+                        return nextParams
+                      })
+                    }}
+                    value={selectedChallenge?.id ?? ''}
+                  >
+                    {personalChallenges.length > 0 ? (
+                      <optgroup label="Personal challenges">
+                        {personalChallenges.map((challenge) => (
+                          <option key={challenge.id} value={challenge.id}>
+                            {challenge.name} · Private personal challenge
+                          </option>
+                        ))}
+                      </optgroup>
+                    ) : null}
+                    {groupChallenges.length > 0 ? (
+                      <optgroup label="Group challenges">
+                        {groupChallenges.map((challenge) => {
+                          const membership = currentMemberships.find(
+                            (item) => item.challengeId === challenge.id,
+                          )
+                          const role =
+                            challenge.ownerId === ownerId
+                              ? membership?.status === 'active'
+                                ? 'Organizer and participant'
+                                : 'Organizer only'
+                              : membership?.status === 'active'
+                                ? 'Participant'
+                                : 'Membership pending'
+                          return (
+                            <option key={challenge.id} value={challenge.id}>
+                              {challenge.name} · {role}
+                            </option>
+                          )
+                        })}
+                      </optgroup>
+                    ) : null}
+                  </select>
+                </div>
+              ) : null}
+              {selectedChallenge ? (
+                <nav aria-label="Selected challenge navigation">
+                  <ul className="grid gap-3 sm:grid-cols-2">
+                    {navigationItems.map(([label, path]) => (
+                      <li key={path}>
+                        <Link
+                          className="inline-block w-full rounded-xl border border-stone-300 px-4 py-3 text-center text-sm font-semibold text-emerald-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+                          to={`${path}${challengeQuery}`}
+                        >
+                          {label}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </nav>
+              ) : null}
             </div>
           )}
         </Card>
@@ -493,9 +685,7 @@ export function TodayPage() {
           title="Today"
           titleId="today-title"
         >
-          <StatusPill>
-            {data?.challenge.name ?? 'Personal dashboard'}
-          </StatusPill>
+          <StatusPill>{challengeContextName(data?.challenge)}</StatusPill>
         </PageHeader>
         <DashboardState
           isLoading={isLoading}
@@ -627,8 +817,11 @@ export function GroupDashboardPage() {
         return
       }
 
-      const visibleChallenges =
+      const allVisibleChallenges =
         challengeResult.state === 'success' ? challengeResult.data : []
+      const visibleChallenges = allVisibleChallenges.filter(
+        ({ kind }) => kind === 'group',
+      )
       setChallenges(visibleChallenges)
       const challenge = challengeParam
         ? visibleChallenges.find(({ id }) => id === challengeParam)
@@ -636,9 +829,14 @@ export function GroupDashboardPage() {
       if (!challenge) {
         setData(null)
         setMessage(
-          visibleChallenges.length === 0
-            ? 'No challenge is available for this account.'
-            : 'The selected challenge is unavailable for this account.',
+          challengeParam &&
+            allVisibleChallenges.some(
+              ({ id, kind }) => id === challengeParam && kind === 'personal',
+            )
+            ? 'Personal challenges are private and do not have a group dashboard.'
+            : visibleChallenges.length === 0
+              ? 'No group challenge is available for this account.'
+              : 'The selected challenge is unavailable for this account.',
         )
         setMessageTone('empty')
         setIsLoading(false)
@@ -692,7 +890,9 @@ export function GroupDashboardPage() {
           title="Group dashboard"
           titleId="group-title"
         >
-          <StatusPill>{data?.challenge.name ?? 'Shared progress'}</StatusPill>
+          <StatusPill>
+            {data ? challengeContextName(data.challenge) : 'Group dashboard'}
+          </StatusPill>
         </PageHeader>
         <div className="mt-6 flex flex-wrap items-end gap-4">
           {data ? (
@@ -874,9 +1074,7 @@ export function ProgressPage() {
           title="Progress"
           titleId="progress-title"
         >
-          <StatusPill>
-            {data?.challenge.name ?? 'Personal dashboard'}
-          </StatusPill>
+          <StatusPill>{challengeContextName(data?.challenge)}</StatusPill>
         </PageHeader>
         <DashboardState
           isLoading={isLoading}
@@ -1021,9 +1219,7 @@ export function GoalsPage() {
           title="Goals"
           titleId="goals-title"
         >
-          <StatusPill>
-            {data?.challenge.name ?? 'Personal dashboard'}
-          </StatusPill>
+          <StatusPill>{challengeContextName(data?.challenge)}</StatusPill>
         </PageHeader>
         <DashboardState
           isLoading={isLoading}

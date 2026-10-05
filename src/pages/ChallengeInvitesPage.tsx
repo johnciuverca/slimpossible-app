@@ -36,6 +36,9 @@ export function ChallengeInvitesPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const persistence = useMemo(() => createPersistence(authState), [authState])
   const [challenges, setChallenges] = useState<Challenge[]>([])
+  const [hasPersonalChallenges, setHasPersonalChallenges] = useState(false)
+  const [personalSelectionBlocked, setPersonalSelectionBlocked] =
+    useState(false)
   const [selectedChallengeId, setSelectedChallengeId] = useState(
     searchParams.get('challenge') ?? '',
   )
@@ -69,17 +72,32 @@ export function ChallengeInvitesPage() {
         return
       }
 
-      const nextChallenges = result.state === 'success' ? result.data : []
-      setChallenges(nextChallenges)
-      setSelectedChallengeId((currentId) => {
-        const nextId = nextChallenges.some(({ id }) => id === currentId)
-          ? currentId
-          : (nextChallenges[0]?.id ?? '')
-        if (nextId && nextId !== searchParams.get('challenge')) {
-          setSearchParams({ challenge: nextId }, { replace: true })
-        }
-        return nextId
-      })
+      const ownedChallenges = result.state === 'success' ? result.data : []
+      const requestedId = searchParams.get('challenge')
+      const selectedPersonal = ownedChallenges.some(
+        ({ id, kind }) => id === requestedId && kind === 'personal',
+      )
+      const groupChallenges = ownedChallenges.filter(
+        ({ kind }) => kind === 'group',
+      )
+      const nextId = selectedPersonal
+        ? ''
+        : groupChallenges.some(({ id }) => id === requestedId)
+          ? requestedId!
+          : (groupChallenges[0]?.id ?? '')
+
+      setHasPersonalChallenges(
+        ownedChallenges.some(({ kind }) => kind === 'personal'),
+      )
+      setPersonalSelectionBlocked(selectedPersonal)
+      setChallenges(groupChallenges)
+      setSelectedChallengeId(nextId)
+      if (!selectedPersonal && nextId !== (requestedId ?? '')) {
+        const nextParams = new URLSearchParams(searchParams)
+        if (nextId) nextParams.set('challenge', nextId)
+        else nextParams.delete('challenge')
+        setSearchParams(nextParams, { replace: true })
+      }
       setIsLoading(false)
     }
 
@@ -200,10 +218,18 @@ export function ChallengeInvitesPage() {
           </p>
         ) : challenges.length === 0 ? (
           <p className="mt-8 text-sm leading-6 text-slate-600">
-            Create a challenge before issuing an invitation.
+            {hasPersonalChallenges
+              ? 'Personal challenges are private and cannot have group invitations. Create or select a group challenge to invite participants.'
+              : 'Create a group challenge before issuing an invitation.'}
           </p>
         ) : (
           <div className="mt-8 space-y-8">
+            {personalSelectionBlocked ? (
+              <p className="text-sm leading-6 text-slate-600" role="status">
+                Personal challenges are private and cannot have group
+                invitations. Select a group challenge to continue.
+              </p>
+            ) : null}
             <div>
               <label
                 className="text-sm font-semibold text-slate-700"
@@ -221,6 +247,9 @@ export function ChallengeInvitesPage() {
                 }}
                 value={selectedChallengeId}
               >
+                {!selectedChallengeId ? (
+                  <option value="">Select a group challenge</option>
+                ) : null}
                 {challenges.map((challenge) => (
                   <option key={challenge.id} value={challenge.id}>
                     {challenge.name}
@@ -247,7 +276,10 @@ export function ChallengeInvitesPage() {
                   type="date"
                   value={expiresOn}
                 />
-                <Button disabled={isSaving} onClick={() => void createInvite()}>
+                <Button
+                  disabled={isSaving || !selectedChallengeId}
+                  onClick={() => void createInvite()}
+                >
                   {isSaving ? 'Creating link…' : 'Create invite link'}
                 </Button>
               </div>
