@@ -33,6 +33,8 @@ const homeChallengeIds = isHomeMulti
 const initialHomeSelection = new URLSearchParams(window.location.search).get(
   'selected',
 )
+const initialHomeRoute =
+  new URLSearchParams(window.location.search).get('route') ?? '/'
 const isMember =
   scenario === 'member' ||
   isProgress ||
@@ -188,7 +190,7 @@ createRoot(document.getElementById('root')!).render(
       initialEntries={
         isHome
           ? [
-              `/${initialHomeSelection ? `?challenge=${encodeURIComponent(initialHomeSelection)}` : ''}`,
+              `${initialHomeRoute}${initialHomeSelection ? `?challenge=${encodeURIComponent(initialHomeSelection)}` : ''}`,
             ]
           : isGoals
             ? [`/goals?challenge=${challengeId}`]

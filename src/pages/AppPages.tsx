@@ -1255,14 +1255,14 @@ export function TodayPage() {
                 className="flex flex-col justify-center rounded-panel border border-dashed border-line bg-canvas p-5 sm:p-6"
               >
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-ink-muted">
-                  Not available yet
+                  Coming in Chapter 16
                 </p>
                 <h2 className="mt-2 text-lg font-extrabold text-ink">
-                  Challenge history and a second challenge
+                  Group history and saving to multiple challenges
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-ink-muted">
-                  Coming in Chapter 16. Your personal check-in and the current
-                  permitted group summary remain available here.
+                  You can switch between joined challenges from Overview. Each
+                  weigh-in is saved to the selected challenge only.
                 </p>
               </div>
             </div>
