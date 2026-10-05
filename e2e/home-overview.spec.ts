@@ -1,7 +1,11 @@
 import { expect, test } from '@playwright/test'
 
-const homeFixture = (scenario: string, selected?: string) =>
-  `/e2e/fixtures/today-harness.html?scenario=${scenario}${selected ? `&selected=${selected}` : ''}`
+const homeFixture = (scenario: string, selected?: string, route?: string) => {
+  const params = new URLSearchParams({ scenario })
+  if (selected) params.set('selected', selected)
+  if (route) params.set('route', route)
+  return `/e2e/fixtures/today-harness.html?${params.toString()}`
+}
 
 for (const viewport of [
   { label: 'desktop', width: 1280 },
@@ -133,6 +137,27 @@ test('challenge cards switch by keyboard and preserve a direct selection after r
       .getByRole('navigation', { name: 'Selected challenge actions' })
       .getByRole('link', { name: 'Group progress' }),
   ).toHaveAttribute('href', '/group?challenge=e2e-challenge-2')
+  const headerToday = page
+    .getByRole('navigation', { name: 'Primary navigation' })
+    .getByRole('link', { name: 'Today' })
+  await expect(headerToday).toHaveAttribute(
+    'href',
+    '/today?challenge=e2e-challenge-2',
+  )
+  await headerToday.click()
+  await expect(page.getByRole('heading', { name: 'Today' })).toBeVisible()
+  await expect(page.getByText('E2E Winter challenge · Active')).toBeVisible()
+  await expect(
+    page.getByRole('heading', {
+      name: 'Group history and saving to multiple challenges',
+    }),
+  ).toBeVisible()
+  await expect(
+    page.getByText('You can switch between joined challenges from Overview.'),
+  ).toBeVisible()
+  await expect(
+    page.getByText('Each weigh-in is saved to the selected challenge only.'),
+  ).toBeVisible()
 
   await page.goto(homeFixture('home-member-multi', 'e2e-challenge-2'))
   await expect(
@@ -146,4 +171,9 @@ test('challenge cards switch by keyboard and preserve a direct selection after r
     page.getByText('No weigh-ins are saved for this challenge yet.'),
   ).toBeVisible()
   await expect(page.getByText('88.4 kg', { exact: true })).toHaveCount(0)
+
+  await page.goto(homeFixture('home-member-multi', 'e2e-challenge-2', '/today'))
+  await expect(page.getByText('E2E Winter challenge · Active')).toBeVisible()
+  await page.reload()
+  await expect(page.getByText('E2E Winter challenge · Active')).toBeVisible()
 })
