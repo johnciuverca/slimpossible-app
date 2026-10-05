@@ -20,13 +20,9 @@ const navigationItems = [
 /** Shared live shell; route guards and each page's real data remain unchanged. */
 export function AppLayout({ children }: AppLayoutProps) {
   const location = useLocation()
-  const selectedChallengeId = new URLSearchParams(location.search).get(
-    'challenge',
-  )
+  const challengeId = new URLSearchParams(location.search).get('challenge')
   const withSelectedChallenge = (to: string) =>
-    selectedChallengeId
-      ? `${to}?challenge=${encodeURIComponent(selectedChallengeId)}`
-      : to
+    challengeId ? `${to}?challenge=${encodeURIComponent(challengeId)}` : to
 
   return (
     <div className="flex min-h-screen flex-col bg-page text-ink">
