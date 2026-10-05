@@ -62,8 +62,58 @@ const personalGroupChallengeAuthorizationCheck = readFileSync(
   ),
   'utf8',
 )
+const executeGrantMigration = readFileSync(
+  resolve(
+    process.cwd(),
+    'supabase/migrations/20261005000001_converge_function_execute_grants.sql',
+  ),
+  'utf8',
+)
+const executeGrantRecovery = readFileSync(
+  resolve(
+    process.cwd(),
+    'supabase/rollback/20261005000001_converge_function_execute_grants.sql',
+  ),
+  'utf8',
+)
 
 describe('row-level security migration contract', () => {
+  it('corrects only inspected explicit grants and guards intervening ACL drift', () => {
+    expect(executeGrantMigration).toContain('aclexplode')
+    expect(executeGrantMigration).toContain('ACL drift')
+    expect(executeGrantMigration).toMatch(
+      /revoke execute on function[\s\S]+from anon;/,
+    )
+    expect(executeGrantMigration).toMatch(
+      /revoke execute on function public\.prevent_challenge_kind_change\(\),\s+public\.prevent_personal_challenge_invites\(\) from authenticated;/,
+    )
+    expect(executeGrantMigration).not.toMatch(/alter default privileges/i)
+    expect(executeGrantMigration).not.toMatch(
+      /revoke[^;]*is_challenge_member[^;]*from authenticated/i,
+    )
+    expect(executeGrantMigration).not.toMatch(
+      /revoke[^;]*preview_challenge_invite/i,
+    )
+    expect(executeGrantMigration).not.toMatch(/revoke[^;]*from service_role/i)
+  })
+
+  it('restores the observed grants with drift protection, without touching data', () => {
+    expect(executeGrantRecovery).toContain('ACL drift')
+    expect(executeGrantRecovery).toMatch(
+      /grant execute on function[\s\S]+to anon;/,
+    )
+    expect(executeGrantRecovery).toMatch(
+      /grant execute on function public\.prevent_challenge_kind_change\(\),\s+public\.prevent_personal_challenge_invites\(\) to authenticated;/,
+    )
+    for (const sql of [executeGrantMigration, executeGrantRecovery]) {
+      expect(sql).not.toMatch(
+        /(?:insert into|update|delete from|alter table|drop table) public\./i,
+      )
+      expect(sql).toContain('begin;')
+      expect(sql).toContain('commit;')
+    }
+  })
+
   it('adds personal/group context without rewriting legacy challenges', () => {
     expect(personalGroupChallengeMigration).toMatch(
       /add column challenge_kind text/i,

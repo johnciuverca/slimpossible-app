@@ -57,12 +57,16 @@ compatible with the qualified invite digest/random-byte calls.
 1. Owner exports schema/role grants and backs up data securely, records the
    recoverable snapshot/time and rehearses restoration in an isolated target.
    A free-tier project or a dashboard badge is not proof of a usable backup.
-2. PM reviews grant drift. Prepare a narrow reviewed delta to explicitly revoke
+2. PM reviews grant drift. The checked-in `20261005000001` candidate explicitly revokes
    anon EXECUTE from the ten non-public functions above; revoke authenticated
    EXECUTE from the two new trigger-only functions. Preserve authenticated RPC
    grants, intentional anon preview access and platform service-role grants.
-   Capture before/after ACLs and an exact inverse delta for recovery. No such
-   change has been applied by this PR's audit.
+   `supabase/tests/function_execute_acl_audit.sql` exports before/after ACLs,
+   effective privileges and defaults. The matching `supabase/rollback` file
+   is the exact inverse of the inspected snapshot. Both files abort on ACL
+   drift or a non-postgres execution role; neither overwrites unknown grants.
+   This eighth migration is **NOT APPLIED remotely**. Its recovery restores
+   the earlier exposure, so recovery also needs explicit approval.
 3. Re-run the catalog export and scoped acceptance. Review any remaining drift
    before recording lineage. Only after definition equivalence is approved may
    an owner reconcile the seven manually applied version records using the
@@ -86,8 +90,37 @@ random challenge IDs and `[16.1 disposable]` labels isolate test records.
 The final `ROLLBACK` removes fixtures and any new profiles. Existing profile
 names, challenges and weigh-ins are neither updated nor deleted. If execution
 errors, issue `ROLLBACK` before any subsequent query; never commit that batch.
-The previous local 11/11 result used the older harness and a minimal native
-PostgreSQL Auth shim, not this revised harness or connected Supabase identities.
+The revised harness was verified locally on 2026-10-05: **11/11 checks passed
+before correction, after correction and after inverse recovery** in native
+PostgreSQL 16.12 with a minimal Auth compatibility shim, explicit local UUIDs
+and Supabase-style direct/default grants. Four local Auth rows existed (an
+unselected account was created earliest), so this also exercises selection
+without relying on creation order or an exactly-three-user project.
+
+Reproduce only in an isolated local database with
+`bash supabase/tests/run_local_personal_group_acl.sh`. The runner creates its
+own temporary cluster with no TCP listener and stops it on exit. It retains
+before/after/recovery ACL exports and local evidence under its printed temp
+path; these are disposable local records, not staging users or credentials.
+Its LOCAL ONLY shim/fixtures/assertion SQL must never run on a remote project.
+
+Additional local assertions passed: 13 effective function ACLs in each phase;
+exact recovery of grantors/grant options; anonymous membership-helper denial;
+authenticated membership/RLS and invite issuance still usable; anonymous
+invalid-token invite preview still callable; unchanged intentional preview,
+aggregate and service-role grants; sentinel profiles/challenge/participant/
+weigh-in preserved exactly, with no leftover fixtures or inserted profile.
+Unfilled, duplicate and nonexistent UUIDs were rejected before DML. Both grant
+forward/recovery scripts rejected injected PUBLIC EXECUTE drift before partial
+changes. CREATE OR REPLACE preserved the corrected helper ACL. New functions
+still inherit the unchanged platform defaults: every future migration must
+explicitly review client grants. None of this replaces connected acceptance.
+
+The feature Preview's invalid-token invitation page was inspected read-only
+and resolved to the invalid-invitation state without login or writes. The
+available inspection surface did not expose resource timing/network hosts;
+the actual Supabase destination is still **NOT VERIFIED**, not inferred from
+the Remote authentication label or an empty invalid-token result.
 
 Next owner step: privately identify the three disposable staging Auth UUIDs
 and designate their roles; do not send passwords or service-role keys. No

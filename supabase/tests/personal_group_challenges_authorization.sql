@@ -196,4 +196,13 @@ select check_name, passed, detail
 from slimpossible_personal_group_results
 order by check_name;
 
+do $$
+begin
+  if (select count(*) from slimpossible_personal_group_results) <> 11
+     or exists (select 1 from slimpossible_personal_group_results where not passed) then
+    raise exception 'Personal/group authorization checks failed; roll back this batch.';
+  end if;
+end;
+$$;
+
 rollback;
