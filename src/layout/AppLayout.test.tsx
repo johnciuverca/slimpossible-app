@@ -29,6 +29,7 @@ function renderLayout(path: string, state: AuthState) {
 
 function CurrentRoute() {
   const location = useLocation()
+
   return (
     <output data-testid="current-route">
       {location.pathname}
@@ -64,27 +65,12 @@ describe('AppLayout', () => {
     )
   })
 
-  it('preserves the selected challenge context on the brand and navigation links', () => {
-    renderLayout('/today?challenge=private%2Fplan', signedOut)
-
-    expect(screen.getByRole('link', { name: 'Slimpossible' })).toHaveAttribute(
-      'href',
-      '/?challenge=private%2Fplan',
-    )
-    for (const { label, path } of liveNavigation) {
-      expect(screen.getByRole('link', { name: label })).toHaveAttribute(
-        'href',
-        `${path}?challenge=private%2Fplan`,
-      )
-    }
-  })
-
-  it('keeps the selected challenge when the shared Today link is clicked from enrollment', () => {
+  it('preserves the selected challenge across shared header navigation', () => {
     render(
       <AuthProvider initialState={signedOut}>
         <MemoryRouter
           initialEntries={[
-            '/challenge/participants/enroll?challenge=challenge-123',
+            '/challenge/participants/enroll?challenge=private%2Fplan',
           ]}
         >
           <AppLayout>
@@ -94,10 +80,22 @@ describe('AppLayout', () => {
       </AuthProvider>,
     )
 
+    expect(screen.getByRole('link', { name: 'Slimpossible' })).toHaveAttribute(
+      'href',
+      '/?challenge=private%2Fplan',
+    )
+
+    for (const { label, path } of liveNavigation) {
+      expect(screen.getByRole('link', { name: label })).toHaveAttribute(
+        'href',
+        `${path}?challenge=private%2Fplan`,
+      )
+    }
+
     fireEvent.click(screen.getByRole('link', { name: 'Today' }))
 
     expect(screen.getByTestId('current-route')).toHaveTextContent(
-      '/today?challenge=challenge-123',
+      '/today?challenge=private%2Fplan',
     )
   })
 
