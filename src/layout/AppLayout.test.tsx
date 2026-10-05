@@ -1,5 +1,5 @@
-import { cleanup, render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { AuthProvider } from '../auth/AuthContext'
@@ -24,6 +24,16 @@ function renderLayout(path: string, state: AuthState) {
         </AppLayout>
       </MemoryRouter>
     </AuthProvider>,
+  )
+}
+
+function CurrentRoute() {
+  const location = useLocation()
+  return (
+    <output data-testid="current-route">
+      {location.pathname}
+      {location.search}
+    </output>
   )
 }
 
@@ -67,6 +77,28 @@ describe('AppLayout', () => {
         `${path}?challenge=private%2Fplan`,
       )
     }
+  })
+
+  it('keeps the selected challenge when the shared Today link is clicked from enrollment', () => {
+    render(
+      <AuthProvider initialState={signedOut}>
+        <MemoryRouter
+          initialEntries={[
+            '/challenge/participants/enroll?challenge=challenge-123',
+          ]}
+        >
+          <AppLayout>
+            <CurrentRoute />
+          </AppLayout>
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+
+    fireEvent.click(screen.getByRole('link', { name: 'Today' }))
+
+    expect(screen.getByTestId('current-route')).toHaveTextContent(
+      '/today?challenge=challenge-123',
+    )
   })
 
   it.each(liveNavigation)(
