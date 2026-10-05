@@ -123,6 +123,22 @@ describe('row-level security migration contract', () => {
     expect(personalGroupChallengeAuthorizationCheck).toContain(
       "('outsider_cannot_read_either_context', visible_count = 0",
     )
+    expect(personalGroupChallengeAuthorizationCheck).toContain(
+      'REPLACE_OWNER_UUID',
+    )
+    expect(personalGroupChallengeAuthorizationCheck).toContain(
+      'REPLACE_MEMBER_UUID',
+    )
+    expect(personalGroupChallengeAuthorizationCheck).toContain(
+      'REPLACE_OUTSIDER_UUID',
+    )
+    expect(personalGroupChallengeAuthorizationCheck).toContain('rollback;')
+    expect(personalGroupChallengeAuthorizationCheck).not.toContain(
+      'order by created_at',
+    )
+    expect(personalGroupChallengeAuthorizationCheck).not.toContain(
+      'delete from public.',
+    )
   })
 
   it('enables RLS on every application table', () => {

@@ -667,7 +667,7 @@ describe('HomePage', () => {
     renderDashboard(<TodayPage />, fetchMock, '/today')
 
     expect(
-      await screen.findByText('Challenge I joined · Active'),
+      await screen.findByText('Group · Challenge I joined · Active'),
     ).toBeInTheDocument()
     expect(screen.getByText('89 kg')).toBeInTheDocument()
     expect(screen.queryByText('My unjoined challenge')).not.toBeInTheDocument()
@@ -1144,7 +1144,9 @@ describe('HomePage', () => {
       await waitFor(() =>
         expect(
           screen.getByText(
-            _ === 'Today' ? /Autumn challenge · Active/ : 'Group · Autumn challenge',
+            _ === 'Today'
+              ? /Autumn challenge · Active/
+              : 'Group · Autumn challenge',
           ),
         ).toBeInTheDocument(),
       )
@@ -1548,7 +1550,9 @@ describe('GroupDashboardPage', () => {
     )
 
     expect(
-      await screen.findByText('No group challenge is available for this account.'),
+      await screen.findByText(
+        'No group challenge is available for this account.',
+      ),
     ).toBeInTheDocument()
     expect(
       screen.queryByRole('heading', { name: 'Group progress' }),
@@ -1820,19 +1824,66 @@ describe('personal/group challenge boundaries', () => {
 
   it('keeps personal and group contexts visible while withholding personal group actions', async () => {
     const rows = [
-      { id: 'personal-1', name: 'Private plan', challenge_kind: 'personal', owner_id: 'member-1', created_by: 'member-1', start_date: '2026-09-17', end_date: '2026-12-01', status: 'active', created_at: '2026-09-17T00:00:00Z', updated_at: '2026-09-17T00:00:00Z', description: null, target_weight_kg: null },
-      { id: 'group-1', name: 'Team reset', challenge_kind: 'group', owner_id: 'member-1', created_by: 'member-1', start_date: '2026-09-17', end_date: '2026-12-01', status: 'active', created_at: '2026-09-17T00:00:00Z', updated_at: '2026-09-17T00:00:00Z', description: null, target_weight_kg: null },
+      {
+        id: 'personal-1',
+        name: 'Private plan',
+        challenge_kind: 'personal',
+        owner_id: 'member-1',
+        created_by: 'member-1',
+        start_date: '2026-09-17',
+        end_date: '2026-12-01',
+        status: 'active',
+        created_at: '2026-09-17T00:00:00Z',
+        updated_at: '2026-09-17T00:00:00Z',
+        description: null,
+        target_weight_kg: null,
+      },
+      {
+        id: 'group-1',
+        name: 'Team reset',
+        challenge_kind: 'group',
+        owner_id: 'member-1',
+        created_by: 'member-1',
+        start_date: '2026-09-17',
+        end_date: '2026-12-01',
+        status: 'active',
+        created_at: '2026-09-17T00:00:00Z',
+        updated_at: '2026-09-17T00:00:00Z',
+        description: null,
+        target_weight_kg: null,
+      },
     ]
-    const fetchMock = vi.fn((input: RequestInfo | URL) => Promise.resolve(response(String(input).includes('/challenges?') ? rows : [])))
+    const fetchMock = vi.fn((input: RequestInfo | URL) =>
+      Promise.resolve(
+        response(String(input).includes('/challenges?') ? rows : []),
+      ),
+    )
     renderSignedIn(fetchMock, '/?challenge=personal-1')
-    expect(await screen.findByRole('region', { name: 'Personal challenge' })).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Group challenges' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Private plan/ })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.queryByRole('link', { name: 'Invite participants' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Group progress' })).not.toBeInTheDocument()
-    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/rpc/'))).toBe(false)
+    expect(
+      await screen.findByRole('region', { name: 'Personal challenge' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('region', { name: 'Group challenges' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /Private plan/ }),
+    ).toHaveAttribute('aria-pressed', 'true')
+    expect(
+      screen.queryByRole('link', { name: 'Invite participants' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: 'Group progress' }),
+    ).not.toBeInTheDocument()
+    expect(
+      fetchMock.mock.calls.some(([url]) => String(url).includes('/rpc/')),
+    ).toBe(false)
     fireEvent.click(screen.getByRole('button', { name: /Team reset/ }))
-    expect(screen.getByRole('button', { name: /Team reset/ })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getAllByRole('link', { name: 'Invite participants' })[0]).toHaveAttribute('href', '/challenge/invites?challenge=group-1')
+    expect(screen.getByRole('button', { name: /Team reset/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(
+      screen.getAllByRole('link', { name: 'Invite participants' })[0],
+    ).toHaveAttribute('href', '/challenge/invites?challenge=group-1')
   })
 })

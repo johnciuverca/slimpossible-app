@@ -1,7 +1,14 @@
 -- Personal/group challenge boundary checks for an approved non-production
 -- Supabase project. Run as postgres after the checked-in migrations. The
--- project must contain exactly three disposable Auth users in creation order:
--- owner, member, unrelated-user. Results contain check names and pass/fail detail.
+-- owner must explicitly identify three existing disposable Auth UUIDs below.
+-- Never infer identities from creation order. Run the WHOLE script in one batch;
+-- results are returned before ROLLBACK removes every fixture and profile change.
+
+begin;
+
+select set_config('slimpossible.test_owner_id', 'REPLACE_OWNER_UUID', true);
+select set_config('slimpossible.test_member_id', 'REPLACE_MEMBER_UUID', true);
+select set_config('slimpossible.test_outsider_id', 'REPLACE_OUTSIDER_UUID', true);
 
 drop table if exists pg_temp.slimpossible_personal_group_results;
 
@@ -26,33 +33,21 @@ declare
   unexpected_member_participant_id uuid := gen_random_uuid();
   visible_count integer;
   affected integer;
-  owner_profile_existed boolean;
-  member_profile_existed boolean;
-  unrelated_profile_existed boolean;
   group_invite_id uuid;
   group_invite_token text;
 begin
-  select count(*)::integer into user_count from auth.users;
-  if user_count <> 3 then
-    raise exception 'Expected exactly three disposable test users; found %.', user_count;
+  -- Invalid/unfilled UUIDs fail here, before any persistent-table DML.
+  owner_id := current_setting('slimpossible.test_owner_id')::uuid;
+  member_id := current_setting('slimpossible.test_member_id')::uuid;
+  unrelated_id := current_setting('slimpossible.test_outsider_id')::uuid;
+  if owner_id = member_id or owner_id = unrelated_id or member_id = unrelated_id then
+    raise exception 'Owner, member and outsider must be distinct approved disposable users.';
   end if;
-
-  select
-    (max(id::text) filter (where creation_order = 1))::uuid,
-    (max(id::text) filter (where creation_order = 2))::uuid,
-    (max(id::text) filter (where creation_order = 3))::uuid
-  into owner_id, member_id, unrelated_id
-  from (
-    select id, row_number() over (order by created_at asc) as creation_order
-    from auth.users
-  ) as ordered_users;
-
-  select exists (select 1 from public.profiles where id = owner_id)
-    into owner_profile_existed;
-  select exists (select 1 from public.profiles where id = member_id)
-    into member_profile_existed;
-  select exists (select 1 from public.profiles where id = unrelated_id)
-    into unrelated_profile_existed;
+  select count(*)::integer into user_count from auth.users
+  where id in (owner_id, member_id, unrelated_id);
+  if user_count <> 3 then
+    raise exception 'All three explicitly approved disposable test users must exist; found %.', user_count;
+  end if;
 
   insert into public.profiles (id, display_name)
   values
@@ -64,10 +59,10 @@ begin
   insert into public.challenges (
     id, owner_id, created_by, name, start_date, end_date, status, challenge_kind
   ) values (
-    personal_challenge_id, owner_id, owner_id, 'Private personal test',
+    personal_challenge_id, owner_id, owner_id, '[16.1 disposable] Private personal test',
     current_date, current_date + 30, 'active', 'personal'
   ), (
-    group_challenge_id, owner_id, owner_id, 'Group test',
+    group_challenge_id, owner_id, owner_id, '[16.1 disposable] Group test',
     current_date, current_date + 30, 'active', 'group'
   );
 
@@ -75,7 +70,7 @@ begin
   insert into public.challenges (
     id, owner_id, created_by, name, start_date, end_date, status
   ) values (
-    legacy_challenge_id, owner_id, owner_id, 'Legacy group test',
+    legacy_challenge_id, owner_id, owner_id, '[16.1 disposable] Legacy group test',
     current_date, current_date + 30, 'active'
   );
 
@@ -194,18 +189,6 @@ begin
 
   execute 'reset role';
   perform set_config('request.jwt.claim.sub', '', true);
-  delete from public.challenges
-  where id in (personal_challenge_id, group_challenge_id, legacy_challenge_id);
-
-  if not owner_profile_existed then
-    delete from public.profiles where id = owner_id;
-  end if;
-  if not member_profile_existed then
-    delete from public.profiles where id = member_id;
-  end if;
-  if not unrelated_profile_existed then
-    delete from public.profiles where id = unrelated_id;
-  end if;
 end;
 $$;
 
@@ -213,4 +196,4 @@ select check_name, passed, detail
 from slimpossible_personal_group_results
 order by check_name;
 
-drop table slimpossible_personal_group_results;
+rollback;
