@@ -95,6 +95,9 @@ describe('ChallengeInvitesPage', () => {
   })
 
   it('lets the owner revoke an active link', async () => {
+    const futureExpiry = new Date(
+      Date.now() + 7 * 24 * 60 * 60 * 1000,
+    ).toISOString()
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(response([challenge]))
@@ -103,7 +106,7 @@ describe('ChallengeInvitesPage', () => {
           {
             challenge_id: 'challenge-1',
             created_at: '2026-09-22T10:00:00.000Z',
-            expires_at: '2026-09-29T23:59:59.000Z',
+            expires_at: futureExpiry,
             invite_id: 'invite-1',
             revoked_at: null,
           },
