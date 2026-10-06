@@ -123,22 +123,41 @@ not an inference from the Remote authentication label; no credentials are
 recorded here. This agent's earlier invalid-token lookup alone did not establish
 the host. Owner/member/outsider SQL acceptance remains unexecuted remotely.
 
-PM also reported that the owner created a private personal test context without
-overwriting the existing group, explicitly enrolled with a 100-to-85 kg goal,
-saved remotely and saw an active participant. The success panel incorrectly
-offered Invite participants for the personal context. The follow-up fix omits
-that action for personal kind and preserves it for explicit/legacy groups;
-focused tests cover newly saved and existing membership. The corrected UI
-still needs a connected recheck on its new Preview deployment. These partial
-owner observations do not establish complete multi-account/privacy acceptance.
+### Redacted PM-observed browser UI checks (2026-10-06)
 
-Next owner step: privately identify the three disposable staging Auth UUIDs
-and designate their roles; do not send passwords or service-role keys. No
-accounts will be created. Sign into the feature Preview with the disposable
-owner when browser acceptance is scheduled. Confirm the Preview's actual
-network destination is staging before test actions. Browser acceptance must
-cover coexistence, explicit enrollment, refresh/account switch, selected
-navigation and weigh-in destinations; SQL RLS checks do not replace it.
+These are PM-reported visible UI observations, not this agent's SQL or server
+payload verification. No fixture identifiers, account addresses, measurements,
+goal values or computed health metrics are included. PM independently inspected
+visible DOM account identity for each role's observation.
+
+- Owner checked personal/group coexistence, explicit self-enrollment, saved
+  entry display and distinct selected-context Progress displays. Switching back
+  retained the personal context's displayed entry. This is an observed switching
+  check, not a complete refresh/account-switch/navigation matrix.
+- Member checked the group-only Overview listing and a direct link to the
+  owner's personal Progress. The direct link showed the unavailable state and
+  did not display weight, goal or history fields.
+- Outsider separately checked the direct personal Progress link after visible
+  identity inspection. It showed the same unavailable state and no weight,
+  goal or history fields. UI non-disclosure does not prove server payload privacy.
+- Owner enrollment's success panel originally offered Invite participants for
+  personal kind. The fix at `299e8e5` omits that action for personal kind and
+  preserves it for explicit/legacy groups. **Connected owner recheck is pending.**
+
+### Remaining acceptance and release gates
+
+- PM/owner rechecks the invitation fix on the new Preview: personal omits
+  Invite participants, Group retains it, and Go to Today keeps selection.
+- Complete outstanding refresh/account-switch, navigation and eligible
+  weigh-in-destination acceptance. Partial UI checks do not complete acceptance.
+- Execute the remotely unexecuted rollback-only SQL harness only with explicitly
+  approved disposable owner/member/outsider UUIDs and staging scope. Never
+  request passwords/keys or use UI results as SQL/RLS proof.
+- Review/approve remote grant convergence, migration lineage and actual backup/
+  restoration rehearsal. Local forward/inverse tests do not verify remote ACL
+  correction or recovery. Production/main retains separate gates.
+- Follow-ups #228 (scroll-wheel input changes) and #229 (per-page challenge tabs)
+  are recorded separately; neither is started or included in this PR.
 
 ## Recovery gates
 
