@@ -36,7 +36,8 @@ removing comments and collapsing whitespace; signatures, search paths and
 security-definer flags were also inspected. `pgcrypto` is in `extensions`,
 compatible with the qualified invite digest/random-byte calls.
 
-**Discrepancies, not schema failure:**
+**Discrepancies, not schema failure (before the separately reviewed permission
+correction recorded below):**
 
 - `supabase_migrations` has no tables: applied-version lineage is unrecorded.
 - Explicit `anon` EXECUTE remains on accept/create/list/revoke invites,
@@ -136,11 +137,12 @@ as described below; they do not establish complete browser acceptance.
 The owner approved three specific existing disposable identities and the exact
 staging project above. A private, exact-email Auth lookup resolved each role to
 one existing user and confirmed distinct UUIDs; no accounts were created and no
-identity mapping is published here. The fresh read-only ACL export still matched
-the candidate correction's expected owners, direct grants, grantors and options.
-The ten non-public functions retained the previously identified anon grants; the
-two new trigger-only functions also retained authenticated EXECUTE. Intentional
-preview access, group/provisional grants and function defaults were unchanged.
+identity mapping is published here. The fresh read-only ACL export matched the
+candidate correction's expected owners, direct grants, grantors and options. The
+ten non-public functions then retained the previously identified anon grants;
+the two new trigger-only functions also retained authenticated EXECUTE.
+Intentional preview access, group/provisional grants and function defaults were
+unchanged at preflight.
 
 The complete checked-in authorization harness ran in one BEGIN/ROLLBACK batch:
 **11/11 connected checks passed**. Assertions used authenticated role and JWT
@@ -163,10 +165,29 @@ read-only audit confirmed no changes. Clipboard replacement then verified an
 exact match to the harness before the successful execution above. Fingerprints,
 account identifiers and personal values are retained privately, not published.
 
-The smallest next step is PM confirmation of this fresh preflight and the
-permission-only inverse/recovery plan before applying the exact guarded ACL
-correction. Then refresh the ACL export and connected checks. Successful checks
-under the current ACLs do not mean the excessive EXECUTE grants are corrected.
+### Applied staging permission correction and post-change checks (2026-10-06)
+
+After PM review and owner authorization, a fresh private ACL export matched the
+guarded migration preflight, the previous owners/grantors/grant options and
+default ACL snapshot; the inverse matched the exact inspected prior state. The
+checked-in `20261005000001_converge_function_execute_grants.sql` ran as one
+transaction on staging project `erylzsdmsohvssgqwfor` under postgres. The
+transaction completed successfully.
+
+An immediate export verified only the intended delta: anon EXECUTE removed from
+the ten listed functions; authenticated EXECUTE removed only from the two
+trigger-only guards. Authenticated membership execution, anon invite-preview
+execution, other intended grants, function owners/grantors/options and public /
+storage default ACLs were preserved. No schema, migration ledger or table data
+was changed.
+
+The rollback-only authorization harness then passed **11/11** again under the
+corrected ACLs. A final read-only export confirmed all five app-table
+fingerprints unchanged across the run, exact post-correction function ACLs and
+defaults still present, and no leftover fixtures or temporary table. The
+postgres role and clear JWT state were confirmed. The inverse was retained as
+recovery evidence and was not executed. Account identifiers and fingerprints
+remain private.
 
 ### Redacted PM-observed browser UI checks (2026-10-06)
 
@@ -204,9 +225,9 @@ PM DOM or server-payload evidence. No personal values are included.
   on Preview; owner-reported group availability does not replace that evidence.
 - Complete outstanding refresh/account-switch, navigation and eligible
   weigh-in-destination acceptance. Partial UI checks do not complete acceptance.
-- The scoped connected rollback-only SQL harness passed, but remote ACL
-  convergence/recovery remains unexecuted. PM must confirm the fresh ACL
-  preflight and permission-only recovery plan before permanent convergence.
+- The connected rollback-only harness passed before and after the guarded ACL
+  correction. Remote permission correction is applied and verified; the inverse
+  remains unexecuted and is reserved for an approved recovery decision if needed.
 - Review migration lineage separately; schema/data recovery rehearsal and
   production/main authorization retain their separate gates. Never request
   passwords/keys or use browser observations as SQL/RLS proof.
