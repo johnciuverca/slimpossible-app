@@ -271,7 +271,7 @@ describe('DailyWeighInFormPage', () => {
     ).toBeDisabled()
     expect(
       screen.getByText(
-        'Authorized group views show aggregate progress and eligible weekly comparison names and check-in dates. They do not expose individual weigh-ins or private notes.',
+        'Active members and the owner can see dates and weights you explicitly choose to share in a group challenge. They never see your private notes; unchecked entries stay private.',
       ),
     ).toBeInTheDocument()
     expect(

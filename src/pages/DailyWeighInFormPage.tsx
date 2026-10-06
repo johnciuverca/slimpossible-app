@@ -567,9 +567,9 @@ export function DailyWeighInFormPage() {
               Your note stays private
             </h2>
             <p className="mt-3 text-sm leading-6 text-ink-muted">
-              Authorized group views show aggregate progress and eligible weekly
-              comparison names and check-in dates. They do not expose individual
-              weigh-ins or private notes.
+              Active members and the owner can see dates and weights you
+              explicitly choose to share in a group challenge. They never see
+              your private notes; unchecked entries stay private.
             </p>
             <dl className="mt-5 divide-y divide-line rounded-xl border border-line bg-page px-4">
               <div className="flex items-baseline justify-between gap-4 py-3">

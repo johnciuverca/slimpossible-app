@@ -31,7 +31,7 @@ for (const viewport of [
     ).toBeDisabled()
     await expect(
       page.getByText(
-        'Authorized group views show aggregate progress and eligible weekly comparison names and check-in dates. They do not expose individual weigh-ins or private notes.',
+        'Active members and the owner can see dates and weights you explicitly choose to share in a group challenge. They never see your private notes; unchecked entries stay private.',
       ),
     ).toBeVisible()
     await expect(
@@ -40,9 +40,15 @@ for (const viewport of [
 
     const note = page.getByLabel('Private note (optional)')
     const saveButton = page.getByRole('button', { name: 'Save weigh-in' })
+    const shareWithGroup = page.getByRole('checkbox', {
+      name: /Share this date and weight with this group’s active members and owner/,
+    })
+    await expect(shareWithGroup).not.toBeChecked()
     await page.getByLabel('Weight in kg').fill('91.8')
     await note.fill('Kept my routine and feel good.')
     await note.focus()
+    await page.keyboard.press('Tab')
+    await expect(shareWithGroup).toBeFocused()
     await page.keyboard.press('Tab')
     await expect(saveButton).toBeFocused()
     await page.keyboard.press('Enter')
@@ -65,12 +71,16 @@ for (const viewport of [
       savedList.getByText('Kept my routine and feel good.'),
     ).toBeVisible()
 
-    const date = await page.getByLabel('Date').getAttribute('max')
+    const date = await page
+      .getByLabel('Date', { exact: true })
+      .getAttribute('max')
     expect(date).toBeTruthy()
     await page.getByRole('button', { name: `Edit ${date}` }).click()
     await page.getByLabel('Weight in kg').fill('91.4')
     await note.fill('Updated private check-in.')
     await note.focus()
+    await page.keyboard.press('Tab')
+    await expect(shareWithGroup).toBeFocused()
     await page.keyboard.press('Tab')
     const updateButton = page.getByRole('button', { name: 'Update weigh-in' })
     await expect(updateButton).toBeFocused()

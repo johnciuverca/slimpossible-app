@@ -101,8 +101,14 @@ test('renders private, saved Progress records accessibly at a mobile viewport', 
     page.getByRole('table', { name: 'Your saved personal weigh-ins' }),
   ).toBeVisible()
 
-  const groupHistory = page.getByRole('region', { name: 'Group history' })
-  await expect(groupHistory).toContainText('Coming in Chapter 16')
+  const groupHistory = page.getByRole('region', {
+    name: 'Shared group weigh-ins',
+  })
+  await expect(groupHistory).toContainText('Opted-in dates and weights only')
+  await expect(groupHistory).toContainText('Notes are never shown here')
+  await expect(groupHistory).toContainText(
+    'Shared group history is unavailable right now.',
+  )
   await expect(groupHistory.getByRole('link')).toHaveCount(0)
   await expect(groupHistory.getByRole('button')).toHaveCount(0)
   await expect
