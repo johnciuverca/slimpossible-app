@@ -79,7 +79,7 @@ compatible with the qualified invite digest/random-byte calls.
    and restoration plan, exact reviewed delta/migration order, explicit owner
    database authorization and a separately reviewed staging-to-main release.
 
-## Connected acceptance (not executed)
+## Connected acceptance (partial, PM-reported)
 
 The updated `supabase/tests/personal_group_challenges_authorization.sql` requires
 three **explicitly owner-approved, existing disposable** UUIDs (owner/member/
@@ -116,11 +116,21 @@ changes. CREATE OR REPLACE preserved the corrected helper ACL. New functions
 still inherit the unchanged platform defaults: every future migration must
 explicitly review client grants. None of this replaces connected acceptance.
 
-The feature Preview's invalid-token invitation page was inspected read-only
-and resolved to the invalid-invitation state without login or writes. The
-available inspection surface did not expose resource timing/network hosts;
-the actual Supabase destination is still **NOT VERIFIED**, not inferred from
-the Remote authentication label or an empty invalid-token result.
+On 2026-10-06 PM reported observing actual feature Preview requests to
+`erylzsdmsohvssgqwfor.supabase.co` for Auth token, profiles, challenges,
+participants, weigh-ins and group RPCs. This is PM-observed network evidence,
+not an inference from the Remote authentication label; no credentials are
+recorded here. This agent's earlier invalid-token lookup alone did not establish
+the host. Owner/member/outsider SQL acceptance remains unexecuted remotely.
+
+PM also reported that the owner created a private personal test context without
+overwriting the existing group, explicitly enrolled with a 100-to-85 kg goal,
+saved remotely and saw an active participant. The success panel incorrectly
+offered Invite participants for the personal context. The follow-up fix omits
+that action for personal kind and preserves it for explicit/legacy groups;
+focused tests cover newly saved and existing membership. The corrected UI
+still needs a connected recheck on its new Preview deployment. These partial
+owner observations do not establish complete multi-account/privacy acceptance.
 
 Next owner step: privately identify the three disposable staging Auth UUIDs
 and designate their roles; do not send passwords or service-role keys. No

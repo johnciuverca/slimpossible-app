@@ -276,111 +276,207 @@ describe('ParticipantEnrollmentPage', () => {
     ).toBe(false)
   })
 
-  it('offers next steps instead of creating a duplicate owner membership', async () => {
-    vi.stubEnv('VITE_SUPABASE_URL', 'https://staging-project.supabase.co')
-    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-anon-key')
+  it.each(['personal', 'group', null])(
+    'offers kind-appropriate next steps for an existing %s owner membership',
+    async (kind) => {
+      vi.stubEnv('VITE_SUPABASE_URL', 'https://staging-project.supabase.co')
+      vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-anon-key')
 
-    const ownerId = '11111111-1111-4111-8111-111111111111'
-    const otherChallengeId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
-    const selectedChallengeId = '22222222-2222-4222-8222-222222222222'
-    const ownerMembership = {
-      challenge_id: selectedChallengeId,
-      created_at: '2026-09-24T09:00:00.000Z',
-      display_name: 'Challenge owner',
-      id: '33333333-3333-4333-8333-333333333333',
-      joined_at: '2026-09-24T09:00:00.000Z',
-      status: 'active',
-      starting_weight_kg: 90,
-      target_weight_kg: 82,
-      user_id: ownerId,
-    }
-    const fetchMock = vi.fn(
-      async (input: RequestInfo | URL, init?: RequestInit) => {
-        const url = String(input)
-        const method = init?.method ?? 'GET'
+      const ownerId = '11111111-1111-4111-8111-111111111111'
+      const otherChallengeId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+      const selectedChallengeId = '22222222-2222-4222-8222-222222222222'
+      const ownerMembership = {
+        challenge_id: selectedChallengeId,
+        created_at: '2026-09-24T09:00:00.000Z',
+        display_name: 'Challenge owner',
+        id: '33333333-3333-4333-8333-333333333333',
+        joined_at: '2026-09-24T09:00:00.000Z',
+        status: 'active',
+        starting_weight_kg: 90,
+        target_weight_kg: 82,
+        user_id: ownerId,
+      }
+      const fetchMock = vi.fn(
+        async (input: RequestInfo | URL, init?: RequestInit) => {
+          const url = String(input)
+          const method = init?.method ?? 'GET'
 
-        if (url.includes('/challenges?')) {
-          return jsonResponse([
-            {
-              created_at: '2026-09-24T07:00:00.000Z',
-              created_by: ownerId,
-              description: null,
-              end_date: '2026-11-01',
-              id: otherChallengeId,
-              name: 'Other owned challenge',
-              owner_id: ownerId,
-              start_date: '2026-08-01',
-              status: 'active',
-              target_weight_kg: null,
-              updated_at: '2026-09-24T07:00:00.000Z',
-            },
-            {
-              created_at: '2026-09-24T08:00:00.000Z',
-              created_by: ownerId,
-              description: null,
-              end_date: '2026-12-01',
-              id: selectedChallengeId,
-              name: 'Selected challenge',
-              owner_id: ownerId,
-              start_date: '2026-09-01',
-              status: 'active',
-              target_weight_kg: null,
-              updated_at: '2026-09-24T08:00:00.000Z',
-            },
-          ])
-        }
-        if (url.includes('/participants?') && method === 'GET') {
-          return jsonResponse(
-            url.includes(`challenge_id=eq.${selectedChallengeId}`)
-              ? [ownerMembership]
-              : [],
-          )
-        }
-        throw new Error(`Unexpected staging request: ${method} ${url}`)
-      },
-    )
-    vi.stubGlobal('fetch', fetchMock)
+          if (url.includes('/challenges?')) {
+            return jsonResponse([
+              {
+                created_at: '2026-09-24T07:00:00.000Z',
+                created_by: ownerId,
+                description: null,
+                end_date: '2026-11-01',
+                id: otherChallengeId,
+                name: 'Other owned challenge',
+                owner_id: ownerId,
+                start_date: '2026-08-01',
+                status: 'active',
+                target_weight_kg: null,
+                updated_at: '2026-09-24T07:00:00.000Z',
+              },
+              {
+                created_at: '2026-09-24T08:00:00.000Z',
+                created_by: ownerId,
+                description: null,
+                end_date: '2026-12-01',
+                id: selectedChallengeId,
+                challenge_kind: kind,
+                name: 'Selected challenge',
+                owner_id: ownerId,
+                start_date: '2026-09-01',
+                status: 'active',
+                target_weight_kg: null,
+                updated_at: '2026-09-24T08:00:00.000Z',
+              },
+            ])
+          }
+          if (url.includes('/participants?') && method === 'GET') {
+            return jsonResponse(
+              url.includes(`challenge_id=eq.${selectedChallengeId}`)
+                ? [ownerMembership]
+                : [],
+            )
+          }
+          throw new Error(`Unexpected staging request: ${method} ${url}`)
+        },
+      )
+      vi.stubGlobal('fetch', fetchMock)
 
-    renderPage(
-      makeAuthValue({
-        error: null,
-        status: 'signed-in',
-        user: { email: 'owner@example.test', id: ownerId },
-      }),
-      `/challenge/participants/enroll?challenge=${selectedChallengeId}&self=owner`,
-    )
+      renderPage(
+        makeAuthValue({
+          error: null,
+          status: 'signed-in',
+          user: { email: 'owner@example.test', id: ownerId },
+        }),
+        `/challenge/participants/enroll?challenge=${selectedChallengeId}&self=owner`,
+      )
 
-    expect(
-      await screen.findByRole('heading', {
-        name: 'You’re already participating.',
-      }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByText(/no duplicate membership was created/),
-    ).toBeInTheDocument()
-    expect(
-      screen.queryByRole('form', { name: 'Participant enrollment form' }),
-    ).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Go to Today' })).toHaveAttribute(
-      'href',
-      `/today?challenge=${selectedChallengeId}`,
-    )
-    expect(
-      screen.getByRole('link', { name: 'Invite participants' }),
-    ).toHaveAttribute(
-      'href',
-      `/challenge/invites?challenge=${selectedChallengeId}`,
-    )
-    const participantListCall = fetchMock.mock.calls.find(([url]) =>
-      String(url).includes('/participants?'),
-    )
-    expect(String(participantListCall?.[0])).toContain(
-      `challenge_id=eq.${selectedChallengeId}`,
-    )
-    expect(
-      fetchMock.mock.calls.some(([, init]) => init?.method === 'POST'),
-    ).toBe(false)
-  })
+      expect(
+        await screen.findByRole('heading', {
+          name: 'You’re already participating.',
+        }),
+      ).toBeInTheDocument()
+      expect(
+        screen.getByText(/no duplicate membership was created/),
+      ).toBeInTheDocument()
+      expect(
+        screen.queryByRole('form', { name: 'Participant enrollment form' }),
+      ).not.toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Go to Today' })).toHaveAttribute(
+        'href',
+        `/today?challenge=${selectedChallengeId}`,
+      )
+      if (kind === 'personal') {
+        expect(
+          screen.queryByRole('link', { name: 'Invite participants' }),
+        ).not.toBeInTheDocument()
+      } else {
+        expect(
+          screen.getByRole('link', { name: 'Invite participants' }),
+        ).toHaveAttribute(
+          'href',
+          `/challenge/invites?challenge=${selectedChallengeId}`,
+        )
+      }
+      const participantListCall = fetchMock.mock.calls.find(([url]) =>
+        String(url).includes('/participants?'),
+      )
+      expect(String(participantListCall?.[0])).toContain(
+        `challenge_id=eq.${selectedChallengeId}`,
+      )
+      expect(
+        fetchMock.mock.calls.some(([, init]) => init?.method === 'POST'),
+      ).toBe(false)
+    },
+  )
+
+  it.each(['personal', 'group'])(
+    'shows kind-appropriate next steps after saving %s owner enrollment',
+    async (kind) => {
+      vi.stubEnv('VITE_SUPABASE_URL', 'https://staging-project.supabase.co')
+      vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-anon-key')
+      const ownerId = '11111111-1111-4111-8111-111111111111'
+      const challengeId = '22222222-2222-4222-8222-222222222222'
+      const fetchMock = vi.fn(
+        async (input: RequestInfo | URL, init?: RequestInit) => {
+          const url = String(input)
+          if (url.includes('/challenges?'))
+            return jsonResponse([
+              {
+                id: challengeId,
+                owner_id: ownerId,
+                created_by: ownerId,
+                name: 'Selected challenge',
+                challenge_kind: kind,
+                description: null,
+                start_date: '2026-09-01',
+                end_date: '2026-12-01',
+                status: 'active',
+                target_weight_kg: null,
+                created_at: '2026-09-24T08:00:00.000Z',
+                updated_at: '2026-09-24T08:00:00.000Z',
+              },
+            ])
+          if (url.includes('/participants?') && init?.method !== 'POST')
+            return jsonResponse([])
+          if (url.includes('/participants') && init?.method === 'POST') {
+            return jsonResponse(
+              {
+                ...JSON.parse(String(init.body)),
+                id: '33333333-3333-4333-8333-333333333333',
+                created_at: '2026-09-24T09:00:00.000Z',
+                updated_at: '2026-09-24T09:00:00.000Z',
+              },
+              201,
+            )
+          }
+          throw new Error(`Unexpected request: ${url}`)
+        },
+      )
+      vi.stubGlobal('fetch', fetchMock)
+      renderPage(
+        makeAuthValue({
+          error: null,
+          status: 'signed-in',
+          user: { id: ownerId, email: 'owner@example.test' },
+        }),
+        `/challenge/participants/enroll?challenge=${challengeId}&self=owner`,
+      )
+      fireEvent.change(await screen.findByLabelText('Display name'), {
+        target: { value: 'Private owner' },
+      })
+      fireEvent.change(screen.getByLabelText('Starting weight in kg'), {
+        target: { value: '100' },
+      })
+      fireEvent.change(screen.getByLabelText('Target weight in kg'), {
+        target: { value: '85' },
+      })
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Enroll participant' }),
+      )
+      expect(
+        await screen.findByRole('heading', { name: 'You’re enrolled.' }),
+      ).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Go to Today' })).toHaveAttribute(
+        'href',
+        `/today?challenge=${challengeId}`,
+      )
+      if (kind === 'personal') {
+        expect(
+          screen.queryByRole('link', { name: 'Invite participants' }),
+        ).not.toBeInTheDocument()
+      } else {
+        expect(
+          screen.getByRole('link', { name: 'Invite participants' }),
+        ).toHaveAttribute('href', `/challenge/invites?challenge=${challengeId}`)
+      }
+      expect(
+        fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST'),
+      ).toHaveLength(1)
+    },
+  )
 
   it('keeps the saved challenge and owner details retryable when enrollment fails', async () => {
     vi.stubEnv('VITE_SUPABASE_URL', 'https://staging-project.supabase.co')
