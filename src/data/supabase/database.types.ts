@@ -121,6 +121,7 @@ export type Database = {
           note: string | null
           participant_id: string
           recorded_date: string
+          share_with_group: boolean
           updated_at: string
           weight_kg: number
         }
@@ -130,6 +131,7 @@ export type Database = {
           note?: string | null
           participant_id: string
           recorded_date: string
+          share_with_group?: boolean
           updated_at?: string
           weight_kg: number
         }
@@ -139,6 +141,7 @@ export type Database = {
           note?: string | null
           participant_id?: string
           recorded_date?: string
+          share_with_group?: boolean
           updated_at?: string
           weight_kg?: number
         }
@@ -192,6 +195,15 @@ export type Database = {
           reached_target_count: number
           weekly_winner_count: number
           weekly_winner_names: string[]
+        }[]
+      }
+      get_group_weigh_in_history: {
+        Args: { target_challenge_id: string }
+        Returns: {
+          change_since_previous_kg: number | null
+          display_name: string
+          recorded_date: string
+          weight_kg: number
         }[]
       }
       get_provisional_group_leader_summary: {

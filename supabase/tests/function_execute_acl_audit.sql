@@ -16,7 +16,8 @@ where n.nspname = 'public' and p.proname in (
   'is_challenge_member', 'list_challenge_invites', 'revoke_challenge_invite',
   'prevent_challenge_ownership_change', 'prevent_participant_user_reassignment',
   'prevent_challenge_kind_change', 'prevent_personal_challenge_invites',
-  'preview_challenge_invite', 'get_group_progress_summary', 'get_provisional_group_leader_summary'
+  'preview_challenge_invite', 'get_group_progress_summary', 'get_provisional_group_leader_summary',
+  'get_group_weigh_in_history'
 )
 order by function_identity, grantee;
 select pg_get_userbyid(d.defaclrole) as owner, n.nspname as schema,

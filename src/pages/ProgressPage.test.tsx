@@ -126,7 +126,10 @@ function authValue(userId: string): AuthContextValue {
   }
 }
 
-function installRemoteFixtures({ emptyWeighIns = false } = {}) {
+function installRemoteFixtures({
+  emptyWeighIns = false,
+  groupHistory = [],
+}: { emptyWeighIns?: boolean; groupHistory?: unknown[] } = {}) {
   vi.stubEnv('VITE_SUPABASE_URL', 'https://progress-project.supabase.co')
   vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-test-key')
   vi.stubGlobal(
@@ -153,6 +156,9 @@ function installRemoteFixtures({ emptyWeighIns = false } = {}) {
             ),
           ),
         )
+      }
+      if (url.includes('/rpc/get_group_weigh_in_history')) {
+        return Promise.resolve(response(groupHistory))
       }
       return Promise.resolve(response([]))
     }),
@@ -207,8 +213,10 @@ describe('ProgressPage', () => {
     expect(
       screen.queryByRole('table', { name: 'Your saved personal weigh-ins' }),
     ).not.toBeInTheDocument()
-    expect(screen.getByText('Group history')).toBeInTheDocument()
-    expect(screen.getByText('Coming in Chapter 16')).toBeInTheDocument()
+    expect(screen.getByText('Shared group weigh-ins')).toBeInTheDocument()
+    expect(
+      await screen.findByText('No entries have been shared with this group.'),
+    ).toBeInTheDocument()
   })
 
   it('clears prior challenge history and displays only the selected challenge records', async () => {
@@ -269,8 +277,20 @@ describe('ProgressPage', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('keeps group history explicitly unavailable and non-actionable', async () => {
-    installRemoteFixtures()
+  it('renders only server-authorized shared history and never private notes', async () => {
+    installRemoteFixtures({
+      groupHistory: [
+        {
+          change_since_previous_kg: -1.5,
+          display_name: 'Visible member',
+          recorded_date: '2026-09-20',
+          weight_kg: 88.5,
+          note: 'must stay private',
+          participant_id: 'must stay private',
+          user_id: 'must stay private',
+        },
+      ],
+    })
     render(
       <AuthContext.Provider value={authValue('member-1')}>
         <MemoryRouter initialEntries={['/progress?challenge=challenge-1']}>
@@ -279,11 +299,14 @@ describe('ProgressPage', () => {
       </AuthContext.Provider>,
     )
 
-    const placeholder = await screen.findByRole('region', {
-      name: 'Group history',
+    const history = await screen.findByRole('region', {
+      name: 'Shared group weigh-ins',
     })
-    expect(placeholder).toHaveTextContent('Coming in Chapter 16')
-    expect(placeholder).toHaveTextContent('other participants’ histories')
-    expect(placeholder.querySelectorAll('a, button')).toHaveLength(0)
+    expect(await screen.findByText('Visible member')).toBeInTheDocument()
+    expect(history).toHaveTextContent('Visible member')
+    expect(history).toHaveTextContent('88.5 kg')
+    expect(history).toHaveTextContent('−1.5 kg')
+    expect(history).not.toHaveTextContent('must stay private')
+    expect(history).not.toHaveTextContent('private note')
   })
 })

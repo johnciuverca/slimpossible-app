@@ -19,6 +19,7 @@ for task_migration in supabase/migrations/*.sql; do
   fi
 done
 "${task_psql[@]}" -f supabase/tests/local_acl_fixture.sql
+"${task_psql[@]}" -f supabase/tests/group_weigh_in_history_authorization.sql
 run_harness() {
   sed -e 's/REPLACE_OWNER_UUID/00000000-0000-4000-8000-000000000001/g' \
       -e 's/REPLACE_MEMBER_UUID/00000000-0000-4000-8000-000000000002/g' \

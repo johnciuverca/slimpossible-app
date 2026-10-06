@@ -8,7 +8,10 @@ import type {
   InviteAcceptanceValues,
 } from '../../models/challengeInvite'
 import type { WeighIn } from '../../models/weighIn'
-import type { GroupProgressSummary } from '../../models/groupProgress'
+import type {
+  GroupProgressSummary,
+  GroupWeighInHistoryEntry,
+} from '../../models/groupProgress'
 import type { ProvisionalGroupLeaderSummary } from '../../models/provisionalGroupLeader'
 import type { Database } from './database.types'
 
@@ -41,6 +44,8 @@ type CreatedChallengeInviteRow =
   Database['public']['Functions']['create_challenge_invite']['Returns'][number]
 type GroupProgressRow =
   Database['public']['Functions']['get_group_progress_summary']['Returns'][number]
+type GroupWeighInHistoryRow =
+  Database['public']['Functions']['get_group_weigh_in_history']['Returns'][number]
 type ProvisionalGroupLeaderRow =
   Database['public']['Functions']['get_provisional_group_leader_summary']['Returns'][number]
 
@@ -111,6 +116,9 @@ export type GroupProgressRepository = {
     challengeId: string,
     currentDate: string,
   ) => Promise<RepositoryResult<ProvisionalGroupLeaderSummary>>
+  getWeighInHistory: (
+    challengeId: string,
+  ) => Promise<RepositoryListResult<GroupWeighInHistoryEntry>>
 }
 
 export type CreatedChallengeInvite = {
@@ -170,6 +178,7 @@ export type WeighInWriteInput = {
   date: string
   note?: string
   participantId: string
+  shareWithGroup?: boolean
   weightKg: number
 }
 
@@ -229,11 +238,23 @@ function mapProfile(row: ProfileRow): Profile {
   return { displayName: row.display_name, id: row.id }
 }
 
+function mapGroupWeighInHistory(
+  row: GroupWeighInHistoryRow,
+): GroupWeighInHistoryEntry {
+  return {
+    changeSincePreviousKg: row.change_since_previous_kg,
+    date: row.recorded_date,
+    displayName: row.display_name,
+    weightKg: row.weight_kg,
+  }
+}
+
 function mapWeighIn(row: WeighInRow): WeighIn {
   return {
     date: row.recorded_date,
     ...(row.note === null ? {} : { note: row.note }),
     participantId: row.participant_id,
+    shareWithGroup: row.share_with_group,
     weightKg: row.weight_kg,
   }
 }
@@ -566,6 +587,18 @@ export function createRepositories(client: DatabaseClient): Repositories {
         }
         return result
       },
+      async getWeighInHistory(challengeId) {
+        const { data, error } = await client.rpc('get_group_weigh_in_history', {
+          target_challenge_id: challengeId,
+        })
+        if (error) {
+          return {
+            error: requestError('load shared group weigh-ins', error),
+            state: 'error',
+          }
+        }
+        return mapList(data, mapGroupWeighInHistory, 'shared group weigh-in')
+      },
     },
     participants: {
       async create(input) {
@@ -785,6 +818,7 @@ export function createRepositories(client: DatabaseClient): Repositories {
             note: input.note ?? null,
             participant_id: input.participantId,
             recorded_date: input.date,
+            share_with_group: input.shareWithGroup ?? false,
             weight_kg: input.weightKg,
           })
           .select('*')
@@ -815,6 +849,7 @@ export function createRepositories(client: DatabaseClient): Repositories {
             note: input.note ?? null,
             participant_id: input.participantId,
             recorded_date: input.date,
+            share_with_group: input.shareWithGroup ?? false,
             weight_kg: input.weightKg,
           })
           .eq('id', id)
@@ -836,6 +871,7 @@ export function createRepositories(client: DatabaseClient): Repositories {
               note: input.note ?? null,
               participant_id: input.participantId,
               recorded_date: input.date,
+              share_with_group: input.shareWithGroup ?? false,
               weight_kg: input.weightKg,
             },
             { onConflict: 'participant_id,recorded_date' },
