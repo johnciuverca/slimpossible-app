@@ -77,10 +77,10 @@ correction recorded below):**
    the earlier exposure, so recovery also needs explicit approval.
 3. Re-run the catalog export and scoped acceptance. Review any remaining drift
    before recording lineage. Only after definition equivalence is approved may
-   an owner reconcile the seven manually applied version records using the
+   an owner reconcile the eight manually applied version records using the
    supported migration bookkeeping workflow. Do not use ledger repair to hide
    unexplained drift. Keep SQL checksums, dated export and review together.
-4. Do not replay any of the seven migrations on staging: their objects already
+4. Do not replay any of the eight migrations on staging: their objects already
    exist. Do not reset the database or backfill NULL kinds. Future migrations
    require a reconciled ledger and reviewed dry run against the exact project.
 5. Production is a separate gate: fresh read-only comparison, approved backup

@@ -68,6 +68,11 @@ describe('InviteAcceptancePage', () => {
       expect(screen.getByText('Autumn challenge')).toBeInTheDocument(),
     )
     expect(
+      screen.getByRole('complementary', { name: 'Group sharing and privacy' }),
+    ).toHaveTextContent(
+      'Only dates and weights you explicitly share are visible to active challenge members and the owner. Your notes remain private.',
+    )
+    expect(
       screen.getByRole('link', { name: 'Sign in to accept' }),
     ).toHaveAttribute('href', '/login')
     expect(screen.getByText(/return here to accept/)).toBeInTheDocument()
@@ -98,6 +103,9 @@ describe('InviteAcceptancePage', () => {
         screen.getByRole('form', { name: 'Accept invitation form' }),
       ).toBeInTheDocument(),
     )
+    expect(
+      screen.getByRole('complementary', { name: 'Group sharing and privacy' }),
+    ).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('Display name'), {
       target: { value: 'Accepted member' },
     })

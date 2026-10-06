@@ -44,6 +44,10 @@ The migration rollback removes the RPC and column, which discards saved
 sharing choices. Review/preserve those choices before rollback after opt-ins
 have been collected. Neither this migration nor its rollback has been applied
 to staging or Production as part of the local implementation work.
+See [the #209 staging and recovery plan](group-weigh-in-history-staging-plan.md)
+for the current destination, migration-history gate, rollback-only checks, and
+backup requirements. Both forward migration and inverse are transaction-wrapped
+so the schema delta cannot be left partially applied by a SQL-editor error.
 
 The policy migration does not add repositories, persistence flows, client
 authentication, activity checks, or demo data. It also does not require a

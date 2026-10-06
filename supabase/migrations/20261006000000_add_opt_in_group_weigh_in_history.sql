@@ -1,5 +1,7 @@
 -- Sharing is opt-in per weigh-in. Existing rows remain private because the
 -- new flag defaults false; no historical rows are automatically backfilled.
+begin;
+
 alter table public.weigh_ins
   add column share_with_group boolean not null default false;
 
@@ -81,3 +83,5 @@ revoke all on function public.get_group_weigh_in_history(uuid)
   from public, anon, authenticated;
 grant execute on function public.get_group_weigh_in_history(uuid)
   to authenticated;
+
+commit;
