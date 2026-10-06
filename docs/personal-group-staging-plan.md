@@ -54,9 +54,16 @@ compatible with the qualified invite digest/random-byte calls.
 
 ## Convergence and application sequence (not executed)
 
-1. Owner exports schema/role grants and backs up data securely, records the
-   recoverable snapshot/time and rehearses restoration in an isolated target.
-   A free-tier project or a dashboard badge is not proof of a usable backup.
+1. Match recovery to the proposed delta. For the permission-only
+   `20261005000001` correction, retain a fresh private direct/effective ACL export,
+   including owners, grantors, grant options and function defaults; compare it
+   with the guarded forward/inverse files and retain the local recovery rehearsal.
+   Re-export immediately before application and abort on drift. The exact inverse
+   restores the inspected grants without touching data or schema, but requires
+   explicit approval because it restores earlier exposure. A full data restore
+   rehearsal is a separate gate for schema/data changes and production release,
+   not a prerequisite for this permission-only delta. A dashboard badge alone is
+   never evidence of a usable data backup.
 2. PM reviews grant drift. The checked-in `20261005000001` candidate explicitly revokes
    anon EXECUTE from the ten non-public functions above; revoke authenticated
    EXECUTE from the two new trigger-only functions. Preserve authenticated RPC
@@ -121,7 +128,45 @@ On 2026-10-06 PM reported observing actual feature Preview requests to
 participants, weigh-ins and group RPCs. This is PM-observed network evidence,
 not an inference from the Remote authentication label; no credentials are
 recorded here. This agent's earlier invalid-token lookup alone did not establish
-the host. Owner/member/outsider SQL acceptance remains unexecuted remotely.
+the host. Connected owner/member/outsider SQL checks were subsequently executed
+as described below; they do not establish complete browser acceptance.
+
+### Executed rollback-only staging SQL checks (2026-10-06)
+
+The owner approved three specific existing disposable identities and the exact
+staging project above. A private, exact-email Auth lookup resolved each role to
+one existing user and confirmed distinct UUIDs; no accounts were created and no
+identity mapping is published here. The fresh read-only ACL export still matched
+the candidate correction's expected owners, direct grants, grantors and options.
+The ten non-public functions retained the previously identified anon grants; the
+two new trigger-only functions also retained authenticated EXECUTE. Intentional
+preview access, group/provisional grants and function defaults were unchanged.
+
+The complete checked-in authorization harness ran in one BEGIN/ROLLBACK batch:
+**11/11 connected checks passed**. Assertions used authenticated role and JWT
+subjects for owner/member/outsider; postgres only prepared isolated fixtures.
+Checks covered owner visibility and explicit enrollment, no implicit enrollment,
+denial of adding another person to personal challenges, denial of personal
+invites and kind changes, preserved group invite/member access, member personal
+challenge/participant non-disclosure and outsider non-disclosure.
+
+Before/after private row-count and content-digest fingerprints matched for
+profiles, challenges, participants, weigh-ins and challenge invites. No labelled
+fixtures or temporary results table remained; postgres role was restored and
+the JWT subject was clear. All 13 audited function ACLs and function defaults
+matched the pre-run snapshot. No permanent ACL/schema changes or ledger repair
+were performed, and production was untouched.
+
+An initial editor submission was rejected at SQL parsing because the editor
+inserted the harness into the preceding query. An explicit ROLLBACK and
+read-only audit confirmed no changes. Clipboard replacement then verified an
+exact match to the harness before the successful execution above. Fingerprints,
+account identifiers and personal values are retained privately, not published.
+
+The smallest next step is PM confirmation of this fresh preflight and the
+permission-only inverse/recovery plan before applying the exact guarded ACL
+correction. Then refresh the ACL export and connected checks. Successful checks
+under the current ACLs do not mean the excessive EXECUTE grants are corrected.
 
 ### Redacted PM-observed browser UI checks (2026-10-06)
 
@@ -148,18 +193,23 @@ visible DOM account identity for each role's observation.
   Go to Today. **Existing-enrollment UI recheck passed**; this does not cover
   fresh post-fix enrollment or the group invitation action.
 
+The owner additionally reported that group invitations remain available,
+personal Today entries persist after switching, and personal Goals calculations
+are correct. These are owner-reported observations, not independently inspected
+PM DOM or server-payload evidence. No personal values are included.
+
 ### Remaining acceptance and release gates
 
-- Recheck the group invitation action and fresh post-fix enrollment on Preview;
-  only personal existing-enrollment omission/Today selection has been rechecked.
+- Independently recheck the group invitation action and fresh post-fix enrollment
+  on Preview; owner-reported group availability does not replace that evidence.
 - Complete outstanding refresh/account-switch, navigation and eligible
   weigh-in-destination acceptance. Partial UI checks do not complete acceptance.
-- Execute the remotely unexecuted rollback-only SQL harness only with explicitly
-  approved disposable owner/member/outsider UUIDs and staging scope. Never
-  request passwords/keys or use UI results as SQL/RLS proof.
-- Review/approve remote grant convergence, migration lineage and actual backup/
-  restoration rehearsal. Local forward/inverse tests do not verify remote ACL
-  correction or recovery. Production/main retains separate gates.
+- The scoped connected rollback-only SQL harness passed, but remote ACL
+  convergence/recovery remains unexecuted. PM must confirm the fresh ACL
+  preflight and permission-only recovery plan before permanent convergence.
+- Review migration lineage separately; schema/data recovery rehearsal and
+  production/main authorization retain their separate gates. Never request
+  passwords/keys or use browser observations as SQL/RLS proof.
 - Follow-ups #228 (scroll-wheel input changes) and #229 (per-page challenge tabs)
   are recorded separately; neither is started or included in this PR.
 
@@ -169,6 +219,7 @@ Revert the application before considering schema rollback. The checked-in
 guarded rollback aborts if any personal challenges exist: dropping the kind
 would erase their privacy classification. Do not delete or reclassify existing
 personal rows to bypass that guard. Preserve them via reviewed restoration or
-forward repair, with the owner choosing the recovery route. A backup/restore
-rehearsal, actual connected acceptance and production authorization remain
-pending; code/CI success alone is not release approval.
+forward repair, with the owner choosing the recovery route. Schema/data
+backup/restore rehearsal, the remaining connected browser matrix and production
+authorization remain pending; the passing rollback-only SQL checks and code/CI
+success alone are not release approval.
