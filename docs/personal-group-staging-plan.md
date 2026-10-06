@@ -142,12 +142,16 @@ visible DOM account identity for each role's observation.
   goal or history fields. UI non-disclosure does not prove server payload privacy.
 - Owner enrollment's success panel originally offered Invite participants for
   personal kind. The fix at `299e8e5` omits that action for personal kind and
-  preserves it for explicit/legacy groups. **Connected owner recheck is pending.**
+  preserves it for explicit/legacy groups. PM's October 6 connected owner
+  recheck confirmed the personal existing-enrollment panel shows already
+  participating, omits Invite participants, and keeps personal selection in
+  Go to Today. **Existing-enrollment UI recheck passed**; this does not cover
+  fresh post-fix enrollment or the group invitation action.
 
 ### Remaining acceptance and release gates
 
-- PM/owner rechecks the invitation fix on the new Preview: personal omits
-  Invite participants, Group retains it, and Go to Today keeps selection.
+- Recheck the group invitation action and fresh post-fix enrollment on Preview;
+  only personal existing-enrollment omission/Today selection has been rechecked.
 - Complete outstanding refresh/account-switch, navigation and eligible
   weigh-in-destination acceptance. Partial UI checks do not complete acceptance.
 - Execute the remotely unexecuted rollback-only SQL harness only with explicitly
