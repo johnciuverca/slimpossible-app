@@ -118,6 +118,11 @@ type PersonalDashboardSnapshot = {
   requestKey: string
 }
 
+function challengeContextName(challenge?: Challenge) {
+  if (!challenge) return 'Selected challenge'
+  return `${challenge.kind === 'personal' ? 'Personal' : 'Group'} · ${challenge.name}`
+}
+
 function usePersonalDashboard({ preferJoinedChallenge = false } = {}) {
   const { state: authState } = useOptionalAuth()
   const [searchParams] = useSearchParams()
@@ -350,6 +355,7 @@ export function HomePage() {
   const persistence = useMemo(() => createPersistence(authState), [authState])
   const [challenges, setChallenges] = useState<Challenge[]>([])
   const [participants, setParticipants] = useState<Participant[]>([])
+  const [loadedOwnerId, setLoadedOwnerId] = useState('')
   const [overview, setOverview] = useState<{
     challengeId: string
     personalFlow: ParticipantDashboardFlow | null
@@ -368,6 +374,7 @@ export function HomePage() {
       if (authState.status !== 'signed-in' || !ownerId) {
         setChallenges([])
         setParticipants([])
+        setLoadedOwnerId('')
         setOverview(null)
         setIsLoading(false)
         setLoadError('')
@@ -377,6 +384,7 @@ export function HomePage() {
       if (persistence.mode === 'unavailable') {
         setChallenges([])
         setParticipants([])
+        setLoadedOwnerId(ownerId)
         setOverview(null)
         setLoadError(persistence.message)
         setIsLoading(false)
@@ -385,6 +393,10 @@ export function HomePage() {
 
       setIsLoading(true)
       setLoadError('')
+      setLoadedOwnerId('')
+      setChallenges([])
+      setParticipants([])
+      setOverview(null)
       const [challengeResult, participantResult] = await Promise.all([
         persistence.repositories.challenges.listVisibleToUser(ownerId),
         persistence.repositories.participants.listForUser(ownerId),
@@ -406,6 +418,7 @@ export function HomePage() {
           participantResult.state === 'success' ? participantResult.data : [],
         )
       }
+      setLoadedOwnerId(ownerId)
       setIsLoading(false)
     }
 
@@ -416,7 +429,11 @@ export function HomePage() {
   }, [authState.status, ownerId, persistence])
 
   const selectedChallenge =
-    challenges.find(({ id }) => id === challengeParam) ?? challenges[0] ?? null
+    loadedOwnerId === ownerId
+      ? (challenges.find(({ id }) => id === challengeParam) ??
+        challenges[0] ??
+        null)
+      : null
   const activeParticipant = selectedChallenge
     ? (participants.find(
         (participant) =>
@@ -426,7 +443,13 @@ export function HomePage() {
     : null
 
   useEffect(() => {
-    if (isLoading || authState.status !== 'signed-in') return
+    if (
+      isLoading ||
+      loadedOwnerId !== ownerId ||
+      loadError ||
+      authState.status !== 'signed-in'
+    )
+      return
     const nextParams = new URLSearchParams(searchParams)
 
     if (!challenges.length) {
@@ -446,6 +469,9 @@ export function HomePage() {
     challengeParam,
     challenges,
     isLoading,
+    loadedOwnerId,
+    ownerId,
+    loadError,
     searchParams,
     setSearchParams,
   ])
@@ -471,10 +497,12 @@ export function HomePage() {
           persistence.repositories.weighIns.listForParticipant(
             activeParticipant.id,
           ),
-          persistence.repositories.groupProgress.getForChallenge(
-            selectedChallenge.id,
-            mostRecentSunday(),
-          ),
+          selectedChallenge.kind === 'group'
+            ? persistence.repositories.groupProgress.getForChallenge(
+                selectedChallenge.id,
+                mostRecentSunday(),
+              )
+            : Promise.resolve({ state: 'empty' as const }),
         ])
         if (!isCurrent) return
 
@@ -583,7 +611,7 @@ export function HomePage() {
     )
   }
 
-  if (isLoading) {
+  if (isLoading || loadedOwnerId !== ownerId) {
     return (
       <section
         className="mx-auto w-full max-w-6xl"
@@ -616,6 +644,7 @@ export function HomePage() {
   }
 
   const isOwner = selectedChallenge?.ownerId === ownerId
+  const isGroup = selectedChallenge?.kind === 'group'
   const isActiveMember = Boolean(activeParticipant)
   const challengeQuery = selectedChallenge
     ? `?challenge=${encodeURIComponent(selectedChallenge.id)}`
@@ -650,10 +679,12 @@ export function HomePage() {
     ? [
         ['Today', `/today${challengeQuery}`],
         ['My progress', `/progress${challengeQuery}`],
-        ['Group progress', `/group${challengeQuery}`],
+        ...(isGroup
+          ? [['Group progress', `/group${challengeQuery}`] as [string, string]]
+          : []),
         ['Goals', `/goals${challengeQuery}`],
         ['Record a weigh-in', `/weigh-ins${challengeQuery}`],
-        ...(isOwner
+        ...(isOwner && isGroup
           ? ([
               ['Invite participants', `/challenge/invites${challengeQuery}`],
             ] as [string, string][])
@@ -665,7 +696,14 @@ export function HomePage() {
             'Enroll yourself',
             `/challenge/participants/enroll?challenge=${encodeURIComponent(selectedChallenge.id)}&self=owner`,
           ],
-          ['Invite participants', `/challenge/invites${challengeQuery}`],
+          ...(isGroup
+            ? [
+                [
+                  'Invite participants',
+                  `/challenge/invites${challengeQuery}`,
+                ] as [string, string],
+              ]
+            : []),
         ]
       : []
   const heroActions: [string, string][] = isActiveMember
@@ -679,7 +717,14 @@ export function HomePage() {
             'Enroll yourself',
             `/challenge/participants/enroll?challenge=${encodeURIComponent(selectedChallenge.id)}&self=owner`,
           ],
-          ['Invite participants', `/challenge/invites${challengeQuery}`],
+          ...(isGroup
+            ? [
+                [
+                  'Invite participants',
+                  `/challenge/invites${challengeQuery}`,
+                ] as [string, string],
+              ]
+            : []),
         ]
       : selectedChallenge
         ? []
@@ -770,6 +815,42 @@ export function HomePage() {
 
       {challenges.length ? (
         <section aria-labelledby="challenge-picker-title" className="order-3">
+          <div className="mb-4 grid gap-4 sm:grid-cols-2">
+            {(['personal', 'group'] as const).map((kind) => (
+              <section
+                className={panelClass}
+                key={kind}
+                aria-label={
+                  kind === 'personal'
+                    ? 'Personal challenge'
+                    : 'Group challenges'
+                }
+              >
+                <h2 className="font-bold">
+                  {kind === 'personal'
+                    ? 'Personal challenge'
+                    : 'Group challenges'}
+                </h2>
+                <p className="mt-2 text-sm text-ink-muted">
+                  {challenges.some((challenge) => challenge.kind === kind)
+                    ? kind === 'personal'
+                      ? 'Private to your account.'
+                      : 'Owned and joined group contexts.'
+                    : kind === 'personal'
+                      ? 'No personal challenge yet.'
+                      : 'No group challenge yet.'}
+                </p>
+                <Link
+                  className="mt-3 inline-block text-sm font-bold text-forest-800 underline"
+                  to={`/challenge/setup?kind=${kind}`}
+                >
+                  {kind === 'personal'
+                    ? 'Create a personal challenge'
+                    : 'Create a group challenge'}
+                </Link>
+              </section>
+            ))}
+          </div>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest-700">
@@ -809,6 +890,21 @@ export function HomePage() {
                   </span>
                   <span className="block text-lg font-bold text-ink">
                     {challenge.name}
+                  </span>
+                  <span className="text-sm text-ink-muted">
+                    {challenge.kind === 'personal'
+                      ? 'Personal · private'
+                      : 'Group'}{' '}
+                    ·{' '}
+                    {challenge.ownerId === ownerId
+                      ? participants.some(
+                          (participant) =>
+                            participant.challengeId === challenge.id &&
+                            participant.status === 'active',
+                        )
+                        ? 'Organizer and participant'
+                        : 'Organizer only'
+                      : 'Participant'}
                   </span>
                   <span className="flex w-full items-center justify-between border-t border-line pt-3 text-sm font-semibold text-forest-800">
                     {isSelected ? 'Currently selected' : 'Select to view'}
@@ -874,25 +970,27 @@ export function HomePage() {
                         : 'Difference between your two most recent saved entries.'}
                     </p>
                   </article>
-                  <article className={panelClass}>
-                    <p className="text-sm font-semibold text-ink-muted">
-                      Weekly group comparison
-                    </p>
-                    <p className="mt-3 text-3xl font-extrabold">
-                      {currentOverview?.groupError
-                        ? '—'
-                        : groupSummary
-                          ? `${groupSummary.eligibleParticipantCount} / ${groupSummary.activeParticipantCount}`
-                          : '—'}
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-ink-muted">
-                      {currentOverview?.groupError
-                        ? 'The authorized group summary is unavailable right now.'
-                        : groupSummary
-                          ? `Eligible participants · ${groupSummary.previousSunday} to ${groupSummary.currentSunday}.`
-                          : 'No authorized group summary is available yet.'}
-                    </p>
-                  </article>
+                  {isGroup ? (
+                    <article className={panelClass}>
+                      <p className="text-sm font-semibold text-ink-muted">
+                        Weekly group comparison
+                      </p>
+                      <p className="mt-3 text-3xl font-extrabold">
+                        {currentOverview?.groupError
+                          ? '—'
+                          : groupSummary
+                            ? `${groupSummary.eligibleParticipantCount} / ${groupSummary.activeParticipantCount}`
+                            : '—'}
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-ink-muted">
+                        {currentOverview?.groupError
+                          ? 'The authorized group summary is unavailable right now.'
+                          : groupSummary
+                            ? `Eligible participants · ${groupSummary.previousSunday} to ${groupSummary.currentSunday}.`
+                            : 'No authorized group summary is available yet.'}
+                      </p>
+                    </article>
+                  ) : null}
                 </div>
               )}
             </section>
@@ -970,13 +1068,19 @@ export function TodayPage() {
   >({ key: '', state: 'loading' })
   const dashboardChallengeId = data?.challenge.id ?? null
   const dashboardViewerId = data?.viewerId ?? null
+  const dashboardChallengeKind = data?.challenge.kind
   const groupSnapshotKey = data
     ? JSON.stringify([data.viewerId, data.challenge.id])
     : ''
 
   useEffect(() => {
     let isCurrent = true
-    if (!dashboardChallengeId || !dashboardViewerId) return
+    if (
+      !dashboardChallengeId ||
+      !dashboardViewerId ||
+      dashboardChallengeKind !== 'group'
+    )
+      return
 
     const key = JSON.stringify([dashboardViewerId, dashboardChallengeId])
     if (persistence.mode !== 'remote') {
@@ -1002,7 +1106,12 @@ export function TodayPage() {
     return () => {
       isCurrent = false
     }
-  }, [dashboardChallengeId, dashboardViewerId, persistence])
+  }, [
+    dashboardChallengeId,
+    dashboardViewerId,
+    dashboardChallengeKind,
+    persistence,
+  ])
 
   const challengeQuery = data
     ? `?challenge=${encodeURIComponent(data.challenge.id)}`
@@ -1040,13 +1149,13 @@ export function TodayPage() {
     >
       <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <PageHeader
-          description="Your personal check-in, with a privacy-safe glimpse of the selected group challenge."
+          description="Your personal check-in for the selected challenge, with group summaries only in group contexts."
           title="Today"
           titleId="today-title"
         >
           <StatusPill className="max-w-full whitespace-normal break-words">
             {data
-              ? `${data.challenge.name} · ${challengeStatusLabel}`
+              ? `${challengeContextName(data.challenge)} · ${challengeStatusLabel}`
               : 'Daily check-in'}
           </StatusPill>
         </PageHeader>
@@ -1181,51 +1290,55 @@ export function TodayPage() {
                 </Link>
               </article>
 
-              <article
-                aria-labelledby="today-group-summary-title"
-                className="rounded-panel border border-line/80 bg-forest-800 p-5 text-white shadow-panel sm:p-7"
-              >
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest-100">
-                  Selected challenge · shared summary
-                </p>
-                <h2
-                  className="mt-3 text-xl font-extrabold"
-                  id="today-group-summary-title"
+              {data.challenge.kind === 'group' ? (
+                <article
+                  aria-labelledby="today-group-summary-title"
+                  className="rounded-panel border border-line/80 bg-forest-800 p-5 text-white shadow-panel sm:p-7"
                 >
-                  This week’s check-ins
-                </h2>
-                {currentGroupSnapshot?.state === 'success' ? (
-                  <>
-                    <p className="mt-4 text-4xl font-extrabold tracking-tight">
-                      {currentGroupSnapshot.summary.eligibleParticipantCount} /{' '}
-                      {currentGroupSnapshot.summary.activeParticipantCount}
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-forest-50">
-                      Members with a qualifying comparison ·{' '}
-                      {formatDate(currentGroupSnapshot.summary.previousSunday)}
-                      {' – '}
-                      {formatDate(currentGroupSnapshot.summary.currentSunday)}
-                    </p>
-                  </>
-                ) : !currentGroupSnapshot ||
-                  currentGroupSnapshot.state === 'loading' ? (
-                  <p className="mt-4 text-sm text-forest-50" role="status">
-                    Loading the permitted group summary…
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest-100">
+                    Selected challenge · shared summary
                   </p>
-                ) : (
-                  <p className="mt-4 text-sm leading-6 text-forest-50">
-                    {currentGroupSnapshot?.state === 'error'
-                      ? 'The shared summary is unavailable right now. Try refreshing.'
-                      : 'A shared summary is not available in this data mode.'}
-                  </p>
-                )}
-                <Link
-                  className="mt-6 inline-flex min-h-11 items-center text-sm font-bold text-white underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-                  to={`/group${challengeQuery}`}
-                >
-                  See group progress
-                </Link>
-              </article>
+                  <h2
+                    className="mt-3 text-xl font-extrabold"
+                    id="today-group-summary-title"
+                  >
+                    This week’s check-ins
+                  </h2>
+                  {currentGroupSnapshot?.state === 'success' ? (
+                    <>
+                      <p className="mt-4 text-4xl font-extrabold tracking-tight">
+                        {currentGroupSnapshot.summary.eligibleParticipantCount}{' '}
+                        / {currentGroupSnapshot.summary.activeParticipantCount}
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-forest-50">
+                        Members with a qualifying comparison ·{' '}
+                        {formatDate(
+                          currentGroupSnapshot.summary.previousSunday,
+                        )}
+                        {' – '}
+                        {formatDate(currentGroupSnapshot.summary.currentSunday)}
+                      </p>
+                    </>
+                  ) : !currentGroupSnapshot ||
+                    currentGroupSnapshot.state === 'loading' ? (
+                    <p className="mt-4 text-sm text-forest-50" role="status">
+                      Loading the permitted group summary…
+                    </p>
+                  ) : (
+                    <p className="mt-4 text-sm leading-6 text-forest-50">
+                      {currentGroupSnapshot?.state === 'error'
+                        ? 'The shared summary is unavailable right now. Try refreshing.'
+                        : 'A shared summary is not available in this data mode.'}
+                    </p>
+                  )}
+                  <Link
+                    className="mt-6 inline-flex min-h-11 items-center text-sm font-bold text-white underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                    to={`/group${challengeQuery}`}
+                  >
+                    See group progress
+                  </Link>
+                </article>
+              ) : null}
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -1327,8 +1440,11 @@ export function GroupDashboardPage() {
         return
       }
 
-      const visibleChallenges =
+      const allVisibleChallenges =
         challengeResult.state === 'success' ? challengeResult.data : []
+      const visibleChallenges = allVisibleChallenges.filter(
+        ({ kind }) => kind === 'group',
+      )
       setChallenges(visibleChallenges)
       const challenge = challengeParam
         ? visibleChallenges.find(({ id }) => id === challengeParam)
@@ -1336,9 +1452,14 @@ export function GroupDashboardPage() {
       if (!challenge) {
         setData(null)
         setMessage(
-          visibleChallenges.length === 0
-            ? 'No challenge is available for this account.'
-            : 'The selected challenge is unavailable for this account.',
+          challengeParam &&
+            allVisibleChallenges.some(
+              ({ id, kind }) => id === challengeParam && kind === 'personal',
+            )
+            ? 'Personal challenges are private and do not have a group dashboard.'
+            : visibleChallenges.length === 0
+              ? 'No group challenge is available for this account.'
+              : 'The selected challenge is unavailable for this account.',
         )
         setMessageTone('empty')
         setIsLoading(false)
@@ -1761,7 +1882,12 @@ export function ProgressPage() {
     let isCurrent = true
     setProvisionalSummary(null)
     setProvisionalMessage('')
-    if (!data || persistence.mode !== 'remote') return
+    if (
+      !data ||
+      data.challenge.kind !== 'group' ||
+      persistence.mode !== 'remote'
+    )
+      return
 
     persistence.repositories.groupProgress
       .getProvisionalLeader(data.challenge.id, localDateOnly())
@@ -1824,9 +1950,7 @@ export function ProgressPage() {
           title="Progress"
           titleId="progress-title"
         >
-          <StatusPill>
-            {data?.challenge.name ?? 'Personal dashboard'}
-          </StatusPill>
+          <StatusPill>{challengeContextName(data?.challenge)}</StatusPill>
         </PageHeader>
         <DashboardState
           isLoading={isLoading}
@@ -1835,7 +1959,8 @@ export function ProgressPage() {
         >
           {data ? (
             <div className="mt-8 space-y-6">
-              {persistence.mode === 'remote' &&
+              {data.challenge.kind === 'group' &&
+              persistence.mode === 'remote' &&
               provisionalSummary?.state !== 'solo-challenge' ? (
                 <section
                   aria-labelledby="provisional-leader-title"
@@ -2166,9 +2291,7 @@ export function GoalsPage() {
           title="Goals"
           titleId="goals-title"
         >
-          <StatusPill>
-            {data?.challenge.name ?? 'Personal dashboard'}
-          </StatusPill>
+          <StatusPill>{challengeContextName(data?.challenge)}</StatusPill>
         </PageHeader>
         <DashboardState
           isLoading={isLoading}

@@ -18,7 +18,10 @@ function response(body: unknown, status = 200) {
   })
 }
 
-function renderOwner(fetchMock: ReturnType<typeof vi.fn>) {
+function renderOwner(
+  fetchMock: ReturnType<typeof vi.fn>,
+  initialEntry = '/challenge/invites?challenge=challenge-1',
+) {
   vi.stubEnv('VITE_SUPABASE_URL', 'https://invites-project.supabase.co')
   vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-anon-key')
   vi.stubGlobal('fetch', fetchMock)
@@ -30,9 +33,7 @@ function renderOwner(fetchMock: ReturnType<typeof vi.fn>) {
         user: { email: 'owner@example.com', id: 'owner-1' },
       }}
     >
-      <MemoryRouter
-        initialEntries={['/challenge/invites?challenge=challenge-1']}
-      >
+      <MemoryRouter initialEntries={[initialEntry]}>
         <ChallengeInvitesPage />
       </MemoryRouter>
     </AuthProvider>,
@@ -69,7 +70,7 @@ describe('ChallengeInvitesPage', () => {
         response([
           {
             challenge_id: 'challenge-1',
-            expires_at: '2026-09-29T23:59:59.000Z',
+            expires_at: '2026-10-29T23:59:59.000Z',
             invite_id: 'invite-1',
             token: 'raw-invite-token',
           },
@@ -95,9 +96,9 @@ describe('ChallengeInvitesPage', () => {
   })
 
   it('lets the owner revoke an active link', async () => {
-    const expiresOn = new Date()
-    expiresOn.setDate(expiresOn.getDate() + 7)
-    const expiresAt = `${expiresOn.getFullYear()}-${String(expiresOn.getMonth() + 1).padStart(2, '0')}-${String(expiresOn.getDate()).padStart(2, '0')}T23:59:59.000Z`
+    const futureExpiry = new Date(
+      Date.now() + 7 * 24 * 60 * 60 * 1000,
+    ).toISOString()
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(response([challenge]))
@@ -106,7 +107,7 @@ describe('ChallengeInvitesPage', () => {
           {
             challenge_id: 'challenge-1',
             created_at: '2026-09-22T10:00:00.000Z',
-            expires_at: expiresAt,
+            expires_at: futureExpiry,
             invite_id: 'invite-1',
             revoked_at: null,
           },
@@ -126,5 +127,34 @@ describe('ChallengeInvitesPage', () => {
       expect(screen.getByText('Status: revoked')).toBeInTheDocument(),
     )
     expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('does not offer group invitation actions for a personal challenge', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementation((request: RequestInfo | URL) => {
+        const requestUrl =
+          typeof request === 'object' && request !== null && 'url' in request
+            ? String(request.url)
+            : String(request)
+        return response(
+          requestUrl.includes('/challenges?')
+            ? [{ ...challenge, challenge_kind: 'personal' }]
+            : [],
+        )
+      })
+    renderOwner(fetchMock)
+
+    expect(
+      await screen.findByText(/Personal challenges are private/),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Create invite link' }),
+    ).not.toBeInTheDocument()
+    expect(
+      fetchMock.mock.calls.some(([url]) =>
+        String(url).includes('create_challenge_invite'),
+      ),
+    ).toBe(false)
   })
 })

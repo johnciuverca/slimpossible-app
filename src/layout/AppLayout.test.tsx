@@ -1,5 +1,5 @@
-import { cleanup, render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { AuthProvider } from '../auth/AuthContext'
@@ -24,6 +24,17 @@ function renderLayout(path: string, state: AuthState) {
         </AppLayout>
       </MemoryRouter>
     </AuthProvider>,
+  )
+}
+
+function CurrentRoute() {
+  const location = useLocation()
+
+  return (
+    <output data-testid="current-route">
+      {location.pathname}
+      {location.search}
+    </output>
   )
 }
 
@@ -54,19 +65,38 @@ describe('AppLayout', () => {
     )
   })
 
-  it('preserves the selected challenge across the brand link and primary navigation', () => {
-    renderLayout('/today?challenge=challenge-2', signedOut)
+  it('preserves the selected challenge across shared header navigation', () => {
+    render(
+      <AuthProvider initialState={signedOut}>
+        <MemoryRouter
+          initialEntries={[
+            '/challenge/participants/enroll?challenge=private%2Fplan',
+          ]}
+        >
+          <AppLayout>
+            <CurrentRoute />
+          </AppLayout>
+        </MemoryRouter>
+      </AuthProvider>,
+    )
 
     expect(screen.getByRole('link', { name: 'Slimpossible' })).toHaveAttribute(
       'href',
-      '/?challenge=challenge-2',
+      '/?challenge=private%2Fplan',
     )
+
     for (const { label, path } of liveNavigation) {
       expect(screen.getByRole('link', { name: label })).toHaveAttribute(
         'href',
-        `${path}?challenge=challenge-2`,
+        `${path}?challenge=private%2Fplan`,
       )
     }
+
+    fireEvent.click(screen.getByRole('link', { name: 'Today' }))
+
+    expect(screen.getByTestId('current-route')).toHaveTextContent(
+      '/today?challenge=private%2Fplan',
+    )
   })
 
   it.each(liveNavigation)(

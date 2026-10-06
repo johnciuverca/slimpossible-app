@@ -17,12 +17,18 @@ const navigationItems = [
   { label: 'Weigh-in', to: '/weigh-ins' },
 ]
 
+function withSelectedChallenge(to: string, search: string) {
+  const challengeId = new URLSearchParams(search).get('challenge')
+
+  if (!challengeId) return to
+
+  const params = new URLSearchParams({ challenge: challengeId })
+  return `${to}?${params.toString()}`
+}
+
 /** Shared live shell; route guards and each page's real data remain unchanged. */
 export function AppLayout({ children }: AppLayoutProps) {
-  const location = useLocation()
-  const challengeId = new URLSearchParams(location.search).get('challenge')
-  const withSelectedChallenge = (to: string) =>
-    challengeId ? `${to}?challenge=${encodeURIComponent(challengeId)}` : to
+  const { search } = useLocation()
 
   return (
     <div className="flex min-h-screen flex-col bg-page text-ink">
@@ -30,7 +36,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-4 px-4 py-4 sm:px-8 xl:flex-row xl:items-center xl:justify-between">
           <Link
             className="w-fit shrink-0 rounded-md text-lg font-extrabold tracking-tight text-forest-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest-700"
-            to={withSelectedChallenge('/')}
+            to={withSelectedChallenge('/', search)}
           >
             Slimpossible
           </Link>
@@ -50,7 +56,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                           : 'inline-flex min-h-10 items-center rounded-xl border border-transparent px-3 py-2 text-ink-muted transition-colors hover:border-line hover:bg-page hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700 sm:px-4'
                       }
                       end={to === '/'}
-                      to={withSelectedChallenge(to)}
+                      to={withSelectedChallenge(to, search)}
                     >
                       {label}
                     </NavLink>

@@ -23,9 +23,9 @@ afterEach(() => {
 })
 
 describe('ChallengeSetupPage', () => {
-  function renderPage() {
+  function renderPage(initialEntry = '/') {
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <ChallengeSetupPage />
       </MemoryRouter>,
     )
@@ -315,6 +315,49 @@ describe('ChallengeSetupPage', () => {
     expect(savedChallenges[0]).not.toHaveProperty('targetWeightKg')
     expect(
       screen.queryByLabelText('Target weight in kg (optional)'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('creates a private personal challenge without implicitly enrolling its owner', async () => {
+    renderPage('/challenge/setup?kind=personal')
+
+    expect(
+      screen.getByRole('radio', { name: /Personal challenge \(private\)/ }),
+    ).toBeChecked()
+    expect(
+      screen.getByText(/Creating it does not enroll you/),
+    ).toBeInTheDocument()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Challenge name' }), {
+      target: { value: 'Private plan' },
+    })
+    fireEvent.change(screen.getByLabelText('Start date'), {
+      target: { value: '2026-10-01' },
+    })
+    fireEvent.change(screen.getByLabelText('End date'), {
+      target: { value: '2026-11-01' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save challenge' }))
+
+    expect(
+      await screen.findByText('Enroll in your personal challenge?'),
+    ).toBeInTheDocument()
+    const [savedChallenge] = JSON.parse(
+      window.localStorage.getItem('slimpossible.local.challenges') ?? '[]',
+    ) as Array<Record<string, unknown>>
+    expect(savedChallenge).toMatchObject({
+      kind: 'personal',
+      name: 'Private plan',
+    })
+    expect(
+      window.localStorage.getItem('slimpossible.local.participants'),
+    ).toBeNull()
+    expect(screen.getByRole('link', { name: 'Enroll me' })).toHaveAttribute(
+      'href',
+      `/challenge/participants/enroll?challenge=${String(savedChallenge.id)}&self=owner`,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Not now' }))
+    expect(
+      screen.queryByRole('link', { name: 'Invite participants' }),
     ).not.toBeInTheDocument()
   })
 

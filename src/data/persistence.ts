@@ -86,6 +86,16 @@ function readList<T>(storage: Storage, key: string): T[] {
   }
 }
 
+function readLocalChallenges(storage: Storage): Challenge[] {
+  return readList<Challenge>(storage, challengesStorageKey).map(
+    (challenge) => ({
+      ...challenge,
+      // Existing local previews predate challenge kinds and remain group contexts.
+      kind: challenge.kind ?? 'group',
+    }),
+  )
+}
+
 function writeList<T>(storage: Storage, key: string, values: T[]) {
   try {
     storage.setItem(key, JSON.stringify(values))
@@ -110,6 +120,7 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
     async create(input: ChallengeWriteInput) {
       const now = new Date().toISOString()
       const challenge: Challenge = {
+        kind: input.kind ?? 'group',
         createdAt: now,
         createdBy: input.createdBy,
         ...(input.description ? { description: input.description } : {}),
@@ -131,7 +142,7 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
       return { data: challenge, state: 'success' }
     },
     async findOwnedById(id: string, ownerId: string) {
-      const challenge = readList<Challenge>(storage, challengesStorageKey).find(
+      const challenge = readLocalChallenges(storage).find(
         (value) => value.id === id && value.ownerId === ownerId,
       )
       return challenge
@@ -139,7 +150,7 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
         : { data: null, state: 'empty' }
     },
     async listOwned(ownerId?: string) {
-      const values = readList<Challenge>(storage, challengesStorageKey).filter(
+      const values = readLocalChallenges(storage).filter(
         (value) => !ownerId || value.ownerId === ownerId,
       )
       return values.length > 0
@@ -155,7 +166,7 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
           )
           .map((participant) => participant.challengeId),
       )
-      const values = readList<Challenge>(storage, challengesStorageKey).filter(
+      const values = readLocalChallenges(storage).filter(
         (challenge) =>
           challenge.ownerId === userId || joinedChallengeIds.has(challenge.id),
       )
@@ -164,7 +175,7 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
         : { data: [], state: 'empty' }
     },
     async update(id: string, input: ChallengeWriteInput) {
-      const values = readList<Challenge>(storage, challengesStorageKey)
+      const values = readLocalChallenges(storage)
       const index = values.findIndex((value) => value.id === id)
       if (index < 0) {
         return { data: null, state: 'empty' }

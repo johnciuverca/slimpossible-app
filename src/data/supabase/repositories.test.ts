@@ -221,6 +221,7 @@ describe('Supabase repositories', () => {
 
   it('creates and maps a challenge through the repository', async () => {
     stubResponse({
+      challenge_kind: 'group',
       created_at: '2026-09-17T10:00:00.000Z',
       created_by: 'owner-1',
       description: null,
@@ -254,6 +255,43 @@ describe('Supabase repositories', () => {
       String(vi.mocked(fetch).mock.calls[0]?.[1]?.body),
     ) as Record<string, unknown>
     expect(requestBody).not.toHaveProperty('target_weight_kg')
+    expect(requestBody).toHaveProperty('challenge_kind', 'group')
+  })
+
+  it('creates an explicit personal challenge without defaulting it to group', async () => {
+    stubResponse({
+      challenge_kind: 'personal',
+      created_at: '2026-09-17T10:00:00.000Z',
+      created_by: 'owner-1',
+      description: null,
+      end_date: '2026-10-01',
+      id: 'personal-1',
+      name: 'Private challenge',
+      owner_id: 'owner-1',
+      start_date: '2026-09-17',
+      status: 'draft',
+      target_weight_kg: null,
+      updated_at: '2026-09-17T10:00:00.000Z',
+    })
+
+    const result = await createRepositories(client).challenges.create({
+      createdBy: 'owner-1',
+      endDate: '2026-10-01',
+      kind: 'personal',
+      name: 'Private challenge',
+      ownerId: 'owner-1',
+      startDate: '2026-09-17',
+    })
+
+    expect(result).toMatchObject({
+      data: { id: 'personal-1', kind: 'personal' },
+      state: 'success',
+    })
+    expect(
+      JSON.parse(String(vi.mocked(fetch).mock.calls[0]?.[1]?.body)),
+    ).toMatchObject({
+      challenge_kind: 'personal',
+    })
   })
 
   it('preserves a legacy challenge target when updating without one', async () => {
@@ -295,6 +333,7 @@ describe('Supabase repositories', () => {
   it('maps a database challenge row to the domain shape', async () => {
     stubResponse([
       {
+        challenge_kind: null,
         created_at: '2026-09-17T10:00:00.000Z',
         created_by: 'creator-1',
         description: 'A focused challenge',
@@ -315,6 +354,7 @@ describe('Supabase repositories', () => {
     expect(result).toEqual({
       data: [
         {
+          kind: 'group',
           createdBy: 'creator-1',
           createdAt: '2026-09-17T10:00:00.000Z',
           description: 'A focused challenge',

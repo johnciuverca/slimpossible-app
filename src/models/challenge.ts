@@ -6,9 +6,12 @@ export const challengeStatuses = [
 ] as const
 
 export type ChallengeStatus = (typeof challengeStatuses)[number]
+export const challengeKinds = ['personal', 'group'] as const
+export type ChallengeKind = (typeof challengeKinds)[number]
 export type DateOnly = string
 
 export type Challenge = {
+  kind: ChallengeKind
   createdAt: string
   createdBy: string
   description?: string
@@ -89,6 +92,16 @@ export function validateChallenge(input: unknown): ChallengeValidationResult {
   addRequiredStringIssue(input, 'name', 'Challenge name', issues)
   addRequiredStringIssue(input, 'ownerId', 'Owner id', issues)
   addRequiredStringIssue(input, 'createdBy', 'Created-by id', issues)
+
+  if (
+    typeof input.kind !== 'string' ||
+    !challengeKinds.includes(input.kind as ChallengeKind)
+  ) {
+    issues.push({
+      field: 'kind',
+      message: `Kind must be one of: ${challengeKinds.join(', ')}.`,
+    })
+  }
 
   if (
     input.description !== undefined &&

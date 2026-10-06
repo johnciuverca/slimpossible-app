@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-import type { Challenge } from '../../models/challenge'
+import type { Challenge, ChallengeKind } from '../../models/challenge'
 import type { Participant } from '../../models/participant'
 import type {
   ChallengeInvite,
@@ -145,6 +145,7 @@ export type Repositories = {
 }
 
 export type ChallengeWriteInput = {
+  kind?: ChallengeKind
   createdBy: string
   description?: string
   endDate: string
@@ -194,6 +195,7 @@ function mappingError(entity: string): RepositoryError {
 
 function mapChallenge(row: ChallengeRow): Challenge {
   return {
+    kind: row.challenge_kind ?? 'group',
     createdAt: row.created_at,
     createdBy: row.created_by,
     ...(row.description === null ? {} : { description: row.description }),
@@ -410,6 +412,7 @@ export function createRepositories(client: DatabaseClient): Repositories {
         const { data, error } = await client
           .from('challenges')
           .insert({
+            challenge_kind: input.kind ?? 'group',
             created_by: input.createdBy,
             description: input.description ?? null,
             end_date: input.endDate,

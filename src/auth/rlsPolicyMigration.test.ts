@@ -41,8 +41,156 @@ const groupProgressAuthorizationCheck = readFileSync(
   resolve(process.cwd(), 'supabase/tests/group_progress_authorization.sql'),
   'utf8',
 )
+const personalGroupChallengeMigration = readFileSync(
+  resolve(
+    process.cwd(),
+    'supabase/migrations/20261005000000_add_personal_group_challenge_kinds.sql',
+  ),
+  'utf8',
+)
+const personalGroupChallengeRollback = readFileSync(
+  resolve(
+    process.cwd(),
+    'supabase/rollback/20261005000000_add_personal_group_challenge_kinds.sql',
+  ),
+  'utf8',
+)
+const personalGroupChallengeAuthorizationCheck = readFileSync(
+  resolve(
+    process.cwd(),
+    'supabase/tests/personal_group_challenges_authorization.sql',
+  ),
+  'utf8',
+)
+const executeGrantMigration = readFileSync(
+  resolve(
+    process.cwd(),
+    'supabase/migrations/20261005000001_converge_function_execute_grants.sql',
+  ),
+  'utf8',
+)
+const executeGrantRecovery = readFileSync(
+  resolve(
+    process.cwd(),
+    'supabase/rollback/20261005000001_converge_function_execute_grants.sql',
+  ),
+  'utf8',
+)
 
 describe('row-level security migration contract', () => {
+  it('corrects only inspected explicit grants and guards intervening ACL drift', () => {
+    expect(executeGrantMigration).toContain('aclexplode')
+    expect(executeGrantMigration).toContain('ACL drift')
+    expect(executeGrantMigration).toMatch(
+      /revoke execute on function[\s\S]+from anon;/,
+    )
+    expect(executeGrantMigration).toMatch(
+      /revoke execute on function public\.prevent_challenge_kind_change\(\),\s+public\.prevent_personal_challenge_invites\(\) from authenticated;/,
+    )
+    expect(executeGrantMigration).not.toMatch(/alter default privileges/i)
+    expect(executeGrantMigration).not.toMatch(
+      /revoke[^;]*is_challenge_member[^;]*from authenticated/i,
+    )
+    expect(executeGrantMigration).not.toMatch(
+      /revoke[^;]*preview_challenge_invite/i,
+    )
+    expect(executeGrantMigration).not.toMatch(/revoke[^;]*from service_role/i)
+  })
+
+  it('restores the observed grants with drift protection, without touching data', () => {
+    expect(executeGrantRecovery).toContain('ACL drift')
+    expect(executeGrantRecovery).toMatch(
+      /grant execute on function[\s\S]+to anon;/,
+    )
+    expect(executeGrantRecovery).toMatch(
+      /grant execute on function public\.prevent_challenge_kind_change\(\),\s+public\.prevent_personal_challenge_invites\(\) to authenticated;/,
+    )
+    for (const sql of [executeGrantMigration, executeGrantRecovery]) {
+      expect(sql).not.toMatch(
+        /(?:insert into|update|delete from|alter table|drop table) public\./i,
+      )
+      expect(sql).toContain('begin;')
+      expect(sql).toContain('commit;')
+    }
+  })
+
+  it('adds personal/group context without rewriting legacy challenges', () => {
+    expect(personalGroupChallengeMigration).toMatch(
+      /add column challenge_kind text/i,
+    )
+    expect(personalGroupChallengeMigration).toMatch(
+      /challenge_kind is null or challenge_kind in \('personal', 'group'\)/i,
+    )
+    expect(personalGroupChallengeMigration).not.toMatch(/default\s+'group'/i)
+    expect(personalGroupChallengeMigration).not.toMatch(
+      /update\s+public\.challenges/i,
+    )
+    expect(personalGroupChallengeMigration).not.toMatch(/public\.weigh_ins/i)
+  })
+
+  it('keeps personal challenges owner-private and blocks group-sharing paths', () => {
+    expect(personalGroupChallengeMigration).toContain(
+      'personal_challenges_limit_participant_insert',
+    )
+    expect(personalGroupChallengeMigration).toContain(
+      'personal_challenges_limit_participant_update',
+    )
+    expect(personalGroupChallengeMigration).toContain('as restrictive')
+    expect(personalGroupChallengeMigration).toContain(
+      'participants.user_id <> auth.uid()',
+    )
+    expect(personalGroupChallengeMigration).toContain(
+      "challenge.challenge_kind is distinct from 'personal'",
+    )
+    expect(personalGroupChallengeMigration).toContain(
+      'personal_challenges_limit_participant_select',
+    )
+    expect(personalGroupChallengeMigration).toContain(
+      'create or replace function public.is_challenge_member',
+    )
+    expect(personalGroupChallengeMigration).toContain(
+      'prevent_challenge_kind_change',
+    )
+    expect(personalGroupChallengeMigration).toContain(
+      'prevent_personal_challenge_invites',
+    )
+    expect(personalGroupChallengeRollback).toContain(
+      "where challenge_kind = 'personal'",
+    )
+    expect(personalGroupChallengeRollback).toContain('Rollback refused')
+    expect(personalGroupChallengeRollback).toContain(
+      'create or replace function public.is_challenge_member',
+    )
+    expect(personalGroupChallengeAuthorizationCheck).toContain(
+      "('owner_creation_did_not_enroll_owner', visible_count = 0",
+    )
+    expect(personalGroupChallengeAuthorizationCheck).toContain(
+      "('member_cannot_read_personal_challenge', visible_count = 0",
+    )
+    expect(personalGroupChallengeAuthorizationCheck).toContain(
+      "('member_cannot_read_personal_participants', visible_count = 0",
+    )
+    expect(personalGroupChallengeAuthorizationCheck).toContain(
+      "('outsider_cannot_read_either_context', visible_count = 0",
+    )
+    expect(personalGroupChallengeAuthorizationCheck).toContain(
+      'REPLACE_OWNER_UUID',
+    )
+    expect(personalGroupChallengeAuthorizationCheck).toContain(
+      'REPLACE_MEMBER_UUID',
+    )
+    expect(personalGroupChallengeAuthorizationCheck).toContain(
+      'REPLACE_OUTSIDER_UUID',
+    )
+    expect(personalGroupChallengeAuthorizationCheck).toContain('rollback;')
+    expect(personalGroupChallengeAuthorizationCheck).not.toContain(
+      'order by created_at',
+    )
+    expect(personalGroupChallengeAuthorizationCheck).not.toContain(
+      'delete from public.',
+    )
+  })
+
   it('enables RLS on every application table', () => {
     expect(migration).toMatch(
       /alter table public\.profiles enable row level security/,

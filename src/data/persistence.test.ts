@@ -13,6 +13,39 @@ afterEach(() => {
 })
 
 describe('challenge and participant persistence', () => {
+  it('reads legacy local challenges as groups without rewriting saved JSON', async () => {
+    const legacyJson = JSON.stringify([
+      {
+        createdAt: '2026-09-17T10:00:00.000Z',
+        createdBy: 'legacy-owner',
+        endDate: '2026-12-01',
+        id: 'legacy-challenge',
+        name: 'Legacy group',
+        ownerId: 'legacy-owner',
+        startDate: '2026-09-01',
+        status: 'draft',
+        updatedAt: '2026-09-17T10:00:00.000Z',
+      },
+    ])
+    window.localStorage.setItem('slimpossible.local.challenges', legacyJson)
+    const persistence = createPersistence(signedOutState)
+    if (persistence.mode !== 'local') {
+      throw new Error('Expected local persistence without public configuration')
+    }
+
+    await expect(
+      persistence.repositories.challenges.listOwned('legacy-owner'),
+    ).resolves.toMatchObject({
+      data: [
+        expect.objectContaining({ id: 'legacy-challenge', kind: 'group' }),
+      ],
+      state: 'success',
+    })
+    expect(window.localStorage.getItem('slimpossible.local.challenges')).toBe(
+      legacyJson,
+    )
+  })
+
   it('shows owners and active members only in the local challenge preview', async () => {
     const persistence = createPersistence(signedOutState)
     if (persistence.mode !== 'local') {

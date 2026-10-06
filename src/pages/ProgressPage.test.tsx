@@ -234,7 +234,7 @@ describe('ProgressPage', () => {
     expect(
       screen.queryByText('First challenge private note'),
     ).not.toBeInTheDocument()
-    expect(screen.getByText('Second challenge')).toBeInTheDocument()
+    expect(screen.getByText('Group · Second challenge')).toBeInTheDocument()
   })
 
   it('removes one account’s history before showing another account’s selected history', async () => {
