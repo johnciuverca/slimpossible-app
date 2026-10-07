@@ -5,7 +5,7 @@ import { AuthContext, type AuthContextValue } from '../../src/auth/context'
 import { ProtectedRoute } from '../../src/auth/ProtectedRoute'
 import { AppLayout } from '../../src/layout/AppLayout'
 import { ChallengeSetupPage } from '../../src/pages/ChallengeSetupPage'
-import { DailyWeighInFormPage } from '../../src/pages/DailyWeighInFormPage'
+import { PersonalWeighInsPage } from '../../src/pages/PersonalWeighInsPage'
 import { ParticipantEnrollmentPage } from '../../src/pages/ParticipantEnrollmentPage'
 import {
   GoalsPage,
@@ -168,6 +168,28 @@ localStorage.setItem(
   ),
 )
 
+// Seed canonical history explicitly for the personal consumers. Retain the
+// separate legacy fixture above for group-only compatibility tests.
+const legacyFixtureEntries = JSON.parse(
+  localStorage.getItem('slimpossible.local.weigh-ins') ?? '[]',
+) as { date: string; note?: string; participantId: string; weightKg: number }[]
+localStorage.setItem(
+  'slimpossible.local.personal-weigh-ins',
+  JSON.stringify(
+    legacyFixtureEntries.map((entry, index) => ({
+      id: `e2e-personal-${index}`,
+      date: entry.date,
+      note: entry.note,
+      weightKg: entry.weightKg,
+      userId:
+        entry.participantId === 'e2e-participant'
+          ? fixtureUserId
+          : 'e2e-other-user',
+      sharedChallengeIds: [],
+    })),
+  ),
+)
+
 const authValue: AuthContextValue = {
   requestPasswordRecovery: async () => undefined,
   resetPassword: async () => false,
@@ -215,7 +237,7 @@ createRoot(document.getElementById('root')!).render(
             element={<ParticipantEnrollmentPage />}
           />
           <Route path="/challenge/setup" element={<ChallengeSetupPage />} />
-          <Route path="/weigh-ins" element={<DailyWeighInFormPage />} />
+          <Route path="/weigh-ins" element={<PersonalWeighInsPage />} />
         </Routes>
       </AppLayout>
     </MemoryRouter>

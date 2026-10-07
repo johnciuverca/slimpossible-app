@@ -725,7 +725,11 @@ describe('HomePage', () => {
       screen.getByRole('link', { name: 'See group progress' }),
     ).toHaveAttribute('href', '/group?challenge=challenge-1')
     expect(screen.queryByText('Private sample winner')).not.toBeInTheDocument()
-    expect(screen.getByText(/Coming in Chapter 16/)).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', {
+        name: 'One entry, optional group sharing',
+      }),
+    ).toBeInTheDocument()
     expect(
       screen.queryByRole('heading', { name: 'No challenge yet' }),
     ).not.toBeInTheDocument()

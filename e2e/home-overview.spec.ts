@@ -149,14 +149,17 @@ test('challenge cards switch by keyboard and preserve a direct selection after r
   await expect(page.getByText('E2E Winter challenge · Active')).toBeVisible()
   await expect(
     page.getByRole('heading', {
-      name: 'Group history and saving to multiple challenges',
+      name: 'One entry, optional group sharing',
     }),
   ).toBeVisible()
   await expect(
     page.getByText('You can switch between joined challenges from Overview.'),
   ).toBeVisible()
   await expect(
-    page.getByText('Each weigh-in is saved to the selected challenge only.'),
+    page.getByText(
+      'Each weigh-in stays in your personal history; only explicitly selected groups receive its date and weight, never your note.',
+      { exact: false },
+    ),
   ).toBeVisible()
 
   await page.goto(homeFixture('home-member-multi', 'e2e-challenge-2'))
@@ -168,9 +171,9 @@ test('challenge cards switch by keyboard and preserve a direct selection after r
     page.getByRole('button', { name: /E2E Winter challenge/ }),
   ).toHaveAttribute('aria-pressed', 'true')
   await expect(
-    page.getByText('No weigh-ins are saved for this challenge yet.'),
+    page.getByRole('heading', { name: 'Your latest weigh-in' }),
   ).toBeVisible()
-  await expect(page.getByText('88.4 kg', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('88.4 kg', { exact: true })).toBeVisible()
 
   await page.goto(homeFixture('home-member-multi', 'e2e-challenge-2', '/today'))
   await expect(page.getByText('E2E Winter challenge · Active')).toBeVisible()
