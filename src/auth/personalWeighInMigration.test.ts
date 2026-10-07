@@ -115,7 +115,7 @@ describe('personal weigh-in migration contract', () => {
     expect(authorizationHarness).toContain(
       'unauthorized_delete_leaves_live_entry_intact',
     )
-    expect(authorizationHarness).toContain('<> 24')
+    expect(authorizationHarness).toContain('<> 25')
     expect(authorizationHarness.trimEnd().endsWith('rollback;')).toBe(true)
   })
 
@@ -138,14 +138,14 @@ describe('personal weigh-in migration contract', () => {
   })
 
   it('keeps migrated summaries and provisional leaders bounded by server dates', () => {
-    expect(migration).toContain(
+    expect(migration).not.toContain(
       'personal.recorded_date <= target_current_sunday',
     )
     expect(migration).toContain('target_current_sunday > current_date')
     expect(migration).toContain('target_current_date > current_date')
     expect(migration).toContain('personal.recorded_date <= current_date')
     expect(authorizationHarness).toContain(
-      'group_summary_uses_only_dates_through_selected_sunday',
+      'weekday_share_updates_completion_without_changing_sunday_winners',
     )
     expect(authorizationHarness).toContain(
       'owner_challenge_summary_excludes_future_copied_row',

@@ -29,9 +29,15 @@ declare
   correction_entry uuid;
   protected_entry uuid;
   past_summary_entry uuid;
+  previous_summary_entry uuid;
   after_sunday_entry uuid;
   future_summary_entry uuid;
   current_sunday date := current_date - extract(dow from current_date)::integer;
+  comparison_sunday date := current_sunday - 28;
+  eligible_count bigint;
+  winner_count bigint;
+  reached_count bigint;
+  recorded_count bigint;
   row_count integer;
   numeric_summary numeric;
   date_summary date;
@@ -139,34 +145,54 @@ begin
   insert into slimpossible_personal_weigh_in_results values
     ('remaining_group_share_is_preserved', row_count = 1);
 
-  -- Simulate legacy rows copied during migration, including dates after the
-  -- selected Sunday and after today. Summary consumers must exclude both
-  -- future categories without relying on the save RPC to reject them.
+  -- Simulate copied legacy data. Current goal completion uses the latest
+  -- nonfuture share; Sunday winners use only the exact comparison dates.
   execute 'reset role';
   insert into public.personal_weigh_ins (
     user_id, recorded_date, weight_kg, note
   ) values
-    (member_id, current_sunday - 1, 90, 'past summary fixture'),
-    (member_id, least(current_sunday + 1, current_date), 95, 'after Sunday fixture'),
-    (member_id, current_date + 1, 10, 'future summary fixture');
+    (member_id, comparison_sunday - 7, 92, 'previous Sunday fixture'),
+    (member_id, comparison_sunday, 90, 'Sunday summary fixture'),
+    (member_id, comparison_sunday + 1, 80, 'weekday reached-target fixture'),
+    (member_id, current_date + 1, 95, 'future summary fixture');
+  select id into previous_summary_entry from public.personal_weigh_ins
+  where user_id = member_id and recorded_date = comparison_sunday - 7;
   select id into past_summary_entry from public.personal_weigh_ins
-  where user_id = member_id and recorded_date = current_sunday - 1;
+  where user_id = member_id and recorded_date = comparison_sunday;
   select id into after_sunday_entry from public.personal_weigh_ins
-  where user_id = member_id and recorded_date = least(current_sunday + 1, current_date);
+  where user_id = member_id and recorded_date = comparison_sunday + 1;
   select id into future_summary_entry from public.personal_weigh_ins
   where user_id = member_id and recorded_date = current_date + 1;
   insert into public.personal_weigh_in_group_shares (
     personal_weigh_in_id, challenge_id
   ) values
+    (previous_summary_entry, group_one),
     (past_summary_entry, group_one),
-    (after_sunday_entry, group_one),
     (future_summary_entry, group_one);
   execute 'set local role authenticated';
   perform set_config('request.jwt.claim.sub', member_id::text, true);
-  select summary.average_completion_percentage into numeric_summary
-  from public.get_group_progress_summary(group_one, current_sunday) summary;
+  select summary.average_completion_percentage, summary.eligible_participant_count,
+    summary.weekly_winner_count, summary.reached_target_count
+    into numeric_summary, eligible_count, winner_count, reached_count
+  from public.get_group_progress_summary(group_one, comparison_sunday) summary;
   insert into slimpossible_personal_weigh_in_results values
-    ('group_summary_uses_only_dates_through_selected_sunday', numeric_summary = 0);
+    ('future_share_does_not_change_current_completion',
+      numeric_summary = 0 and eligible_count = 1 and winner_count = 1 and reached_count = 0);
+  execute 'reset role';
+  insert into public.personal_weigh_in_group_shares (
+    personal_weigh_in_id, challenge_id
+  ) values (after_sunday_entry, group_one);
+  execute 'set local role authenticated';
+  perform set_config('request.jwt.claim.sub', member_id::text, true);
+  select summary.average_completion_percentage, summary.eligible_participant_count,
+    summary.weekly_winner_count, summary.reached_target_count,
+    summary.participants_with_recorded_weight_count
+    into numeric_summary, eligible_count, winner_count, reached_count, recorded_count
+  from public.get_group_progress_summary(group_one, comparison_sunday) summary;
+  insert into slimpossible_personal_weigh_in_results values
+    ('weekday_share_updates_completion_without_changing_sunday_winners',
+      numeric_summary = 100 and reached_count = 1 and recorded_count = 1
+      and eligible_count = 1 and winner_count = 1);
   begin
     perform * from public.get_group_progress_summary(group_one, current_sunday + 7);
     insert into slimpossible_personal_weigh_in_results values
@@ -189,7 +215,7 @@ begin
   from public.get_challenge_progress_summary(group_one) summary;
   insert into slimpossible_personal_weigh_in_results values
     ('owner_challenge_summary_excludes_future_copied_row',
-      row_count = 2 and date_summary = least(current_sunday + 1, current_date));
+      row_count = 3 and date_summary = comparison_sunday + 1);
   perform set_config('request.jwt.claim.sub', member_id::text, true);
 
   begin
@@ -300,7 +326,7 @@ select check_name, passed from slimpossible_personal_weigh_in_results order by c
 
 do $$
 begin
-  if (select count(*) from slimpossible_personal_weigh_in_results) <> 24
+  if (select count(*) from slimpossible_personal_weigh_in_results) <> 25
      or exists (select 1 from slimpossible_personal_weigh_in_results where not passed) then
     raise exception 'Personal weigh-in authorization checks failed; roll back this batch.';
   end if;

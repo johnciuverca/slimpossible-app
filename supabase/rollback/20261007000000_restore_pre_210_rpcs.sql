@@ -8,6 +8,8 @@
 -- participant/challenge for private entries or flatten them into weigh_ins.
 -- Old clients will not display canonical-only entries; preserve this data so
 -- a later forward rollout can resume from it. Take a verified backup first.
+-- Legacy reads can show stale versions of entries edited/deleted canonically.
+-- Keep the legacy client read-only until canonical and legacy data are reconciled.
 
 begin;
 

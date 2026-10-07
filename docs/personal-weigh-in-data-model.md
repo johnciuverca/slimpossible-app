@@ -34,11 +34,15 @@ That is the data-preserving inverse: users can roll the app forward again
 without losing any post-rollout personal entries.
 
 Canonical-only entries created after rollout remain in `personal_weigh_ins`.
-The older app does not display or update them. Do not automatically copy them
+The older app does not display or update them. Legacy reads can also show
+outdated versions of migrated entries that were edited or deleted canonically
+after rollout, because the retained legacy rows are not rewritten by canonical
+operations. Keep the legacy client read-only during recovery until those rows
+are reconciled with canonical changes and deletions. Do not automatically copy them
 into `weigh_ins`: private entries have no challenge/participant destination,
 and choosing one would silently broaden visibility. If users must keep logging
-while the old app is deployed, pause personal weigh-in writes or keep the
-personal-entry client/RPC path enabled. Reconcile this retained data during the
+while recovery is in progress, keep the personal-entry client/RPC path enabled;
+do not reopen legacy writes before reconciliation. Reconcile this retained data during the
 next forward rollout before retiring the canonical tables.
 
 ## Delivery dependency

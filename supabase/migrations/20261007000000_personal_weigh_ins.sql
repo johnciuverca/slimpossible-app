@@ -383,7 +383,6 @@ begin
     join public.personal_weigh_ins as personal
       on personal.id = share.personal_weigh_in_id
      and personal.user_id = participant.user_id
-     and personal.recorded_date <= target_current_sunday
      and personal.recorded_date <= current_date
     order by participant.id, personal.recorded_date desc
   ), participant_progress as (
