@@ -137,6 +137,22 @@ describe('personal weigh-in migration contract', () => {
     expect(rollback.trimEnd().endsWith('commit;')).toBe(true)
   })
 
+  it('ranks weekly winners by each participant own weight change, not absolute weight or target completion', () => {
+    expect(migration).toContain(
+      'current_entry.weight_kg - previous_entry.weight_kg as weight_change',
+    )
+    expect(migration).toContain(
+      'previous_entry.recorded_date = target_current_sunday - 7',
+    )
+    expect(migration).toContain(
+      'current_entry.recorded_date = target_current_sunday',
+    )
+    expect(migration).toContain('min(candidate.weight_change) as weight_change')
+    expect(migration).toContain('candidate.weight_change = best.weight_change')
+    expect(migration).not.toContain('min(current_entry.weight_kg)')
+    expect(migration).toContain('progress.completion_percentage = 100')
+  })
+
   it('keeps migrated summaries and provisional leaders bounded by server dates', () => {
     expect(migration).not.toContain(
       'personal.recorded_date <= target_current_sunday',
