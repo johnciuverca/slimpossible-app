@@ -412,6 +412,7 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
         date: input.date,
         ...(input.note ? { note: input.note } : {}),
         participantId: input.participantId,
+        shareWithGroup: input.shareWithGroup ?? false,
         weightKg: input.weightKg,
       }
       const values = readList<WeighIn>(storage, weighInsStorageKey)
@@ -441,6 +442,7 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
         date: input.date,
         ...(input.note ? { note: input.note } : {}),
         participantId: input.participantId,
+        shareWithGroup: input.shareWithGroup ?? false,
         weightKg: input.weightKg,
       }
       values[index] = weighIn
@@ -460,6 +462,7 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
         date: input.date,
         ...(input.note ? { note: input.note } : {}),
         participantId: input.participantId,
+        shareWithGroup: input.shareWithGroup ?? false,
         weightKg: input.weightKg,
       }
 
@@ -499,6 +502,15 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
         error: {
           kind: 'request',
           message: 'Shared group progress requires a signed-in server session.',
+        },
+        state: 'error',
+      }
+    },
+    async getWeighInHistory() {
+      return {
+        error: {
+          kind: 'request',
+          message: 'Shared group history requires a signed-in server session.',
         },
         state: 'error',
       }

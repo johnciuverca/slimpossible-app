@@ -28,6 +28,7 @@ import type { WeighIn } from '../models/weighIn'
 import {
   mostRecentSunday,
   type GroupProgressSummary,
+  type GroupWeighInHistoryEntry,
 } from '../models/groupProgress'
 import {
   localDateOnly,
@@ -1876,6 +1877,11 @@ export function ProgressPage() {
   const [provisionalSummary, setProvisionalSummary] =
     useState<ProvisionalGroupLeaderSummary | null>(null)
   const [provisionalMessage, setProvisionalMessage] = useState('')
+  const [groupHistory, setGroupHistory] = useState<{
+    challengeId: string
+    entries: GroupWeighInHistoryEntry[]
+    state: 'error' | 'loading' | 'success'
+  } | null>(null)
   const [refreshVersion, setRefreshVersion] = useState(0)
 
   useEffect(() => {
@@ -1908,6 +1914,37 @@ export function ProgressPage() {
         }
       })
 
+    return () => {
+      isCurrent = false
+    }
+  }, [data, persistence, refreshVersion])
+
+  useEffect(() => {
+    let isCurrent = true
+    if (!data || data.challenge.kind !== 'group') {
+      setGroupHistory(null)
+      return
+    }
+    const challengeId = data.challenge.id
+    setGroupHistory({ challengeId, entries: [], state: 'loading' })
+    if (persistence.mode !== 'remote') {
+      setGroupHistory({ challengeId, entries: [], state: 'error' })
+      return
+    }
+    persistence.repositories.groupProgress
+      .getWeighInHistory(challengeId)
+      .then((result) => {
+        if (!isCurrent) return
+        setGroupHistory({
+          challengeId,
+          entries: result.state === 'success' ? result.data : [],
+          state: result.state === 'error' ? 'error' : 'success',
+        })
+      })
+      .catch(() => {
+        if (isCurrent)
+          setGroupHistory({ challengeId, entries: [], state: 'error' })
+      })
     return () => {
       isCurrent = false
     }
@@ -2231,25 +2268,87 @@ export function ProgressPage() {
                 )}
               </section>
 
-              <section
-                aria-labelledby="group-history-placeholder-title"
-                className="rounded-3xl border border-dashed border-stone-300 bg-stone-50 p-5 sm:p-7"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h2
-                    className="text-lg font-bold text-slate-800"
-                    id="group-history-placeholder-title"
-                  >
-                    Group history
-                  </h2>
-                  <StatusPill>Coming in Chapter 16</StatusPill>
-                </div>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                  Shared weigh-in history is not available yet. This page shows
-                  only your own saved records; other participants’ histories and
-                  private notes remain private.
-                </p>
-              </section>
+              {data.challenge.kind === 'group' ? (
+                <section
+                  aria-labelledby="group-history-title"
+                  className="rounded-3xl border border-stone-200 bg-white p-5 sm:p-7"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h2
+                      className="text-lg font-bold text-slate-800"
+                      id="group-history-title"
+                    >
+                      Shared group weigh-ins
+                    </h2>
+                    <StatusPill>Opted-in dates and weights only</StatusPill>
+                  </div>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                    Active members and the challenge owner can see entries each
+                    participant chose to share. Notes are never shown here.
+                  </p>
+                  {groupHistory?.challengeId !== data.challenge.id ||
+                  groupHistory.state === 'loading' ? (
+                    <p className="mt-4 text-sm text-slate-600" role="status">
+                      Loading shared group weigh-ins…
+                    </p>
+                  ) : groupHistory.state === 'error' ? (
+                    <p className="mt-4 text-sm text-red-700" role="status">
+                      Shared group history is unavailable right now.
+                    </p>
+                  ) : groupHistory.entries.length === 0 ? (
+                    <p className="mt-4 text-sm text-slate-600">
+                      No entries have been shared with this group.
+                    </p>
+                  ) : (
+                    <div className="mt-4 overflow-x-auto rounded-xl border border-stone-200">
+                      <table
+                        aria-label="Shared group weigh-ins"
+                        className="w-full min-w-[34rem] border-collapse text-left text-sm"
+                      >
+                        <thead className="bg-stone-50 text-slate-700">
+                          <tr>
+                            <th className="px-4 py-3 font-semibold" scope="col">
+                              Member
+                            </th>
+                            <th className="px-4 py-3 font-semibold" scope="col">
+                              Date
+                            </th>
+                            <th className="px-4 py-3 font-semibold" scope="col">
+                              Weight
+                            </th>
+                            <th className="px-4 py-3 font-semibold" scope="col">
+                              Change since previous shared entry
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-stone-200">
+                          {groupHistory.entries.map((entry, index) => (
+                            <tr
+                              className="text-slate-800"
+                              key={`${entry.displayName}-${entry.date}-${index}`}
+                            >
+                              <td className="px-4 py-3">{entry.displayName}</td>
+                              <td className="px-4 py-3">
+                                <time dateTime={entry.date}>
+                                  {formatDate(entry.date)}
+                                </time>
+                              </td>
+                              <td className="px-4 py-3 font-semibold">
+                                {formatWeight(entry.weightKg)}
+                              </td>
+                              <td className="px-4 py-3">
+                                {entry.changeSincePreviousKg === null
+                                  ? '—'
+                                  : formatChange(entry.changeSincePreviousKg)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </section>
+              ) : null}
 
               <Link
                 className="inline-flex min-h-11 items-center rounded-xl bg-emerald-800 px-5 py-3 text-sm font-semibold text-white underline-offset-4 hover:bg-emerald-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-800"

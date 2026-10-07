@@ -271,7 +271,7 @@ describe('DailyWeighInFormPage', () => {
     ).toBeDisabled()
     expect(
       screen.getByText(
-        'Authorized group views show aggregate progress and eligible weekly comparison names and check-in dates. They do not expose individual weigh-ins or private notes.',
+        'Active members and the owner can see dates and weights you explicitly choose to share in a group challenge. They never see your private notes; unchecked entries stay private.',
       ),
     ).toBeInTheDocument()
     expect(
@@ -324,6 +324,7 @@ describe('DailyWeighInFormPage', () => {
             note: 'Saved note',
             participant_id: 'participant-real',
             recorded_date: today,
+            share_with_group: false,
             updated_at: '2026-09-17T10:00:00.000Z',
             weight_kg: 90.5,
           },
@@ -336,6 +337,7 @@ describe('DailyWeighInFormPage', () => {
           note: 'Corrected note',
           participant_id: 'participant-real',
           recorded_date: today,
+          share_with_group: true,
           updated_at: '2026-09-17T11:00:00.000Z',
           weight_kg: 90.1,
         }),
@@ -349,6 +351,10 @@ describe('DailyWeighInFormPage', () => {
     expect(screen.queryByText('Alex Participant')).not.toBeInTheDocument()
     expect(screen.queryByText('Another member')).not.toBeInTheDocument()
     expect(screen.getByText(/90.5 kg/)).toBeInTheDocument()
+    const shareConsent = screen.getByRole('checkbox', {
+      name: /Share this date and weight with this group’s active members and owner/,
+    })
+    fireEvent.click(shareConsent)
 
     fireEvent.change(screen.getByLabelText('Weight in kg'), {
       target: { value: '90.1' },
@@ -378,6 +384,9 @@ describe('DailyWeighInFormPage', () => {
     expect(String(upsertRequest?.[0])).toContain('/weigh_ins')
     expect(String(upsertRequest?.[1]?.body)).toContain('participant-real')
     expect(String(upsertRequest?.[1]?.body)).not.toContain('participant-other')
+    expect(JSON.parse(String(upsertRequest?.[1]?.body))).toMatchObject({
+      share_with_group: true,
+    })
   })
 
   it('switches selected challenges and saves only to the matching participant', async () => {

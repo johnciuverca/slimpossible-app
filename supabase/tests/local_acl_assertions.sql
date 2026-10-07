@@ -17,11 +17,15 @@ begin
     'prevent_challenge_ownership_change()', 'prevent_participant_user_reassignment()',
     'prevent_challenge_kind_change()', 'prevent_personal_challenge_invites()',
     'preview_challenge_invite(text)', 'get_group_progress_summary(uuid,date)',
-    'get_provisional_group_leader_summary(uuid,date)'
+    'get_provisional_group_leader_summary(uuid,date)',
+    'get_group_weigh_in_history(uuid)'
   ] loop
     expected_anon := target = 'preview_challenge_invite(text)'
       or (phase <> 'forward' and target not in (
         'get_group_progress_summary(uuid,date)', 'get_provisional_group_leader_summary(uuid,date)'));
+    if target = 'get_group_weigh_in_history(uuid)' then
+      expected_anon := false;
+    end if;
     expected_auth := not (phase = 'forward' and target in (
       'prevent_challenge_kind_change()', 'prevent_personal_challenge_invites()'));
     if has_function_privilege('anon', ('public.' || target)::regprocedure, 'EXECUTE') <> expected_anon
@@ -31,7 +35,8 @@ begin
     end if;
     if phase = 'recovery' or target in (
       'preview_challenge_invite(text)', 'get_group_progress_summary(uuid,date)',
-      'get_provisional_group_leader_summary(uuid,date)'
+      'get_provisional_group_leader_summary(uuid,date)',
+      'get_group_weigh_in_history(uuid)'
     ) then
       select grants into before_grants from local_test.acl_before where identity = target;
       select jsonb_agg(jsonb_build_array(a.grantor, a.grantee, a.privilege_type, a.is_grantable)
@@ -47,7 +52,7 @@ begin
     (select * from pg_default_acl except select * from local_test.defaults_before)
     union all (select * from local_test.defaults_before except select * from pg_default_acl)
   ) then raise exception 'Global/schema default grants changed.'; end if;
-  raise notice '13 effective ACL checks passed for phase %; defaults unchanged.', phase;
+  raise notice '14 effective ACL checks passed for phase %; defaults unchanged.', phase;
 end;
 $$;
 

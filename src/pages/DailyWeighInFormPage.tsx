@@ -5,6 +5,7 @@ import { participantFixture } from '../models/fixtures'
 import { sortWeighInsByDate, upsertWeighIn } from '../models/weighInStore'
 import type { WeighInValidationField } from '../models/weighIn'
 import type { WeighIn } from '../models/weighIn'
+import type { ChallengeKind } from '../models/challenge'
 import type { Participant } from '../models/participant'
 import {
   Button,
@@ -58,6 +59,9 @@ export function DailyWeighInFormPage() {
   const [weighIns, setWeighIns] = useState<WeighIn[]>([])
   const [participant, setParticipant] = useState<Participant | null>(null)
   const [selectedChallengeName, setSelectedChallengeName] = useState('')
+  const [selectedChallengeKind, setSelectedChallengeKind] =
+    useState<ChallengeKind | null>(null)
+  const [shareWithGroup, setShareWithGroup] = useState(false)
   const [errors, setErrors] = useState<WeighInFormErrors>({})
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -82,11 +86,13 @@ export function DailyWeighInFormPage() {
     setIsLoading(true)
     setParticipant(null)
     setSelectedChallengeName('')
+    setSelectedChallengeKind(null)
     setWeighIns([])
     setHasNoEligibleParticipant(false)
     setIsSaving(false)
     setEditingDate(null)
     setValues(initialValues)
+    setShareWithGroup(false)
     setErrors({})
     setSubmitError('')
     setSuccessMessage('')
@@ -118,6 +124,13 @@ export function DailyWeighInFormPage() {
                 ({ id }) => id === participantFixture.challengeId,
               )?.name ?? '')
             : '',
+        )
+        setSelectedChallengeKind(
+          visibleChallenges.state === 'success'
+            ? (visibleChallenges.data.find(
+                ({ id }) => id === participantFixture.challengeId,
+              )?.kind ?? null)
+            : null,
         )
         if (result.state === 'error') {
           setSubmitError(result.error.message)
@@ -183,6 +196,13 @@ export function DailyWeighInFormPage() {
             )?.name ?? '')
           : '',
       )
+      setSelectedChallengeKind(
+        visibleChallenges.state === 'success'
+          ? (visibleChallenges.data.find(
+              ({ id }) => id === savedParticipant.challengeId,
+            )?.kind ?? null)
+          : null,
+      )
       const result = await persistence.repositories.weighIns.listForParticipant(
         savedParticipant.id,
       )
@@ -219,6 +239,7 @@ export function DailyWeighInFormPage() {
       note: weighIn.note ?? '',
       weightKg: String(weighIn.weightKg),
     })
+    setShareWithGroup(weighIn.shareWithGroup ?? false)
     setErrors({})
     setSubmitError('')
     setSuccessMessage('')
@@ -227,6 +248,7 @@ export function DailyWeighInFormPage() {
   function cancelEditing() {
     setEditingDate(null)
     setValues(initialValues)
+    setShareWithGroup(false)
     setErrors({})
     setSubmitError('')
     setSuccessMessage('')
@@ -243,6 +265,7 @@ export function DailyWeighInFormPage() {
       date: values.date,
       note: values.note.trim() || undefined,
       participantId: participant.id,
+      shareWithGroup: selectedChallengeKind === 'group' && shareWithGroup,
       weightKg: Number(values.weightKg),
     }
     const result = upsertWeighIn(weighIns, input)
@@ -292,6 +315,7 @@ export function DailyWeighInFormPage() {
     setSubmitError('')
     setEditingDate(null)
     setValues(initialValues)
+    setShareWithGroup(false)
     setSuccessMessage(
       persistence.mode === 'remote'
         ? 'Weigh-in saved remotely.'
@@ -469,6 +493,30 @@ export function DailyWeighInFormPage() {
                 ) : null}
               </div>
 
+              {selectedChallengeKind === 'group' ? (
+                <div className="rounded-xl border border-forest-200 bg-forest-50 p-4">
+                  <label className="flex items-start gap-3 text-sm font-semibold text-ink">
+                    <input
+                      checked={shareWithGroup}
+                      className="mt-1 size-4 accent-forest-800"
+                      onChange={(event) =>
+                        setShareWithGroup(event.target.checked)
+                      }
+                      type="checkbox"
+                    />
+                    <span>
+                      Share this date and weight with this group’s active
+                      members and owner.
+                    </span>
+                  </label>
+                  <p className="ml-7 mt-2 text-xs leading-5 text-ink-muted">
+                    This is optional. Your private note is never shared. Older
+                    entries stay private unless you edit and opt in; you can
+                    uncheck this later to remove an entry from group history.
+                  </p>
+                </div>
+              ) : null}
+
               {successMessage ? (
                 <p
                   aria-live="polite"
@@ -519,9 +567,9 @@ export function DailyWeighInFormPage() {
               Your note stays private
             </h2>
             <p className="mt-3 text-sm leading-6 text-ink-muted">
-              Authorized group views show aggregate progress and eligible weekly
-              comparison names and check-in dates. They do not expose individual
-              weigh-ins or private notes.
+              Active members and the owner can see dates and weights you
+              explicitly choose to share in a group challenge. They never see
+              your private notes; unchecked entries stay private.
             </p>
             <dl className="mt-5 divide-y divide-line rounded-xl border border-line bg-page px-4">
               <div className="flex items-baseline justify-between gap-4 py-3">

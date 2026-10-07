@@ -124,6 +124,44 @@ describe('Supabase repositories', () => {
     })
   })
 
+  it('maps only the challenge-scoped shared weigh-in contract', async () => {
+    stubResponse([
+      {
+        change_since_previous_kg: -1.5,
+        display_name: 'Ava',
+        recorded_date: '2026-09-20',
+        weight_kg: 88.5,
+        note: 'must not escape',
+        participant_id: 'must not escape',
+      },
+    ])
+
+    const result =
+      await createRepositories(client).groupProgress.getWeighInHistory(
+        'challenge-1',
+      )
+
+    expect(result).toEqual({
+      data: [
+        {
+          changeSincePreviousKg: -1.5,
+          date: '2026-09-20',
+          displayName: 'Ava',
+          weightKg: 88.5,
+        },
+      ],
+      state: 'success',
+    })
+    expect(JSON.stringify(result)).not.toContain('must not escape')
+    expect(JSON.stringify(result)).not.toContain('participant')
+    expect(JSON.stringify(result)).not.toContain('note')
+    const request = vi.mocked(fetch).mock.calls[0]
+    expect(String(request?.[0])).toContain('/rpc/get_group_weigh_in_history')
+    expect(JSON.parse(String(request?.[1]?.body))).toEqual({
+      target_challenge_id: 'challenge-1',
+    })
+  })
+
   it('returns a safe denial for callers without active group membership', async () => {
     stubResponse(
       {
@@ -454,6 +492,7 @@ describe('Supabase repositories', () => {
       note: 'Corrected reading.',
       participant_id: 'participant-1',
       recorded_date: '2026-09-17',
+      share_with_group: true,
       updated_at: '2026-09-17T11:00:00.000Z',
       weight_kg: 91.5,
     })
@@ -462,6 +501,7 @@ describe('Supabase repositories', () => {
       date: '2026-09-17',
       note: 'Corrected reading.',
       participantId: 'participant-1',
+      shareWithGroup: true,
       weightKg: 91.5,
     })
 
@@ -469,9 +509,14 @@ describe('Supabase repositories', () => {
       data: {
         date: '2026-09-17',
         participantId: 'participant-1',
+        shareWithGroup: true,
         weightKg: 91.5,
       },
       state: 'success',
+    })
+    const request = vi.mocked(fetch).mock.calls[0]
+    expect(JSON.parse(String(request?.[1]?.body))).toMatchObject({
+      share_with_group: true,
     })
   })
 

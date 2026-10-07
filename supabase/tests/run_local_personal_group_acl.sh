@@ -19,6 +19,60 @@ for task_migration in supabase/migrations/*.sql; do
   fi
 done
 "${task_psql[@]}" -f supabase/tests/local_acl_fixture.sql
+"${task_psql[@]}" -f supabase/tests/group_weigh_in_history_authorization.sql
+run_history_harness() {
+  sed -e 's/REPLACE_OWNER_UUID/00000000-0000-4000-8000-000000000001/g' \
+      -e 's/REPLACE_MEMBER_UUID/00000000-0000-4000-8000-000000000002/g' \
+      -e 's/REPLACE_OUTSIDER_UUID/00000000-0000-4000-8000-000000000003/g' \
+    supabase/tests/group_weigh_in_history_staging_authorization.sql | "${task_psql[@]}"
+}
+run_history_harness
+if "${task_psql[@]}" -f supabase/tests/group_weigh_in_history_staging_authorization.sql; then
+  printf 'ERROR: unfilled group-history identity placeholders were accepted\n' >&2
+  exit 1
+fi
+if sed -e 's/REPLACE_OWNER_UUID/not-a-uuid/' \
+       -e 's/REPLACE_MEMBER_UUID/00000000-0000-4000-8000-000000000002/' \
+       -e 's/REPLACE_OUTSIDER_UUID/00000000-0000-4000-8000-000000000003/' \
+    supabase/tests/group_weigh_in_history_staging_authorization.sql | "${task_psql[@]}"; then
+  printf 'ERROR: malformed group-history identity was accepted\n' >&2
+  exit 1
+fi
+if sed -e 's/REPLACE_OWNER_UUID/00000000-0000-4000-8000-000000000001/g' \
+       -e 's/REPLACE_MEMBER_UUID/00000000-0000-4000-8000-000000000001/g' \
+       -e 's/REPLACE_OUTSIDER_UUID/00000000-0000-4000-8000-000000000003/g' \
+    supabase/tests/group_weigh_in_history_staging_authorization.sql | "${task_psql[@]}"; then
+  printf 'ERROR: duplicate group-history identities were accepted\n' >&2
+  exit 1
+fi
+if sed -e 's/REPLACE_OWNER_UUID/00000000-0000-4000-8000-000000000001/g' \
+       -e 's/REPLACE_MEMBER_UUID/00000000-0000-4000-8000-000000000002/g' \
+       -e 's/REPLACE_OUTSIDER_UUID/00000000-0000-4000-8000-000000000088/g' \
+    supabase/tests/group_weigh_in_history_staging_authorization.sql | "${task_psql[@]}"; then
+  printf 'ERROR: nonexistent group-history identity was accepted\n' >&2
+  exit 1
+fi
+"${task_psql[@]}" -f supabase/rollback/20261006000000_add_opt_in_group_weigh_in_history.sql
+"${task_psql[@]}" -c "do \$verify\$ begin
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'weigh_ins' and column_name = 'share_with_group')
+     or to_regprocedure('public.get_group_weigh_in_history(uuid)') is not null then
+    raise exception 'Issue 16.2 rollback left part of the delta installed';
+  end if;
+  if (select count(*) from public.weigh_ins where note = 'Preserve existing note') <> 1 then
+    raise exception 'Issue 16.2 rollback changed a pre-existing weigh-in';
+  end if;
+end; \$verify\$"
+"${task_psql[@]}" -f supabase/migrations/20261006000000_add_opt_in_group_weigh_in_history.sql
+"${task_psql[@]}" -c "do \$verify\$ begin
+  if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'weigh_ins' and column_name = 'share_with_group')
+     or to_regprocedure('public.get_group_weigh_in_history(uuid)') is null then
+    raise exception 'Issue 16.2 forward migration did not restore the complete delta';
+  end if;
+  if (select count(*) from public.weigh_ins where note = 'Preserve existing note' and not share_with_group) <> 1 then
+    raise exception 'Issue 16.2 re-forward changed a pre-existing row or made it public';
+  end if;
+end; \$verify\$"
+run_history_harness
 run_harness() {
   sed -e 's/REPLACE_OWNER_UUID/00000000-0000-4000-8000-000000000001/g' \
       -e 's/REPLACE_MEMBER_UUID/00000000-0000-4000-8000-000000000002/g' \

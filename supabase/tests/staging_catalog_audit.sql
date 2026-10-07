@@ -44,6 +44,7 @@ select jsonb_build_object(
     where n.nspname = 'public' and p.proname in (
       'is_challenge_member', 'get_challenge_progress_summary',
       'get_group_progress_summary', 'get_provisional_group_leader_summary',
+      'get_group_weigh_in_history',
       'create_challenge_invite', 'preview_challenge_invite',
       'list_challenge_invites', 'revoke_challenge_invite', 'accept_challenge_invite',
       'prevent_challenge_ownership_change', 'prevent_participant_user_reassignment',

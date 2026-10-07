@@ -338,6 +338,21 @@ export function ParticipantEnrollmentPage() {
               noValidate
               onSubmit={handleSubmit}
             >
+              {challengeKind === 'group' ? (
+                <aside
+                  aria-label="Group sharing and privacy"
+                  className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5"
+                >
+                  <h2 className="font-semibold text-slate-950">
+                    What group members can see
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-slate-700">
+                    Only dates and weights you explicitly share are visible to
+                    active challenge members and the owner. Your notes remain
+                    private.
+                  </p>
+                </aside>
+              ) : null}
               <TextInput
                 autoComplete="off"
                 error={errors.displayName}

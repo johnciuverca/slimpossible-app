@@ -444,6 +444,22 @@ describe('ParticipantEnrollmentPage', () => {
         }),
         `/challenge/participants/enroll?challenge=${challengeId}&self=owner`,
       )
+      if (kind === 'group') {
+        expect(
+          await screen.findByRole('complementary', {
+            name: 'Group sharing and privacy',
+          }),
+        ).toHaveTextContent(
+          'Only dates and weights you explicitly share are visible to active challenge members and the owner. Your notes remain private.',
+        )
+      } else {
+        await screen.findByLabelText('Display name')
+        expect(
+          screen.queryByRole('complementary', {
+            name: 'Group sharing and privacy',
+          }),
+        ).not.toBeInTheDocument()
+      }
       fireEvent.change(await screen.findByLabelText('Display name'), {
         target: { value: 'Private owner' },
       })
