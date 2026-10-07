@@ -162,6 +162,85 @@ describe('Supabase repositories', () => {
     })
   })
 
+  it('uses the atomic personal save RPC and keeps its private result owner-scoped', async () => {
+    stubResponse([
+      {
+        id: 'personal-entry-1',
+        user_id: 'member-1',
+        recorded_date: '2026-10-07',
+        weight_kg: 82.4,
+        note: 'private note',
+        created_at: '2026-10-07T08:00:00.000Z',
+        updated_at: '2026-10-07T08:00:00.000Z',
+        shared_challenge_ids: ['group-1', 'group-2'],
+      },
+    ])
+
+    const result = await createRepositories(client).personalWeighIns.save(
+      'member-1',
+      {
+        id: 'personal-entry-1',
+        date: '2026-10-07',
+        note: ' private note ',
+        sharedChallengeIds: ['group-1', 'group-2'],
+        weightKg: 82.4,
+      },
+    )
+
+    expect(result).toEqual({
+      data: {
+        id: 'personal-entry-1',
+        date: '2026-10-07',
+        note: 'private note',
+        sharedChallengeIds: ['group-1', 'group-2'],
+        weightKg: 82.4,
+      },
+      state: 'success',
+    })
+    const request = vi.mocked(fetch).mock.calls[0]
+    expect(String(request?.[0])).toContain('/rpc/save_personal_weigh_in')
+    expect(JSON.parse(String(request?.[1]?.body))).toEqual({
+      target_note: 'private note',
+      target_recorded_date: '2026-10-07',
+      target_shared_challenge_ids: ['group-1', 'group-2'],
+      target_weigh_in_id: 'personal-entry-1',
+      target_weight_kg: 82.4,
+    })
+  })
+
+  it('lists only the session owner’s personal entries and deletes through the server', async () => {
+    stubResponse([
+      {
+        id: 'personal-entry-1',
+        user_id: 'member-1',
+        recorded_date: '2026-10-07',
+        weight_kg: 82.4,
+        note: 'private note',
+        created_at: '2026-10-07T08:00:00.000Z',
+        updated_at: '2026-10-07T08:00:00.000Z',
+        shared_challenge_ids: [],
+      },
+    ])
+    const listed =
+      await createRepositories(client).personalWeighIns.listForUser('member-1')
+    expect(listed.state).toBe('success')
+    expect(String(vi.mocked(fetch).mock.calls[0]?.[0])).toContain(
+      '/rpc/list_my_personal_weigh_ins',
+    )
+
+    stubResponse(true)
+    const deleted = await createRepositories(client).personalWeighIns.delete(
+      'member-1',
+      'personal-entry-1',
+    )
+    expect(deleted).toEqual({ data: true, state: 'success' })
+    const request = vi.mocked(fetch).mock.calls.at(-1)
+    expect(String(request?.[0])).toContain('/rpc/delete_personal_weigh_in')
+    expect(JSON.parse(String(request?.[1]?.body))).toEqual({
+      target_weigh_in_id: 'personal-entry-1',
+    })
+  })
+
   it('returns a safe denial for callers without active group membership', async () => {
     stubResponse(
       {

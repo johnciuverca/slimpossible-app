@@ -3,6 +3,10 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Challenge, ChallengeKind } from '../../models/challenge'
 import type { Participant } from '../../models/participant'
 import type {
+  PersonalWeighIn,
+  PersonalWeighInInput,
+} from '../../models/personalWeighIn'
+import type {
   ChallengeInvite,
   ChallengeInvitePreview,
   InviteAcceptanceValues,
@@ -36,6 +40,8 @@ type ChallengeRow = Database['public']['Tables']['challenges']['Row']
 type ParticipantRow = Database['public']['Tables']['participants']['Row']
 type ProfileRow = Database['public']['Tables']['profiles']['Row']
 type WeighInRow = Database['public']['Tables']['weigh_ins']['Row']
+type PersonalWeighInRow =
+  Database['public']['Functions']['list_my_personal_weigh_ins']['Returns'][number]
 type ChallengeInviteRow =
   Database['public']['Functions']['list_challenge_invites']['Returns'][number]
 type ChallengeInvitePreviewRow =
@@ -107,6 +113,17 @@ export type WeighInRepository = {
   upsert: (input: WeighInWriteInput) => Promise<RepositoryResult<WeighIn>>
 }
 
+export type PersonalWeighInRepository = {
+  listForUser: (
+    userId: string,
+  ) => Promise<RepositoryListResult<PersonalWeighIn>>
+  save: (
+    userId: string,
+    input: PersonalWeighInInput,
+  ) => Promise<RepositoryResult<PersonalWeighIn>>
+  delete: (userId: string, id: string) => Promise<RepositoryResult<boolean>>
+}
+
 export type GroupProgressRepository = {
   getForChallenge: (
     challengeId: string,
@@ -149,6 +166,7 @@ export type Repositories = {
   participants: ParticipantRepository
   profiles: ProfileRepository
   invites: ChallengeInviteRepository
+  personalWeighIns: PersonalWeighInRepository
   weighIns: WeighInRepository
 }
 
@@ -255,6 +273,16 @@ function mapWeighIn(row: WeighInRow): WeighIn {
     ...(row.note === null ? {} : { note: row.note }),
     participantId: row.participant_id,
     shareWithGroup: row.share_with_group,
+    weightKg: row.weight_kg,
+  }
+}
+
+function mapPersonalWeighIn(row: PersonalWeighInRow): PersonalWeighIn {
+  return {
+    id: row.id,
+    date: row.recorded_date,
+    ...(row.note === null ? {} : { note: row.note }),
+    sharedChallengeIds: row.shared_challenge_ids,
     weightKg: row.weight_kg,
   }
 }
@@ -808,6 +836,44 @@ export function createRepositories(client: DatabaseClient): Repositories {
         return data
           ? { data: true, state: 'success' }
           : { data: null, state: 'empty' }
+      },
+    },
+    personalWeighIns: {
+      async listForUser() {
+        const { data, error } = await client.rpc('list_my_personal_weigh_ins')
+        return error
+          ? {
+              error: requestError('load personal weigh-ins', error),
+              state: 'error',
+            }
+          : mapList(data, mapPersonalWeighIn, 'personal weigh-in')
+      },
+      async save(_userId, input) {
+        const { data, error } = await client.rpc('save_personal_weigh_in', {
+          target_note: input.note?.trim() || null,
+          target_recorded_date: input.date,
+          target_shared_challenge_ids: input.sharedChallengeIds,
+          target_weigh_in_id: input.id ?? null,
+          target_weight_kg: input.weightKg,
+        })
+        const row = data?.[0] ?? null
+        return error
+          ? {
+              error: requestError('save the personal weigh-in', error),
+              state: 'error',
+            }
+          : mapSingle(row, mapPersonalWeighIn, 'personal weigh-in')
+      },
+      async delete(_userId, id) {
+        const { data, error } = await client.rpc('delete_personal_weigh_in', {
+          target_weigh_in_id: id,
+        })
+        return error
+          ? {
+              error: requestError('delete the personal weigh-in', error),
+              state: 'error',
+            }
+          : { data: data === true, state: 'success' }
       },
     },
     weighIns: {

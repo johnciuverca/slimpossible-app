@@ -214,6 +214,58 @@ describe('challenge and participant persistence', () => {
     })
   })
 
+  it('keeps personal weigh-ins independent of challenges and unique by user/date', async () => {
+    const persistence = createPersistence(signedOutState)
+    if (persistence.mode !== 'local') {
+      throw new Error('Expected local persistence without public configuration')
+    }
+
+    const first = await persistence.repositories.personalWeighIns.save(
+      'member-1',
+      {
+        date: '2026-10-06',
+        note: 'Private note',
+        sharedChallengeIds: [],
+        weightKg: 82.4,
+      },
+    )
+    expect(first.state).toBe('success')
+
+    const correction = await persistence.repositories.personalWeighIns.save(
+      'member-1',
+      {
+        date: '2026-10-06',
+        note: 'Corrected private note',
+        sharedChallengeIds: [],
+        weightKg: 82.1,
+      },
+    )
+    expect(correction).toMatchObject({
+      data: {
+        date: '2026-10-06',
+        note: 'Corrected private note',
+        sharedChallengeIds: [],
+        weightKg: 82.1,
+      },
+      state: 'success',
+    })
+    if (first.state === 'success' && correction.state === 'success') {
+      expect(correction.data.id).toBe(first.data.id)
+    }
+    await expect(
+      persistence.repositories.personalWeighIns.listForUser('member-1'),
+    ).resolves.toMatchObject({ data: [{ weightKg: 82.1 }], state: 'success' })
+    await expect(
+      persistence.repositories.personalWeighIns.listForUser('member-2'),
+    ).resolves.toEqual({ data: [], state: 'empty' })
+    await expect(
+      persistence.repositories.personalWeighIns.delete(
+        'member-2',
+        correction.state === 'success' ? correction.data.id : '',
+      ),
+    ).resolves.toEqual({ data: null, state: 'empty' })
+  })
+
   it('does not enable remote writes without a signed-in Supabase user id', () => {
     expect(
       createPersistence(signedOutState, window.localStorage, {

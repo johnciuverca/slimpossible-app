@@ -132,6 +132,7 @@ function installRemoteFixtures({
 }: { emptyWeighIns?: boolean; groupHistory?: unknown[] } = {}) {
   vi.stubEnv('VITE_SUPABASE_URL', 'https://progress-project.supabase.co')
   vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-test-key')
+  let currentUserId = 'member-1'
   vi.stubGlobal(
     'fetch',
     vi.fn((input: RequestInfo) => {
@@ -139,21 +140,36 @@ function installRemoteFixtures({
       if (url.includes('/challenges?'))
         return Promise.resolve(response(challenges))
       if (url.includes('/participants?')) {
-        const userId = url.includes('user_id=eq.member-2')
+        currentUserId = url.includes('user_id=eq.member-2')
           ? 'member-2'
           : 'member-1'
         return Promise.resolve(
-          response(participants.filter(({ user_id }) => user_id === userId)),
+          response(
+            participants.filter(({ user_id }) => user_id === currentUserId),
+          ),
         )
       }
-      if (url.includes('/weigh_ins?')) {
+      if (url.includes('/rpc/list_my_personal_weigh_ins')) {
         if (emptyWeighIns) return Promise.resolve(response([]))
-        const participantId = url.match(/participant_id=eq\.([^&]+)/)?.[1]
+        const participantIds = new Set(
+          participants
+            .filter(({ user_id }) => user_id === currentUserId)
+            .map(({ id }) => id),
+        )
         return Promise.resolve(
           response(
-            weighIns.filter(
-              ({ participant_id }) => participant_id === participantId,
-            ),
+            weighIns
+              .filter(({ participant_id }) =>
+                participantIds.has(participant_id),
+              )
+              .map(({ id, note, recorded_date, weight_kg }) => ({
+                id,
+                user_id: currentUserId,
+                note,
+                recorded_date,
+                shared_challenge_ids: [],
+                weight_kg,
+              })),
           ),
         )
       }
@@ -219,7 +235,7 @@ describe('ProgressPage', () => {
     ).toBeInTheDocument()
   })
 
-  it('clears prior challenge history and displays only the selected challenge records', async () => {
+  it('keeps personal history across challenge switches', async () => {
     installRemoteFixtures()
     render(
       <AuthContext.Provider value={authValue('member-1')}>
@@ -232,17 +248,20 @@ describe('ProgressPage', () => {
     expect(
       await screen.findByText('First challenge private note'),
     ).toBeInTheDocument()
+    expect(
+      screen.getByText('Second challenge private note'),
+    ).toBeInTheDocument()
     fireEvent.click(
       screen.getByRole('link', { name: 'Select the second challenge' }),
     )
 
     expect(
-      await screen.findByText('Second challenge private note'),
+      await screen.findByText('Group · Second challenge'),
     ).toBeInTheDocument()
+    expect(screen.getByText('First challenge private note')).toBeInTheDocument()
     expect(
-      screen.queryByText('First challenge private note'),
-    ).not.toBeInTheDocument()
-    expect(screen.getByText('Group · Second challenge')).toBeInTheDocument()
+      screen.getByText('Second challenge private note'),
+    ).toBeInTheDocument()
   })
 
   it('removes one account’s history before showing another account’s selected history', async () => {

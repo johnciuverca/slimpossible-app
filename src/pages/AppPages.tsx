@@ -25,6 +25,7 @@ import { createPersistence } from '../data/persistence'
 import type { Challenge } from '../models/challenge'
 import type { Participant } from '../models/participant'
 import type { WeighIn } from '../models/weighIn'
+import type { PersonalWeighIn } from '../models/personalWeighIn'
 import {
   mostRecentSunday,
   type GroupProgressSummary,
@@ -122,6 +123,18 @@ type PersonalDashboardSnapshot = {
 function challengeContextName(challenge?: Challenge) {
   if (!challenge) return 'Selected challenge'
   return `${challenge.kind === 'personal' ? 'Personal' : 'Group'} · ${challenge.name}`
+}
+
+function forParticipant(
+  entries: PersonalWeighIn[],
+  participantId: string,
+): WeighIn[] {
+  return entries.map((entry) => ({
+    date: entry.date,
+    ...(entry.note ? { note: entry.note } : {}),
+    participantId,
+    weightKg: entry.weightKg,
+  }))
 }
 
 function usePersonalDashboard({ preferJoinedChallenge = false } = {}) {
@@ -251,9 +264,7 @@ function usePersonalDashboard({ preferJoinedChallenge = false } = {}) {
         }
 
         const weighIns =
-          await persistence.repositories.weighIns.listForParticipant(
-            participant.id,
-          )
+          await persistence.repositories.personalWeighIns.listForUser(ownerId)
         if (!isCurrent) return
         if (weighIns.state === 'error') {
           setSnapshot({
@@ -264,7 +275,10 @@ function usePersonalDashboard({ preferJoinedChallenge = false } = {}) {
           })
           return
         }
-        const records = weighIns.state === 'success' ? weighIns.data : []
+        const records =
+          weighIns.state === 'success'
+            ? forParticipant(weighIns.data, participant.id)
+            : []
         setSnapshot({
           ...baseSnapshot,
           data: {
@@ -2157,8 +2171,8 @@ export function ProgressPage() {
                   Your saved trend
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Only your saved weigh-ins for this challenge are plotted.
-                  Missing dates have no estimated weights.
+                  Your personal history is independent of the selected
+                  challenge. Missing dates have no estimated weights.
                 </p>
                 {data.flow.historyTrend.history.length === 0 ? (
                   <FeedbackPanel className="mt-5" tone="empty">

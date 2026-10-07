@@ -91,20 +91,20 @@ function dashboardResponses(
     ]),
     response([
       {
-        created_at: '2026-09-17T10:00:00.000Z',
         id: 'weigh-in-1',
+        user_id: 'member-1',
         note: null,
-        participant_id: 'participant-1',
         recorded_date: '2026-09-17',
+        shared_challenge_ids: [],
         updated_at: '2026-09-17T10:00:00.000Z',
         weight_kg: 95,
       },
       {
-        created_at: '2026-09-18T10:00:00.000Z',
         id: 'weigh-in-2',
+        user_id: 'member-1',
         note: latestNote,
-        participant_id: 'participant-1',
         recorded_date: '2026-09-18',
+        shared_challenge_ids: [],
         updated_at: '2026-09-18T10:00:00.000Z',
         weight_kg: 90,
       },
@@ -649,14 +649,14 @@ describe('HomePage', () => {
           },
         ])
       }
-      if (url.includes('/weigh_ins?')) {
+      if (url.includes('/rpc/list_my_personal_weigh_ins')) {
         return response([
           {
-            created_at: '2026-09-18T10:00:00.000Z',
             id: 'joined-weigh-in',
+            user_id: 'member-1',
             note: null,
-            participant_id: 'joined-participant',
             recorded_date: '2026-09-18',
+            shared_challenge_ids: [],
             updated_at: '2026-09-18T10:00:00.000Z',
             weight_kg: 89,
           },
@@ -784,19 +784,17 @@ describe('HomePage', () => {
           },
         ])
       }
-      if (url.includes('/weigh_ins?')) {
+      if (url.includes('/rpc/list_my_personal_weigh_ins')) {
         const secondAccount = challengeRequestCount > 1
         return response([
           {
-            created_at: '2026-09-17T10:00:00.000Z',
             id: secondAccount ? 'weigh-in-two' : 'weigh-in-one',
+            user_id: secondAccount ? 'member-2' : 'member-1',
             note: secondAccount
               ? 'Account two private note'
               : 'Account one private note',
-            participant_id: secondAccount
-              ? 'participant-two'
-              : 'participant-one',
             recorded_date: '2026-09-17',
+            shared_challenge_ids: [],
             updated_at: '2026-09-17T10:00:00.000Z',
             weight_kg: secondAccount ? 70 : 90,
           },
@@ -934,7 +932,7 @@ describe('HomePage', () => {
     })
     expect(
       fetchMock.mock.calls.filter(([url]) =>
-        String(url).includes('/weigh_ins?'),
+        String(url).includes('/rpc/list_my_personal_weigh_ins'),
       ),
     ).toHaveLength(1)
   })
@@ -1152,7 +1150,7 @@ describe('HomePage', () => {
       )
       expect(
         fetchMock.mock.calls.some(([url]) =>
-          String(url).includes('participant_id=eq.participant-1'),
+          String(url).includes('/rpc/list_my_personal_weigh_ins'),
         ),
       ).toBe(true)
       const challengeRequest = fetchMock.mock.calls.find(([url]) =>
