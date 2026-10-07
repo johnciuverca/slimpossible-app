@@ -1,6 +1,7 @@
 import type { FormEvent } from 'react'
 
 import type { Challenge } from '../models/challenge'
+import { personalWeighInToday } from '../models/personalWeighIn'
 import { Button, TextInput } from './ui'
 
 export type PersonalWeighInFormValues = {
@@ -24,7 +25,7 @@ type PersonalWeighInEditorProps = {
   values: PersonalWeighInFormValues
 }
 
-const today = new Date().toISOString().slice(0, 10)
+const today = personalWeighInToday()
 
 export function PersonalWeighInEditor({
   errors = {},

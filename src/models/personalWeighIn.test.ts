@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
-import { validatePersonalWeighIn } from './personalWeighIn'
+import {
+  personalWeighInToday,
+  validatePersonalWeighIn,
+} from './personalWeighIn'
 
 describe('validatePersonalWeighIn', () => {
+  it('uses the local calendar date rather than the UTC date boundary', () => {
+    expect(personalWeighInToday(new Date(2026, 9, 7))).toBe('2026-10-07')
+  })
+
   it('accepts a private entry without a challenge', () => {
     expect(
       validatePersonalWeighIn(

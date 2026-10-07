@@ -20,6 +20,13 @@ const authorizationHarness = readFileSync(
   resolve(process.cwd(), 'supabase/tests/personal_weigh_in_authorization.sql'),
   'utf8',
 )
+const rollback = readFileSync(
+  resolve(
+    process.cwd(),
+    'supabase/rollback/20261007000000_restore_pre_210_rpcs.sql',
+  ),
+  'utf8',
+)
 
 describe('personal weigh-in migration contract', () => {
   it('stops before data conversion when one user has duplicate legacy dates', () => {
@@ -99,6 +106,52 @@ describe('personal weigh-in migration contract', () => {
     expect(authorizationHarness).toContain('outsider_denied')
     expect(authorizationHarness).toContain('other_user_delete_denied')
     expect(authorizationHarness).toContain('delete_cascades_group_shares')
+    expect(authorizationHarness).toContain(
+      'withdrawn_member_cannot_read_group_history',
+    )
+    expect(authorizationHarness).toContain(
+      'anonymous_cannot_read_raw_share_rows',
+    )
+    expect(authorizationHarness).toContain(
+      'unauthorized_delete_leaves_live_entry_intact',
+    )
+    expect(authorizationHarness).toContain('<> 24')
     expect(authorizationHarness.trimEnd().endsWith('rollback;')).toBe(true)
+  })
+
+  it('provides a non-destructive inverse that restores replaced RPCs', () => {
+    expect(rollback).toContain(
+      'create or replace function public.get_group_weigh_in_history',
+    )
+    expect(rollback).toContain(
+      'create or replace function public.get_group_progress_summary',
+    )
+    expect(rollback).toContain(
+      'create or replace function public.get_provisional_group_leader_summary',
+    )
+    expect(rollback).toContain(
+      'create or replace function public.get_challenge_progress_summary',
+    )
+    expect(rollback).toMatch(/deliberately does NOT\s+-- drop canonical tables/)
+    expect(rollback).not.toMatch(/\bdrop\s+(table|function)\b/i)
+    expect(rollback.trimEnd().endsWith('commit;')).toBe(true)
+  })
+
+  it('keeps migrated summaries and provisional leaders bounded by server dates', () => {
+    expect(migration).toContain(
+      'personal.recorded_date <= target_current_sunday',
+    )
+    expect(migration).toContain('target_current_sunday > current_date')
+    expect(migration).toContain('target_current_date > current_date')
+    expect(migration).toContain('personal.recorded_date <= current_date')
+    expect(authorizationHarness).toContain(
+      'group_summary_uses_only_dates_through_selected_sunday',
+    )
+    expect(authorizationHarness).toContain(
+      'owner_challenge_summary_excludes_future_copied_row',
+    )
+    expect(authorizationHarness).toContain(
+      'future_provisional_summary_date_rejected',
+    )
   })
 })

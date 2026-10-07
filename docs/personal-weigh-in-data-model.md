@@ -24,6 +24,23 @@ For unambiguous single-row dates, copy the exact date, weight, note, and timesta
 4. Switch reads/writes to canonical entries while keeping explicit compatibility reads for the old challenge-specific scoring until those consumers are migrated and tested.
 5. Retire legacy writes or tables only in a separately reviewed migration after all consumers and hosted acceptance are proven.
 
+## Application rollback
+
+Use `supabase/rollback/20261007000000_restore_pre_210_rpcs.sql` only after
+rolling the application client back and taking a verified backup. It restores
+the four pre-#210 RPC bodies that this migration replaces. It intentionally
+does not drop canonical tables, personal RPCs, shares, provenance, or rows.
+That is the data-preserving inverse: users can roll the app forward again
+without losing any post-rollout personal entries.
+
+Canonical-only entries created after rollout remain in `personal_weigh_ins`.
+The older app does not display or update them. Do not automatically copy them
+into `weigh_ins`: private entries have no challenge/participant destination,
+and choosing one would silently broaden visibility. If users must keep logging
+while the old app is deployed, pause personal weigh-in writes or keep the
+personal-entry client/RPC path enabled. Reconcile this retained data during the
+next forward rollout before retiring the canonical tables.
+
 ## Delivery dependency
 
 Live `staging` is `a6fcfb021a401036864517a50ef4452d115200c9`. PR #230 (`codex/16-2-group-weigh-in-privacy`) is open and based on that head; the staging database has the migration applied, but this is not equivalent to the PR's connected acceptance or code being merged. The canonical multi-group model consumes the explicit-share concept from #209, so a final PR directly to `staging` must not include a duplicate copy of PR #230. This implementation branch is stacked on PR #230 so its eventual PR diff can contain only #210 changes. Keep that PR based on #230 while #230 is open; retarget it to `staging` only after #230 is accepted and merged. Do not present #210 as merge-ready while #230's connected acceptance gate remains open.

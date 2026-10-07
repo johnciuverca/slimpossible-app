@@ -11,10 +11,13 @@ import { createPersistence } from '../data/persistence'
 import type { Challenge } from '../models/challenge'
 import { participantFixture } from '../models/fixtures'
 import type { PersonalWeighIn } from '../models/personalWeighIn'
-import { validatePersonalWeighIn } from '../models/personalWeighIn'
+import {
+  personalWeighInToday,
+  validatePersonalWeighIn,
+} from '../models/personalWeighIn'
 
 const emptyForm: PersonalWeighInFormValues = {
-  date: new Date().toISOString().slice(0, 10),
+  date: personalWeighInToday(),
   note: '',
   sharedChallengeIds: [],
   weightKg: '',

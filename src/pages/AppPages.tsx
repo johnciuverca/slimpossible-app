@@ -129,12 +129,14 @@ function forParticipant(
   entries: PersonalWeighIn[],
   participantId: string,
 ): WeighIn[] {
-  return entries.map((entry) => ({
-    date: entry.date,
-    ...(entry.note ? { note: entry.note } : {}),
-    participantId,
-    weightKg: entry.weightKg,
-  }))
+  return entries
+    .filter((entry) => entry.date <= localDateOnly())
+    .map((entry) => ({
+      date: entry.date,
+      ...(entry.note ? { note: entry.note } : {}),
+      participantId,
+      weightKg: entry.weightKg,
+    }))
 }
 
 function usePersonalDashboard({ preferJoinedChallenge = false } = {}) {
@@ -499,6 +501,7 @@ export function HomePage() {
       setIsOverviewLoading(false)
       if (
         isLoading ||
+        !ownerId ||
         !selectedChallenge ||
         !activeParticipant ||
         persistence.mode === 'unavailable'
@@ -509,9 +512,7 @@ export function HomePage() {
       setIsOverviewLoading(true)
       try {
         const [weighIns, groupResult] = await Promise.all([
-          persistence.repositories.weighIns.listForParticipant(
-            activeParticipant.id,
-          ),
+          persistence.repositories.personalWeighIns.listForUser(ownerId),
           selectedChallenge.kind === 'group'
             ? persistence.repositories.groupProgress.getForChallenge(
                 selectedChallenge.id,
@@ -534,7 +535,10 @@ export function HomePage() {
                   challenge: selectedChallenge,
                   participantId: activeParticipant.id,
                   participants: [activeParticipant],
-                  weighIns: weighIns.state === 'success' ? weighIns.data : [],
+                  weighIns:
+                    weighIns.state === 'success'
+                      ? forParticipant(weighIns.data, activeParticipant.id)
+                      : [],
                 }),
         })
       } catch {
@@ -555,7 +559,7 @@ export function HomePage() {
     return () => {
       isCurrent = false
     }
-  }, [activeParticipant, isLoading, persistence, selectedChallenge])
+  }, [activeParticipant, isLoading, ownerId, persistence, selectedChallenge])
 
   function selectChallenge(challengeId: string) {
     const nextParams = new URLSearchParams(searchParams)

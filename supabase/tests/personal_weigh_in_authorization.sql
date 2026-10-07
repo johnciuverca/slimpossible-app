@@ -27,7 +27,14 @@ declare
   first_entry uuid;
   second_entry uuid;
   correction_entry uuid;
+  protected_entry uuid;
+  past_summary_entry uuid;
+  after_sunday_entry uuid;
+  future_summary_entry uuid;
+  current_sunday date := current_date - extract(dow from current_date)::integer;
   row_count integer;
+  numeric_summary numeric;
+  date_summary date;
   projection jsonb;
 begin
   if owner_id = member_id or owner_id = outsider_id or member_id = outsider_id then
@@ -132,6 +139,93 @@ begin
   insert into slimpossible_personal_weigh_in_results values
     ('remaining_group_share_is_preserved', row_count = 1);
 
+  -- Simulate legacy rows copied during migration, including dates after the
+  -- selected Sunday and after today. Summary consumers must exclude both
+  -- future categories without relying on the save RPC to reject them.
+  execute 'reset role';
+  insert into public.personal_weigh_ins (
+    user_id, recorded_date, weight_kg, note
+  ) values
+    (member_id, current_sunday - 1, 90, 'past summary fixture'),
+    (member_id, least(current_sunday + 1, current_date), 95, 'after Sunday fixture'),
+    (member_id, current_date + 1, 10, 'future summary fixture');
+  select id into past_summary_entry from public.personal_weigh_ins
+  where user_id = member_id and recorded_date = current_sunday - 1;
+  select id into after_sunday_entry from public.personal_weigh_ins
+  where user_id = member_id and recorded_date = least(current_sunday + 1, current_date);
+  select id into future_summary_entry from public.personal_weigh_ins
+  where user_id = member_id and recorded_date = current_date + 1;
+  insert into public.personal_weigh_in_group_shares (
+    personal_weigh_in_id, challenge_id
+  ) values
+    (past_summary_entry, group_one),
+    (after_sunday_entry, group_one),
+    (future_summary_entry, group_one);
+  execute 'set local role authenticated';
+  perform set_config('request.jwt.claim.sub', member_id::text, true);
+  select summary.average_completion_percentage into numeric_summary
+  from public.get_group_progress_summary(group_one, current_sunday) summary;
+  insert into slimpossible_personal_weigh_in_results values
+    ('group_summary_uses_only_dates_through_selected_sunday', numeric_summary = 0);
+  begin
+    perform * from public.get_group_progress_summary(group_one, current_sunday + 7);
+    insert into slimpossible_personal_weigh_in_results values
+      ('future_sunday_summary_rejected', false);
+  exception when invalid_parameter_value then
+    insert into slimpossible_personal_weigh_in_results values
+      ('future_sunday_summary_rejected', true);
+  end;
+  begin
+    perform * from public.get_provisional_group_leader_summary(group_one, current_date + 1);
+    insert into slimpossible_personal_weigh_in_results values
+      ('future_provisional_summary_date_rejected', false);
+  exception when invalid_parameter_value then
+    insert into slimpossible_personal_weigh_in_results values
+      ('future_provisional_summary_date_rejected', true);
+  end;
+  perform set_config('request.jwt.claim.sub', owner_id::text, true);
+  select summary.total_weigh_in_count, summary.latest_recorded_date
+    into row_count, date_summary
+  from public.get_challenge_progress_summary(group_one) summary;
+  insert into slimpossible_personal_weigh_in_results values
+    ('owner_challenge_summary_excludes_future_copied_row',
+      row_count = 2 and date_summary = least(current_sunday + 1, current_date));
+  perform set_config('request.jwt.claim.sub', member_id::text, true);
+
+  begin
+    perform count(*) from public.personal_weigh_in_group_shares;
+    insert into slimpossible_personal_weigh_in_results values
+      ('member_cannot_read_raw_share_rows', false);
+  exception when insufficient_privilege then
+    insert into slimpossible_personal_weigh_in_results values
+      ('member_cannot_read_raw_share_rows', true);
+  end;
+
+  -- A withdrawn member must lose group-history access even though their
+  -- personal entries and prior explicit shares remain stored.
+  execute 'reset role';
+  update public.participants set status = 'withdrawn'
+  where id = member_two_participant;
+  execute 'set local role authenticated';
+  perform set_config('request.jwt.claim.sub', member_id::text, true);
+  begin
+    perform * from public.get_group_weigh_in_history(group_two);
+    insert into slimpossible_personal_weigh_in_results values
+      ('withdrawn_member_cannot_read_group_history', false);
+  exception when insufficient_privilege then
+    insert into slimpossible_personal_weigh_in_results values
+      ('withdrawn_member_cannot_read_group_history', true);
+  end;
+  execute 'reset role';
+  update public.participants set status = 'active'
+  where id = member_two_participant;
+  execute 'set local role authenticated';
+  perform set_config('request.jwt.claim.sub', member_id::text, true);
+
+  select id into protected_entry from public.save_personal_weigh_in(
+    null, current_date - 3, 88, '[16.3 private] owned entry', array[group_two]
+  );
+
   perform set_config('request.jwt.claim.sub', outsider_id::text, true);
   begin
     perform * from public.get_group_weigh_in_history(group_one);
@@ -140,6 +234,26 @@ begin
     insert into slimpossible_personal_weigh_in_results values ('outsider_denied', true);
   end;
 
+  execute 'reset role';
+  execute 'set local role anon';
+  begin
+    perform * from public.list_my_personal_weigh_ins();
+    insert into slimpossible_personal_weigh_in_results values
+      ('anonymous_cannot_call_personal_list', false);
+  exception when insufficient_privilege then
+    insert into slimpossible_personal_weigh_in_results values
+      ('anonymous_cannot_call_personal_list', true);
+  end;
+  begin
+    perform count(*) from public.personal_weigh_in_group_shares;
+    insert into slimpossible_personal_weigh_in_results values
+      ('anonymous_cannot_read_raw_share_rows', false);
+  exception when insufficient_privilege then
+    insert into slimpossible_personal_weigh_in_results values
+      ('anonymous_cannot_read_raw_share_rows', true);
+  end;
+
+  execute 'set local role authenticated';
   perform set_config('request.jwt.claim.sub', member_id::text, true);
   if public.delete_personal_weigh_in(first_entry) then
     insert into slimpossible_personal_weigh_in_results values ('owner_delete_succeeds', true);
@@ -153,10 +267,29 @@ begin
     ('delete_cascades_group_shares', row_count = 0);
   execute 'set local role authenticated';
   perform set_config('request.jwt.claim.sub', owner_id::text, true);
-  if public.delete_personal_weigh_in(first_entry) then
+  if public.delete_personal_weigh_in(protected_entry) then
     insert into slimpossible_personal_weigh_in_results values ('other_user_delete_denied', false);
   else
     insert into slimpossible_personal_weigh_in_results values ('other_user_delete_denied', true);
+  end if;
+  select count(*)::integer into row_count from public.list_my_personal_weigh_ins()
+  where id = protected_entry and note = '[16.3 private] owned entry';
+  insert into slimpossible_personal_weigh_in_results values
+    ('other_user_cannot_read_private_note', row_count = 0);
+  execute 'reset role';
+  select count(*)::integer into row_count from public.personal_weigh_ins
+  where id = protected_entry and user_id = member_id
+    and note = '[16.3 private] owned entry';
+  insert into slimpossible_personal_weigh_in_results values
+    ('unauthorized_delete_leaves_live_entry_intact', row_count = 1);
+  execute 'set local role authenticated';
+  perform set_config('request.jwt.claim.sub', member_id::text, true);
+  if public.delete_personal_weigh_in(protected_entry) then
+    insert into slimpossible_personal_weigh_in_results values
+      ('owner_can_delete_after_denied_attempt', true);
+  else
+    insert into slimpossible_personal_weigh_in_results values
+      ('owner_can_delete_after_denied_attempt', false);
   end if;
 
   execute 'reset role';
@@ -167,7 +300,7 @@ select check_name, passed from slimpossible_personal_weigh_in_results order by c
 
 do $$
 begin
-  if (select count(*) from slimpossible_personal_weigh_in_results) <> 13
+  if (select count(*) from slimpossible_personal_weigh_in_results) <> 24
      or exists (select 1 from slimpossible_personal_weigh_in_results where not passed) then
     raise exception 'Personal weigh-in authorization checks failed; roll back this batch.';
   end if;

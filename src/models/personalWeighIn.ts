@@ -27,6 +27,10 @@ export type PersonalWeighInValidationResult =
 
 const dateOnlyPattern = /^\d{4}-\d{2}-\d{2}$/
 
+export function personalWeighInToday(date = new Date()): DateOnly {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
 function isDateOnly(value: unknown): value is DateOnly {
   if (typeof value !== 'string' || !dateOnlyPattern.test(value)) return false
   const parsed = new Date(`${value}T00:00:00.000Z`)
@@ -38,7 +42,7 @@ function isDateOnly(value: unknown): value is DateOnly {
 
 export function validatePersonalWeighIn(
   input: unknown,
-  today = new Date().toISOString().slice(0, 10),
+  today = personalWeighInToday(),
 ): PersonalWeighInValidationResult {
   if (typeof input !== 'object' || input === null) {
     return {

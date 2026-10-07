@@ -355,8 +355,9 @@ begin
     raise exception using errcode = '42501', message = 'Sign-in required.';
   end if;
   if target_current_sunday is null
-     or extract(dow from target_current_sunday) <> 0 then
-    raise exception using errcode = '22023', message = 'Valid Sunday and sign-in required.';
+     or extract(dow from target_current_sunday) <> 0
+     or target_current_sunday > current_date then
+    raise exception using errcode = '22023', message = 'A current or past Sunday is required.';
   end if;
   if not exists (
     select 1 from public.participants as member
@@ -382,6 +383,8 @@ begin
     join public.personal_weigh_ins as personal
       on personal.id = share.personal_weigh_in_id
      and personal.user_id = participant.user_id
+     and personal.recorded_date <= target_current_sunday
+     and personal.recorded_date <= current_date
     order by participant.id, personal.recorded_date desc
   ), participant_progress as (
     select participant.id, latest.recorded_date is not null as has_record,
@@ -472,8 +475,8 @@ begin
   if auth.uid() is null then
     raise exception using errcode = '42501', message = 'Sign-in required.';
   end if;
-  if target_current_date is null then
-    raise exception using errcode = '22023', message = 'Current date is required.';
+  if target_current_date is null or target_current_date > current_date then
+    raise exception using errcode = '22023', message = 'A current or past date is required.';
   end if;
   if not exists (
     select 1 from public.participants as member
@@ -568,6 +571,7 @@ as $$
    and participant.status = 'active'
   left join public.personal_weigh_ins as personal
     on personal.user_id = participant.user_id
+   and personal.recorded_date <= current_date
    and (
      (challenge.challenge_kind = 'personal' and participant.user_id = challenge.owner_id)
      or (challenge.challenge_kind is distinct from 'personal' and exists (
