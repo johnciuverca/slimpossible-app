@@ -9,7 +9,7 @@ function shiftDate(dateOnly: string, days: number) {
   return date.toISOString().slice(0, 10)
 }
 
-async function installGroupFixtures(page: Page) {
+async function installGroupFixtures(page: Page, multiple = false) {
   const requests: string[] = []
   page.on('request', (request) => requests.push(request.url()))
 
@@ -34,6 +34,23 @@ async function installGroupFixtures(page: Page) {
             target_weight_kg: null,
             updated_at: '2026-09-17T10:00:00.000Z',
           },
+          ...(multiple
+            ? [
+                {
+                  created_at: '2026-09-17T10:00:00.000Z',
+                  created_by: 'e2e-owner',
+                  description: null,
+                  end_date: '2026-12-01',
+                  id: 'e2e-second-group',
+                  name: 'Second authorized group',
+                  owner_id: 'e2e-owner',
+                  start_date: '2026-09-17',
+                  status: 'active',
+                  target_weight_kg: null,
+                  updated_at: '2026-09-17T10:00:00.000Z',
+                },
+              ]
+            : []),
         ]),
       })
       return
@@ -44,14 +61,18 @@ async function installGroupFixtures(page: Page) {
         target_challenge_id: string
         target_current_sunday: string
       }
-      expect(body.target_challenge_id).toBe(challengeId)
+      expect([
+        challengeId,
+        ...(multiple ? ['e2e-second-group'] : []),
+      ]).toContain(body.target_challenge_id)
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify([
           {
             active_participant_count: 3,
-            average_completion_percentage: 42.5,
-            challenge_id: challengeId,
+            average_completion_percentage:
+              body.target_challenge_id === challengeId ? 42.5 : 73.2,
+            challenge_id: body.target_challenge_id,
             current_sunday: body.target_current_sunday,
             eligible_participant_count: 2,
             participants_with_progress_count: 2,
@@ -59,7 +80,10 @@ async function installGroupFixtures(page: Page) {
             previous_sunday: shiftDate(body.target_current_sunday, -7),
             reached_target_count: 1,
             weekly_winner_count: 2,
-            weekly_winner_names: ['Ava', 'Ben'],
+            weekly_winner_names:
+              body.target_challenge_id === challengeId
+                ? ['Ava', 'Ben']
+                : ['Jo', 'Kim'],
             private_note: 'fixture private note must never render',
             raw_weigh_ins: [{ weight_kg: 91.5 }],
           },
@@ -73,7 +97,10 @@ async function installGroupFixtures(page: Page) {
         target_challenge_id: string
         target_current_date: string
       }
-      expect(body.target_challenge_id).toBe(challengeId)
+      expect([
+        challengeId,
+        ...(multiple ? ['e2e-second-group'] : []),
+      ]).toContain(body.target_challenge_id)
       const currentDate = new Date(`${body.target_current_date}T00:00:00.000Z`)
       const mondayOffset = (currentDate.getUTCDay() + 6) % 7
       const currentWeekStart = shiftDate(
@@ -86,7 +113,7 @@ async function installGroupFixtures(page: Page) {
         body: JSON.stringify([
           {
             active_participant_count: 3,
-            challenge_id: challengeId,
+            challenge_id: body.target_challenge_id,
             current_week_end: shiftDate(currentWeekStart, 6),
             current_week_start: currentWeekStart,
             eligible_participant_count: 2,
@@ -95,7 +122,10 @@ async function installGroupFixtures(page: Page) {
               body.target_current_date,
               body.target_current_date,
             ],
-            leader_names: ['Ava', 'Ben'],
+            leader_names:
+              body.target_challenge_id === challengeId
+                ? ['Ava', 'Ben']
+                : ['Jo', 'Kim'],
             previous_sunday: previousSunday,
             state: 'leaders',
             leader_email: 'private@example.invalid',
@@ -116,6 +146,46 @@ for (const viewport of [
   { label: 'desktop', width: 1280 },
   { label: 'mobile', width: 390 },
 ]) {
+  test(`pill switch and direct refresh keep distinct authorized group records on ${viewport.label}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ height: 900, width: viewport.width })
+    await installGroupFixtures(page, true)
+    await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    await expect(page.getByText('42.5%', { exact: true })).toBeVisible()
+    const contexts = page.getByRole('navigation', {
+      name: 'Challenge contexts',
+    })
+    const second = contexts.getByRole('link', {
+      name: 'Group · Second authorized group',
+      exact: true,
+    })
+    await second.focus()
+    await page.keyboard.press('Enter')
+    await expect(page.getByText('73.2%', { exact: true })).toBeVisible()
+    await expect(page.getByText('42.5%', { exact: true })).toHaveCount(0)
+    await expect(
+      contexts.getByRole('link', { name: /Second authorized group/ }),
+    ).toHaveAttribute('aria-current', 'page')
+    await expect(
+      page.getByRole('list', { name: 'Weekly winners' }),
+    ).toContainText('Jo')
+    await expect(
+      page.getByRole('list', { name: 'Weekly winners' }),
+    ).not.toContainText('Ava')
+    await page.goto(
+      '/e2e/fixtures/today-harness.html?scenario=group&selected=e2e-second-group',
+    )
+    await page.reload()
+    await expect(page.getByText('73.2%', { exact: true })).toBeVisible()
+    await expect(contexts.getByRole('combobox')).toHaveCount(0)
+    await expect(
+      page.getByText('fixture private note must never render'),
+    ).toHaveCount(0)
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+      .toBeLessThanOrEqual(viewport.width)
+  })
   test(`renders only authorized Group data accessibly on ${viewport.label}`, async ({
     page,
   }) => {

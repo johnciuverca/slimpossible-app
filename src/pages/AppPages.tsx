@@ -10,6 +10,7 @@ import {
 } from '../components/ui'
 import { MilestoneProgress } from '../components/MilestoneProgress'
 import { PersonalProgressChart } from '../components/PersonalProgressChart'
+import { ChallengeTabs } from '../components/ChallengeContextTabs'
 import type { ParticipantMilestones } from '../models/participantMilestones'
 import { createParticipantMilestones } from '../models/participantMilestones'
 import {
@@ -1409,11 +1410,15 @@ export function TodayPage() {
 export function GroupDashboardPage() {
   const { state: authState } = useOptionalAuth()
   const ownerId = authState.user?.id
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams] = useSearchParams()
   const challengeParam = searchParams.get('challenge')
   const persistence = useMemo(() => createPersistence(authState), [authState])
-  const [data, setData] = useState<GroupDashboardData | null>(null)
-  const [challenges, setChallenges] = useState<Challenge[]>([])
+  const [savedData, setData] = useState<GroupDashboardData | null>(null)
+  const [savedChallenges, setChallenges] = useState<Challenge[]>([])
+  const requestKey = `${authState.status}:${ownerId ?? ''}:${challengeParam ?? ''}:${persistence.mode}`
+  const [loadedKey, setLoadedKey] = useState('')
+  const data = loadedKey === requestKey ? savedData : null
+  const challenges = loadedKey === requestKey ? savedChallenges : []
   const [isLoading, setIsLoading] = useState(authState.status === 'signed-in')
   const [message, setMessage] = useState('')
   const [messageTone, setMessageTone] = useState<FeedbackTone>('info')
@@ -1424,6 +1429,8 @@ export function GroupDashboardPage() {
     let isCurrent = true
 
     async function loadGroupDashboard() {
+      setLoadedKey(requestKey)
+      setChallenges([])
       setData(null)
       setWeeklyAnnouncement('')
       if (authState.status !== 'signed-in' || !ownerId) {
@@ -1465,7 +1472,7 @@ export function GroupDashboardPage() {
       const visibleChallenges = allVisibleChallenges.filter(
         ({ kind }) => kind === 'group',
       )
-      setChallenges(visibleChallenges)
+      setChallenges(allVisibleChallenges)
       const challenge = challengeParam
         ? visibleChallenges.find(({ id }) => id === challengeParam)
         : visibleChallenges[0]
@@ -1558,7 +1565,14 @@ export function GroupDashboardPage() {
     return () => {
       isCurrent = false
     }
-  }, [authState.status, challengeParam, ownerId, persistence, reloadKey])
+  }, [
+    authState.status,
+    challengeParam,
+    ownerId,
+    persistence,
+    reloadKey,
+    requestKey,
+  ])
 
   const summary = data?.summary
   const provisionalLeader = data?.provisionalLeader
@@ -1573,7 +1587,7 @@ export function GroupDashboardPage() {
       ? challengeParam
       : null) ??
     data?.challenge.id ??
-    challenges[0]?.id ??
+    challenges.find(({ kind }) => kind === 'group')?.id ??
     ''
   const selectedChallenge = challenges.find(
     ({ id }) => id === selectedChallengeId,
@@ -1603,28 +1617,13 @@ export function GroupDashboardPage() {
           </StatusPill>
         </PageHeader>
         <div className="mt-6 flex flex-wrap items-end gap-4">
-          {challenges.length > 0 ? (
-            <label className="min-w-56 flex-1 text-sm font-semibold text-slate-700">
-              Selected challenge
-              <select
-                className="mt-2 block w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-slate-900 focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                onChange={(event) => {
-                  setData(null)
-                  setIsLoading(true)
-                  const nextParams = new URLSearchParams(searchParams)
-                  nextParams.set('challenge', event.target.value)
-                  setSearchParams(nextParams)
-                }}
-                value={selectedChallengeId}
-              >
-                {challenges.map((challenge) => (
-                  <option key={challenge.id} value={challenge.id}>
-                    {challenge.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
+          <div className="w-full min-w-0">
+            <ChallengeTabs
+              challenges={challenges}
+              selectedId={selectedChallengeId}
+              loading={isLoading}
+            />
+          </div>
           <button
             className="min-h-11 rounded-xl border border-stone-300 px-4 py-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
             onClick={() => setReloadKey((value) => value + 1)}

@@ -220,7 +220,9 @@ createRoot(document.getElementById('root')!).render(
             : isProgress
               ? [`/progress?challenge=${challengeId}`]
               : isGroup
-                ? [`/group?challenge=${challengeId}`]
+                ? [
+                    `/group?challenge=${encodeURIComponent(initialHomeSelection ?? challengeId)}`,
+                  ]
                 : [isMember ? `/today?challenge=${challengeId}` : '/today']
       }
     >
