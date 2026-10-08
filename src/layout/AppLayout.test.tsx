@@ -7,8 +7,8 @@ import type { AuthState } from '../auth/context'
 import { AppLayout } from './AppLayout'
 
 const liveNavigation = [
-  { label: 'Overview', path: '/' },
-  { label: 'Today', path: '/today' },
+  { label: 'Dashboard', path: '/dashboard' },
+  { label: 'Challenges', path: '/challenges' },
   { label: 'My progress', path: '/progress' },
   { label: 'Group', path: '/group' },
   { label: 'Goals', path: '/goals' },
@@ -88,15 +88,15 @@ describe('AppLayout', () => {
     for (const { label, path } of liveNavigation) {
       expect(screen.getByRole('link', { name: label })).toHaveAttribute(
         'href',
-        `${path}?challenge=private%2Fplan`,
+        ['/dashboard', '/progress', '/weigh-ins'].includes(path)
+          ? path
+          : `${path}?challenge=private%2Fplan`,
       )
     }
 
-    fireEvent.click(screen.getByRole('link', { name: 'Today' }))
+    fireEvent.click(screen.getByRole('link', { name: 'Dashboard' }))
 
-    expect(screen.getByTestId('current-route')).toHaveTextContent(
-      '/today?challenge=private%2Fplan',
-    )
+    expect(screen.getByTestId('current-route')).toHaveTextContent('/dashboard')
   })
 
   it.each(liveNavigation)(

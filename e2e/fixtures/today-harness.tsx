@@ -6,6 +6,7 @@ import { ProtectedRoute } from '../../src/auth/ProtectedRoute'
 import { AppLayout } from '../../src/layout/AppLayout'
 import { ChallengeSetupPage } from '../../src/pages/ChallengeSetupPage'
 import { PersonalWeighInsPage } from '../../src/pages/PersonalWeighInsPage'
+import { PersonalDashboardPage } from '../../src/pages/PersonalDashboardPage'
 import { ParticipantEnrollmentPage } from '../../src/pages/ParticipantEnrollmentPage'
 import {
   GoalsPage,
@@ -227,6 +228,8 @@ createRoot(document.getElementById('root')!).render(
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route element={<ProtectedRoute />}>
+            <Route path="/dashboard" element={<PersonalDashboardPage />} />
+            <Route path="/challenges" element={<HomePage />} />
             <Route path="/today" element={<TodayPage />} />
             <Route path="/progress" element={<ProgressPage />} />
             <Route path="/goals" element={<GoalsPage />} />
