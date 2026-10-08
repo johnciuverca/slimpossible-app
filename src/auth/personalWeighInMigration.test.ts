@@ -29,6 +29,45 @@ const rollback = readFileSync(
 )
 
 describe('personal weigh-in migration contract', () => {
+  it('ships a distinct RPC-only draft compatibility upgrade without rewriting the applied migration', () => {
+    const correction = readFileSync(
+      resolve(
+        process.cwd(),
+        'supabase/migrations/20261008000000_allow_draft_group_weigh_in_sharing.sql',
+      ),
+      'utf8',
+    )
+    const originalSave = migration
+      .slice(
+        migration.indexOf(
+          'create or replace function public.save_personal_weigh_in(',
+        ),
+        migration.indexOf(
+          'create or replace function public.delete_personal_weigh_in(',
+        ),
+      )
+      .trim()
+    const correctedSave = correction
+      .slice(
+        correction.indexOf(
+          'create or replace function public.save_personal_weigh_in(',
+        ),
+        correction.lastIndexOf('commit;'),
+      )
+      .trim()
+    expect(correctedSave).toBe(
+      originalSave.replace(
+        "and challenge.status = 'active'",
+        "and challenge.status in ('draft', 'active')",
+      ),
+    )
+    expect(correction).not.toMatch(
+      /\b(grant|revoke|alter table|create table|alter default privileges)\b/i,
+    )
+    expect(correctedSave).toContain("and participant.status = 'active'")
+    expect(correctedSave).toContain('challenge.owner_id = actor_id')
+  })
+
   it('stops before data conversion when one user has duplicate legacy dates', () => {
     const guard = migration.indexOf(
       'duplicate user/date rows need owner review',

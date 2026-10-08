@@ -9,6 +9,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 
 import { PersonalWeighInsPage } from './PersonalWeighInsPage'
+import { ChallengeSetupPage } from './ChallengeSetupPage'
+import { AuthProvider } from '../auth/AuthContext'
+import { createPersistence } from '../data/persistence'
+import * as persistenceModule from '../data/persistence'
 
 function dateOffset(offset: number) {
   const date = new Date()
@@ -31,6 +35,214 @@ function renderPage() {
 }
 
 describe('PersonalWeighInsPage', () => {
+  it('keeps the unavailable-share warning visible and requires confirmation before removing a share', async () => {
+    const persistence = createPersistence({
+      status: 'signed-out',
+      error: null,
+      user: null,
+    })
+    if (persistence.mode !== 'local') throw new Error('Expected local mode')
+    const group = await persistence.repositories.challenges.create({
+      name: 'Closed group',
+      ownerId: 'user-alex',
+      createdBy: 'user-alex',
+      startDate: '2026-10-01',
+      endDate: '2026-12-31',
+    })
+    if (group.state !== 'success') throw new Error('Expected group')
+    await persistence.repositories.personalWeighIns.save('user-alex', {
+      date: dateOffset(0),
+      weightKg: 82,
+      sharedChallengeIds: [group.data.id],
+    })
+    await persistence.repositories.challenges.update(group.data.id, {
+      ...group.data,
+      status: 'archived',
+    })
+    renderPage()
+    await screen.findByText(/82 kg/)
+    fireEvent.click(screen.getByRole('button', { name: /Edit/ }))
+    expect(
+      screen.getByText(/Saving will remove that unavailable share/),
+    ).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Weight in kg'), {
+      target: { value: '81.9' },
+    })
+    expect(
+      screen.getByText(/Saving will remove that unavailable share/),
+    ).toBeInTheDocument()
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    fireEvent.click(screen.getByRole('button', { name: 'Update weigh-in' }))
+    expect(confirm).toHaveBeenCalledOnce()
+    expect(
+      await persistence.repositories.personalWeighIns.listForUser('user-alex'),
+    ).toMatchObject({
+      data: [{ weightKg: 82, sharedChallengeIds: [group.data.id] }],
+    })
+    confirm.mockReturnValue(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Update weigh-in' }))
+    await screen.findByText(/81.9 kg/)
+    expect(
+      await persistence.repositories.personalWeighIns.listForUser('user-alex'),
+    ).toMatchObject({ data: [{ sharedChallengeIds: [] }] })
+  })
+
+  it('does not strip existing shares when group eligibility could not be loaded', async () => {
+    const persistence = createPersistence({
+      status: 'signed-out',
+      error: null,
+      user: null,
+    })
+    if (persistence.mode !== 'local') throw new Error('Expected local mode')
+    const group = await persistence.repositories.challenges.create({
+      name: 'Draft group',
+      ownerId: 'user-alex',
+      createdBy: 'user-alex',
+      startDate: '2026-10-01',
+      endDate: '2026-12-31',
+    })
+    if (group.state !== 'success') throw new Error('Expected group')
+    await persistence.repositories.personalWeighIns.save('user-alex', {
+      date: dateOffset(0),
+      weightKg: 82,
+      sharedChallengeIds: [group.data.id],
+    })
+    vi.spyOn(
+      persistence.repositories.participants,
+      'listForUser',
+    ).mockResolvedValue({
+      state: 'error',
+      error: { kind: 'request', message: 'Cannot load memberships' },
+    })
+    vi.spyOn(persistenceModule, 'createPersistence').mockReturnValue(
+      persistence,
+    )
+    renderPage()
+    await screen.findByText(/82 kg/)
+    fireEvent.click(screen.getByRole('button', { name: /Edit/ }))
+    expect(
+      screen.getByText(/Reload before editing a shared entry/),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Update weigh-in' }),
+    ).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Weight in kg'), {
+      target: { value: '81.9' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
+    await screen.findByText(/Reload before correcting a shared entry/)
+    expect(
+      await persistence.repositories.personalWeighIns.listForUser('user-alex'),
+    ).toMatchObject({ data: [{ sharedChallengeIds: [group.data.id] }] })
+  })
+
+  it('shares with a setup-created draft group and preserves that share when editing', async () => {
+    const setup = render(
+      <AuthProvider
+        initialState={{
+          status: 'signed-in',
+          error: null,
+          user: { id: 'user-alex', email: 'owner@example.com' },
+        }}
+      >
+        <MemoryRouter>
+          <ChallengeSetupPage />
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+    await screen.findByRole('textbox', { name: 'Challenge name' })
+    fireEvent.change(screen.getByLabelText('Challenge name'), {
+      target: { value: 'Setup draft group' },
+    })
+    fireEvent.change(screen.getByLabelText('Start date'), {
+      target: { value: '2026-10-01' },
+    })
+    fireEvent.change(screen.getByLabelText('End date'), {
+      target: { value: '2026-12-31' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save challenge' }))
+    await waitFor(() =>
+      expect(
+        JSON.parse(
+          window.localStorage.getItem('slimpossible.local.challenges') ?? '[]',
+        ),
+      ).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: 'Setup draft group',
+            status: 'draft',
+          }),
+        ]),
+      ),
+    )
+    setup.unmount()
+    renderPage()
+    const choice = await screen.findByRole('checkbox', {
+      name: 'Setup draft group',
+    })
+    expect(choice).not.toBeChecked()
+    fireEvent.click(choice)
+    fireEvent.change(screen.getByLabelText('Weight in kg'), {
+      target: { value: '82' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
+    await screen.findByText('Shared with Setup draft group')
+    fireEvent.click(screen.getByRole('button', { name: /Edit/ }))
+    expect(
+      screen.getByRole('checkbox', { name: 'Setup draft group' }),
+    ).toBeChecked()
+    expect(screen.queryByText(/Saving will remove/)).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Weight in kg'), {
+      target: { value: '81.9' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Update weigh-in' }))
+    await screen.findByText(/81.9 kg/)
+    expect(
+      screen.getByText('Shared with Setup draft group'),
+    ).toBeInTheDocument()
+  })
+
+  it('offers only draft/active groups owned by the author or joined as an active member', async () => {
+    const persistence = createPersistence({
+      status: 'signed-out',
+      error: null,
+      user: null,
+    })
+    if (persistence.mode !== 'local') throw new Error('Expected local mode')
+    for (const [name, ownerId, kind, status, membership] of [
+      ['Draft member', 'other', 'group', 'draft', 'active'],
+      ['Withdrawn', 'other', 'group', 'draft', 'withdrawn'],
+      ['Invited', 'other', 'group', 'active', 'invited'],
+      ['Completed', 'user-alex', 'group', 'completed', null],
+      ['Archived', 'user-alex', 'group', 'archived', null],
+      ['Personal', 'user-alex', 'personal', 'draft', null],
+      ['Outsider', 'other', 'group', 'active', null],
+    ] as const) {
+      const group = await persistence.repositories.challenges.create({
+        name,
+        ownerId,
+        createdBy: ownerId,
+        kind,
+        status,
+        startDate: '2026-10-01',
+        endDate: '2026-12-31',
+      })
+      if (group.state !== 'success') throw new Error('Expected group')
+      if (membership)
+        await persistence.repositories.participants.create({
+          challengeId: group.data.id,
+          userId: 'user-alex',
+          displayName: 'Alex',
+          status: membership,
+          startingWeightKg: 90,
+          targetWeightKg: 80,
+        })
+    }
+    renderPage()
+    await screen.findByRole('checkbox', { name: 'Draft member' })
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1)
+  })
+
   it('records a private weigh-in without a challenge', async () => {
     renderPage()
 

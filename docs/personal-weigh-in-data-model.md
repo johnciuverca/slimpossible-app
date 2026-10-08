@@ -12,6 +12,36 @@ Canonical table privileges are reset explicitly for `PUBLIC`, `anon`, and `authe
 
 ## Legacy compatibility and migration policy
 
+### Draft-group compatibility correction (2026-10-08)
+
+Owner-approved eligibility is a non-personal group with challenge status `draft`
+or `active`, where the caller is the owner or an active member. Setup creates
+draft groups and has no activation workflow; draft is not an inactive membership.
+Completed/archived groups, personal challenges, outsiders, and withdrawn-only
+memberships cannot receive new/updated sharing. Legacy NULL challenge kinds stay
+group contexts. UI choices and local saves use the same predicate; the SQL RPC
+independently enforces it. Legitimate prior draft shares stay selected on edit.
+If eligibility lookup fails, editing a shared entry is blocked until reload;
+genuinely unavailable shares show a persistent warning and require confirmation
+before a correction removes them.
+
+The original #210 migration was applied to staging by PM on Oct 8. Do not rewrite
+or rerun it there. Review the distinct forward correction
+`supabase/migrations/20261008000000_allow_draft_group_weigh_in_sharing.sql`:
+it replaces only the save RPC and changes only its lifecycle predicate. It
+preserves the existing restricted ACL and all stored data, shares and statuses.
+Applying this SQL to hosted staging requires separate approval; implementation
+approval does not authorize SQL execution, production changes, or merge. A new
+preview alone does not correct the already-deployed server function.
+
+Run `bash supabase/tests/run_local_personal_weigh_in_eligibility.sh` for synthetic
+socket-only PostgreSQL clean-install, already-applied upgrade, and permissive-default
+coverage. All three paths run the 32 existing authorization assertions plus the draft/active
+eligibility contract. Upgrade checks preserve canonical/legacy/share rows and
+RPC ACL/ownership and reproduce then correct the old draft rejection. These
+local checks are not connected acceptance. The existing permissive-default
+fixture also applies the correction to verify grants remain minimal.
+
 The legacy `public.weigh_ins` table is keyed by `(participant_id, recorded_date)`, with a note and the per-row `share_with_group` flag delivered in PR #230. A user can have multiple participant rows across challenges, so more than one legacy row can map to the same `(user_id, recorded_date)`. The old unique constraint does not prevent that. PR #230 completed owner-confirmed connected acceptance and was merged into staging; its migration is inherited from the base, not duplicated in this PR.
 
 Use an additive, reversible migration. Keep `weigh_ins` and all source rows/notes intact during rollout; do not drop, overwrite, or repoint legacy rows. A migration preflight must inventory duplicates by user/date and classify weight and note conflicts before any data transformation. A date with multiple legacy rows is not silently collapsed, even if the weights happen to match: separate notes, timestamps, and prior per-challenge opt-ins are meaningful source evidence. If any duplicate date exists, stop the data-copy phase and obtain an owner/PM resolution for each affected date. Preserve all original rows while resolving; never pick a weight/note by row order or automatically broaden a legacy opt-in to other challenges.

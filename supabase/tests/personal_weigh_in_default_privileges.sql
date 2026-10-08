@@ -17,6 +17,7 @@ alter default privileges in schema public grant all on sequences to public, anon
 alter default privileges in schema public grant execute on functions to public, anon, authenticated;
 create temp table fixture_defaults_before as select to_jsonb(d) as row_data from pg_default_acl d;
 \ir ../migrations/20261007000000_personal_weigh_ins.sql
+\ir ../migrations/20261008000000_allow_draft_group_weigh_in_sharing.sql
 
 do $$ begin
   if exists(select row_data from fixture_defaults_before except select to_jsonb(d) from pg_default_acl d)

@@ -9,6 +9,7 @@ import {
 import { useOptionalAuth } from '../auth/useAuth'
 import { createPersistence } from '../data/persistence'
 import type { Challenge } from '../models/challenge'
+import { isEligibleSharingGroup } from '../models/groupSharingEligibility'
 import { participantFixture } from '../models/fixtures'
 import type { PersonalWeighIn } from '../models/personalWeighIn'
 import {
@@ -46,6 +47,7 @@ export function PersonalWeighInsPage() {
   const [loadError, setLoadError] = useState('')
   const [groupsError, setGroupsError] = useState('')
   const [submitError, setSubmitError] = useState('')
+  const [sharesWarning, setSharesWarning] = useState('')
   const [success, setSuccess] = useState('')
 
   useEffect(() => {
@@ -59,6 +61,7 @@ export function PersonalWeighInsPage() {
     setLoadError('')
     setGroupsError('')
     setSubmitError('')
+    setSharesWarning('')
     setSuccess('')
 
     async function load() {
@@ -70,25 +73,29 @@ export function PersonalWeighInsPage() {
         return
       }
 
-      const [entriesResult, groupsResult] = await Promise.all([
-        persistence.repositories.personalWeighIns.listForUser(userId),
-        persistence.repositories.challenges.listVisibleToUser(userId),
-      ])
+      const [entriesResult, groupsResult, participantsResult] =
+        await Promise.all([
+          persistence.repositories.personalWeighIns.listForUser(userId),
+          persistence.repositories.challenges.listVisibleToUser(userId),
+          persistence.repositories.participants.listForUser(userId),
+        ])
       if (!current) return
       if (entriesResult.state === 'error') {
         setLoadError(entriesResult.error.message)
       } else if (entriesResult.state === 'success') {
         setEntries(entriesResult.data)
       }
-      if (groupsResult.state === 'error') {
+      if (
+        groupsResult.state === 'error' ||
+        participantsResult.state === 'error'
+      ) {
         setGroupsError(
           'Group choices could not be loaded. You can still save privately.',
         )
       } else if (groupsResult.state === 'success') {
         setGroups(
-          groupsResult.data.filter(
-            (challenge) =>
-              challenge.kind === 'group' && challenge.status === 'active',
+          groupsResult.data.filter((challenge) =>
+            isEligibleSharingGroup(challenge, userId, participantsResult.data),
           ),
         )
       }
@@ -116,6 +123,12 @@ export function PersonalWeighInsPage() {
   }
 
   function startEditing(entry: PersonalWeighIn) {
+    if (groupsError && entry.sharedChallengeIds.length > 0) {
+      setSubmitError(
+        'Group choices could not be verified. Reload before editing a shared entry; its existing shares have not changed.',
+      )
+      return
+    }
     const eligibleIds = new Set(groups.map(({ id }) => id))
     const unavailableShares = entry.sharedChallengeIds.some(
       (id) => !eligibleIds.has(id),
@@ -129,7 +142,8 @@ export function PersonalWeighInsPage() {
       ),
       weightKg: String(entry.weightKg),
     })
-    setSubmitError(
+    setSubmitError('')
+    setSharesWarning(
       unavailableShares
         ? 'A previous group share is no longer eligible. Saving will remove that unavailable share.'
         : '',
@@ -143,6 +157,7 @@ export function PersonalWeighInsPage() {
     setValues(emptyForm)
     setErrors({})
     setSubmitError('')
+    setSharesWarning('')
     setSuccess('')
   }
 
@@ -153,6 +168,15 @@ export function PersonalWeighInsPage() {
         persistence.mode === 'unavailable'
           ? persistence.message
           : 'A signed-in user is required to save a weigh-in.',
+      )
+      return
+    }
+    const existingEntry = entries.find((entry) =>
+      editingId ? entry.id === editingId : entry.date === values.date,
+    )
+    if (groupsError && existingEntry?.sharedChallengeIds.length) {
+      setSubmitError(
+        'Group choices could not be verified. Reload before correcting a shared entry; its existing shares have not changed.',
       )
       return
     }
@@ -175,6 +199,13 @@ export function PersonalWeighInsPage() {
       return
     }
 
+    if (
+      sharesWarning &&
+      !window.confirm(
+        'Save this correction and remove shares to groups that are no longer eligible?',
+      )
+    )
+      return
     setIsSaving(true)
     setSubmitError('')
     setSuccess('')
@@ -202,6 +233,7 @@ export function PersonalWeighInsPage() {
     if (reloaded.state === 'success') setEntries(reloaded.data)
     else if (reloaded.state === 'empty') setEntries([])
     setEditingId(null)
+    setSharesWarning('')
     setValues(emptyForm)
     setErrors({})
     setSuccess(
@@ -297,6 +329,11 @@ export function PersonalWeighInsPage() {
               role="alert"
             >
               {submitError}
+            </p>
+          ) : null}
+          {sharesWarning ? (
+            <p className="mt-5 text-sm text-amber-800" role="status">
+              {sharesWarning}
             </p>
           ) : null}
           {success ? (

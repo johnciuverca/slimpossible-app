@@ -5,6 +5,7 @@ import {
 } from './supabase/client'
 import type { Challenge } from '../models/challenge'
 import type { Participant } from '../models/participant'
+import { isEligibleSharingGroup } from '../models/groupSharingEligibility'
 import type {
   PersonalWeighIn,
   PersonalWeighInInput,
@@ -550,17 +551,8 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
       )
       const permittedIds = new Set(
         groups
-          .filter(
-            (challenge) =>
-              challenge.kind === 'group' &&
-              challenge.status === 'active' &&
-              (challenge.ownerId === userId ||
-                participants.some(
-                  (participant) =>
-                    participant.userId === userId &&
-                    participant.challengeId === challenge.id &&
-                    participant.status === 'active',
-                )),
+          .filter((challenge) =>
+            isEligibleSharingGroup(challenge, userId, participants),
           )
           .map(({ id }) => id),
       )

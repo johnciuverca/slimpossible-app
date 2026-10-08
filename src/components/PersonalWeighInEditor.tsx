@@ -111,7 +111,7 @@ export function PersonalWeighInEditor({
         </legend>
         {groups.length === 0 ? (
           <p className="text-sm leading-6 text-ink-muted">
-            No eligible active groups. You can still save this private weigh-in.
+            No eligible groups. You can still save this private weigh-in.
           </p>
         ) : (
           <>
