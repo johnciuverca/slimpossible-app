@@ -1,4 +1,5 @@
-import type { FormEvent } from 'react'
+import { useRef, type FormEvent } from 'react'
+import { useUnsavedNavigation } from './navigationSafety'
 
 import type { Challenge } from '../models/challenge'
 import { personalWeighInToday } from '../models/personalWeighIn'
@@ -37,6 +38,14 @@ export function PersonalWeighInEditor({
   submitLabel,
   values,
 }: PersonalWeighInEditorProps) {
+  const initial = useRef(JSON.stringify(values))
+  useUnsavedNavigation(
+    isSaving
+      ? 'saving'
+      : JSON.stringify(values) !== initial.current
+        ? 'dirty'
+        : null,
+  )
   function toggleGroup(id: string, selected: boolean) {
     onChange(
       'sharedChallengeIds',

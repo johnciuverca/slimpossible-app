@@ -1822,12 +1822,14 @@ describe('GroupDashboardPage', () => {
     )
 
     expect(await screen.findByText('45.1%')).toBeInTheDocument()
-    const challengeSelector = screen.getByRole('combobox', {
-      name: 'Selected challenge',
+    const challengeSelector = screen.getByRole('link', {
+      name: 'Group · Winter challenge',
     })
-    fireEvent.change(challengeSelector, { target: { value: 'challenge-2' } })
+    fireEvent.click(challengeSelector)
     expect(await screen.findByText('61.2%')).toBeInTheDocument()
-    expect(challengeSelector).toHaveValue('challenge-2')
+    expect(
+      screen.getByRole('link', { name: /Group · Winter challenge/ }),
+    ).toHaveAttribute('aria-current', 'page')
     expect(screen.queryByText('45.1%')).not.toBeInTheDocument()
     expect(await screen.findByText('Jamie')).toBeInTheDocument()
 
