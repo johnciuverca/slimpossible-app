@@ -52,6 +52,25 @@ begin
     raise exception 'All three approved disposable Auth users must exist.';
   end if;
 
+  insert into slimpossible_personal_weigh_in_results values
+    ('effective_client_table_privileges_are_minimal', not exists (
+      select 1 from (values ('anon'), ('authenticated')) as client(role_name)
+      cross join (values ('personal_weigh_ins'), ('personal_weigh_in_group_shares'),
+        ('personal_weigh_in_legacy_map')) as relation(table_name)
+      cross join (values ('SELECT'), ('INSERT'), ('UPDATE'), ('DELETE'),
+        ('TRUNCATE'), ('REFERENCES'), ('TRIGGER')) as operation(privilege_name)
+      where not (client.role_name = 'authenticated'
+        and relation.table_name = 'personal_weigh_ins' and operation.privilege_name = 'SELECT')
+      and has_table_privilege(client.role_name, 'public.' || relation.table_name, operation.privilege_name)
+    ) and has_table_privilege('authenticated', 'public.personal_weigh_ins', 'SELECT'));
+  insert into slimpossible_personal_weigh_in_results values
+    ('canonical_uuid_keys_create_no_sequences', not exists (
+      select 1 from pg_class sequence join pg_depend dependency on dependency.objid = sequence.oid
+      where sequence.relkind = 'S' and dependency.refobjid in (
+        'public.personal_weigh_ins'::regclass, 'public.personal_weigh_in_group_shares'::regclass,
+        'public.personal_weigh_in_legacy_map'::regclass)
+    ));
+
   insert into public.profiles (id, display_name)
   values (owner_id, '[16.3 test] owner'),
     (member_id, '[16.3 test] member'),
@@ -87,6 +106,10 @@ begin
   where id = first_entry and note = '[16.3 private] never returned to groups';
   insert into slimpossible_personal_weigh_in_results values
     ('owner_can_read_own_private_note', row_count = 1);
+  select count(*)::integer into row_count from public.personal_weigh_ins
+  where id = first_entry and note = '[16.3 private] never returned to groups';
+  insert into slimpossible_personal_weigh_in_results values
+    ('author_can_read_own_raw_private_entry', row_count = 1);
 
   select id into second_entry from public.save_personal_weigh_in(
     null, current_date - 21, 91, null, '{}'::uuid[]
@@ -229,6 +252,14 @@ begin
 
   -- A withdrawn member must lose group-history access even though their
   -- personal entries and prior explicit shares remain stored.
+  begin
+    perform count(*) from public.personal_weigh_in_legacy_map;
+    insert into slimpossible_personal_weigh_in_results values
+      ('member_cannot_read_raw_provenance', false);
+  exception when insufficient_privilege then
+    insert into slimpossible_personal_weigh_in_results values
+      ('member_cannot_read_raw_provenance', true);
+  end;
   execute 'reset role';
   update public.participants set status = 'withdrawn'
   where id = member_two_participant;
@@ -262,6 +293,22 @@ begin
 
   execute 'reset role';
   execute 'set local role anon';
+  begin
+    perform count(*) from public.personal_weigh_ins;
+    insert into slimpossible_personal_weigh_in_results values
+      ('anonymous_cannot_read_raw_personal_entries', false);
+  exception when insufficient_privilege then
+    insert into slimpossible_personal_weigh_in_results values
+      ('anonymous_cannot_read_raw_personal_entries', true);
+  end;
+  begin
+    perform count(*) from public.personal_weigh_in_legacy_map;
+    insert into slimpossible_personal_weigh_in_results values
+      ('anonymous_cannot_read_raw_provenance', false);
+  exception when insufficient_privilege then
+    insert into slimpossible_personal_weigh_in_results values
+      ('anonymous_cannot_read_raw_provenance', true);
+  end;
   begin
     perform * from public.list_my_personal_weigh_ins();
     insert into slimpossible_personal_weigh_in_results values
@@ -302,6 +349,10 @@ begin
   where id = protected_entry and note = '[16.3 private] owned entry';
   insert into slimpossible_personal_weigh_in_results values
     ('other_user_cannot_read_private_note', row_count = 0);
+  select count(*)::integer into row_count from public.personal_weigh_ins
+  where id = protected_entry;
+  insert into slimpossible_personal_weigh_in_results values
+    ('other_user_cannot_read_raw_private_entry', row_count = 0);
   execute 'reset role';
   select count(*)::integer into row_count from public.personal_weigh_ins
   where id = protected_entry and user_id = member_id
@@ -326,7 +377,7 @@ select check_name, passed from slimpossible_personal_weigh_in_results order by c
 
 do $$
 begin
-  if (select count(*) from slimpossible_personal_weigh_in_results) <> 25
+  if (select count(*) from slimpossible_personal_weigh_in_results) <> 32
      or exists (select 1 from slimpossible_personal_weigh_in_results where not passed) then
     raise exception 'Personal weigh-in authorization checks failed; roll back this batch.';
   end if;

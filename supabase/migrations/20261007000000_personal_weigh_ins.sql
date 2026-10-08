@@ -62,12 +62,15 @@ alter table public.personal_weigh_in_group_shares enable row level security;
 alter table public.personal_weigh_in_legacy_map enable row level security;
 
 create policy personal_weigh_ins_select_own
-  on public.personal_weigh_ins for select
+  on public.personal_weigh_ins for select to authenticated
   using (user_id = (select auth.uid()));
 
-grant select on public.personal_weigh_ins to authenticated;
-revoke all on public.personal_weigh_in_group_shares,
+-- Hosted executors may inherit permissive table defaults. RLS does not guard
+-- every privilege (for example TRUNCATE), so reset client ACLs explicitly.
+-- UUID keys use gen_random_uuid(); these three tables create no sequences.
+revoke all on public.personal_weigh_ins, public.personal_weigh_in_group_shares,
   public.personal_weigh_in_legacy_map from public, anon, authenticated;
+grant select on public.personal_weigh_ins to authenticated;
 
 -- This guard above must pass before any row is copied. With one source row per
 -- user/date, every legacy note and row can be preserved exactly. Existing

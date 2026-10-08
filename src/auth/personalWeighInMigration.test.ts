@@ -115,8 +115,26 @@ describe('personal weigh-in migration contract', () => {
     expect(authorizationHarness).toContain(
       'unauthorized_delete_leaves_live_entry_intact',
     )
-    expect(authorizationHarness).toContain('<> 25')
+    expect(authorizationHarness).toContain('<> 32')
     expect(authorizationHarness.trimEnd().endsWith('rollback;')).toBe(true)
+  })
+
+  it('resets inherited client ACLs before granting author-only SELECT', () => {
+    expect(migration).toMatch(
+      /revoke all on public\.personal_weigh_ins, public\.personal_weigh_in_group_shares,\s+public\.personal_weigh_in_legacy_map from public, anon, authenticated;/,
+    )
+    expect(migration).toContain('for select to authenticated')
+    expect(migration).not.toMatch(/alter default privileges/i)
+    expect(migration).not.toMatch(/create sequence/i)
+    expect(authorizationHarness).toContain(
+      'effective_client_table_privileges_are_minimal',
+    )
+    expect(authorizationHarness).toContain(
+      'anonymous_cannot_read_raw_personal_entries',
+    )
+    expect(authorizationHarness).toContain(
+      'other_user_cannot_read_raw_private_entry',
+    )
   })
 
   it('provides a non-destructive inverse that restores replaced RPCs', () => {

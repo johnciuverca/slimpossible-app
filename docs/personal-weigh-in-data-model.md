@@ -8,6 +8,8 @@ Represent group visibility separately as explicit `(personal_weigh_in_id, challe
 
 Personal challenge scoring continues to consume the user's canonical history without requiring an explicit group share. Group scoring must retain the current challenge-date, baseline/goal, and Sunday rules; it may consume only rows associated with that challenge and must not infer consent from membership. Remembered group choices are UI suggestions only, visibly editable and never submitted implicitly.
 
+Canonical table privileges are reset explicitly for `PUBLIC`, `anon`, and `authenticated`, regardless of the migration executor's inherited defaults. Only authenticated SELECT is regranted on personal entries, with an authenticated author-only RLS policy; writes, shares, and provenance stay behind authorized RPCs. The UUID keys create no sequences. No global default ACL is changed. RLS row denial alone is not a substitute for least-privilege ACLs: privileges such as TRUNCATE are not row-filtered. The local-only `supabase/tests/personal_weigh_in_default_privileges.sql` fixture verifies permissive defaults are neutralized and left unchanged by the migration; run it only on an explicitly authorized disposable pre-#210 database.
+
 ## Legacy compatibility and migration policy
 
 The legacy `public.weigh_ins` table is keyed by `(participant_id, recorded_date)`, with a note and the per-row `share_with_group` flag delivered in PR #230. A user can have multiple participant rows across challenges, so more than one legacy row can map to the same `(user_id, recorded_date)`. The old unique constraint does not prevent that. PR #230 completed owner-confirmed connected acceptance and was merged into staging; its migration is inherited from the base, not duplicated in this PR.
