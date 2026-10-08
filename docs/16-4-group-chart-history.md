@@ -128,13 +128,31 @@ verification or complete authorization/privacy acceptance. The screenshot and
 all actual member names, dates, weights and other private values remain private
 and are not included here. No data mutation or new implementation was performed.
 
+## Connected owner-reported private save/member exclusion — PARTIAL 2026-10-08
+
+On the same immutable preview, the owner reported completing the save step with
+group sharing unchecked. PM reported seeing the owner session's "Personal weight
+saved" confirmation and only the existing member's shared series in Group.
+After the owner switched accounts, PM confirmed the member session and observed
+the same existing member-only chart/history, with no owner entry or private notes
+displayed for the selected group.
+
+The unchecked-share save is owner-reported; PM's observed confirmation does not
+independently establish the stored sharing state. Member exclusion is a partial
+connected visual observation relayed by PM, not A's independent test. No stored
+share inspection, correction, unsharing of a previously shared entry, deletion,
+full authorization harness or complete privacy acceptance is claimed. Names,
+emails, weights, actual recorded dates and screenshots are not published.
+No implementation change or merge was performed by A.
+
 ## Remaining connected browser/privacy acceptance — NOT EXECUTED
 
-The staging function and basic checks are complete, with only the partial member
-observation above. The rollback-only privacy harness, owner/outsider/withdrawn
-checks, correction/unshare/delete, account/challenge switching and mobile matrix
-remain unexecuted. Obtain required approved disposable identities and complete
-the full matrix before merge acceptance; the PR remains unmerged:
+The staging function and basic checks are complete, with only the partial
+observations above. The rollback-only privacy harness, full owner/outsider/
+withdrawn checks, correction/unshare/delete, controlled account/challenge
+switching during loading and mobile matrix remain unexecuted. Obtain required
+approved disposable identities and complete the full matrix before merge
+acceptance; the PR remains unmerged:
 
 1. Use approved disposable owner/member accounts. In Group, verify only selected
    group's explicitly shared dates/weights appear; private notes/emails and other
