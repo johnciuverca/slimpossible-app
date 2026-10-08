@@ -12,6 +12,7 @@ import { MilestoneProgress } from '../components/MilestoneProgress'
 import { PersonalProgressChart } from '../components/PersonalProgressChart'
 import { ChallengeTabs } from '../components/ChallengeContextTabs'
 import { WeightPageHeader } from '../components/WeightPageHeader'
+import { GroupChartHistory } from '../components/GroupChartHistory'
 import type { ParticipantMilestones } from '../models/participantMilestones'
 import { createParticipantMilestones } from '../models/participantMilestones'
 import {
@@ -1603,9 +1604,9 @@ export function GroupDashboardPage() {
       className="mx-auto w-full max-w-6xl space-y-6"
       aria-labelledby="group-title"
     >
-      <WeightPageHeader>
+      <WeightPageHeader onRecorded={() => setReloadKey((value) => value + 1)}>
         <PageHeader
-          description="Shared summary, this week’s provisional leader, and Sunday-based results for the selected challenge. Individual histories and private notes stay private."
+          description="Shared summary, this week’s provisional leader, and Sunday-based results for the selected challenge. History includes only explicitly shared weights; notes stay private."
           title="Group dashboard"
           titleId="group-title"
         >
@@ -1850,30 +1851,13 @@ export function GroupDashboardPage() {
                 </dl>
               </section>
 
-              <section
-                aria-describedby="group-history-unavailable-copy"
-                aria-disabled="true"
-                aria-labelledby="group-history-heading"
-                className="rounded-2xl border border-dashed border-stone-300 bg-stone-50 p-5 sm:p-7"
-              >
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-600">
-                  Not available yet · Chapter 16
-                </p>
-                <h2
-                  className="mt-2 text-xl font-bold text-slate-800"
-                  id="group-history-heading"
-                >
-                  Group chart and weigh-in history
-                </h2>
-                <p
-                  className="mt-2 max-w-3xl text-sm leading-6 text-slate-700"
-                  id="group-history-unavailable-copy"
-                >
-                  Individual weigh-in histories and chart lines are not shown.
-                  This panel stays unavailable until Chapter 16 defines the
-                  authorized group-history feature.
-                </p>
-              </section>
+              <GroupChartHistory
+                key={`${ownerId}:${data.challenge.id}`}
+                challengeId={data.challenge.id}
+                viewerId={ownerId ?? ''}
+                persistence={persistence}
+                refreshVersion={reloadKey}
+              />
 
               <Link
                 className="inline-flex min-h-11 items-center text-sm font-semibold text-emerald-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"

@@ -26,6 +26,39 @@ afterEach(() => {
 })
 
 describe('Supabase repositories', () => {
+  it('maps chart identity and exact shared values without notes, emails or raw identities', async () => {
+    stubResponse([
+      {
+        member_key: 'opaque',
+        display_name: 'Ava',
+        recorded_date: '2026-09-20',
+        weight_kg: 88.5,
+        note: 'private',
+        email: 'private',
+        user_id: 'private',
+      },
+    ])
+    const result =
+      await createRepositories(client).groupProgress.getChartHistory('group-a')
+    expect(result).toEqual({
+      state: 'success',
+      data: [
+        {
+          memberKey: 'opaque',
+          displayName: 'Ava',
+          date: '2026-09-20',
+          weightKg: 88.5,
+        },
+      ],
+    })
+    expect(JSON.stringify(result)).not.toContain('private')
+    expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain(
+      '/rpc/get_group_chart_history',
+    )
+    expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body))).toEqual(
+      { target_challenge_id: 'group-a' },
+    )
+  })
   it('maps only names, comparison dates, and counts for provisional leaders', async () => {
     stubResponse([
       {
