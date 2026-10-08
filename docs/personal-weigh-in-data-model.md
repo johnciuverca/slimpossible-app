@@ -42,6 +42,25 @@ RPC ACL/ownership and reproduce then correct the old draft rejection. These
 local checks are not connected acceptance. The existing permissive-default
 fixture also applies the correction to verify grants remain minimal.
 
+### Canonical browser acceptance coverage
+
+`e2e/personal-weigh-in-form.spec.ts` renders the actual `PersonalWeighInsPage`
+through `e2e/fixtures/personal-weigh-in-harness.html`, using synthetic local
+storage and a synthetic signed-in context, not Supabase or a hosted account.
+Four tests cover desktop (1280px) and mobile (390px): zero owned challenges and
+zero memberships, an unused past-date private save, author-note display,
+keyboard submission, no horizontal overflow, refresh persistence, same-date
+correction retaining one canonical row/ID, and edit corrections preserving
+explicit draft/active group shares. New entries still start unchecked.
+
+The two existing `e2e/weigh-in-form.spec.ts` tests render the legacy
+`DailyWeighInFormPage` and are retained as legacy coverage, not counted as
+canonical-page evidence. All these browser tests are synthetic/local. They do
+not establish a connected zero-context identity pass, hosted API note isolation,
+or owner-visible Sunday ranking. Keep the dated owner/member staging acceptance
+observations separately attributed to PM; owner acceptance of remaining
+automated-only checks is still a separate review decision.
+
 The legacy `public.weigh_ins` table is keyed by `(participant_id, recorded_date)`, with a note and the per-row `share_with_group` flag delivered in PR #230. A user can have multiple participant rows across challenges, so more than one legacy row can map to the same `(user_id, recorded_date)`. The old unique constraint does not prevent that. PR #230 completed owner-confirmed connected acceptance and was merged into staging; its migration is inherited from the base, not duplicated in this PR.
 
 Use an additive, reversible migration. Keep `weigh_ins` and all source rows/notes intact during rollout; do not drop, overwrite, or repoint legacy rows. A migration preflight must inventory duplicates by user/date and classify weight and note conflicts before any data transformation. A date with multiple legacy rows is not silently collapsed, even if the weights happen to match: separate notes, timestamps, and prior per-challenge opt-ins are meaningful source evidence. If any duplicate date exists, stop the data-copy phase and obtain an owner/PM resolution for each affected date. Preserve all original rows while resolving; never pick a weight/note by row order or automatically broaden a legacy opt-in to other challenges.
