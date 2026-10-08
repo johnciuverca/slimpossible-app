@@ -139,20 +139,66 @@ displayed for the selected group.
 
 The unchecked-share save is owner-reported; PM's observed confirmation does not
 independently establish the stored sharing state. Member exclusion is a partial
-connected visual observation relayed by PM, not A's independent test. No stored
-share inspection, correction, unsharing of a previously shared entry, deletion,
-full authorization harness or complete privacy acceptance is claimed. Names,
+connected visual observation relayed by PM, not A's independent test. This initial
+observation did not inspect stored shares or execute correction, unsharing of a
+previously shared entry, deletion or the full authorization harness. Subsequent
+owner reports below are separate evidence, not retroactive independent checks. Names,
 emails, weights, actual recorded dates and screenshots are not published.
 No implementation change or merge was performed by A.
 
-## Remaining connected browser/privacy acceptance — NOT EXECUTED
+## Consolidated additional connected results — PARTIAL 2026-10-08
 
-The staging function and basic checks are complete, with only the partial
-observations above. The rollback-only privacy harness, full owner/outsider/
-withdrawn checks, correction/unshare/delete, controlled account/challenge
-switching during loading and mobile matrix remain unexecuted. Obtain required
-approved disposable identities and complete the full matrix before merge
-acceptance; the PR remains unmerged:
+- Owner-reported behavior passed: sharing caused the disposable entry to appear
+  in Group; unsharing made it disappear; correcting a shared weight was reflected
+  after Group refresh; deletion removed the disposable shared entry from chart
+  and table. These are owner reports, not A's direct inspection of saved shares,
+  network responses or database rows, and not full connected acceptance.
+- PM reported a connected nonmember direct-link browser denial on the same
+  immutable preview. The existing session was authorized for a different group;
+  requesting the tested group's link produced "The selected challenge is
+  unavailable for this account" with no requested-group chart/table/summary
+  rows. Header/context retained the other authorized group's label while the
+  body denied the requested group: a cosmetic mismatch, not observed forbidden
+  data. This observation neither implements a fix nor approves pending #242.
+- PM reported completing the owner-approved hosted staging withdrawn-membership
+  RPC check in SQL Editor. Read-only preflight resolved exactly one existing
+  active, nonowner disposable membership. Within BEGIN/DO, only that membership
+  was set to withdrawn with a one-row guard; transaction-local JWT subject
+  simulated that existing user's `auth.uid()`. The chart RPC raised the expected
+  insufficient-privilege result; unexpected access would have raised an error.
+  ROLLBACK restored the membership, and the final check confirmed active status.
+  PM reported no execution errors or persistent membership/data change. This is
+  a connected RPC guard assertion with a simulated JWT subject, not a withdrawn
+  browser-session observation or full authenticated-role authorization harness.
+
+All observations are source-qualified PM/owner reports. A did not execute the
+hosted check. Private screenshots, target identities and actual dates/weights/
+notes/emails are retained privately and are not published. No account, entry or
+share deletion occurred in the rollback-only withdrawn RPC check; the separate
+disposable entry deletion above is owner-reported. No production change or merge
+was performed.
+
+## Remaining hard merge gates — PENDING
+
+Basic migration checks and partial connected observations above do not complete
+the acceptance matrix. Before merge:
+
+- Complete the connected authenticated-role privacy harness with specifically
+  approved existing disposable identities and execution authority. The supplied
+  rollback-only harness remains NOT EXECUTED on hosted staging; the simulated
+  JWT-subject SQL check does not replace it.
+- Complete withdrawn-session browser denial and the remaining connected matrix:
+  owner/member selected-group privacy across draft/active groups, late entries,
+  duplicate names, gains/maintenance/ties/future data, controlled account/challenge
+  switches during loading, and mobile/keyboard behavior. Relevant local/CI tests
+  pass, but do not establish connected coverage. Owner reports above are recorded
+  without claiming independently verified stored-share/deletion state.
+- Obtain independent PM review sign-off and explicit owner merge approval. None
+  is inferred from hosted migration approval or partial acceptance. PR #243 stays
+  unmerged. Separately, #242's owner visual acceptance is still pending; its
+  layout work and queued #244/#245 remain separate with no new implementation.
+
+Retain this owner/PM checklist when completing the remaining matrix:
 
 1. Use approved disposable owner/member accounts. In Group, verify only selected
    group's explicitly shared dates/weights appear; private notes/emails and other
