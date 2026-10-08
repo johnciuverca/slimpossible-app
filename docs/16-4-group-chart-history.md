@@ -44,7 +44,7 @@ and old rows hidden synchronously. Missing RPC/migration or denied access shows
 an unavailable state; there is no fallback to private rows or synthetic data.
 No chart data is persisted in the browser.
 
-## Migration and connected gate — NOT EXECUTED
+## Hosted staging migration — APPLIED 2026-10-08; browser acceptance pending
 
 Forward: `supabase/migrations/20261009000000_add_group_chart_history.sql`.
 Inverse: `supabase/rollback/20261009000000_add_group_chart_history.sql`.
@@ -53,11 +53,29 @@ does not modify tables, backfill data, widen raw-row policies or change rankings
 The inverse removes only the new RPC and preserves all entries, shares and the
 old history contract. Applying it leaves this UI honestly unavailable.
 
-Before hosted staging execution: obtain independent PM migration review,
-specific owner approval, a fresh verified recoverable backup and a private
-non-mutating connection check. Existing canonical #210 and draft-sharing
-migrations must be applied. Do not run hosted SQL or modify production under
-this implementation approval. Vercel/CI green does not apply the database RPC.
+PM reported applying the owner-approved additive RPC through Supabase SQL Editor
+on `slimpossible-staging` (project `erylzsdmsohvssgqwfor`) on 2026-10-08,
+after fresh backup recovery verification. The applied SQL matched the migration
+at implementation head `03e94ea87abf8a4125c7f23ff8a7275c2f446bfd`; only comments
+and whitespace were compacted. The transaction reported Success. This was SQL
+Editor execution, not a Supabase migration-ledger entry or repair. A did not
+execute hosted SQL.
+
+PM-reported preflight: `connection_ok=1`, chart RPC absent, canonical/shares
+tables ready, 16 canonical entries and 5 shares. Completed postchecks:
+sessionless calls denied by the DO guard; security definer enabled; fixed
+`pg_catalog, public, auth` search path; only member key, display name, recorded
+date and kg projected; anonymous EXECUTE false; authenticated EXECUTE true;
+entry/share counts unchanged at 16/5. The retained local SQL Editor proof
+`slimpossible-211-staging-verification.jpg` was inspected by A and visibly
+confirms anonymous false, authenticated true and 16 entries. The 5-share result
+is PM-reported; its screenshot column is obscured by an editor overlay.
+
+These are migration/catalog/access/count checks, not executed owner/member
+browser acceptance or the full connected privacy matrix. No hosted Auth
+identities, private row values or credentials are included in this evidence.
+No PR merge or production change is authorized by the staging approval.
+Vercel/CI green is still separate from connected acceptance.
 
 `supabase/tests/group_chart_history_authorization.sql` is rollback-only and
 requires three distinct owner-approved existing disposable Auth UUIDs supplied
@@ -85,10 +103,22 @@ and populated identities must not be committed.
   kg/date labels, separate gain/loss series, missing-date gaps, legend and exact
   weight table. `e2e/fixtures/group-chart-harness.html` is test-only and never used
   as a production data fallback.
+- Fresh database-archive recovery passed in a new internal-only, no-published-port
+  Docker database. The original backup checksum remained unchanged. Aggregate
+  orphan/index/constraint checks passed; RLS and checked privacy ACLs remained
+  intact. Exact #211 forward/inverse/reapply preserved all 46 snapshotted tables,
+  existing public function definitions/ACLs, managed-role flags/memberships and
+  selected-group history/ranking outputs. The new local resources were stopped
+  and retained; owner containers/backups remained untouched. This proves archive
+  recoverability relative to that backup, not source completeness without a
+  source manifest, live Auth configuration/sign-in, or Storage object bytes.
 
-## Owner/PM connected acceptance — NOT EXECUTED
+## Owner/PM connected browser/privacy acceptance — NOT EXECUTED
 
-After separately approved staging migration and privacy checks:
+The staging function is applied and its basic checks above are complete. The
+rollback-only connected privacy harness and full owner/member browser matrix
+remain unexecuted; obtain the required approved disposable identities and
+complete those checks before merge acceptance:
 
 1. Use approved disposable owner/member accounts. In Group, verify only selected
    group's explicitly shared dates/weights appear; private notes/emails and other
