@@ -61,7 +61,7 @@ for (const viewport of [
     await note.focus()
     await page.keyboard.press('Tab')
     await expect(
-      page.getByRole('button', { name: 'Save weigh-in', exact: true }),
+      page.getByRole('button', { name: 'Save weight', exact: true }),
     ).toBeFocused()
     await page.keyboard.press('Enter')
     const history = page.getByRole('list', {
@@ -92,16 +92,26 @@ for (const viewport of [
         exact: true,
       }),
     ).toBeVisible()
-    // Same-date save corrects the same canonical row, rather than inserting another.
+    // A new form cannot silently replace an existing record's note/shares.
     await page.getByLabel('Date', { exact: true }).fill(pastDate)
     await page.getByLabel('Weight in kg').fill('82.1')
     await note.fill('Synthetic same-date correction.')
     await note.focus()
     await page.keyboard.press('Tab')
     await expect(
-      page.getByRole('button', { name: 'Save weigh-in', exact: true }),
+      page.getByRole('button', { name: 'Save weight', exact: true }),
     ).toBeFocused()
     await page.keyboard.press('Enter')
+    await expect(page.getByRole('alert')).toContainText('Edit the saved record')
+    expect(await canonicalRows(page)).toEqual([original])
+    await page
+      .getByRole('button', { name: `Edit weight ${pastDate}`, exact: true })
+      .click()
+    await page.getByLabel('Weight in kg').fill('82.1')
+    await note.fill('Synthetic same-date correction.')
+    await page
+      .getByRole('button', { name: 'Update weight', exact: true })
+      .click()
     await expect(history.getByText('82.1 kg', { exact: true })).toBeVisible()
     expect(await canonicalRows(page)).toEqual([
       expect.objectContaining({
@@ -113,14 +123,14 @@ for (const viewport of [
     ])
 
     await page
-      .getByRole('button', { name: `Edit ${pastDate}`, exact: true })
+      .getByRole('button', { name: `Edit weight ${pastDate}`, exact: true })
       .click()
     await page.getByLabel('Weight in kg').fill('81.9')
     await note.fill('Synthetic edited private note.')
     await note.focus()
     await page.keyboard.press('Tab')
     await expect(
-      page.getByRole('button', { name: 'Update weigh-in', exact: true }),
+      page.getByRole('button', { name: 'Update weight', exact: true }),
     ).toBeFocused()
     await page.keyboard.press('Enter')
     await expect(history.getByText('81.9 kg', { exact: true })).toBeVisible()
@@ -170,7 +180,7 @@ for (const viewport of [
     await page.keyboard.press('Space')
     await page.keyboard.press('Tab')
     await expect(
-      page.getByRole('button', { name: 'Save weigh-in', exact: true }),
+      page.getByRole('button', { name: 'Save weight', exact: true }),
     ).toBeFocused()
     await page.keyboard.press('Enter')
     const history = page.getByRole('list', {
@@ -181,7 +191,7 @@ for (const viewport of [
     const expectedShares = ['canonical-draft-group', 'canonical-active-group']
     expect(original.sharedChallengeIds).toEqual(expectedShares)
 
-    // A fresh entry starts private again; shares are selected explicitly for this correction.
+    // A fresh entry starts private; a same-date attempt must preserve the saved shares.
     await expect(draft).not.toBeChecked()
     await expect(active).not.toBeChecked()
     await page.getByLabel('Date', { exact: true }).fill(pastDate)
@@ -189,8 +199,18 @@ for (const viewport of [
     await note.fill('Synthetic same-date shared correction.')
     await draft.check()
     await active.check()
+    await page.getByRole('button', { name: 'Save weight', exact: true }).click()
+    await expect(page.getByRole('alert')).toContainText('Edit the saved record')
+    expect(await canonicalRows(page)).toEqual([original])
     await page
-      .getByRole('button', { name: 'Save weigh-in', exact: true })
+      .getByRole('button', { name: `Edit weight ${pastDate}`, exact: true })
+      .click()
+    await expect(draft).toBeChecked()
+    await expect(active).toBeChecked()
+    await page.getByLabel('Weight in kg').fill('89.9')
+    await note.fill('Synthetic same-date shared correction.')
+    await page
+      .getByRole('button', { name: 'Update weight', exact: true })
       .click()
     await expect(history.getByText('89.9 kg', { exact: true })).toBeVisible()
     expect(await canonicalRows(page)).toEqual([
@@ -202,7 +222,7 @@ for (const viewport of [
     ])
     await page.reload()
     await page
-      .getByRole('button', { name: `Edit ${pastDate}`, exact: true })
+      .getByRole('button', { name: `Edit weight ${pastDate}`, exact: true })
       .click()
     await expect(draft).toBeChecked()
     await expect(active).toBeChecked()
@@ -210,7 +230,7 @@ for (const viewport of [
     await page.getByLabel('Weight in kg').fill('89.8')
     await note.fill('Synthetic shared edit.')
     await page
-      .getByRole('button', { name: 'Update weigh-in', exact: true })
+      .getByRole('button', { name: 'Update weight', exact: true })
       .click()
     await expect(history.getByText('89.8 kg', { exact: true })).toBeVisible()
     await page.reload()

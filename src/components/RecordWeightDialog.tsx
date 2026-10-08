@@ -127,6 +127,8 @@ export function RecordWeightDialog({
         setSaving(false)
         return
       }
+      dialog.current?.close()
+      if (trigger.current?.isConnected) trigger.current.focus()
       onSaved()
     } catch {
       if (active.current) {

@@ -35,12 +35,15 @@ test('renders only the signed-in member latest weigh-in and private note', async
     page.getByText('E2E private note for the signed-in participant.'),
   ).toBeVisible()
 
-  const recordLink = page.getByRole('link', { name: 'Record a weigh-in' })
+  const recordLink = page.getByRole('button', {
+    name: 'Record weight',
+    exact: true,
+  })
   await recordLink.focus()
   await expect(recordLink).toBeFocused()
   await page.keyboard.press('Enter')
   await expect(
-    page.getByRole('heading', { name: 'Record a weigh-in' }),
+    page.getByRole('heading', { name: 'Record weight' }),
   ).toBeVisible()
 })
 

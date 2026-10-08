@@ -20,12 +20,12 @@ describe('createParticipantFeaturePlaceholders', () => {
       latestRecordDate: null,
       recordCount: 0,
       streak: {
-        message: 'Record a weigh-in before future streak tracking can begin.',
+        message: 'Record weight before future streak tracking can begin.',
         state: 'no-records',
         value: null,
       },
       weeklyWin: {
-        message: 'Record a weigh-in before weekly wins can be assessed.',
+        message: 'Record weight before weekly wins can be assessed.',
         state: 'no-records',
         value: null,
       },

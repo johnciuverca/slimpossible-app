@@ -20,6 +20,23 @@ import {
 } from './AppPages'
 import { mostRecentSunday } from '../models/groupProgress'
 import { PersonalWeighInsPage } from './PersonalWeighInsPage'
+// These legacy challenge-view tests use ordered HTTP responses. Exercise the
+// independent personal action with real repositories in PersonalWorkspacePages
+// and the cross-page browser suite, rather than mixing its requests into these.
+vi.mock('../components/WeightPageHeader', () => ({
+  WeightPageHeader: ({
+    children,
+    action,
+  }: {
+    children: React.ReactNode
+    action?: React.ReactNode
+  }) => (
+    <header>
+      {children}
+      {action ?? <button>Record weight</button>}
+    </header>
+  ),
+}))
 import {
   localDateOnly,
   provisionalWeekDates,
@@ -342,13 +359,15 @@ describe('HomePage', () => {
     fireEvent.change(screen.getByLabelText('Weight in kg'), {
       target: { value: '89' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save weight' }))
     await screen.findByText(/89 kg/)
-    fireEvent.click(screen.getByRole('button', { name: `Edit ${today}` }))
+    fireEvent.click(
+      screen.getByRole('button', { name: `Edit weight ${today}` }),
+    )
     fireEvent.change(screen.getByLabelText('Weight in kg'), {
       target: { value: '90' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Update weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Update weight' }))
     await screen.findByText(/90 kg/)
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     fireEvent.click(screen.getByRole('button', { name: `Delete ${today}` }))
@@ -719,8 +738,8 @@ describe('HomePage', () => {
       screen.getByText('You are 10 kg away from your target weight.'),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('link', { name: 'Record a weigh-in' }),
-    ).toHaveAttribute('href', '/weigh-ins?challenge=challenge-1')
+      screen.getByRole('button', { name: 'Record weight' }),
+    ).toBeInTheDocument()
     expect(
       screen.getByRole('link', { name: 'See group progress' }),
     ).toHaveAttribute('href', '/group?challenge=challenge-1')

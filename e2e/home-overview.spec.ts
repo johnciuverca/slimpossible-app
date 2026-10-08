@@ -40,7 +40,6 @@ for (const viewport of [
       ['My progress', '/progress?challenge=e2e-challenge'],
       ['Group progress', '/group?challenge=e2e-challenge'],
       ['Goals', '/goals?challenge=e2e-challenge'],
-      ['Record a weigh-in', '/weigh-ins?challenge=e2e-challenge'],
     ]) {
       await expect(actions.getByRole('link', { name: label })).toHaveAttribute(
         'href',

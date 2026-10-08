@@ -140,7 +140,7 @@ describe('DailyWeighInFormPage', () => {
     fireEvent.change(screen.getByLabelText('Date'), {
       target: { value: '2099-01-01' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save weight' }))
 
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Please correct the highlighted fields before saving.',
@@ -166,7 +166,7 @@ describe('DailyWeighInFormPage', () => {
     fireEvent.change(screen.getByLabelText('Private note (optional)'), {
       target: { value: 'Morning reading.' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save weight' }))
 
     await waitFor(() => {
       expect(
@@ -183,7 +183,7 @@ describe('DailyWeighInFormPage', () => {
     fireEvent.change(screen.getByLabelText('Weight in kg'), {
       target: { value: '91.8' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save weight' }))
 
     await waitFor(() => {
       expect(
@@ -194,7 +194,7 @@ describe('DailyWeighInFormPage', () => {
     fireEvent.change(screen.getByLabelText('Weight in kg'), {
       target: { value: '91.5' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save weight' }))
 
     await waitFor(() => {
       expect(
@@ -212,7 +212,7 @@ describe('DailyWeighInFormPage', () => {
     fireEvent.change(screen.getByLabelText('Weight in kg'), {
       target: { value: '95.4' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save weight' }))
 
     await waitFor(() => {
       expect(screen.getByText(/95.4 kg/)).toBeInTheDocument()
@@ -362,7 +362,7 @@ describe('DailyWeighInFormPage', () => {
     fireEvent.change(screen.getByLabelText('Private note (optional)'), {
       target: { value: 'Corrected note' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save weight' }))
 
     await waitFor(() => {
       expect(screen.getByText('Weigh-in saved remotely.')).toBeInTheDocument()
@@ -481,7 +481,7 @@ describe('DailyWeighInFormPage', () => {
     fireEvent.change(screen.getByLabelText('Private note (optional)'), {
       target: { value: 'Challenge two private note' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save weight' }))
 
     await screen.findByText('Weigh-in saved remotely.')
     const writeCall = fetchMock.mock.calls.find(
@@ -732,7 +732,7 @@ describe('DailyWeighInFormPage', () => {
     fireEvent.change(screen.getByLabelText('Weight in kg'), {
       target: { value: '86.2' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save weight' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Unable to save the weigh-in.',
@@ -753,7 +753,7 @@ describe('DailyWeighInFormPage', () => {
     fireEvent.change(screen.getByLabelText('Weight in kg'), {
       target: { value: '91.8' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save weight' }))
 
     await waitFor(() => {
       expect(
@@ -767,7 +767,7 @@ describe('DailyWeighInFormPage', () => {
     fireEvent.change(screen.getByLabelText('Weight in kg'), {
       target: { value: '92.5' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save weight' }))
 
     await waitFor(() => {
       expect(screen.getAllByRole('listitem')).toHaveLength(2)
@@ -783,14 +783,16 @@ describe('DailyWeighInFormPage', () => {
       ),
     ).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: `Edit ${today}` }))
+    fireEvent.click(
+      screen.getByRole('button', { name: `Edit weight ${today}` }),
+    )
     expect(
-      screen.getByRole('button', { name: 'Update weigh-in' }),
+      screen.getByRole('button', { name: 'Update weight' }),
     ).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('Weight in kg'), {
       target: { value: '91.5' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Update weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Update weight' }))
 
     await waitFor(() => {
       expect(

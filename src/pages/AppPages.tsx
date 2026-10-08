@@ -11,6 +11,7 @@ import {
 import { MilestoneProgress } from '../components/MilestoneProgress'
 import { PersonalProgressChart } from '../components/PersonalProgressChart'
 import { ChallengeTabs } from '../components/ChallengeContextTabs'
+import { WeightPageHeader } from '../components/WeightPageHeader'
 import type { ParticipantMilestones } from '../models/participantMilestones'
 import { createParticipantMilestones } from '../models/participantMilestones'
 import {
@@ -703,7 +704,6 @@ export function HomePage() {
           ? [['Group progress', `/group${challengeQuery}`] as [string, string]]
           : []),
         ['Goals', `/goals${challengeQuery}`],
-        ['Record a weigh-in', `/weigh-ins${challengeQuery}`],
         ...(isOwner && isGroup
           ? ([
               ['Invite participants', `/challenge/invites${challengeQuery}`],
@@ -727,10 +727,7 @@ export function HomePage() {
         ]
       : []
   const heroActions: [string, string][] = isActiveMember
-    ? [
-        ['Record a weigh-in', `/weigh-ins${challengeQuery}`],
-        ['View my progress', `/progress${challengeQuery}`],
-      ]
+    ? [['View my progress', `/progress${challengeQuery}`]]
     : isOwner && selectedChallenge
       ? [
           [
@@ -753,21 +750,28 @@ export function HomePage() {
   return (
     <section
       className="mx-auto flex w-full max-w-6xl flex-col gap-8"
-      aria-labelledby="home-title"
+      aria-labelledby="challenges-title"
     >
+      <WeightPageHeader>
+        <PageHeader
+          title="Challenges"
+          titleId="challenges-title"
+          description="Your challenges and shared progress."
+        />
+      </WeightPageHeader>
       <div className="order-1 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <Card className="flex min-h-[240px] flex-col justify-between gap-8 overflow-hidden border-forest-200 bg-gradient-to-br from-forest-50 via-panel to-forest-100 p-7 sm:p-10 lg:p-12">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest-700">
               {selectedChallenge ? 'Your challenge' : 'Your overview'}
             </p>
-            <h1
+            <h2
               className="mt-4 max-w-2xl text-3xl font-extrabold leading-tight tracking-tight text-ink sm:text-4xl"
               id="home-title"
             >
               Keep showing up.
               <span className="block text-forest-700">It adds up.</span>
-            </h1>
+            </h2>
             <p className="mt-4 max-w-xl text-base leading-7 text-ink-muted">
               {selectedChallenge
                 ? 'Your personal progress stays yours. Shared group information appears only when your membership allows it.'
@@ -1167,7 +1171,7 @@ export function TodayPage() {
       className="mx-auto w-full max-w-6xl space-y-6"
       aria-labelledby="today-title"
     >
-      <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+      <WeightPageHeader>
         <PageHeader
           description="Your personal check-in for the selected challenge, with group summaries only in group contexts."
           title="Today"
@@ -1179,15 +1183,7 @@ export function TodayPage() {
               : 'Daily check-in'}
           </StatusPill>
         </PageHeader>
-        {data ? (
-          <Link
-            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-forest-800 px-5 py-3 text-sm font-bold text-white hover:bg-forest-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-800"
-            to={`/weigh-ins${challengeQuery}`}
-          >
-            Record a weigh-in
-          </Link>
-        ) : null}
-      </header>
+      </WeightPageHeader>
 
       <DashboardState
         isLoading={isLoading}
@@ -1603,8 +1599,11 @@ export function GroupDashboardPage() {
   }
 
   return (
-    <section className="mx-auto w-full max-w-6xl" aria-labelledby="group-title">
-      <Card className="p-5 sm:p-8 lg:p-10">
+    <section
+      className="mx-auto w-full max-w-6xl space-y-6"
+      aria-labelledby="group-title"
+    >
+      <WeightPageHeader>
         <PageHeader
           description="Shared summary, this week’s provisional leader, and Sunday-based results for the selected challenge. Individual histories and private notes stay private."
           title="Group dashboard"
@@ -1616,6 +1615,8 @@ export function GroupDashboardPage() {
               'Shared progress'}
           </StatusPill>
         </PageHeader>
+      </WeightPageHeader>
+      <Card className="p-5 sm:p-8 lg:p-10">
         <div className="mt-6 flex flex-wrap items-end gap-4">
           <div className="w-full min-w-0">
             <ChallengeTabs
@@ -1888,7 +1889,9 @@ export function GroupDashboardPage() {
   )
 }
 
-export function ProgressPage() {
+export function ProgressPage({
+  personalHeader = false,
+}: { personalHeader?: boolean } = {}) {
   const { data, isLoading, message, messageTone } = usePersonalDashboard()
   const { state: authState } = useOptionalAuth()
   const persistence = useMemo(() => createPersistence(authState), [authState])
@@ -1996,17 +1999,27 @@ export function ProgressPage() {
 
   return (
     <section
-      className="mx-auto w-full max-w-6xl"
+      className="mx-auto w-full max-w-6xl space-y-6"
       aria-labelledby="progress-title"
     >
-      <Card className="p-5 sm:p-8 lg:p-10">
+      <WeightPageHeader>
         <PageHeader
           description="Your saved weigh-ins, personal trend, and goal progress for the selected challenge."
-          title="Progress"
+          title={personalHeader ? 'Challenge progress' : 'Progress'}
           titleId="progress-title"
         >
           <StatusPill>{challengeContextName(data?.challenge)}</StatusPill>
+          {personalHeader ? (
+            <Link
+              className="ml-3 inline-flex min-h-11 items-center font-semibold text-forest-800 underline"
+              to="/progress"
+            >
+              Back to My Progress
+            </Link>
+          ) : null}
         </PageHeader>
+      </WeightPageHeader>
+      <Card className="p-5 sm:p-8 lg:p-10">
         <DashboardState
           isLoading={isLoading}
           message={message}
@@ -2367,13 +2380,6 @@ export function ProgressPage() {
                   )}
                 </section>
               ) : null}
-
-              <Link
-                className="inline-flex min-h-11 items-center rounded-xl bg-emerald-800 px-5 py-3 text-sm font-semibold text-white underline-offset-4 hover:bg-emerald-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-800"
-                to={`/weigh-ins${data ? `?challenge=${encodeURIComponent(data.challenge.id)}` : ''}`}
-              >
-                Record a weigh-in
-              </Link>
             </div>
           ) : null}
         </DashboardState>
@@ -2401,8 +2407,11 @@ export function GoalsPage() {
   }, [data])
 
   return (
-    <section className="mx-auto w-full max-w-6xl" aria-labelledby="goals-title">
-      <Card className="p-5 sm:p-8 lg:p-10">
+    <section
+      className="mx-auto w-full max-w-6xl space-y-6"
+      aria-labelledby="goals-title"
+    >
+      <WeightPageHeader>
         <PageHeader
           description="Your personal starting weight, target, and milestones for the selected challenge."
           title="Goals"
@@ -2410,6 +2419,8 @@ export function GoalsPage() {
         >
           <StatusPill>{challengeContextName(data?.challenge)}</StatusPill>
         </PageHeader>
+      </WeightPageHeader>
+      <Card className="p-5 sm:p-8 lg:p-10">
         <DashboardState
           isLoading={isLoading}
           message={message}

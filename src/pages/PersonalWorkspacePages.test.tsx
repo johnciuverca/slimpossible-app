@@ -18,6 +18,7 @@ import {
 import { personalWeighInToday } from '../models/personalWeighIn'
 import { PersonalDashboardPage } from './PersonalDashboardPage'
 import { MyProgressPage } from './MyProgressPage'
+import { GoalsPage, GroupDashboardPage } from './AppPages'
 
 function authValue(id = 'user-alex'): AuthContextValue {
   return {
@@ -103,10 +104,59 @@ afterEach(() => {
 })
 
 describe('personal Dashboard and My Progress', () => {
+  it.each([
+    ['Group', GroupDashboardPage, '/group?challenge=missing'],
+    ['Goals', GoalsPage, '/goals?challenge=missing'],
+  ])(
+    'keeps %s recording independent of failed optional challenge loading',
+    async (_name, Page, path) => {
+      const storage = local()
+      vi.spyOn(
+        storage.repositories.challenges,
+        'listVisibleToUser',
+      ).mockResolvedValue({
+        state: 'error',
+        error: { kind: 'request', message: 'Unavailable' },
+      })
+      vi.spyOn(persistenceModule, 'createPersistence').mockReturnValue(storage)
+      render(page(<Page />, 'user-alex', path))
+      const action = screen.getByRole('button', { name: 'Record weight' })
+      await waitFor(() => expect(action).toBeEnabled())
+      fireEvent.click(action)
+      const dialog = screen.getByRole('dialog', { name: 'Record weight' })
+      expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument()
+      fireEvent.change(within(dialog).getByLabelText('Weight in kg'), {
+        target: { value: '81' },
+      })
+      fireEvent.click(
+        within(dialog).getByRole('button', { name: 'Save weight' }),
+      )
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+      )
+      expect(
+        await storage.repositories.personalWeighIns.listForUser('user-alex'),
+      ).toMatchObject({ data: [{ weightKg: 81, sharedChallengeIds: [] }] })
+      await waitFor(() =>
+        expect(
+          screen.getByRole('button', { name: 'Record weight' }),
+        ).toBeEnabled(),
+      )
+      fireEvent.click(screen.getByRole('button', { name: 'Record weight' }))
+      expect(
+        screen.getByRole('dialog', { name: 'Edit weight' }),
+      ).toBeInTheDocument()
+      expect(screen.getByLabelText('Weight in kg')).toHaveValue(81)
+    },
+  )
+
   it('records a private entry with no challenge and updates logged-today state', async () => {
     render(page(<PersonalDashboardPage />))
     await screen.findByText('No record yet')
     expect(screen.getByText('Not logged today')).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Edit weight' }),
+    ).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Record weight' }))
     const dialog = screen.getByRole('dialog', { name: 'Record weight' })
     expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument()
@@ -119,6 +169,10 @@ describe('personal Dashboard and My Progress', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save weight' }))
     await screen.findByText('82.1 kg')
     expect(screen.getByText('Logged today')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Record weight' })).toBeEnabled()
+    expect(
+      screen.queryByRole('button', { name: 'Edit weight' }),
+    ).not.toBeInTheDocument()
     expect(screen.queryByText('Only my note')).not.toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     const entries =
@@ -172,7 +226,7 @@ describe('personal Dashboard and My Progress', () => {
     render(page(<PersonalDashboardPage />))
     await screen.findByText('85 kg')
     await waitFor(() => expect(summary).toHaveBeenCalledOnce())
-    fireEvent.click(screen.getByRole('button', { name: 'Edit today’s weight' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Record weight' }))
     const dialog = screen.getByRole('dialog', { name: 'Edit weight' })
     expect(
       within(dialog).getByRole('checkbox', { name: 'Slimpossible 2026' }),
@@ -255,7 +309,7 @@ describe('personal Dashboard and My Progress', () => {
     })
     vi.spyOn(persistenceModule, 'createPersistence').mockReturnValue(storage)
     render(page(<PersonalDashboardPage />))
-    await screen.findByText(/Your personal history could not be loaded/)
+    await screen.findAllByText(/Your personal history could not be loaded/)
     expect(screen.queryByText('No record yet')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Record weight' })).toBeDisabled()
   })
@@ -288,7 +342,9 @@ describe('personal Dashboard and My Progress', () => {
     const rendered = render(page(<MyProgressPage />, 'user-alex', '/progress'))
     await screen.findByText('Old account secret')
     fireEvent.click(
-      screen.getByRole('button', { name: `Edit ${personalWeighInToday()}` }),
+      screen.getByRole('button', {
+        name: `Edit weight ${personalWeighInToday()}`,
+      }),
     )
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     rendered.rerender(page(<MyProgressPage />, 'second-user', '/progress'))
