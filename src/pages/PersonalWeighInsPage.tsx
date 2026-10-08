@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 
-import { Button, Card, PageHeader, StatusPill } from '../components/ui'
+import { Card, PageHeader, StatusPill } from '../components/ui'
+import { PersonalWeightRecordCard } from '../components/PersonalWeightRecordCard'
+import { formatPersonalWeight } from '../models/personalHistory'
 import {
   PersonalWeighInEditor,
   type PersonalWeighInFormValues,
@@ -49,11 +51,14 @@ export function PersonalWeighInsPage() {
   const [submitError, setSubmitError] = useState('')
   const [sharesWarning, setSharesWarning] = useState('')
   const [success, setSuccess] = useState('')
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const editorRegion = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     let current = true
     setIsLoading(true)
     setIsSaving(false)
+    setDeletingId(null)
     setEntries([])
     setGroups([])
     setValues(emptyForm)
@@ -150,6 +155,13 @@ export function PersonalWeighInsPage() {
     )
     setErrors({})
     setSuccess('')
+    editorRegion.current?.scrollIntoView?.({
+      block: 'start',
+      behavior: 'instant',
+    })
+    editorRegion.current
+      ?.querySelector<HTMLInputElement>('input[type="number"]')
+      ?.focus({ preventScroll: true })
   }
 
   function cancelEditing() {
@@ -246,7 +258,7 @@ export function PersonalWeighInsPage() {
   async function deleteEntry(entry: PersonalWeighIn) {
     if (
       !window.confirm(
-        `Delete the weigh-in for ${entry.date}? This also removes its group shares.`,
+        `Delete ${formatPersonalWeight(entry.weightKg)} recorded ${entry.date}? This also removes its group shares.`,
       )
     ) {
       return
@@ -256,18 +268,29 @@ export function PersonalWeighInsPage() {
       return
     }
     setSubmitError('')
-    const result = await persistence.repositories.personalWeighIns.delete(
-      userId,
-      entry.id,
-    )
-    if (latestRequestKey.current !== requestKey) return
-    if (result.state === 'error') {
-      setSubmitError(result.error.message)
-      return
+    setSuccess('')
+    setDeletingId(entry.id)
+    try {
+      const result = await persistence.repositories.personalWeighIns.delete(
+        userId,
+        entry.id,
+      )
+      if (latestRequestKey.current !== requestKey) return
+      setDeletingId(null)
+      if (result.state !== 'success' || !result.data) {
+        setSubmitError(
+          'Deletion could not be confirmed. Your history has not been changed; try again.',
+        )
+        return
+      }
+      setEntries((current) => current.filter(({ id }) => id !== entry.id))
+      if (editingId === entry.id) cancelEditing()
+      setSuccess('Weigh-in and its group shares were deleted.')
+    } catch {
+      if (latestRequestKey.current !== requestKey) return
+      setDeletingId(null)
+      setSubmitError('Deletion could not be confirmed. Try again.')
     }
-    setEntries((current) => current.filter(({ id }) => id !== entry.id))
-    if (editingId === entry.id) cancelEditing()
-    setSuccess('Weigh-in and its group shares were deleted.')
   }
 
   return (
@@ -292,60 +315,62 @@ export function PersonalWeighInsPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
-        <Card className="p-6 sm:p-8">
-          <h2 className="mb-5 text-xl font-bold text-ink">
-            {editingId ? 'Edit personal weigh-in' : 'Your personal entry'}
-          </h2>
-          {groupsError ? (
-            <p className="mb-4 text-sm text-amber-800" role="status">
-              {groupsError}
-            </p>
-          ) : null}
-          {loadError ? (
-            <p className="mb-4 text-sm text-red-700" role="alert">
-              {loadError}
-            </p>
-          ) : null}
-          {isLoading ? (
-            <p aria-live="polite" role="status">
-              Loading your personal weigh-ins…
-            </p>
-          ) : !loadError ? (
-            <PersonalWeighInEditor
-              errors={errors}
-              groups={groups}
-              isSaving={isSaving}
-              onCancel={editingId ? cancelEditing : undefined}
-              onChange={updateValue}
-              onSubmit={handleSubmit}
-              submitLabel={editingId ? 'Update weigh-in' : 'Save weigh-in'}
-              values={values}
-            />
-          ) : null}
-          {submitError ? (
-            <p
-              aria-live="polite"
-              className="mt-5 text-sm text-red-700"
-              role="alert"
-            >
-              {submitError}
-            </p>
-          ) : null}
-          {sharesWarning ? (
-            <p className="mt-5 text-sm text-amber-800" role="status">
-              {sharesWarning}
-            </p>
-          ) : null}
-          {success ? (
-            <p
-              aria-live="polite"
-              className="mt-5 text-sm text-forest-800"
-              role="status"
-            >
-              {success}
-            </p>
-          ) : null}
-        </Card>
+        <div ref={editorRegion} className="min-w-0 scroll-mt-6">
+          <Card className="p-6 sm:p-8">
+            <h2 className="mb-5 text-xl font-bold text-ink">
+              {editingId ? 'Edit personal weigh-in' : 'Your personal entry'}
+            </h2>
+            {groupsError ? (
+              <p className="mb-4 text-sm text-amber-800" role="status">
+                {groupsError}
+              </p>
+            ) : null}
+            {loadError ? (
+              <p className="mb-4 text-sm text-red-700" role="alert">
+                {loadError}
+              </p>
+            ) : null}
+            {isLoading ? (
+              <p aria-live="polite" role="status">
+                Loading your personal weigh-ins…
+              </p>
+            ) : !loadError ? (
+              <PersonalWeighInEditor
+                errors={errors}
+                groups={groups}
+                isSaving={isSaving || deletingId !== null}
+                onCancel={editingId ? cancelEditing : undefined}
+                onChange={updateValue}
+                onSubmit={handleSubmit}
+                submitLabel={editingId ? 'Update weigh-in' : 'Save weigh-in'}
+                values={values}
+              />
+            ) : null}
+            {submitError ? (
+              <p
+                aria-live="polite"
+                className="mt-5 text-sm text-red-700"
+                role="alert"
+              >
+                {submitError}
+              </p>
+            ) : null}
+            {sharesWarning ? (
+              <p className="mt-5 text-sm text-amber-800" role="status">
+                {sharesWarning}
+              </p>
+            ) : null}
+            {success ? (
+              <p
+                aria-live="polite"
+                className="mt-5 text-sm text-forest-800"
+                role="status"
+              >
+                {success}
+              </p>
+            ) : null}
+          </Card>
+        </div>
 
         <Card aria-labelledby="personal-history-title" className="p-6 sm:p-8">
           <h2
@@ -375,40 +400,18 @@ export function PersonalWeighInsPage() {
               {[...entries]
                 .sort((a, b) => b.date.localeCompare(a.date))
                 .map((entry) => (
-                  <li
-                    className="rounded-xl border border-line bg-page p-4"
+                  <PersonalWeightRecordCard
                     key={entry.id}
-                  >
-                    <p className="font-semibold text-ink">
-                      {entry.date}: {entry.weightKg} kg
-                    </p>
-                    {entry.note ? (
-                      <p className="mt-2 whitespace-pre-wrap text-sm text-ink-muted">
-                        {entry.note}
-                      </p>
-                    ) : null}
-                    <p className="mt-2 text-xs text-ink-muted">
-                      {entry.sharedChallengeIds.length === 0
-                        ? 'Private — not shared with a group'
-                        : `Shared with ${entry.sharedChallengeIds.map((id) => groups.find((group) => group.id === id)?.name ?? 'an unavailable group').join(', ')}`}
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Button
-                        onClick={() => startEditing(entry)}
-                        type="button"
-                        variant="secondary"
-                      >
-                        Edit {entry.date}
-                      </Button>
-                      <Button
-                        onClick={() => void deleteEntry(entry)}
-                        type="button"
-                        variant="secondary"
-                      >
-                        Delete {entry.date}
-                      </Button>
-                    </div>
-                  </li>
+                    entry={entry}
+                    groupName={(id) =>
+                      groups.find((group) => group.id === id)?.name ??
+                      'an unavailable group'
+                    }
+                    onEdit={() => startEditing(entry)}
+                    onDelete={() => void deleteEntry(entry)}
+                    disabled={isSaving || deletingId !== null}
+                    deleting={deletingId === entry.id}
+                  />
                 ))}
             </ul>
           )}

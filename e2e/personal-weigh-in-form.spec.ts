@@ -68,17 +68,13 @@ for (const viewport of [
       name: 'Personal weigh-in history',
     })
     await expect(history.getByRole('listitem')).toHaveCount(1)
-    await expect(
-      history.getByText(`${pastDate}: 82.4 kg`, { exact: true }),
-    ).toBeVisible()
+    await expect(history.getByText('82.4 kg', { exact: true })).toBeVisible()
     await expect(
       history.getByText('Synthetic author-private late entry.', {
         exact: true,
       }),
     ).toBeVisible()
-    await expect(
-      history.getByText('Private — not shared with a group'),
-    ).toBeVisible()
+    await expect(history.getByText('Private', { exact: true })).toBeVisible()
     const [original] = await canonicalRows(page)
     expect(original).toMatchObject({
       date: pastDate,
@@ -90,9 +86,7 @@ for (const viewport of [
       .toBe(viewport.width)
 
     await page.reload()
-    await expect(
-      history.getByText(`${pastDate}: 82.4 kg`, { exact: true }),
-    ).toBeVisible()
+    await expect(history.getByText('82.4 kg', { exact: true })).toBeVisible()
     await expect(
       history.getByText('Synthetic author-private late entry.', {
         exact: true,
@@ -108,9 +102,7 @@ for (const viewport of [
       page.getByRole('button', { name: 'Save weigh-in', exact: true }),
     ).toBeFocused()
     await page.keyboard.press('Enter')
-    await expect(
-      history.getByText(`${pastDate}: 82.1 kg`, { exact: true }),
-    ).toBeVisible()
+    await expect(history.getByText('82.1 kg', { exact: true })).toBeVisible()
     expect(await canonicalRows(page)).toEqual([
       expect.objectContaining({
         id: original.id,
@@ -131,9 +123,7 @@ for (const viewport of [
       page.getByRole('button', { name: 'Update weigh-in', exact: true }),
     ).toBeFocused()
     await page.keyboard.press('Enter')
-    await expect(
-      history.getByText(`${pastDate}: 81.9 kg`, { exact: true }),
-    ).toBeVisible()
+    await expect(history.getByText('81.9 kg', { exact: true })).toBeVisible()
     await page.reload()
     await expect(history.getByRole('listitem')).toHaveCount(1)
     await expect(
@@ -186,9 +176,7 @@ for (const viewport of [
     const history = page.getByRole('list', {
       name: 'Personal weigh-in history',
     })
-    await expect(
-      history.getByText(`${pastDate}: 90 kg`, { exact: true }),
-    ).toBeVisible()
+    await expect(history.getByText('90 kg', { exact: true })).toBeVisible()
     const [original] = await canonicalRows(page)
     const expectedShares = ['canonical-draft-group', 'canonical-active-group']
     expect(original.sharedChallengeIds).toEqual(expectedShares)
@@ -204,9 +192,7 @@ for (const viewport of [
     await page
       .getByRole('button', { name: 'Save weigh-in', exact: true })
       .click()
-    await expect(
-      history.getByText(`${pastDate}: 89.9 kg`, { exact: true }),
-    ).toBeVisible()
+    await expect(history.getByText('89.9 kg', { exact: true })).toBeVisible()
     expect(await canonicalRows(page)).toEqual([
       expect.objectContaining({
         id: original.id,
@@ -226,9 +212,7 @@ for (const viewport of [
     await page
       .getByRole('button', { name: 'Update weigh-in', exact: true })
       .click()
-    await expect(
-      history.getByText(`${pastDate}: 89.8 kg`, { exact: true }),
-    ).toBeVisible()
+    await expect(history.getByText('89.8 kg', { exact: true })).toBeVisible()
     await page.reload()
     await expect(history.getByRole('listitem')).toHaveCount(1)
     await expect(

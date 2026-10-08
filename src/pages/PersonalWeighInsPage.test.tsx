@@ -35,6 +35,47 @@ function renderPage() {
 }
 
 describe('PersonalWeighInsPage', () => {
+  it('announces pending deletion and preserves the card if deletion is not confirmed', async () => {
+    const persistence = createPersistence({
+      status: 'signed-out',
+      error: null,
+      user: null,
+    })
+    if (persistence.mode !== 'local') throw new Error('Expected local mode')
+    await persistence.repositories.personalWeighIns.save('user-alex', {
+      date: dateOffset(0),
+      weightKg: 82,
+      sharedChallengeIds: [],
+    })
+    let complete!: (value: { state: 'success'; data: boolean }) => void
+    vi.spyOn(
+      persistence.repositories.personalWeighIns,
+      'delete',
+    ).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          complete = resolve
+        }),
+    )
+    vi.spyOn(persistenceModule, 'createPersistence').mockReturnValue(
+      persistence,
+    )
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    renderPage()
+    await screen.findByText('82 kg')
+    fireEvent.click(screen.getByRole('button', { name: /Delete/ }))
+    expect(
+      screen.getByText(/Deleting entry and group shares/),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Delete/ })).toBeDisabled()
+    complete({ state: 'success', data: false })
+    await screen.findByRole('alert')
+    expect(screen.getByText('82 kg')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Delete/ })).toBeEnabled()
+    expect(
+      screen.queryByText('Weigh-in and its group shares were deleted.'),
+    ).not.toBeInTheDocument()
+  })
   it('keeps the unavailable-share warning visible and requires confirmation before removing a share', async () => {
     const persistence = createPersistence({
       status: 'signed-out',
@@ -263,9 +304,7 @@ describe('PersonalWeighInsPage', () => {
     await screen.findByText('Personal weigh-in saved in this browser.')
     expect(screen.getByText(/82.4 kg/)).toBeInTheDocument()
     expect(screen.getByText('Only for me.')).toBeInTheDocument()
-    expect(
-      screen.getByText('Private — not shared with a group'),
-    ).toBeInTheDocument()
+    expect(screen.getByText('Private')).toBeInTheDocument()
   })
 
   it('allows explicit sharing with multiple eligible groups and starts unchecked', async () => {
@@ -329,13 +368,20 @@ describe('PersonalWeighInsPage', () => {
     await screen.findByText(/83.1 kg/)
 
     fireEvent.click(screen.getByRole('button', { name: /Edit/ }))
+    expect(screen.getByLabelText('Weight in kg')).toHaveFocus()
     fireEvent.change(screen.getByLabelText('Weight in kg'), {
       target: { value: '82.9' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Update weigh-in' }))
     await screen.findByText(/82.9 kg/)
 
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    fireEvent.click(screen.getByRole('button', { name: /Delete/ }))
+    expect(confirm).toHaveBeenCalledWith(
+      expect.stringContaining('82.9 kg recorded'),
+    )
+    expect(screen.getByText(/82.9 kg/)).toBeInTheDocument()
+    confirm.mockReturnValue(true)
     fireEvent.click(screen.getByRole('button', { name: /Delete/ }))
     await waitFor(() => {
       expect(
