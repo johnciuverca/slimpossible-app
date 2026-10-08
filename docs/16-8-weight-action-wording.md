@@ -1,52 +1,62 @@
-# 16.8 — Consistent weight-action wording
+# 16.8 — Consistent Record weight action across pages
 
-Issue #236, based on staging `2a1af0d` after #237.
+Issue #236, PR #239, based on staging `2a1af0d`.
 
-## Changes
+## Behavior
 
-- New-entry actions use **Record weight** across Dashboard, Challenges, My Progress
-  and challenge-view entry links. Existing record actions use **Edit weight**.
-- Dashboard retains **Logged today** plus **Edit weight** when today's canonical
-  entry exists; otherwise the action is **Record weight**.
-- Full-page and legacy compatibility editor headings switch between **Record
-  weight** and **Edit weight**, with **Save weight** / **Update weight** submission
-  labels. The canonical full-page field section is neutrally named Weight details.
-- Record-card icon names retain the unique date: `Edit weight YYYY-MM-DD`. Edit
-  tooltips retain weight and date; delete identifiers/confirmation are unchanged.
-- The existing modal already used the requested headings and submission wording.
-  Related no-record placeholder text now uses Record weight consistently.
-
-Only text and label assertions changed. Canonical saves, dates, optional explicit
-sharing, author-private notes, account isolation, editors and navigation guards
-are unchanged. Standalone design-concept preview labels are not live application
-actions and are intentionally outside this change.
+- Dashboard, Challenges, My Progress (including selected challenge progress),
+  Group, Goals, and full Weigh-ins use the shared `WeightPageHeader`: the primary
+  **Record weight** action sits at the top right on desktop and below the header
+  text on mobile. Competing weight-entry links were removed.
+- The main action always says **Record weight**. Dashboard's **Logged today**
+  remains a separate status. Record pencils retain `Edit weight YYYY-MM-DD`.
+- Modal actions load today's canonical entry with its ID, private note and
+  explicit shares when present. Otherwise they start a private new entry.
+  Editor headings and submission labels distinguish Record/Save from Edit/Update.
+- Group and Goals recording loads personal history independently of challenge
+  membership, selected context, and optional challenge-loading failures. Existing
+  shared entries remain protected if group eligibility cannot be verified.
+- The full-page action focuses and scrolls to the weight field. An unfinished
+  draft is resumed intact, even when today already has a saved record. With no
+  draft it loads today's record or an empty new form. Editing remounts the form's
+  navigation baseline and restores focus after rendering.
+- A new full-page form targeting an existing date is rejected with edit guidance,
+  preserving the existing note and shares. Explicit corrections use that record's
+  ID; conflicting date edits retain the repository's duplicate-date error.
+- Modal dismissal and successful saves restore focus to the invoking control;
+  account changes hide the old editor and clear its state.
 
 No schema, SQL, ranking, auth/environment, hosted or production changes.
-**#238's lower Group-tab placement is not fixed by this PR.**
+Dashboard's personal-only redesign is #240; Group tab alignment is #238.
+Neither follow-up is included. Standalone concept preview labels are unchanged.
 
-## Local evidence — 2026-10-08
+## Validation — 2026-10-08
 
-- Format/lint/typecheck/build/diff checks passed; existing large-bundle warning remains.
-- 426 unit tests passed across 70 files. Strengthened Dashboard assertions cover
-  no-today Record weight versus Logged today/Edit weight, without a duplicate
-  Record weight action after saving.
-- 61 browser tests passed (57 application + 4 group). Desktop/mobile keyboard tests
-  use the new action names and assert Edit weight headings/Update weight labels in
-  modal and fallback editors, while preserving date-specific icon identities.
-- Existing canonical sharing, private notes, account switches, Stay/Discard,
-  challenge navigation, refresh, delete and empty-state coverage remains passing.
-- Local in-app visual smoke inspected the canonical full-page Record weight title,
-  Save weight action and date-labelled Edit weight icon.
-- Initial format and test-only type failures were corrected before the passing
-  quality run. Browser fixtures are synthetic; no hosted acceptance was performed.
+- Format, lint, typecheck, production build and diff checks pass. The existing
+  large-bundle warning remains.
+- 428 unit tests pass in 70 files. New Group/Goals cases verify recording and
+  correction without usable challenge data. Existing account isolation, private
+  notes, canonical saves and explicit-sharing checks pass.
+- 65 browser tests pass (61 application + 4 group). Desktop/mobile cases cover
+  one primary action, shared header placement,
+  empty private editors on every page, correction of today's entry from every
+  page, unchanged notes/shares, one canonical row, full-page draft preservation
+  and Stay/Discard navigation.
+- Focus after successful save was additionally verified at both viewport sizes.
+- Local in-app visual inspection confirms the Group header/action is available
+  with no challenge membership and positioned consistently outside the content card.
+- Existing challenge-view unit tests isolate the independent personal action
+  from their ordered HTTP fixtures; real action behavior is covered by the
+  personal workspace and cross-page browser suites.
 
-## Connected staging acceptance — NOT EXECUTED for #236
+## Connected staging acceptance — NOT EXECUTED
 
-PM/owner should inspect the immutable preview: Dashboard without today's entry
-shows Record weight; after an authorized disposable save it shows Logged today and
-Edit weight. Check new-entry links in Challenges and My Progress, modal/fallback
-Record/Edit headings and Save/Update buttons, and keyboard record-icon names.
-Existing canonical/sharing/privacy and Stay/Discard behavior must stay unchanged.
-The known Group positioning inconsistency remains separately queued in #238.
+On the immutable PR preview, PM/owner should check the main Record weight action
+on all six pages at desktop and mobile widths. With a disposable authorized
+account, save a private entry, reopen it from another page, and confirm Update
+weight, the private note and any explicit group selections are preserved. Check
+Group/Goals without a selected challenge. On full Weigh-ins, enter an unfinished
+draft and use Record weight: the input and focus must be retained. Logged today
+must not change the main action label.
 
-Leave this focused staging PR unmerged for PM review and owner acceptance.
+Leave PR #239 unmerged for independent review and owner preview acceptance.

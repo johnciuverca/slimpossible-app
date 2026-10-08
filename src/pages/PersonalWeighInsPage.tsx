@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 
-import { Card, PageHeader, StatusPill } from '../components/ui'
+import { Button, Card, PageHeader, StatusPill } from '../components/ui'
+import { WeightPageHeader } from '../components/WeightPageHeader'
 import { PersonalWeightRecordCard } from '../components/PersonalWeightRecordCard'
 import { formatPersonalWeight } from '../models/personalHistory'
 import {
@@ -53,6 +54,18 @@ export function PersonalWeighInsPage() {
   const [success, setSuccess] = useState('')
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const editorRegion = useRef<HTMLDivElement>(null)
+  const draftChanged = useRef(false)
+  const [focusRevision, setFocusRevision] = useState(0)
+  useEffect(() => {
+    if (!focusRevision) return
+    editorRegion.current?.scrollIntoView?.({
+      block: 'start',
+      behavior: 'instant',
+    })
+    editorRegion.current
+      ?.querySelector<HTMLInputElement>('input[type="number"]')
+      ?.focus({ preventScroll: true })
+  }, [focusRevision])
 
   useEffect(() => {
     let current = true
@@ -62,6 +75,7 @@ export function PersonalWeighInsPage() {
     setEntries([])
     setGroups([])
     setValues(emptyForm)
+    draftChanged.current = false
     setEditingId(null)
     setLoadError('')
     setGroupsError('')
@@ -117,6 +131,7 @@ export function PersonalWeighInsPage() {
     field: keyof PersonalWeighInFormValues,
     value: string | string[],
   ) {
+    draftChanged.current = true
     setValues((current) =>
       field === 'sharedChallengeIds'
         ? { ...current, sharedChallengeIds: Array.isArray(value) ? value : [] }
@@ -139,6 +154,8 @@ export function PersonalWeighInsPage() {
       (id) => !eligibleIds.has(id),
     )
     setEditingId(entry.id)
+    setFocusRevision((value) => value + 1)
+    draftChanged.current = false
     setValues({
       date: entry.date,
       note: entry.note ?? '',
@@ -165,12 +182,32 @@ export function PersonalWeighInsPage() {
   }
 
   function cancelEditing() {
+    draftChanged.current = false
     setEditingId(null)
     setValues(emptyForm)
     setErrors({})
     setSubmitError('')
     setSharesWarning('')
     setSuccess('')
+  }
+
+  function recordWeight() {
+    setFocusRevision((value) => value + 1)
+    // The header action resumes unfinished input rather than replacing it.
+    if (!draftChanged.current) {
+      const todayEntry = entries.find(
+        ({ date }) => date === personalWeighInToday(),
+      )
+      if (todayEntry) startEditing(todayEntry)
+      else cancelEditing()
+    }
+    editorRegion.current?.scrollIntoView?.({
+      block: 'start',
+      behavior: 'instant',
+    })
+    editorRegion.current
+      ?.querySelector<HTMLInputElement>('input[type="number"]')
+      ?.focus({ preventScroll: true })
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -189,6 +226,12 @@ export function PersonalWeighInsPage() {
     if (groupsError && existingEntry?.sharedChallengeIds.length) {
       setSubmitError(
         'Group choices could not be verified. Reload before correcting a shared entry; its existing shares have not changed.',
+      )
+      return
+    }
+    if (!editingId && existingEntry) {
+      setSubmitError(
+        'An entry already exists for that date. Edit the saved record to preserve its note and sharing.',
       )
       return
     }
@@ -245,6 +288,7 @@ export function PersonalWeighInsPage() {
     if (reloaded.state === 'success') setEntries(reloaded.data)
     else if (reloaded.state === 'empty') setEntries([])
     setEditingId(null)
+    draftChanged.current = false
     setSharesWarning('')
     setValues(emptyForm)
     setErrors({})
@@ -298,21 +342,33 @@ export function PersonalWeighInsPage() {
       aria-labelledby="personal-weigh-ins-title"
       className="mx-auto w-full max-w-6xl space-y-6"
     >
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <WeightPageHeader
+        action={
+          <Button
+            disabled={
+              isLoading || !!loadError || isSaving || deletingId !== null
+            }
+            onClick={recordWeight}
+          >
+            Record weight
+          </Button>
+        }
+      >
         <PageHeader
           eyebrow="PERSONAL CHECK-IN"
           description="Your weigh-ins belong to you. A group is optional, and sharing is always explicit."
           title={editingId ? 'Edit weight' : 'Record weight'}
           titleId="personal-weigh-ins-title"
-        />
-        <StatusPill>
-          {persistence.mode === 'remote'
-            ? 'Remote data'
-            : persistence.mode === 'local'
-              ? 'Local storage'
-              : 'Remote unavailable'}
-        </StatusPill>
-      </div>
+        >
+          <StatusPill>
+            {persistence.mode === 'remote'
+              ? 'Remote data'
+              : persistence.mode === 'local'
+                ? 'Local storage'
+                : 'Remote unavailable'}
+          </StatusPill>
+        </PageHeader>
+      </WeightPageHeader>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
         <div ref={editorRegion} className="min-w-0 scroll-mt-6">
@@ -334,6 +390,7 @@ export function PersonalWeighInsPage() {
               </p>
             ) : !loadError ? (
               <PersonalWeighInEditor
+                key={editingId ?? 'new'}
                 errors={errors}
                 groups={groups}
                 isSaving={isSaving || deletingId !== null}

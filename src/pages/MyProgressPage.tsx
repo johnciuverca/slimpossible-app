@@ -10,6 +10,10 @@ import {
 } from '../components/ui'
 import { PersonalProgressChart } from '../components/PersonalProgressChart'
 import { RecordWeightDialog } from '../components/RecordWeightDialog'
+import {
+  WeightPageHeader,
+  RecordWeightAction,
+} from '../components/WeightPageHeader'
 import { PersonalWeightRecordCard } from '../components/PersonalWeightRecordCard'
 import { ChallengeSummaryCards } from '../components/ChallengeSummaryCards'
 import {
@@ -26,25 +30,7 @@ import { ProgressPage } from './AppPages'
 export function MyProgressPage() {
   const [params] = useSearchParams()
   // Explicit legacy challenge links remain a distinct view, never a prerequisite.
-  if (params.has('challenge'))
-    return (
-      <div className="w-full space-y-5">
-        <header>
-          <h1 className="text-2xl font-extrabold">Challenge progress</h1>
-          <p className="mt-2 text-sm text-ink-muted">
-            This is a selected challenge view, separate from your personal
-            history.
-          </p>
-          <Link
-            className="inline-flex min-h-11 items-center font-semibold text-forest-800 underline"
-            to="/progress"
-          >
-            Back to My Progress
-          </Link>
-        </header>
-        <ProgressPage />
-      </div>
-    )
+  if (params.has('challenge')) return <ProgressPage personalHeader />
   return <PersonalHistoryPage />
 }
 
@@ -124,19 +110,13 @@ function PersonalHistoryPage() {
       aria-labelledby="my-progress-title"
       className="mx-auto w-full max-w-6xl space-y-6"
     >
-      <header className="flex flex-wrap items-end justify-between gap-4">
+      <WeightPageHeader action={<RecordWeightAction workspace={workspace} />}>
         <PageHeader
           title="My Progress"
           titleId="my-progress-title"
           description="Your complete personal weight history. Challenges are optional, separate views."
         />
-        <Button
-          disabled={workspace.personal.state !== 'ready'}
-          onClick={() => setEditor({ key: workspace.ownerKey })}
-        >
-          Record weight
-        </Button>
-      </header>
+      </WeightPageHeader>
       {notice?.key === workspace.ownerKey ? (
         <FeedbackPanel tone={notice.error ? 'error' : 'info'}>
           {notice.message}

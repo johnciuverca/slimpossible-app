@@ -62,11 +62,12 @@ for (const viewport of [
     await page.keyboard.press('Enter')
     await expect(dialog).toHaveCount(0)
     await expect(page.getByText('Logged today', { exact: true })).toBeVisible()
-    await expect(
-      page.getByRole('button', { name: 'Edit weight', exact: true }),
-    ).toBeVisible()
+    await expect(record).toBeFocused()
     await expect(
       page.getByRole('button', { name: 'Record weight', exact: true }),
+    ).toBeVisible()
+    await expect(
+      page.getByRole('button', { name: 'Edit weight', exact: true }),
     ).toHaveCount(0)
     await expect(page.getByText('82.4 kg', { exact: true })).toBeVisible()
     await expect(
@@ -138,7 +139,9 @@ for (const viewport of [
       name: 'Synthetic personal goal completion',
     })
     await expect(goal).toHaveAttribute('aria-valuenow', '20')
-    await page.getByRole('button', { name: 'Edit weight', exact: true }).click()
+    await page
+      .getByRole('button', { name: 'Record weight', exact: true })
+      .click()
     await expect(draft).toBeChecked()
     await expect(active).toBeChecked()
     await dialog.getByLabel('Weight in kg').fill('85')

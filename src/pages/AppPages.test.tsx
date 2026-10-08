@@ -20,6 +20,23 @@ import {
 } from './AppPages'
 import { mostRecentSunday } from '../models/groupProgress'
 import { PersonalWeighInsPage } from './PersonalWeighInsPage'
+// These legacy challenge-view tests use ordered HTTP responses. Exercise the
+// independent personal action with real repositories in PersonalWorkspacePages
+// and the cross-page browser suite, rather than mixing its requests into these.
+vi.mock('../components/WeightPageHeader', () => ({
+  WeightPageHeader: ({
+    children,
+    action,
+  }: {
+    children: React.ReactNode
+    action?: React.ReactNode
+  }) => (
+    <header>
+      {children}
+      {action ?? <button>Record weight</button>}
+    </header>
+  ),
+}))
 import {
   localDateOnly,
   provisionalWeekDates,
@@ -720,10 +737,9 @@ describe('HomePage', () => {
     expect(
       screen.getByText('You are 10 kg away from your target weight.'),
     ).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Record weight' })).toHaveAttribute(
-      'href',
-      '/weigh-ins?challenge=challenge-1',
-    )
+    expect(
+      screen.getByRole('button', { name: 'Record weight' }),
+    ).toBeInTheDocument()
     expect(
       screen.getByRole('link', { name: 'See group progress' }),
     ).toHaveAttribute('href', '/group?challenge=challenge-1')

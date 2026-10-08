@@ -404,6 +404,15 @@ describe('PersonalWeighInsPage', () => {
       target: { value: '82.7' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Save weight' }))
+    await screen.findByText(
+      /Edit the saved record to preserve its note and sharing/,
+    )
+    expect(screen.getByText(/83.1 kg/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Edit weight/ }))
+    fireEvent.change(screen.getByLabelText('Weight in kg'), {
+      target: { value: '82.7' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Update weight' }))
     await screen.findByText(/82.7 kg/)
     expect(screen.getAllByRole('listitem')).toHaveLength(1)
 
