@@ -1,4 +1,10 @@
-import { BrowserRouter, Outlet, Route, Routes } from 'react-router-dom'
+import {
+  BrowserRouter,
+  Outlet,
+  Route,
+  Routes,
+  useSearchParams,
+} from 'react-router-dom'
 
 import { AuthProvider } from './auth/AuthContext'
 import { ProtectedRoute } from './auth/ProtectedRoute'
@@ -12,14 +18,15 @@ import { ChallengeInvitesPage } from './pages/ChallengeInvitesPage'
 import { InviteAcceptancePage } from './pages/InviteAcceptancePage'
 import { RegisterPage } from './pages/RegisterPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
+import { PersonalDashboardPage } from './pages/PersonalDashboardPage'
+import { MyProgressPage } from './pages/MyProgressPage'
+import { useOptionalAuth } from './auth/useAuth'
 import {
   GroupDashboardPage,
   GoalsPage,
   HomePage,
   MilestonePreviewPage,
   NotFoundPage,
-  ProgressPage,
-  TodayPage,
 } from './pages/AppPages'
 
 function RoutedLayout() {
@@ -30,13 +37,23 @@ function RoutedLayout() {
   )
 }
 
+function HomeRoute() {
+  const { state } = useOptionalAuth()
+  const [params] = useSearchParams()
+  return state.status === 'signed-in' && !params.has('challenge') ? (
+    <PersonalDashboardPage />
+  ) : (
+    <HomePage />
+  )
+}
+
 function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <Routes>
           <Route element={<RoutedLayout />}>
-            <Route index element={<HomePage />} />
+            <Route index element={<HomeRoute />} />
             <Route path="login" element={<LoginPage />} />
             <Route path="register" element={<RegisterPage />} />
             <Route path="forgot-password" element={<ForgotPasswordPage />} />
@@ -53,8 +70,10 @@ function App() {
               element={<ParticipantEnrollmentPage />}
             />
             <Route element={<ProtectedRoute />}>
-              <Route path="today" element={<TodayPage />} />
-              <Route path="progress" element={<ProgressPage />} />
+              <Route path="dashboard" element={<PersonalDashboardPage />} />
+              <Route path="today" element={<PersonalDashboardPage />} />
+              <Route path="challenges" element={<HomePage />} />
+              <Route path="progress" element={<MyProgressPage />} />
               <Route path="group" element={<GroupDashboardPage />} />
               <Route path="goals" element={<GoalsPage />} />
               <Route

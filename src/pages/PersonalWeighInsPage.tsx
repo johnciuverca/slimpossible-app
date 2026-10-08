@@ -30,7 +30,7 @@ export function PersonalWeighInsPage() {
   const userId =
     persistence.mode === 'remote'
       ? (authState.user?.id ?? '')
-      : participantFixture.userId
+      : (authState.user?.id ?? participantFixture.userId)
   const requestKey = `${authState.user?.id ?? 'local'}:${persistence.mode}`
   const latestRequestKey = useRef(requestKey)
   latestRequestKey.current = requestKey

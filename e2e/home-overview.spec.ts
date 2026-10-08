@@ -139,27 +139,17 @@ test('challenge cards switch by keyboard and preserve a direct selection after r
   ).toHaveAttribute('href', '/group?challenge=e2e-challenge-2')
   const headerToday = page
     .getByRole('navigation', { name: 'Primary navigation' })
-    .getByRole('link', { name: 'Today' })
-  await expect(headerToday).toHaveAttribute(
-    'href',
-    '/today?challenge=e2e-challenge-2',
-  )
+    .getByRole('link', { name: 'Dashboard' })
+  await expect(headerToday).toHaveAttribute('href', '/dashboard')
   await headerToday.click()
-  await expect(page.getByRole('heading', { name: 'Today' })).toBeVisible()
-  await expect(page.getByText('E2E Winter challenge · Active')).toBeVisible()
   await expect(
-    page.getByRole('heading', {
-      name: 'One entry, optional group sharing',
-    }),
+    page.getByRole('heading', { name: 'Dashboard', exact: true }),
   ).toBeVisible()
   await expect(
-    page.getByText('You can switch between joined challenges from Overview.'),
+    page.getByRole('heading', { name: 'Latest personal weight' }),
   ).toBeVisible()
   await expect(
-    page.getByText(
-      'Each weigh-in stays in your personal history; only explicitly selected groups receive its date and weight, never your note.',
-      { exact: false },
-    ),
+    page.getByRole('button', { name: 'Record weight', exact: true }),
   ).toBeVisible()
 
   await page.goto(homeFixture('home-member-multi', 'e2e-challenge-2'))

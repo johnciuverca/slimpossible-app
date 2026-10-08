@@ -64,8 +64,8 @@ export function PersonalProgressChart({
       >
         <title>Personal saved weigh-ins</title>
         <desc id="personal-history-description">
-          The plotted points use saved weigh-in dates and weights only. Exact
-          dates, weights, changes, and private notes are in the table below.
+          The plotted points use saved weigh-in dates and weights only. Private
+          notes are never plotted. Missing dates have no estimated weights.
         </desc>
         {[top, (top + bottom) / 2, bottom].map((y) => (
           <line

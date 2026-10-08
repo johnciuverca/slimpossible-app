@@ -12,9 +12,9 @@ test('keeps the application shell usable at 390px without page overflow', async 
   ).toBeVisible()
   await expect(page.getByRole('main')).toBeVisible()
   await expect(page.getByRole('contentinfo')).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Overview' })).toHaveAttribute(
-    'aria-current',
-    'page',
+  await expect(page.getByRole('link', { name: 'Dashboard' })).toHaveAttribute(
+    'href',
+    '/dashboard',
   )
   await expect(
     page.getByRole('button', { name: 'Group history, coming soon' }),
@@ -23,7 +23,7 @@ test('keeps the application shell usable at 390px without page overflow', async 
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
     .toBe(390)
 
-  await page.getByRole('link', { name: 'Today' }).click()
+  await page.getByRole('link', { name: 'Dashboard' }).click()
   await expect(page).toHaveURL(/\/login$/)
   await expect(
     page.getByRole('heading', { name: 'Welcome back.' }),
@@ -37,8 +37,8 @@ test('shows all live destinations without horizontal overflow on desktop', async
   await page.goto('/')
 
   for (const label of [
-    'Overview',
-    'Today',
+    'Dashboard',
+    'Challenges',
     'My progress',
     'Group',
     'Goals',

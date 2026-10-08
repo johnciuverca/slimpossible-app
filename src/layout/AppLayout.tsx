@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 
 import { AuthSessionUI } from '../auth/AuthSessionUI'
+import { useOptionalAuth } from '../auth/useAuth'
 import { Button } from '../components/ui'
 
 type AppLayoutProps = {
@@ -9,8 +10,8 @@ type AppLayoutProps = {
 }
 
 const navigationItems = [
-  { label: 'Overview', to: '/' },
-  { label: 'Today', to: '/today' },
+  { label: 'Dashboard', to: '/dashboard' },
+  { label: 'Challenges', to: '/challenges' },
   { label: 'My progress', to: '/progress' },
   { label: 'Group', to: '/group' },
   { label: 'Goals', to: '/goals' },
@@ -18,6 +19,8 @@ const navigationItems = [
 ]
 
 function withSelectedChallenge(to: string, search: string) {
+  // Personal destinations must never inherit a challenge selection.
+  if (['/dashboard', '/progress', '/weigh-ins'].includes(to)) return to
   const challengeId = new URLSearchParams(search).get('challenge')
 
   if (!challengeId) return to
@@ -28,7 +31,13 @@ function withSelectedChallenge(to: string, search: string) {
 
 /** Shared live shell; route guards and each page's real data remain unchanged. */
 export function AppLayout({ children }: AppLayoutProps) {
-  const { search } = useLocation()
+  const { search, pathname } = useLocation()
+  const { state } = useOptionalAuth()
+  const personalHome =
+    pathname === '/today' ||
+    (pathname === '/' &&
+      !new URLSearchParams(search).has('challenge') &&
+      state.status === 'signed-in')
 
   return (
     <div className="flex min-h-screen flex-col bg-page text-ink">
@@ -50,8 +59,11 @@ export function AppLayout({ children }: AppLayoutProps) {
                 {navigationItems.map(({ label, to }) => (
                   <li className="shrink-0" key={to}>
                     <NavLink
+                      aria-current={
+                        to === '/dashboard' && personalHome ? 'page' : undefined
+                      }
                       className={({ isActive }) =>
-                        isActive
+                        isActive || (to === '/dashboard' && personalHome)
                           ? 'inline-flex min-h-10 items-center rounded-xl border border-forest-800 bg-forest-50 px-3 py-2 font-bold text-forest-900 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700 sm:px-4'
                           : 'inline-flex min-h-10 items-center rounded-xl border border-transparent px-3 py-2 text-ink-muted transition-colors hover:border-line hover:bg-page hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700 sm:px-4'
                       }

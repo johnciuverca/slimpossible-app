@@ -1,0 +1,140 @@
+// Synthetic local-only browser fixture; never a connected acceptance claim.
+import { useState } from 'react'
+import { createRoot } from 'react-dom/client'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { AuthContext, type AuthContextValue } from '../../src/auth/context'
+import { AppLayout } from '../../src/layout/AppLayout'
+import { PersonalDashboardPage } from '../../src/pages/PersonalDashboardPage'
+import { MyProgressPage } from '../../src/pages/MyProgressPage'
+import { PersonalWeighInsPage } from '../../src/pages/PersonalWeighInsPage'
+import { GroupDashboardPage } from '../../src/pages/AppPages'
+import {
+  createChallengeFixture,
+  createParticipantFixture,
+} from '../../src/models/fixtures'
+import { personalWeighInToday } from '../../src/models/personalWeighIn'
+import '../../src/index.css'
+
+const params = new URLSearchParams(window.location.search)
+const scenario = params.get('scenario')
+const hasGroups = scenario === 'groups'
+const today = personalWeighInToday()
+function dateOffset(days: number) {
+  const date = new Date(`${today}T00:00:00.000Z`)
+  date.setUTCDate(date.getUTCDate() + days)
+  return date.toISOString().slice(0, 10)
+}
+function seedOnce(key: string, rows: unknown[]) {
+  if (localStorage.getItem(key) === null)
+    localStorage.setItem(key, JSON.stringify(rows))
+}
+const challenges = hasGroups
+  ? [
+      createChallengeFixture({
+        id: 'dashboard-draft',
+        name: 'Synthetic draft group',
+        ownerId: 'user-alex',
+        createdBy: 'user-alex',
+        startDate: dateOffset(-30),
+        endDate: dateOffset(30),
+      }),
+      createChallengeFixture({
+        id: 'dashboard-active',
+        name: 'Synthetic active group',
+        status: 'active',
+        startDate: dateOffset(-30),
+        endDate: dateOffset(30),
+      }),
+      createChallengeFixture({
+        id: 'dashboard-personal',
+        name: 'Synthetic personal goal',
+        kind: 'personal',
+        ownerId: 'user-alex',
+        createdBy: 'user-alex',
+        status: 'active',
+        startDate: dateOffset(-30),
+        endDate: dateOffset(30),
+      }),
+    ]
+  : []
+seedOnce('slimpossible.local.challenges', challenges)
+seedOnce(
+  'slimpossible.local.participants',
+  hasGroups
+    ? challenges.map(({ id }) =>
+        createParticipantFixture({ id: `${id}-member`, challengeId: id }),
+      )
+    : [],
+)
+seedOnce('slimpossible.local.weigh-ins', [])
+seedOnce(
+  'slimpossible.local.personal-weigh-ins',
+  scenario === 'accounts'
+    ? [
+        {
+          id: 'account-one-entry',
+          userId: 'user-alex',
+          date: dateOffset(-1),
+          weightKg: 90,
+          note: 'Synthetic first-account private note',
+          sharedChallengeIds: [],
+        },
+        {
+          id: 'account-two-entry',
+          userId: 'synthetic-second',
+          date: dateOffset(-1),
+          weightKg: 75,
+          note: 'Synthetic second-account private note',
+          sharedChallengeIds: [],
+        },
+      ]
+    : [],
+)
+
+export function Harness() {
+  const [userId, setUserId] = useState('user-alex')
+  const value: AuthContextValue = {
+    state: {
+      status: 'signed-in',
+      error: null,
+      user: { id: userId, email: `${userId}@example.invalid` },
+    },
+    requestPasswordRecovery: async () => undefined,
+    resetPassword: async () => false,
+    retrySession: () => undefined,
+    signIn: async () => undefined,
+    signOut: async () => undefined,
+    signUp: async () => undefined,
+  }
+  return (
+    <AuthContext.Provider value={value}>
+      <MemoryRouter initialEntries={[params.get('path') ?? '/dashboard']}>
+        {scenario === 'accounts' ? (
+          <div className="bg-panel p-3">
+            <button
+              className="rounded-xl border border-line px-4 py-3"
+              onClick={() =>
+                setUserId((current) =>
+                  current === 'user-alex' ? 'synthetic-second' : 'user-alex',
+                )
+              }
+            >
+              Switch synthetic account
+            </button>
+          </div>
+        ) : null}
+        <AppLayout>
+          <Routes>
+            <Route path="/" element={<PersonalDashboardPage />} />
+            <Route path="/dashboard" element={<PersonalDashboardPage />} />
+            <Route path="/today" element={<PersonalDashboardPage />} />
+            <Route path="/progress" element={<MyProgressPage />} />
+            <Route path="/weigh-ins" element={<PersonalWeighInsPage />} />
+            <Route path="/group" element={<GroupDashboardPage />} />
+          </Routes>
+        </AppLayout>
+      </MemoryRouter>
+    </AuthContext.Provider>
+  )
+}
+createRoot(document.getElementById('root')!).render(<Harness />)
