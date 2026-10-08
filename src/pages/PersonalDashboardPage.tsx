@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useOptionalAuth } from '../auth/useAuth'
 import { usePersonalWorkspace } from '../data/usePersonalWorkspace'
 import {
   Button,
@@ -11,7 +12,7 @@ import {
   WeightPageHeader,
   RecordWeightAction,
 } from '../components/WeightPageHeader'
-import { ChallengeSummaryCards } from '../components/ChallengeSummaryCards'
+import { DashboardChallengeActions } from '../components/DashboardChallengeActions'
 import { PersonalProgressChart } from '../components/PersonalProgressChart'
 import {
   personalHistory,
@@ -22,6 +23,7 @@ import { personalWeighInToday } from '../models/personalWeighIn'
 
 export function PersonalDashboardPage() {
   const workspace = usePersonalWorkspace()
+  const { state: auth } = useOptionalAuth()
   const today = personalWeighInToday()
   const { latest } = personalHistory(workspace.personal.data, today)
   const recent = personalHistory(workspace.personal.data, today, 30)
@@ -122,7 +124,32 @@ export function PersonalDashboardPage() {
       <Button variant="secondary" onClick={workspace.refresh}>
         Refresh Dashboard
       </Button>
-      <ChallengeSummaryCards workspace={workspace} />
+      {auth.status === 'signed-in' ? (
+        <Card
+          className="space-y-4 p-6"
+          role="region"
+          aria-labelledby="dashboard-profile-title"
+        >
+          <h2 id="dashboard-profile-title" className="text-lg font-bold">
+            About you
+          </h2>
+          <dl className="grid gap-4 sm:grid-cols-2">
+            {auth.user.displayName?.trim() ? (
+              <div>
+                <dt className="text-sm text-ink-muted">Name</dt>
+                <dd className="break-words font-semibold">
+                  {auth.user.displayName}
+                </dd>
+              </div>
+            ) : null}
+            <div>
+              <dt className="text-sm text-ink-muted">Email</dt>
+              <dd className="break-all font-semibold">{auth.user.email}</dd>
+            </div>
+          </dl>
+        </Card>
+      ) : null}
+      <DashboardChallengeActions workspace={workspace} />
       <Link
         className="inline-flex min-h-11 items-center text-sm font-semibold text-forest-800 underline"
         to="/weigh-ins"

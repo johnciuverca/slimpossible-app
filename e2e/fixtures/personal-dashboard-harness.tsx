@@ -7,6 +7,8 @@ import { AppLayout } from '../../src/layout/AppLayout'
 import { PersonalDashboardPage } from '../../src/pages/PersonalDashboardPage'
 import { MyProgressPage } from '../../src/pages/MyProgressPage'
 import { PersonalWeighInsPage } from '../../src/pages/PersonalWeighInsPage'
+import { ChallengeInvitesPage } from '../../src/pages/ChallengeInvitesPage'
+import { ChallengeSetupPage } from '../../src/pages/ChallengeSetupPage'
 import {
   GoalsPage,
   HomePage,
@@ -21,7 +23,9 @@ import '../../src/index.css'
 
 const params = new URLSearchParams(window.location.search)
 const scenario = params.get('scenario')
-const hasGroups = scenario === 'groups' || scenario === 'tabs'
+const hasGroups = ['groups', 'tabs', 'owned-one', 'owned-many'].includes(
+  scenario ?? '',
+)
 const today = personalWeighInToday()
 function dateOffset(days: number) {
   const date = new Date(`${today}T00:00:00.000Z`)
@@ -45,6 +49,9 @@ const challenges = hasGroups
       createChallengeFixture({
         id: 'dashboard-active',
         name: 'Synthetic active group',
+        ...(scenario === 'owned-many'
+          ? { ownerId: 'user-alex', createdBy: 'user-alex' }
+          : {}),
         status: 'active',
         startDate: dateOffset(-30),
         endDate: dateOffset(30),
@@ -129,7 +136,12 @@ export function Harness() {
     state: {
       status: 'signed-in',
       error: null,
-      user: { id: userId, email: `${userId}@example.invalid` },
+      user: {
+        id: userId,
+        email: `${userId}@example.invalid`,
+        displayName:
+          userId === 'user-alex' ? 'Synthetic Alex' : 'Synthetic Second',
+      },
     },
     requestPasswordRecovery: async () => undefined,
     resetPassword: async () => false,
@@ -141,7 +153,9 @@ export function Harness() {
   return (
     <AuthContext.Provider value={value}>
       <MemoryRouter initialEntries={[params.get('path') ?? '/dashboard']}>
-        {scenario === 'accounts' || scenario === 'tabs' ? (
+        {scenario === 'accounts' ||
+        scenario === 'tabs' ||
+        scenario === 'owned-many' ? (
           <div className="bg-panel p-3">
             <button
               className="rounded-xl border border-line px-4 py-3"
@@ -166,6 +180,11 @@ export function Harness() {
             <Route path="/group" element={<GroupDashboardPage />} />
             <Route path="/goals" element={<GoalsPage />} />
             <Route path="/challenges" element={<HomePage />} />
+            <Route path="/challenge/setup" element={<ChallengeSetupPage />} />
+            <Route
+              path="/challenge/invites"
+              element={<ChallengeInvitesPage />}
+            />
           </Routes>
         </AppLayout>
       </MemoryRouter>

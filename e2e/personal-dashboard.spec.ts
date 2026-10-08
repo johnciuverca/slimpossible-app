@@ -138,7 +138,7 @@ for (const viewport of [
     const goal = page.getByRole('progressbar', {
       name: 'Synthetic personal goal completion',
     })
-    await expect(goal).toHaveAttribute('aria-valuenow', '20')
+    await expect(goal).toHaveCount(0)
     await page
       .getByRole('button', { name: 'Record weight', exact: true })
       .click()
@@ -149,7 +149,7 @@ for (const viewport of [
       .getByRole('button', { name: 'Update weight', exact: true })
       .click()
     await expect(page.getByText('85 kg', { exact: true })).toBeVisible()
-    await expect(goal).toHaveAttribute('aria-valuenow', '60')
+    await expect(goal).toHaveCount(0)
     const rows = await page.evaluate(() =>
       JSON.parse(
         localStorage.getItem('slimpossible.local.personal-weigh-ins') ?? '[]',
