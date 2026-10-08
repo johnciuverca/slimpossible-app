@@ -113,12 +113,28 @@ and populated identities must not be committed.
   recoverability relative to that backup, not source completeness without a
   source manifest, live Auth configuration/sign-in, or Storage object bytes.
 
-## Owner/PM connected browser/privacy acceptance — NOT EXECUTED
+## Connected member visual observation — PARTIAL 2026-10-08
 
-The staging function is applied and its basic checks above are complete. The
-rollback-only connected privacy harness and full owner/member browser matrix
-remain unexecuted; obtain the required approved disposable identities and
-complete those checks before merge acceptance:
+PM reported a read-only staging member-session observation on immutable preview
+`https://slimpossible-c27au014n-cvc10.vercel.app` (implementation `03e94ea`).
+The selected authorized group loaded a real chart and dated exact-weight table;
+own-baseline arithmetic and missing-date gaps appeared correct. Existing empty
+rankings accurately reflected the absence of eligible Sunday pairs. PM observed
+no private notes or other members' emails in the visible Group output; the
+current viewer's session email in global navigation is expected.
+
+This is PM-reported partial member visual evidence, not A's independent browser
+verification or complete authorization/privacy acceptance. The screenshot and
+all actual member names, dates, weights and other private values remain private
+and are not included here. No data mutation or new implementation was performed.
+
+## Remaining connected browser/privacy acceptance — NOT EXECUTED
+
+The staging function and basic checks are complete, with only the partial member
+observation above. The rollback-only privacy harness, owner/outsider/withdrawn
+checks, correction/unshare/delete, account/challenge switching and mobile matrix
+remain unexecuted. Obtain required approved disposable identities and complete
+the full matrix before merge acceptance; the PR remains unmerged:
 
 1. Use approved disposable owner/member accounts. In Group, verify only selected
    group's explicitly shared dates/weights appear; private notes/emails and other
