@@ -156,6 +156,12 @@ for (const viewport of [
     const contexts = page.getByRole('navigation', {
       name: 'Challenge contexts',
     })
+    await expect(contexts).toHaveCount(1)
+    const row = (await contexts.boundingBox())!
+    const heading = (await page
+      .getByRole('heading', { name: 'Group dashboard' })
+      .boundingBox())!
+    expect(row.y + row.height).toBeLessThan(heading.y)
     const second = contexts.getByRole('link', {
       name: 'Group · Second authorized group',
       exact: true,
