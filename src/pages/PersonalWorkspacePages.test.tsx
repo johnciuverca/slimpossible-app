@@ -201,7 +201,7 @@ describe('personal Dashboard and My Progress', () => {
       sharedChallengeIds: [],
     })
     render(page(<MyProgressPage />, 'user-alex', '/progress'))
-    const table = await screen.findByRole('table', {
+    const table = await screen.findByRole('list', {
       name: 'Your saved personal weigh-ins',
     })
     expect(within(table).getByText('Private history')).toBeInTheDocument()

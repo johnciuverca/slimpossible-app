@@ -76,7 +76,7 @@ for (const viewport of [
     await expect(
       page.getByRole('heading', { name: 'My Progress', exact: true }),
     ).toBeVisible()
-    const table = page.getByRole('table', {
+    const table = page.getByRole('list', {
       name: 'Your saved personal weigh-ins',
     })
     await expect(
@@ -158,7 +158,7 @@ for (const viewport of [
       .getByRole('navigation', { name: 'Primary navigation' })
       .getByRole('link', { name: 'My progress', exact: true })
       .click()
-    const table = page.getByRole('table', {
+    const table = page.getByRole('list', {
       name: 'Your saved personal weigh-ins',
     })
     await expect(
@@ -227,7 +227,7 @@ for (const viewport of [
   }) => {
     await page.setViewportSize({ width: viewport.width, height: 900 })
     await page.goto(fixture('accounts', '/progress'))
-    const table = page.getByRole('table', {
+    const table = page.getByRole('list', {
       name: 'Your saved personal weigh-ins',
     })
     await expect(

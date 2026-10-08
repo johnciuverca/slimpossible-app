@@ -10,6 +10,7 @@ import {
 } from '../components/ui'
 import { PersonalProgressChart } from '../components/PersonalProgressChart'
 import { RecordWeightDialog } from '../components/RecordWeightDialog'
+import { PersonalWeightRecordCard } from '../components/PersonalWeightRecordCard'
 import { ChallengeSummaryCards } from '../components/ChallengeSummaryCards'
 import {
   personalHistory,
@@ -76,7 +77,7 @@ function PersonalHistoryPage() {
   async function deleteEntry(entry: PersonalWeighIn) {
     if (
       !window.confirm(
-        `Delete the personal entry for ${entry.date}? Its group shares will also be removed.`,
+        `Delete ${formatPersonalWeight(entry.weightKg)} recorded ${entry.date}? Its group shares will also be removed.`,
       ) ||
       workspace.persistence.mode === 'unavailable'
     )
@@ -187,84 +188,29 @@ function PersonalHistoryPage() {
                 No entries saved yet.
               </p>
             ) : (
-              <div
-                className="mt-5 overflow-x-auto rounded-xl border border-line"
-                tabIndex={0}
-                aria-label="Scrollable personal history"
+              <ul
+                className="mt-5 grid gap-4 md:grid-cols-2"
+                aria-label="Your saved personal weigh-ins"
               >
-                <table className="w-full min-w-[620px] text-left text-sm">
-                  <caption className="sr-only">
-                    Your saved personal weigh-ins
-                  </caption>
-                  <thead className="bg-page">
-                    <tr>
-                      {[
-                        'Date',
-                        'Weight',
-                        'Private note',
-                        'Sharing',
-                        'Actions',
-                      ].map((label) => (
-                        <th
-                          scope="col"
-                          className="px-4 py-3 font-semibold"
-                          key={label}
-                        >
-                          {label}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {history.map((entry) => (
-                      <tr
-                        key={entry.id}
-                        className="border-t border-line align-top"
-                      >
-                        <th
-                          scope="row"
-                          className="whitespace-nowrap px-4 py-4 font-medium"
-                        >
-                          <time dateTime={entry.date}>{entry.date}</time>
-                        </th>
-                        <td className="whitespace-nowrap px-4 py-4">
-                          {formatPersonalWeight(entry.weightKg)}
-                        </td>
-                        <td className="max-w-xs whitespace-pre-wrap break-words px-4 py-4">
-                          {entry.note ?? '—'}
-                        </td>
-                        <td className="px-4 py-4">
-                          {entry.sharedChallengeIds.length
-                            ? `Shared with ${entry.sharedChallengeIds.map((id) => workspace.contexts.data.challenges.find((row) => row.id === id)?.name ?? 'an unavailable group').join(', ')}`
-                            : 'Private'}
-                        </td>
-                        <td className="px-4 py-4">
-                          <div className="flex flex-wrap gap-2">
-                            <Button
-                              variant="secondary"
-                              onClick={() =>
-                                setEditor({ key: workspace.ownerKey, entry })
-                              }
-                            >
-                              Edit {entry.date}
-                            </Button>
-                            <Button
-                              variant="secondary"
-                              disabled={
-                                deleting?.key === workspace.ownerKey &&
-                                deleting.id === entry.id
-                              }
-                              onClick={() => void deleteEntry(entry)}
-                            >
-                              Delete {entry.date}
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                {history.map((entry) => (
+                  <PersonalWeightRecordCard
+                    key={entry.id}
+                    entry={entry}
+                    groupName={(id) =>
+                      workspace.contexts.data.challenges.find(
+                        (row) => row.id === id,
+                      )?.name ?? 'an unavailable group'
+                    }
+                    onEdit={() => setEditor({ key: workspace.ownerKey, entry })}
+                    onDelete={() => void deleteEntry(entry)}
+                    disabled={deleting?.key === workspace.ownerKey}
+                    deleting={
+                      deleting?.key === workspace.ownerKey &&
+                      deleting.id === entry.id
+                    }
+                  />
+                ))}
+              </ul>
             )}
           </Card>
         </>
