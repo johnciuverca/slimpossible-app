@@ -104,6 +104,129 @@ afterEach(() => {
 })
 
 describe('personal Dashboard and My Progress', () => {
+  it.each([0, 1, 2])(
+    'offers invite destinations for %s owned eligible groups only, without creating invitations',
+    async (count) => {
+      const storage = local()
+      const createInvite = vi.spyOn(storage.repositories.invites, 'create')
+      vi.spyOn(persistenceModule, 'createPersistence').mockReturnValue(storage)
+      window.localStorage.setItem(
+        'slimpossible.local.challenges',
+        JSON.stringify([
+          ...Array.from({ length: count }, (_, index) =>
+            createChallengeFixture({
+              id: `owned-${index}`,
+              name: `Owned group ${index + 1}`,
+              ownerId: 'user-alex',
+              createdBy: 'user-alex',
+              kind: 'group',
+            }),
+          ),
+          createChallengeFixture({
+            id: 'personal',
+            name: 'Owned personal goal',
+            ownerId: 'user-alex',
+            kind: 'personal',
+          }),
+          createChallengeFixture({
+            id: 'archived',
+            name: 'Archived owned group',
+            ownerId: 'user-alex',
+            status: 'archived',
+          }),
+          createChallengeFixture({
+            id: 'joined',
+            name: 'Joined group',
+            ownerId: 'someone-else',
+          }),
+        ]),
+      )
+      window.localStorage.setItem(
+        'slimpossible.local.participants',
+        JSON.stringify([createParticipantFixture({ challengeId: 'joined' })]),
+      )
+      render(page(<PersonalDashboardPage />))
+      await screen.findByText('No record yet')
+      expect(
+        screen.getByRole('link', { name: 'Create challenge' }),
+      ).toHaveAttribute('href', '/challenge/setup')
+      expect(
+        screen.queryByRole('list', { name: 'Separate challenge summaries' }),
+      ).not.toBeInTheDocument()
+      if (count === 1) {
+        const invite = await screen.findByRole('link', {
+          name: 'Invite people',
+        })
+        expect(invite).toHaveAttribute(
+          'href',
+          '/challenge/invites?challenge=owned-0',
+        )
+      } else {
+        const invite = screen.getByRole('button', { name: 'Invite people' })
+        await waitFor(() => expect(invite).toBeEnabled())
+        fireEvent.click(invite)
+        if (count === 0)
+          await screen.findByText(/Create a group challenge first/)
+        else {
+          const chooser = screen.getByRole('combobox', {
+            name: 'Choose a group you own',
+          })
+          expect(chooser).toHaveValue('')
+          expect(
+            screen.queryByRole('link', { name: 'Continue to invitations' }),
+          ).not.toBeInTheDocument()
+          expect(within(chooser).getAllByRole('option')).toHaveLength(3)
+          fireEvent.change(chooser, { target: { value: 'owned-1' } })
+          expect(
+            screen.getByRole('link', { name: 'Continue to invitations' }),
+          ).toHaveAttribute('href', '/challenge/invites?challenge=owned-1')
+        }
+      }
+      expect(createInvite).not.toHaveBeenCalled()
+      expect(screen.queryByText('Owned personal goal')).not.toBeInTheDocument()
+      expect(screen.queryByText('Archived owned group')).not.toBeInTheDocument()
+      expect(screen.queryByText('Joined group')).not.toBeInTheDocument()
+    },
+  )
+
+  it('clears invitation choices and session information when the account changes', async () => {
+    window.localStorage.setItem(
+      'slimpossible.local.challenges',
+      JSON.stringify(
+        [0, 1].map((index) =>
+          createChallengeFixture({
+            id: `owned-${index}`,
+            name: `First account group ${index}`,
+            ownerId: 'user-alex',
+          }),
+        ),
+      ),
+    )
+    const rendered = render(page(<PersonalDashboardPage />))
+    const invite = screen.getByRole('button', { name: 'Invite people' })
+    await waitFor(() => expect(invite).toBeEnabled())
+    fireEvent.click(invite)
+    fireEvent.change(screen.getByRole('combobox'), {
+      target: { value: 'owned-1' },
+    })
+    expect(
+      screen.getByRole('link', { name: 'Continue to invitations' }),
+    ).toBeInTheDocument()
+    rendered.rerender(page(<PersonalDashboardPage />, 'second-user'))
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: 'Continue to invitations' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('user-alex@example.invalid'),
+    ).not.toBeInTheDocument()
+    expect(
+      within(screen.getByRole('region', { name: 'About you' })).getByText(
+        'second-user@example.invalid',
+      ),
+    ).toBeInTheDocument()
+  })
+
   it.each([
     ['Group', GroupDashboardPage, '/group?challenge=missing'],
     ['Goals', GoalsPage, '/goals?challenge=missing'],
@@ -188,7 +311,7 @@ describe('personal Dashboard and My Progress', () => {
     })
   })
 
-  it('preserves today’s explicit draft share on correction and refreshes the existing group RPC', async () => {
+  it('preserves today’s explicit share on correction without requesting Dashboard group summaries', async () => {
     seedGroups()
     const storage = local()
     await storage.repositories.personalWeighIns.save('user-alex', {
@@ -225,7 +348,7 @@ describe('personal Dashboard and My Progress', () => {
     })
     render(page(<PersonalDashboardPage />))
     await screen.findByText('85 kg')
-    await waitFor(() => expect(summary).toHaveBeenCalledOnce())
+    expect(summary).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Record weight' }))
     const dialog = screen.getByRole('dialog', { name: 'Edit weight' })
     expect(
@@ -238,7 +361,7 @@ describe('personal Dashboard and My Progress', () => {
       within(dialog).getByRole('button', { name: 'Update weight' }),
     )
     await screen.findByText('84 kg')
-    await waitFor(() => expect(summary).toHaveBeenCalledTimes(2))
+    expect(summary).not.toHaveBeenCalled()
     expect(
       await storage.repositories.personalWeighIns.listForUser('user-alex'),
     ).toMatchObject({

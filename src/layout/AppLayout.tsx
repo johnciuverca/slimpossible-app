@@ -73,15 +73,9 @@ export function AppLayout({ children }: AppLayoutProps) {
     if (currentPending) dialog?.showModal()
     return () => dialog?.close()
   }, [currentPending])
-  const contextPage = [
-    '/dashboard',
-    '/today',
-    '/',
-    '/challenges',
-    '/progress',
-    '/goals',
-    '/weigh-ins',
-  ].includes(pathname)
+  const contextPage =
+    ['/challenges', '/progress', '/goals', '/weigh-ins'].includes(pathname) ||
+    (pathname === '/' && new URLSearchParams(search).has('challenge'))
   const personalHome =
     pathname === '/today' ||
     (pathname === '/' &&

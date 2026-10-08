@@ -13,6 +13,10 @@ for (const width of [1280, 390]) {
       name: 'Challenge contexts',
     })
     const primary = page.getByRole('navigation', { name: 'Primary navigation' })
+    await expect(contexts).toHaveCount(0)
+    await primary
+      .getByRole('link', { name: 'My progress', exact: true })
+      .click()
     await expect(
       contexts.getByRole('link', { name: /Personal tracking/ }),
     ).toHaveAttribute('aria-current', 'page')
