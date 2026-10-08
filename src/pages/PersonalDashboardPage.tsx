@@ -61,7 +61,7 @@ export function PersonalDashboardPage() {
             })
           }
         >
-          {todayEntry ? 'Edit today’s weight' : 'Record weight'}
+          {todayEntry ? 'Edit weight' : 'Record weight'}
         </Button>
       </header>
       {message?.key === workspace.ownerKey ? (

@@ -342,13 +342,15 @@ describe('HomePage', () => {
     fireEvent.change(screen.getByLabelText('Weight in kg'), {
       target: { value: '89' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save weight' }))
     await screen.findByText(/89 kg/)
-    fireEvent.click(screen.getByRole('button', { name: `Edit ${today}` }))
+    fireEvent.click(
+      screen.getByRole('button', { name: `Edit weight ${today}` }),
+    )
     fireEvent.change(screen.getByLabelText('Weight in kg'), {
       target: { value: '90' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Update weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Update weight' }))
     await screen.findByText(/90 kg/)
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     fireEvent.click(screen.getByRole('button', { name: `Delete ${today}` }))
@@ -718,9 +720,10 @@ describe('HomePage', () => {
     expect(
       screen.getByText('You are 10 kg away from your target weight.'),
     ).toBeInTheDocument()
-    expect(
-      screen.getByRole('link', { name: 'Record a weigh-in' }),
-    ).toHaveAttribute('href', '/weigh-ins?challenge=challenge-1')
+    expect(screen.getByRole('link', { name: 'Record weight' })).toHaveAttribute(
+      'href',
+      '/weigh-ins?challenge=challenge-1',
+    )
     expect(
       screen.getByRole('link', { name: 'See group progress' }),
     ).toHaveAttribute('href', '/group?challenge=challenge-1')

@@ -62,6 +62,12 @@ for (const viewport of [
     await page.keyboard.press('Enter')
     await expect(dialog).toHaveCount(0)
     await expect(page.getByText('Logged today', { exact: true })).toBeVisible()
+    await expect(
+      page.getByRole('button', { name: 'Edit weight', exact: true }),
+    ).toBeVisible()
+    await expect(
+      page.getByRole('button', { name: 'Record weight', exact: true }),
+    ).toHaveCount(0)
     await expect(page.getByText('82.4 kg', { exact: true })).toBeVisible()
     await expect(
       page.getByText('Synthetic Dashboard private note', { exact: true }),
@@ -132,9 +138,7 @@ for (const viewport of [
       name: 'Synthetic personal goal completion',
     })
     await expect(goal).toHaveAttribute('aria-valuenow', '20')
-    await page
-      .getByRole('button', { name: 'Edit today’s weight', exact: true })
-      .click()
+    await page.getByRole('button', { name: 'Edit weight', exact: true }).click()
     await expect(draft).toBeChecked()
     await expect(active).toBeChecked()
     await dialog.getByLabel('Weight in kg').fill('85')
@@ -169,7 +173,7 @@ for (const viewport of [
     ).toBeVisible()
     const date = rows[0].date as string
     await table
-      .getByRole('button', { name: `Edit ${date}`, exact: true })
+      .getByRole('button', { name: `Edit weight ${date}`, exact: true })
       .click()
     await expect(draft).toBeChecked()
     await dialog.getByLabel('Weight in kg').fill('84')

@@ -302,7 +302,7 @@ export function PersonalWeighInsPage() {
         <PageHeader
           eyebrow="PERSONAL CHECK-IN"
           description="Your weigh-ins belong to you. A group is optional, and sharing is always explicit."
-          title="Record a weigh-in"
+          title={editingId ? 'Edit weight' : 'Record weight'}
           titleId="personal-weigh-ins-title"
         />
         <StatusPill>
@@ -317,9 +317,7 @@ export function PersonalWeighInsPage() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
         <div ref={editorRegion} className="min-w-0 scroll-mt-6">
           <Card className="p-6 sm:p-8">
-            <h2 className="mb-5 text-xl font-bold text-ink">
-              {editingId ? 'Edit personal weigh-in' : 'Your personal entry'}
-            </h2>
+            <h2 className="mb-5 text-xl font-bold text-ink">Weight details</h2>
             {groupsError ? (
               <p className="mb-4 text-sm text-amber-800" role="status">
                 {groupsError}
@@ -342,7 +340,7 @@ export function PersonalWeighInsPage() {
                 onCancel={editingId ? cancelEditing : undefined}
                 onChange={updateValue}
                 onSubmit={handleSubmit}
-                submitLabel={editingId ? 'Update weigh-in' : 'Save weigh-in'}
+                submitLabel={editingId ? 'Update weight' : 'Save weight'}
                 values={values}
               />
             ) : null}

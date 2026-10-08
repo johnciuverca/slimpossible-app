@@ -28,8 +28,8 @@ describe('PersonalWeightRecordCard', () => {
     expect(screen.getByText('Private')).toBeInTheDocument()
     expect(screen.queryByText('—')).not.toBeInTheDocument()
     expect(
-      screen.getByRole('button', { name: `Edit ${entry.date}` }),
-    ).toHaveAttribute('title', `Edit 82.4 kg recorded ${entry.date}`)
+      screen.getByRole('button', { name: `Edit weight ${entry.date}` }),
+    ).toHaveAttribute('title', `Edit weight: 82.4 kg recorded ${entry.date}`)
   })
   it('shows the author note and group names and exposes labelled icon actions', () => {
     const edit = vi.fn()
@@ -50,7 +50,9 @@ describe('PersonalWeightRecordCard', () => {
     )
     expect(screen.getByText('Author-only note')).toBeInTheDocument()
     expect(screen.getByText('Shared with First, Second')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: `Edit ${entry.date}` }))
+    fireEvent.click(
+      screen.getByRole('button', { name: `Edit weight ${entry.date}` }),
+    )
     fireEvent.click(
       screen.getByRole('button', { name: `Delete ${entry.date}` }),
     )
@@ -74,7 +76,7 @@ describe('PersonalWeightRecordCard', () => {
       'Deleting entry and group shares',
     )
     expect(
-      screen.getByRole('button', { name: `Edit ${entry.date}` }),
+      screen.getByRole('button', { name: `Edit weight ${entry.date}` }),
     ).toBeDisabled()
     fireEvent.click(
       screen.getByRole('button', { name: `Delete ${entry.date}` }),

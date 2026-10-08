@@ -35,8 +35,8 @@ export function PersonalWeightRecordCard({
             <button
               key={action}
               type="button"
-              aria-label={`${action === 'edit' ? 'Edit' : 'Delete'} ${entry.date}`}
-              title={`${action === 'edit' ? 'Edit' : 'Delete'} ${formatPersonalWeight(entry.weightKg)} recorded ${entry.date}`}
+              aria-label={`${action === 'edit' ? 'Edit weight' : 'Delete'} ${entry.date}`}
+              title={`${action === 'edit' ? 'Edit weight:' : 'Delete'} ${formatPersonalWeight(entry.weightKg)} recorded ${entry.date}`}
               disabled={disabled || deleting}
               onClick={action === 'edit' ? onEdit : onDelete}
               className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-transparent transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700 disabled:cursor-not-allowed disabled:opacity-50 ${action === 'delete' ? 'text-danger-800 hover:border-line hover:bg-panel' : 'text-forest-800 hover:border-line hover:bg-panel'}`}

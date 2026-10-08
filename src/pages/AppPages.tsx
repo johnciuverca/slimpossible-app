@@ -703,7 +703,7 @@ export function HomePage() {
           ? [['Group progress', `/group${challengeQuery}`] as [string, string]]
           : []),
         ['Goals', `/goals${challengeQuery}`],
-        ['Record a weigh-in', `/weigh-ins${challengeQuery}`],
+        ['Record weight', `/weigh-ins${challengeQuery}`],
         ...(isOwner && isGroup
           ? ([
               ['Invite participants', `/challenge/invites${challengeQuery}`],
@@ -728,7 +728,7 @@ export function HomePage() {
       : []
   const heroActions: [string, string][] = isActiveMember
     ? [
-        ['Record a weigh-in', `/weigh-ins${challengeQuery}`],
+        ['Record weight', `/weigh-ins${challengeQuery}`],
         ['View my progress', `/progress${challengeQuery}`],
       ]
     : isOwner && selectedChallenge
@@ -1184,7 +1184,7 @@ export function TodayPage() {
             className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-forest-800 px-5 py-3 text-sm font-bold text-white hover:bg-forest-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-800"
             to={`/weigh-ins${challengeQuery}`}
           >
-            Record a weigh-in
+            Record weight
           </Link>
         ) : null}
       </header>
@@ -2372,7 +2372,7 @@ export function ProgressPage() {
                 className="inline-flex min-h-11 items-center rounded-xl bg-emerald-800 px-5 py-3 text-sm font-semibold text-white underline-offset-4 hover:bg-emerald-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-800"
                 to={`/weigh-ins${data ? `?challenge=${encodeURIComponent(data.challenge.id)}` : ''}`}
               >
-                Record a weigh-in
+                Record weight
               </Link>
             </div>
           ) : null}

@@ -29,14 +29,17 @@ for (const width of [1280, 390]) {
       ).toHaveCount(0)
       const date = await history.locator('time').getAttribute('datetime')
       const edit = history.getByRole('button', {
-        name: `Edit ${date}`,
+        name: `Edit weight ${date}`,
         exact: true,
       })
       const remove = history.getByRole('button', {
         name: `Delete ${date}`,
         exact: true,
       })
-      await expect(edit).toHaveAttribute('title', `Edit 90 kg recorded ${date}`)
+      await expect(edit).toHaveAttribute(
+        'title',
+        `Edit weight: 90 kg recorded ${date}`,
+      )
       await expect(remove).toHaveAttribute(
         'title',
         `Delete 90 kg recorded ${date}`,
@@ -52,6 +55,12 @@ for (const width of [1280, 390]) {
       await page.keyboard.press('Enter')
       await expect(weight).toBeFocused()
       await expect(weight).toHaveValue('90')
+      await expect(
+        page.getByRole('heading', { name: 'Edit weight', exact: true }),
+      ).toBeVisible()
+      await expect(
+        page.getByRole('button', { name: 'Update weight', exact: true }),
+      ).toBeVisible()
       if (path === '/progress') {
         await expect(
           page.getByRole('dialog', { name: 'Edit weight' }),

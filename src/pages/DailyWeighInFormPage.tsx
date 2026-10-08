@@ -338,7 +338,7 @@ export function DailyWeighInFormPage() {
               ? 'A private check-in for the challenge selected in this preview.'
               : 'Record one weigh-in for your currently selected challenge.'
           }
-          title="Record a weigh-in"
+          title={editingDate ? 'Edit weight' : 'Record weight'}
           titleId="daily-weigh-in-title"
         />
         <StatusPill>
@@ -529,7 +529,7 @@ export function DailyWeighInFormPage() {
 
               <div className="flex flex-wrap gap-3">
                 <Button disabled={isSaving} type="submit">
-                  {editingDate ? 'Update weigh-in' : 'Save weigh-in'}
+                  {editingDate ? 'Update weight' : 'Save weight'}
                 </Button>
                 {editingDate ? (
                   <Button
@@ -630,7 +630,7 @@ export function DailyWeighInFormPage() {
                       type="button"
                       variant="secondary"
                     >
-                      Edit {weighIn.date}
+                      Edit weight {weighIn.date}
                     </Button>
                   </li>
                 ))}

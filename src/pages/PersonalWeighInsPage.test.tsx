@@ -113,7 +113,7 @@ describe('PersonalWeighInsPage', () => {
       screen.getByText(/Saving will remove that unavailable share/),
     ).toBeInTheDocument()
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
-    fireEvent.click(screen.getByRole('button', { name: 'Update weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Update weight' }))
     expect(confirm).toHaveBeenCalledOnce()
     expect(
       await persistence.repositories.personalWeighIns.listForUser('user-alex'),
@@ -121,7 +121,7 @@ describe('PersonalWeighInsPage', () => {
       data: [{ weightKg: 82, sharedChallengeIds: [group.data.id] }],
     })
     confirm.mockReturnValue(true)
-    fireEvent.click(screen.getByRole('button', { name: 'Update weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Update weight' }))
     await screen.findByText(/81.9 kg/)
     expect(
       await persistence.repositories.personalWeighIns.listForUser('user-alex'),
@@ -165,12 +165,12 @@ describe('PersonalWeighInsPage', () => {
       screen.getByText(/Reload before editing a shared entry/),
     ).toBeInTheDocument()
     expect(
-      screen.queryByRole('button', { name: 'Update weigh-in' }),
+      screen.queryByRole('button', { name: 'Update weight' }),
     ).not.toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('Weight in kg'), {
       target: { value: '81.9' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save weight' }))
     await screen.findByText(/Reload before correcting a shared entry/)
     expect(
       await persistence.repositories.personalWeighIns.listForUser('user-alex'),
@@ -226,7 +226,7 @@ describe('PersonalWeighInsPage', () => {
     fireEvent.change(screen.getByLabelText('Weight in kg'), {
       target: { value: '82' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save weight' }))
     await screen.findByText('Shared with Setup draft group')
     fireEvent.click(screen.getByRole('button', { name: /Edit/ }))
     expect(
@@ -236,7 +236,7 @@ describe('PersonalWeighInsPage', () => {
     fireEvent.change(screen.getByLabelText('Weight in kg'), {
       target: { value: '81.9' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Update weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Update weight' }))
     await screen.findByText(/81.9 kg/)
     expect(
       screen.getByText('Shared with Setup draft group'),
@@ -299,7 +299,7 @@ describe('PersonalWeighInsPage', () => {
     fireEvent.change(screen.getByLabelText(/Private note/), {
       target: { value: 'Only for me.' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save weight' }))
 
     await screen.findByText('Personal weigh-in saved in this browser.')
     expect(screen.getByText(/82.4 kg/)).toBeInTheDocument()
@@ -349,7 +349,7 @@ describe('PersonalWeighInsPage', () => {
     fireEvent.change(screen.getByLabelText('Weight in kg'), {
       target: { value: '81.9' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save weight' }))
 
     await screen.findByText(/81.9 kg/)
     expect(
@@ -364,7 +364,7 @@ describe('PersonalWeighInsPage', () => {
     fireEvent.change(screen.getByLabelText('Weight in kg'), {
       target: { value: '83.1' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save weight' }))
     await screen.findByText(/83.1 kg/)
 
     fireEvent.click(screen.getByRole('button', { name: /Edit/ }))
@@ -372,7 +372,7 @@ describe('PersonalWeighInsPage', () => {
     fireEvent.change(screen.getByLabelText('Weight in kg'), {
       target: { value: '82.9' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Update weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Update weight' }))
     await screen.findByText(/82.9 kg/)
 
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
@@ -397,13 +397,13 @@ describe('PersonalWeighInsPage', () => {
     fireEvent.change(screen.getByLabelText('Weight in kg'), {
       target: { value: '83.1' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save weight' }))
     await screen.findByText(/83.1 kg/)
 
     fireEvent.change(screen.getByLabelText('Weight in kg'), {
       target: { value: '82.7' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save weight' }))
     await screen.findByText(/82.7 kg/)
     expect(screen.getAllByRole('listitem')).toHaveLength(1)
 
@@ -413,7 +413,7 @@ describe('PersonalWeighInsPage', () => {
     fireEvent.change(screen.getByLabelText('Weight in kg'), {
       target: { value: '82.2' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save weight' }))
     await screen.findByText(/82.2 kg/)
     expect(screen.getAllByRole('listitem')).toHaveLength(2)
 
@@ -421,7 +421,7 @@ describe('PersonalWeighInsPage', () => {
     fireEvent.change(screen.getByLabelText('Date'), {
       target: { value: dateOffset(0) },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Update weigh-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Update weight' }))
     await screen.findByText(/A weigh-in already exists for that date/)
     expect(screen.getAllByRole('listitem')).toHaveLength(2)
     expect(screen.getByText(/82.7 kg/)).toBeInTheDocument()

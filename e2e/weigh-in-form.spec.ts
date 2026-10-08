@@ -14,7 +14,7 @@ for (const viewport of [
     await page.goto(weighInFixture)
 
     await expect(
-      page.getByRole('heading', { name: 'Record a weigh-in' }),
+      page.getByRole('heading', { name: 'Record weight' }),
     ).toBeVisible()
     await expect(
       page.getByRole('heading', { name: 'Slimpossible 2026' }),
@@ -39,7 +39,7 @@ for (const viewport of [
     ).toHaveAttribute('href', '/today?challenge=challenge-1')
 
     const note = page.getByLabel('Private note (optional)')
-    const saveButton = page.getByRole('button', { name: 'Save weigh-in' })
+    const saveButton = page.getByRole('button', { name: 'Save weight' })
     const shareWithGroup = page.getByRole('checkbox', {
       name: /Share this date and weight with this group’s active members and owner/,
     })
@@ -75,14 +75,14 @@ for (const viewport of [
       .getByLabel('Date', { exact: true })
       .getAttribute('max')
     expect(date).toBeTruthy()
-    await page.getByRole('button', { name: `Edit ${date}` }).click()
+    await page.getByRole('button', { name: `Edit weight ${date}` }).click()
     await page.getByLabel('Weight in kg').fill('91.4')
     await note.fill('Updated private check-in.')
     await note.focus()
     await page.keyboard.press('Tab')
     await expect(shareWithGroup).toBeFocused()
     await page.keyboard.press('Tab')
-    const updateButton = page.getByRole('button', { name: 'Update weigh-in' })
+    const updateButton = page.getByRole('button', { name: 'Update weight' })
     await expect(updateButton).toBeFocused()
     await page.keyboard.press('Enter')
 
