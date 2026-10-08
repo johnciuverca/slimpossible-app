@@ -25,6 +25,7 @@ import { createPersistence } from '../data/persistence'
 import type { Challenge } from '../models/challenge'
 import type { Participant } from '../models/participant'
 import type { WeighIn } from '../models/weighIn'
+import type { PersonalWeighIn } from '../models/personalWeighIn'
 import {
   mostRecentSunday,
   type GroupProgressSummary,
@@ -122,6 +123,20 @@ type PersonalDashboardSnapshot = {
 function challengeContextName(challenge?: Challenge) {
   if (!challenge) return 'Selected challenge'
   return `${challenge.kind === 'personal' ? 'Personal' : 'Group'} · ${challenge.name}`
+}
+
+function forParticipant(
+  entries: PersonalWeighIn[],
+  participantId: string,
+): WeighIn[] {
+  return entries
+    .filter((entry) => entry.date <= localDateOnly())
+    .map((entry) => ({
+      date: entry.date,
+      ...(entry.note ? { note: entry.note } : {}),
+      participantId,
+      weightKg: entry.weightKg,
+    }))
 }
 
 function usePersonalDashboard({ preferJoinedChallenge = false } = {}) {
@@ -251,9 +266,7 @@ function usePersonalDashboard({ preferJoinedChallenge = false } = {}) {
         }
 
         const weighIns =
-          await persistence.repositories.weighIns.listForParticipant(
-            participant.id,
-          )
+          await persistence.repositories.personalWeighIns.listForUser(ownerId)
         if (!isCurrent) return
         if (weighIns.state === 'error') {
           setSnapshot({
@@ -264,7 +277,10 @@ function usePersonalDashboard({ preferJoinedChallenge = false } = {}) {
           })
           return
         }
-        const records = weighIns.state === 'success' ? weighIns.data : []
+        const records =
+          weighIns.state === 'success'
+            ? forParticipant(weighIns.data, participant.id)
+            : []
         setSnapshot({
           ...baseSnapshot,
           data: {
@@ -485,6 +501,7 @@ export function HomePage() {
       setIsOverviewLoading(false)
       if (
         isLoading ||
+        !ownerId ||
         !selectedChallenge ||
         !activeParticipant ||
         persistence.mode === 'unavailable'
@@ -495,9 +512,7 @@ export function HomePage() {
       setIsOverviewLoading(true)
       try {
         const [weighIns, groupResult] = await Promise.all([
-          persistence.repositories.weighIns.listForParticipant(
-            activeParticipant.id,
-          ),
+          persistence.repositories.personalWeighIns.listForUser(ownerId),
           selectedChallenge.kind === 'group'
             ? persistence.repositories.groupProgress.getForChallenge(
                 selectedChallenge.id,
@@ -520,7 +535,10 @@ export function HomePage() {
                   challenge: selectedChallenge,
                   participantId: activeParticipant.id,
                   participants: [activeParticipant],
-                  weighIns: weighIns.state === 'success' ? weighIns.data : [],
+                  weighIns:
+                    weighIns.state === 'success'
+                      ? forParticipant(weighIns.data, activeParticipant.id)
+                      : [],
                 }),
         })
       } catch {
@@ -541,7 +559,7 @@ export function HomePage() {
     return () => {
       isCurrent = false
     }
-  }, [activeParticipant, isLoading, persistence, selectedChallenge])
+  }, [activeParticipant, isLoading, ownerId, persistence, selectedChallenge])
 
   function selectChallenge(challengeId: string) {
     const nextParams = new URLSearchParams(searchParams)
@@ -1365,18 +1383,19 @@ export function TodayPage() {
               </article>
 
               <div
-                aria-label="Future features"
+                aria-label="Personal weigh-in sharing"
                 className="flex flex-col justify-center rounded-panel border border-dashed border-line bg-canvas p-5 sm:p-6"
               >
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-ink-muted">
-                  Coming in Chapter 16
+                  Personal history
                 </p>
                 <h2 className="mt-2 text-lg font-extrabold text-ink">
-                  Group history and saving to multiple challenges
+                  One entry, optional group sharing
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-ink-muted">
                   You can switch between joined challenges from Overview. Each
-                  weigh-in is saved to the selected challenge only.
+                  weigh-in stays in your personal history; only explicitly
+                  selected groups receive its date and weight, never your note.
                 </p>
               </div>
             </div>
@@ -2157,8 +2176,8 @@ export function ProgressPage() {
                   Your saved trend
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Only your saved weigh-ins for this challenge are plotted.
-                  Missing dates have no estimated weights.
+                  Your personal history is independent of the selected
+                  challenge. Missing dates have no estimated weights.
                 </p>
                 {data.flow.historyTrend.history.length === 0 ? (
                   <FeedbackPanel className="mt-5" tone="empty">

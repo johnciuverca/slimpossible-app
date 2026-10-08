@@ -1,0 +1,230 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { describe, expect, it } from 'vitest'
+
+const migration = readFileSync(
+  resolve(
+    process.cwd(),
+    'supabase/migrations/20261007000000_personal_weigh_ins.sql',
+  ),
+  'utf8',
+)
+const inventory = readFileSync(
+  resolve(
+    process.cwd(),
+    'supabase/verification/issue_210_legacy_duplicate_inventory.sql',
+  ),
+  'utf8',
+)
+const authorizationHarness = readFileSync(
+  resolve(process.cwd(), 'supabase/tests/personal_weigh_in_authorization.sql'),
+  'utf8',
+)
+const rollback = readFileSync(
+  resolve(
+    process.cwd(),
+    'supabase/rollback/20261007000000_restore_pre_210_rpcs.sql',
+  ),
+  'utf8',
+)
+
+describe('personal weigh-in migration contract', () => {
+  it('ships a distinct RPC-only draft compatibility upgrade without rewriting the applied migration', () => {
+    const correction = readFileSync(
+      resolve(
+        process.cwd(),
+        'supabase/migrations/20261008000000_allow_draft_group_weigh_in_sharing.sql',
+      ),
+      'utf8',
+    )
+    const originalSave = migration
+      .slice(
+        migration.indexOf(
+          'create or replace function public.save_personal_weigh_in(',
+        ),
+        migration.indexOf(
+          'create or replace function public.delete_personal_weigh_in(',
+        ),
+      )
+      .trim()
+    const correctedSave = correction
+      .slice(
+        correction.indexOf(
+          'create or replace function public.save_personal_weigh_in(',
+        ),
+        correction.lastIndexOf('commit;'),
+      )
+      .trim()
+    expect(correctedSave).toBe(
+      originalSave.replace(
+        "and challenge.status = 'active'",
+        "and challenge.status in ('draft', 'active')",
+      ),
+    )
+    expect(correction).not.toMatch(
+      /\b(grant|revoke|alter table|create table|alter default privileges)\b/i,
+    )
+    expect(correctedSave).toContain("and participant.status = 'active'")
+    expect(correctedSave).toContain('challenge.owner_id = actor_id')
+  })
+
+  it('stops before data conversion when one user has duplicate legacy dates', () => {
+    const guard = migration.indexOf(
+      'duplicate user/date rows need owner review',
+    )
+    const firstCreate = migration.indexOf(
+      'create table public.personal_weigh_ins',
+    )
+    const firstCopy = migration.indexOf('insert into public.personal_weigh_ins')
+    expect(guard).toBeGreaterThanOrEqual(0)
+    expect(firstCreate).toBeGreaterThan(guard)
+    expect(firstCopy).toBeGreaterThan(guard)
+    expect(migration).toMatch(
+      /group by participant\.user_id, weigh_in\.recorded_date\s+having count\(\*\) > 1/i,
+    )
+  })
+
+  it('copies legacy notes and only explicit group-sharing intent without deleting sources', () => {
+    expect(migration).toMatch(
+      /weigh_in\.note, weigh_in\.created_at, weigh_in\.updated_at/,
+    )
+    expect(migration).toContain('weigh_in.share_with_group')
+    expect(migration).toContain('where mapping.legacy_share_with_group')
+    expect(migration).not.toMatch(/\bdelete\s+from\s+public\.weigh_ins/i)
+    expect(migration).not.toMatch(/\bdrop\s+table\s+public\.weigh_ins/i)
+    expect(migration).toMatch(/unique \(user_id, recorded_date\)/i)
+  })
+
+  it('makes personal writes atomic and owner-authorized, and exposes no group note', () => {
+    const historyStart = migration.indexOf(
+      'create or replace function public.get_group_weigh_in_history',
+    )
+    const historyEnd = migration.indexOf(
+      '-- Group aggregates consume only',
+      historyStart,
+    )
+    const groupHistory = migration.slice(historyStart, historyEnd)
+    expect(migration).toContain(
+      'create or replace function public.save_personal_weigh_in',
+    )
+    expect(migration).toContain('where current_entry.id = target_weigh_in_id')
+    expect(migration).toContain('and current_entry.user_id = actor_id')
+    expect(migration).toContain(
+      'delete from public.personal_weigh_in_group_shares',
+    )
+    expect(migration).toContain(
+      'create or replace function public.delete_personal_weigh_in',
+    )
+    expect(groupHistory).toContain('display_name text')
+    expect(groupHistory).toContain('change_since_previous_kg numeric')
+    expect(groupHistory).not.toContain('note text')
+    expect(groupHistory).toContain('personal_weigh_in_group_shares')
+    expect(migration).toContain('target_current_sunday - 7')
+    expect(migration).toContain('baseline_date := week_start - 1')
+    expect(migration).toMatch(
+      /revoke all on function public\.save_personal_weigh_in[\s\S]*?from public, anon/i,
+    )
+    expect(migration).toMatch(
+      /grant execute on function public\.save_personal_weigh_in[\s\S]*?to authenticated/i,
+    )
+  })
+
+  it('provides an owner-run duplicate inventory that never selects private notes', () => {
+    expect(inventory).toContain('begin transaction read only')
+    expect(inventory).toContain('count(distinct weigh_in.weight_kg)')
+    expect(inventory).toContain('count(distinct weigh_in.note)')
+    expect(inventory).toContain('rollback;')
+    expect(inventory).not.toMatch(/select\s+weigh_in\.note\s*,/i)
+  })
+
+  it('includes rollback-only server authorization checks for sharing and deletion', () => {
+    expect(authorizationHarness).toContain('array[group_one, group_two]')
+    expect(authorizationHarness).toContain(
+      'cross_group_share_denied_atomically',
+    )
+    expect(authorizationHarness).toContain('outsider_denied')
+    expect(authorizationHarness).toContain('other_user_delete_denied')
+    expect(authorizationHarness).toContain('delete_cascades_group_shares')
+    expect(authorizationHarness).toContain(
+      'withdrawn_member_cannot_read_group_history',
+    )
+    expect(authorizationHarness).toContain(
+      'anonymous_cannot_read_raw_share_rows',
+    )
+    expect(authorizationHarness).toContain(
+      'unauthorized_delete_leaves_live_entry_intact',
+    )
+    expect(authorizationHarness).toContain('<> 32')
+    expect(authorizationHarness.trimEnd().endsWith('rollback;')).toBe(true)
+  })
+
+  it('resets inherited client ACLs before granting author-only SELECT', () => {
+    expect(migration).toMatch(
+      /revoke all on public\.personal_weigh_ins, public\.personal_weigh_in_group_shares,\s+public\.personal_weigh_in_legacy_map from public, anon, authenticated;/,
+    )
+    expect(migration).toContain('for select to authenticated')
+    expect(migration).not.toMatch(/alter default privileges/i)
+    expect(migration).not.toMatch(/create sequence/i)
+    expect(authorizationHarness).toContain(
+      'effective_client_table_privileges_are_minimal',
+    )
+    expect(authorizationHarness).toContain(
+      'anonymous_cannot_read_raw_personal_entries',
+    )
+    expect(authorizationHarness).toContain(
+      'other_user_cannot_read_raw_private_entry',
+    )
+  })
+
+  it('provides a non-destructive inverse that restores replaced RPCs', () => {
+    expect(rollback).toContain(
+      'create or replace function public.get_group_weigh_in_history',
+    )
+    expect(rollback).toContain(
+      'create or replace function public.get_group_progress_summary',
+    )
+    expect(rollback).toContain(
+      'create or replace function public.get_provisional_group_leader_summary',
+    )
+    expect(rollback).toContain(
+      'create or replace function public.get_challenge_progress_summary',
+    )
+    expect(rollback).toMatch(/deliberately does NOT\s+-- drop canonical tables/)
+    expect(rollback).not.toMatch(/\bdrop\s+(table|function)\b/i)
+    expect(rollback.trimEnd().endsWith('commit;')).toBe(true)
+  })
+
+  it('ranks weekly winners by each participant own weight change, not absolute weight or target completion', () => {
+    expect(migration).toContain(
+      'current_entry.weight_kg - previous_entry.weight_kg as weight_change',
+    )
+    expect(migration).toContain(
+      'previous_entry.recorded_date = target_current_sunday - 7',
+    )
+    expect(migration).toContain(
+      'current_entry.recorded_date = target_current_sunday',
+    )
+    expect(migration).toContain('min(candidate.weight_change) as weight_change')
+    expect(migration).toContain('candidate.weight_change = best.weight_change')
+    expect(migration).not.toContain('min(current_entry.weight_kg)')
+    expect(migration).toContain('progress.completion_percentage = 100')
+  })
+
+  it('keeps migrated summaries and provisional leaders bounded by server dates', () => {
+    expect(migration).not.toContain(
+      'personal.recorded_date <= target_current_sunday',
+    )
+    expect(migration).toContain('target_current_sunday > current_date')
+    expect(migration).toContain('target_current_date > current_date')
+    expect(migration).toContain('personal.recorded_date <= current_date')
+    expect(authorizationHarness).toContain(
+      'weekday_share_updates_completion_without_changing_sunday_winners',
+    )
+    expect(authorizationHarness).toContain(
+      'owner_challenge_summary_excludes_future_copied_row',
+    )
+    expect(authorizationHarness).toContain(
+      'future_provisional_summary_date_rejected',
+    )
+  })
+})

@@ -114,6 +114,54 @@ export type Database = {
         }
         Relationships: []
       }
+      personal_weigh_ins: {
+        Row: {
+          id: string
+          user_id: string
+          recorded_date: string
+          weight_kg: number
+          note: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          recorded_date: string
+          weight_kg: number
+          note?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          recorded_date?: string
+          weight_kg?: number
+          note?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      personal_weigh_in_group_shares: {
+        Row: {
+          personal_weigh_in_id: string
+          challenge_id: string
+          created_at: string
+        }
+        Insert: {
+          personal_weigh_in_id: string
+          challenge_id: string
+          created_at?: string
+        }
+        Update: {
+          personal_weigh_in_id?: string
+          challenge_id?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       weigh_ins: {
         Row: {
           created_at: string
@@ -150,6 +198,42 @@ export type Database = {
     }
     Views: Record<string, never>
     Functions: {
+      delete_personal_weigh_in: {
+        Args: { target_weigh_in_id: string }
+        Returns: boolean
+      }
+      list_my_personal_weigh_ins: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          user_id: string
+          recorded_date: string
+          weight_kg: number
+          note: string | null
+          created_at: string
+          updated_at: string
+          shared_challenge_ids: string[]
+        }[]
+      }
+      save_personal_weigh_in: {
+        Args: {
+          target_note: string | null
+          target_recorded_date: string
+          target_shared_challenge_ids: string[]
+          target_weigh_in_id: string | null
+          target_weight_kg: number
+        }
+        Returns: {
+          id: string
+          user_id: string
+          recorded_date: string
+          weight_kg: number
+          note: string | null
+          created_at: string
+          updated_at: string
+          shared_challenge_ids: string[]
+        }[]
+      }
       accept_challenge_invite: {
         Args: {
           invite_token: string

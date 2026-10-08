@@ -19,6 +19,7 @@ import {
   TodayPage,
 } from './AppPages'
 import { mostRecentSunday } from '../models/groupProgress'
+import { PersonalWeighInsPage } from './PersonalWeighInsPage'
 import {
   localDateOnly,
   provisionalWeekDates,
@@ -91,22 +92,31 @@ function dashboardResponses(
     ]),
     response([
       {
-        created_at: '2026-09-17T10:00:00.000Z',
         id: 'weigh-in-1',
+        user_id: 'member-1',
         note: null,
-        participant_id: 'participant-1',
         recorded_date: '2026-09-17',
+        shared_challenge_ids: [],
         updated_at: '2026-09-17T10:00:00.000Z',
         weight_kg: 95,
       },
       {
-        created_at: '2026-09-18T10:00:00.000Z',
         id: 'weigh-in-2',
+        user_id: 'member-1',
         note: latestNote,
-        participant_id: 'participant-1',
         recorded_date: '2026-09-18',
+        shared_challenge_ids: [],
         updated_at: '2026-09-18T10:00:00.000Z',
         weight_kg: 90,
+      },
+      {
+        id: 'future-weigh-in',
+        user_id: 'member-1',
+        note: 'future row from legacy migration',
+        recorded_date: '2099-01-01',
+        shared_challenge_ids: [],
+        updated_at: '2099-01-01T10:00:00.000Z',
+        weight_kg: 1,
       },
     ]),
   ]
@@ -210,6 +220,146 @@ afterEach(() => {
 })
 
 describe('HomePage', () => {
+  it('reflects canonical personal save, edit, and delete after returning to Overview', async () => {
+    const today = localDateOnly()
+    const yesterdayDate = new Date(`${today}T00:00:00.000Z`)
+    yesterdayDate.setUTCDate(yesterdayDate.getUTCDate() - 1)
+    const yesterday = yesterdayDate.toISOString().slice(0, 10)
+    let rows: Array<{
+      id: string
+      user_id: string
+      note: string | null
+      recorded_date: string
+      shared_challenge_ids: string[]
+      created_at: string
+      updated_at: string
+      weight_kg: number
+    }> = [
+      {
+        id: 'existing-entry',
+        user_id: 'member-1',
+        note: null,
+        recorded_date: yesterday,
+        shared_challenge_ids: [] as string[],
+        created_at: `${yesterday}T10:00:00.000Z`,
+        updated_at: `${yesterday}T10:00:00.000Z`,
+        weight_kg: 88,
+      },
+    ]
+    const fetchMock = vi.fn((input: RequestInfo, init?: RequestInit) => {
+      const url = String(input)
+      if (url.includes('/challenges?'))
+        return Promise.resolve(
+          response([
+            {
+              created_at: `${yesterday}T10:00:00.000Z`,
+              created_by: 'member-1',
+              description: null,
+              end_date: '2026-12-31',
+              id: 'challenge-1',
+              name: 'Autumn challenge',
+              owner_id: 'member-1',
+              start_date: '2026-09-17',
+              status: 'active',
+              target_weight_kg: null,
+              updated_at: `${yesterday}T10:00:00.000Z`,
+            },
+          ]),
+        )
+      if (url.includes('/participants?'))
+        return Promise.resolve(
+          response([
+            {
+              challenge_id: 'challenge-1',
+              created_at: `${yesterday}T10:00:00.000Z`,
+              display_name: 'Member',
+              id: 'participant-1',
+              joined_at: `${yesterday}T10:00:00.000Z`,
+              starting_weight_kg: 100,
+              status: 'active',
+              target_weight_kg: 80,
+              updated_at: `${yesterday}T10:00:00.000Z`,
+              user_id: 'member-1',
+            },
+          ]),
+        )
+      if (url.includes('/rpc/list_my_personal_weigh_ins'))
+        return Promise.resolve(response(rows))
+      if (url.includes('/rpc/save_personal_weigh_in')) {
+        const body = JSON.parse(String(init?.body)) as {
+          target_note: string | null
+          target_recorded_date: string
+          target_shared_challenge_ids: string[]
+          target_weigh_in_id: string | null
+          target_weight_kg: number
+        }
+        const saved = {
+          id: body.target_weigh_in_id ?? 'new-entry',
+          user_id: 'member-1',
+          note: body.target_note,
+          recorded_date: body.target_recorded_date,
+          shared_challenge_ids: body.target_shared_challenge_ids,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          weight_kg: body.target_weight_kg,
+        }
+        rows = [saved, ...rows.filter((row) => row.id !== saved.id)]
+        return Promise.resolve(response([saved]))
+      }
+      if (url.includes('/rpc/delete_personal_weigh_in')) {
+        const body = JSON.parse(String(init?.body)) as {
+          target_weigh_in_id: string
+        }
+        rows = rows.filter((row) => row.id !== body.target_weigh_in_id)
+        return Promise.resolve(response(true))
+      }
+      return Promise.resolve(groupProgressResponse())
+    })
+
+    const renderRemotePage = (page: React.ReactNode) => {
+      vi.stubEnv('VITE_SUPABASE_URL', 'https://home-project.supabase.co')
+      vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-anon-key')
+      vi.stubGlobal('fetch', fetchMock)
+      render(
+        <AuthProvider
+          initialState={{
+            error: null,
+            status: 'signed-in',
+            user: { email: 'member@example.com', id: 'member-1' },
+          }}
+        >
+          <MemoryRouter>{page}</MemoryRouter>
+        </AuthProvider>,
+      )
+    }
+
+    renderRemotePage(<HomePage />)
+    expect(await screen.findByText('88 kg')).toBeInTheDocument()
+    cleanup()
+
+    renderRemotePage(<PersonalWeighInsPage />)
+    await screen.findByRole('form', { name: 'Personal weigh-in form' })
+    fireEvent.change(screen.getByLabelText('Weight in kg'), {
+      target: { value: '89' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save weigh-in' }))
+    await screen.findByText(/89 kg/)
+    fireEvent.click(screen.getByRole('button', { name: `Edit ${today}` }))
+    fireEvent.change(screen.getByLabelText('Weight in kg'), {
+      target: { value: '90' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Update weigh-in' }))
+    await screen.findByText(/90 kg/)
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    fireEvent.click(screen.getByRole('button', { name: `Delete ${today}` }))
+    await screen.findByText('Weigh-in and its group shares were deleted.')
+    cleanup()
+
+    renderRemotePage(<HomePage />)
+    expect(await screen.findByText('88 kg')).toBeInTheDocument()
+    expect(screen.queryByText('90 kg')).not.toBeInTheDocument()
+  })
+
   it('shows a session-loading state while authentication is being restored', () => {
     const contextValue: AuthContextValue = {
       requestPasswordRecovery: vi.fn(),
@@ -355,22 +505,31 @@ describe('HomePage', () => {
     fetchMock.mockResolvedValueOnce(
       response([
         {
-          created_at: '2026-09-17T10:00:00.000Z',
           id: 'private-weigh-in',
+          user_id: 'member-1',
           note: 'Private note content',
-          participant_id: 'participant-1',
           recorded_date: '2026-09-17',
+          shared_challenge_ids: [],
           updated_at: '2026-09-17T10:00:00.000Z',
           weight_kg: 95,
         },
         {
-          created_at: '2026-09-18T10:00:00.000Z',
           id: 'latest-weigh-in',
+          user_id: 'member-1',
           note: null,
-          participant_id: 'participant-1',
           recorded_date: '2026-09-18',
+          shared_challenge_ids: [],
           updated_at: '2026-09-18T10:00:00.000Z',
           weight_kg: 90,
+        },
+        {
+          id: 'future-weigh-in',
+          user_id: 'member-1',
+          note: null,
+          recorded_date: '2099-01-01',
+          shared_challenge_ids: [],
+          updated_at: '2099-01-01T10:00:00.000Z',
+          weight_kg: 1,
         },
       ]),
     )
@@ -397,6 +556,12 @@ describe('HomePage', () => {
       await screen.findByRole('button', { name: /Owner hosted challenge/ }),
     ).toHaveAttribute('aria-pressed', 'true')
     expect(await screen.findByText('90 kg')).toBeInTheDocument()
+    expect(screen.queryByText('1 kg')).not.toBeInTheDocument()
+    expect(
+      fetchMock.mock.calls.some(([url]) =>
+        String(url).includes('/rpc/list_my_personal_weigh_ins'),
+      ),
+    ).toBe(true)
     expect(
       screen.getByText((_, element) =>
         /^2\s*\/\s*3$/.test(element?.textContent?.trim() ?? ''),
@@ -560,7 +725,11 @@ describe('HomePage', () => {
       screen.getByRole('link', { name: 'See group progress' }),
     ).toHaveAttribute('href', '/group?challenge=challenge-1')
     expect(screen.queryByText('Private sample winner')).not.toBeInTheDocument()
-    expect(screen.getByText(/Coming in Chapter 16/)).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', {
+        name: 'One entry, optional group sharing',
+      }),
+    ).toBeInTheDocument()
     expect(
       screen.queryByRole('heading', { name: 'No challenge yet' }),
     ).not.toBeInTheDocument()
@@ -649,14 +818,14 @@ describe('HomePage', () => {
           },
         ])
       }
-      if (url.includes('/weigh_ins?')) {
+      if (url.includes('/rpc/list_my_personal_weigh_ins')) {
         return response([
           {
-            created_at: '2026-09-18T10:00:00.000Z',
             id: 'joined-weigh-in',
+            user_id: 'member-1',
             note: null,
-            participant_id: 'joined-participant',
             recorded_date: '2026-09-18',
+            shared_challenge_ids: [],
             updated_at: '2026-09-18T10:00:00.000Z',
             weight_kg: 89,
           },
@@ -784,19 +953,17 @@ describe('HomePage', () => {
           },
         ])
       }
-      if (url.includes('/weigh_ins?')) {
+      if (url.includes('/rpc/list_my_personal_weigh_ins')) {
         const secondAccount = challengeRequestCount > 1
         return response([
           {
-            created_at: '2026-09-17T10:00:00.000Z',
             id: secondAccount ? 'weigh-in-two' : 'weigh-in-one',
+            user_id: secondAccount ? 'member-2' : 'member-1',
             note: secondAccount
               ? 'Account two private note'
               : 'Account one private note',
-            participant_id: secondAccount
-              ? 'participant-two'
-              : 'participant-one',
             recorded_date: '2026-09-17',
+            shared_challenge_ids: [],
             updated_at: '2026-09-17T10:00:00.000Z',
             weight_kg: secondAccount ? 70 : 90,
           },
@@ -934,7 +1101,7 @@ describe('HomePage', () => {
     })
     expect(
       fetchMock.mock.calls.filter(([url]) =>
-        String(url).includes('/weigh_ins?'),
+        String(url).includes('/rpc/list_my_personal_weigh_ins'),
       ),
     ).toHaveLength(1)
   })
@@ -1152,7 +1319,7 @@ describe('HomePage', () => {
       )
       expect(
         fetchMock.mock.calls.some(([url]) =>
-          String(url).includes('participant_id=eq.participant-1'),
+          String(url).includes('/rpc/list_my_personal_weigh_ins'),
         ),
       ).toBe(true)
       const challengeRequest = fetchMock.mock.calls.find(([url]) =>

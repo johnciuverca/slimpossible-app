@@ -4,7 +4,7 @@ import { AuthProvider } from './auth/AuthContext'
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import { AppLayout } from './layout/AppLayout'
 import { ChallengeSetupPage } from './pages/ChallengeSetupPage'
-import { DailyWeighInFormPage } from './pages/DailyWeighInFormPage'
+import { PersonalWeighInsPage } from './pages/PersonalWeighInsPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { LoginPage } from './pages/LoginPage'
 import { ParticipantEnrollmentPage } from './pages/ParticipantEnrollmentPage'
@@ -43,7 +43,7 @@ function App() {
             <Route path="reset-password" element={<ResetPasswordPage />} />
             <Route path="challenge/setup" element={<ChallengeSetupPage />} />
             <Route path="invite/:token" element={<InviteAcceptancePage />} />
-            <Route path="weigh-ins" element={<DailyWeighInFormPage />} />
+            <Route path="weigh-ins" element={<PersonalWeighInsPage />} />
             <Route
               path="milestones-preview"
               element={<MilestonePreviewPage />}

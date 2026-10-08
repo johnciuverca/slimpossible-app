@@ -5,6 +5,11 @@ import {
 } from './supabase/client'
 import type { Challenge } from '../models/challenge'
 import type { Participant } from '../models/participant'
+import { isEligibleSharingGroup } from '../models/groupSharingEligibility'
+import type {
+  PersonalWeighIn,
+  PersonalWeighInInput,
+} from '../models/personalWeighIn'
 import {
   getChallengeInviteStatus,
   type ChallengeInvite,
@@ -37,6 +42,7 @@ export type PersistenceRepositories = Pick<
   | 'groupProgress'
   | 'invites'
   | 'participants'
+  | 'personalWeighIns'
   | 'profiles'
   | 'weighIns'
 >
@@ -69,6 +75,7 @@ export type InvitePersistence =
 const challengesStorageKey = 'slimpossible.local.challenges'
 const participantsStorageKey = 'slimpossible.local.participants'
 const weighInsStorageKey = 'slimpossible.local.weigh-ins'
+const personalWeighInsStorageKey = 'slimpossible.local.personal-weigh-ins'
 const invitesStorageKey = 'slimpossible.local.challenge-invites'
 
 type LocalChallengeInvite = ChallengeInvite & { token: string }
@@ -478,6 +485,117 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
     },
   }
 
+  const personalWeighIns: Repositories['personalWeighIns'] = {
+    async listForUser(userId) {
+      const values = readList<PersonalWeighIn & { userId: string }>(
+        storage,
+        personalWeighInsStorageKey,
+      )
+        .filter((value) => value.userId === userId)
+        .map(({ id, date, note, sharedChallengeIds, weightKg }) => ({
+          id,
+          date,
+          ...(note ? { note } : {}),
+          sharedChallengeIds,
+          weightKg,
+        }))
+      return values.length > 0
+        ? { data: values, state: 'success' }
+        : { data: [], state: 'empty' }
+    },
+    async save(userId: string, input: PersonalWeighInInput) {
+      if (!userId) {
+        return {
+          error: {
+            kind: 'request',
+            message: 'A signed-in user is required to save a weigh-in.',
+          },
+          state: 'error',
+        }
+      }
+      const allValues = readList<PersonalWeighIn & { userId: string }>(
+        storage,
+        personalWeighInsStorageKey,
+      )
+      const existingById = input.id
+        ? allValues.find(
+            (value) => value.id === input.id && value.userId === userId,
+          )
+        : undefined
+      if (input.id && !existingById) return { data: null, state: 'empty' }
+      const existingByDate = allValues.find(
+        (value) => value.userId === userId && value.date === input.date,
+      )
+      const existing = existingById ?? (input.id ? undefined : existingByDate)
+      const dateCollision = allValues.find(
+        (value) =>
+          value.userId === userId &&
+          value.date === input.date &&
+          value.id !== existing?.id,
+      )
+      if (dateCollision) {
+        return {
+          error: {
+            kind: 'request',
+            code: '23505',
+            message: 'A weigh-in already exists for that date.',
+          },
+          state: 'error',
+        }
+      }
+
+      const groups = readLocalChallenges(storage)
+      const participants = readList<Participant>(
+        storage,
+        participantsStorageKey,
+      )
+      const permittedIds = new Set(
+        groups
+          .filter((challenge) =>
+            isEligibleSharingGroup(challenge, userId, participants),
+          )
+          .map(({ id }) => id),
+      )
+      if (input.sharedChallengeIds.some((id) => !permittedIds.has(id))) {
+        return {
+          error: {
+            kind: 'request',
+            message: 'One or more selected groups are no longer available.',
+          },
+          state: 'error',
+        }
+      }
+
+      const saved: PersonalWeighIn = {
+        id: existing?.id ?? createLocalId('personal-weigh-in'),
+        date: input.date,
+        ...(input.note?.trim() ? { note: input.note.trim() } : {}),
+        sharedChallengeIds: [...input.sharedChallengeIds],
+        weightKg: input.weightKg,
+      }
+      const values = allValues.filter((value) => value.id !== existing?.id)
+      values.unshift({ ...saved, userId })
+      if (!writeList(storage, personalWeighInsStorageKey, values)) {
+        return localStorageError()
+      }
+      return { data: saved, state: 'success' }
+    },
+    async delete(userId, id) {
+      const values = readList<PersonalWeighIn & { userId: string }>(
+        storage,
+        personalWeighInsStorageKey,
+      )
+      const filtered = values.filter(
+        (value) => value.id !== id || value.userId !== userId,
+      )
+      if (filtered.length === values.length)
+        return { data: null, state: 'empty' }
+      return writeList(storage, personalWeighInsStorageKey, filtered)
+        ? { data: true, state: 'success' }
+        : localStorageError()
+    },
+  }
+
   const profiles: ProfileRepository = {
     async ensure(input) {
       return {
@@ -523,6 +641,7 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
     invites,
     participants,
     profiles,
+    personalWeighIns,
     weighIns,
   }
 }
