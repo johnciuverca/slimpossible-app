@@ -106,13 +106,39 @@ Format/lint/typecheck/build and all 442 unit tests passed again; shell syntax an
 diff checks passed. Existing 75-browser-test evidence above is reused because
 application code is unchanged; these are not new connected browser results.
 
-Hosted execution is still NOT EXECUTED: PM requested exact-scope owner approval
-before generated fixture writes and private resolution of the three existing
-disposable identities. The available preview browser is signed into test1;
-remaining member mobile/keyboard checks need the owner to sign into the existing
-disposable member at the named preview and leave Group open. The withdrawn
-browser gate remains pending; transaction-local SQL denial and synthetic browser
-403 handling are separate evidence, not a silent replacement for that gate.
+## Connected hosted and mobile evidence — 2026-10-09
+
+After the owner's exact-scope approval, PM reviewed and executed the hardened
+harness at `954caebb63d5c6084a18535c06e38a4950f22722` in staging SQL Editor.
+The three existing disposable identities were resolved privately. PM reported
+all 12 named assertions true and all five denial guards completing without an
+execution error, including actual authenticated/anonymous role switches. This
+covers owner/member authorization, selected draft/active group scope, nonfuture
+shared rows, private projection, group-specific keys, late baseline, correction,
+unshare, deletion of generated fixtures, duplicate-name keys, withdrawn viewer
+denial/author exclusion, and original entry/share equality. A separate ROLLBACK
+and cleanup query found zero remaining fixture challenges and the original
+outsider membership still active. No production or persistent fixture changes
+occurred. This is PM-executed hosted evidence, not A's independent execution;
+private identity lookup and proof are not published.
+
+The owner then signed into the existing member account on immutable preview
+`https://slimpossible-c27au014n-cvc10.vercel.app` (application `03e94ea`, unchanged
+by the harness/docs commits). A completed read-only connected checks at 390x844:
+both labeled chart/table regions were focusable; Tab moved from chart to table;
+Right scrolled each region by 40px; neither caused horizontal page overflow.
+Keyboard group selection cleared the previous chart/table during the observed
+load, showed the other group's honest empty state, and restored five shared
+entries when switching back. Direct refresh retained the selected context and
+restored chart/table. This observes natural connected loading, not a controlled
+delayed response or account switch. No entry/share/membership mutation or sign-out
+occurred. The viewport was reset and the authorized Group tab left open. Private
+names, identities, dates, weights, notes and screenshots are not published.
+
+The actual withdrawn-session browser gate remains pending; hosted role denial
+and synthetic browser 403 handling are distinct evidence. The owner has not
+approved substituting layered evidence for that written gate. Quality, Vercel
+and Preview Comments all passed on `954caebb`; no merge is authorized.
 
 ## Local validation — 2026-10-08
 
@@ -213,16 +239,15 @@ was performed.
 Basic migration checks and partial connected observations above do not complete
 the acceptance matrix. Before merge:
 
-- Complete the connected authenticated-role privacy harness with specifically
-  approved existing disposable identities and execution authority. The supplied
-  rollback-only harness remains NOT EXECUTED on hosted staging; the simulated
-  JWT-subject SQL check does not replace it.
 - Complete withdrawn-session browser denial and the remaining connected matrix:
   owner/member selected-group privacy across draft/active groups, late entries,
   duplicate names, gains/maintenance/ties/future data, controlled account/challenge
-  switches during loading, and mobile/keyboard behavior. Relevant local/CI tests
-  pass, but do not establish connected coverage. Owner reports above are recorded
-  without claiming independently verified stored-share/deletion state.
+  switches during loading. Hosted authorization/projection/late/correction/
+  removal/draft/future/duplicate-key checks and member mobile/keyboard/natural
+  group switching are now completed as specifically described above. Remaining
+  browser rendering variants and controlled switching must not be described as
+  connected passes solely from local/CI coverage. Owner reports above remain
+  source-qualified; no written gate has been waived.
 - Obtain independent PM review sign-off and explicit owner merge approval. None
   is inferred from hosted migration approval or partial acceptance. PR #243 stays
   unmerged. Separately, #242's owner visual acceptance is still pending; its
