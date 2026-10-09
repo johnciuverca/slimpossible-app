@@ -48,7 +48,7 @@ for (const width of [1280, 390]) {
       page.getByRole('heading', { name: 'Challenge progress', exact: true }),
     ).toBeVisible()
     await expect(
-      page.getByRole('heading', { name: 'Group dashboard' }),
+      page.getByRole('heading', { name: 'Group', exact: true }),
     ).toHaveCount(0)
     const bounds = await contexts.evaluate((nav) => {
       const active = nav
@@ -84,6 +84,15 @@ for (const width of [1280, 390]) {
     await primary.getByRole('link', { name: 'Group', exact: true }).click()
     await expect(page.getByTestId('fixture-route')).toHaveText(
       '/group?challenge=dashboard-active',
+    )
+    await expect(contexts.getByRole('link', { name: /Personal/ })).toHaveCount(
+      0,
+    )
+    await primary
+      .getByRole('link', { name: 'My progress', exact: true })
+      .click()
+    await expect(page.getByTestId('fixture-route')).toHaveText(
+      '/progress?challenge=dashboard-active',
     )
     await contexts
       .getByRole('link', {

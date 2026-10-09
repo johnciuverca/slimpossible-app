@@ -27,18 +27,23 @@ export function ChallengeTabs({
   selectedId,
   loading = false,
   error = '',
+  showPersonalTracking = true,
 }: {
   challenges: Challenge[]
   selectedId?: string | null
   loading?: boolean
   error?: string
+  showPersonalTracking?: boolean
 }) {
   const { pathname, search } = useLocation()
+  const querySelection = new URLSearchParams(search).get('challenge') || null
   const selected = ['/dashboard', '/today'].includes(pathname)
     ? null
-    : (selectedId ??
-      new URLSearchParams(search).get('challenge') ??
-      (['/goals', '/challenges'].includes(pathname) ? challenges[0]?.id : null))
+    : selectedId ||
+      querySelection ||
+      (['/goals', '/challenges', '/group'].includes(pathname)
+        ? challenges[0]?.id
+        : null)
   const row = useRef<HTMLDivElement>(null)
   const personalPage = [
     '/dashboard',
@@ -63,18 +68,24 @@ export function ChallengeTabs({
   return (
     <nav aria-label="Challenge contexts" className="min-w-0 space-y-2">
       <p className="text-xs font-semibold text-ink-muted">
-        {pathname === '/weigh-ins'
-          ? 'Context navigation only. Recording stays personal; choose group shares explicitly in the form.'
-          : 'Personal tracking is separate from challenge views. Choosing a context never changes sharing.'}
+        {!showPersonalTracking
+          ? 'Choose an authorized group to view its shared progress. Navigation never changes who can see your weights.'
+          : pathname === '/weigh-ins'
+            ? 'Context navigation only. Recording stays personal; choose group shares explicitly in the form.'
+            : 'Personal tracking is separate from challenge views. Choosing a context never changes sharing.'}
       </p>
       <div ref={row} className="app-nav-scroll max-w-full overflow-x-auto py-2">
         <ul className="flex w-max min-w-full gap-2">
           {[
-            {
-              id: '',
-              label: 'Personal tracking',
-              to: challengeTabDestination(pathname),
-            },
+            ...(showPersonalTracking
+              ? [
+                  {
+                    id: '',
+                    label: 'Personal tracking',
+                    to: challengeTabDestination(pathname),
+                  },
+                ]
+              : []),
             ...challenges.map((challenge) => ({
               id: challenge.id,
               label: `${challenge.kind === 'personal' ? 'Personal' : 'Group'} · ${challenge.name}`,
@@ -99,7 +110,9 @@ export function ChallengeTabs({
       </div>
       {loading ? (
         <p role="status" className="text-sm text-ink-muted">
-          Loading authorized challenge contexts…
+          {showPersonalTracking
+            ? 'Loading authorized challenge contexts…'
+            : 'Loading authorized group challenges…'}
         </p>
       ) : error ? (
         <p role="alert" className="text-sm text-danger-800">
@@ -107,13 +120,15 @@ export function ChallengeTabs({
         </p>
       ) : selected && !challenges.some(({ id }) => id === selected) ? (
         <p role="status" className="text-sm text-ink-muted">
-          That challenge context is unavailable for this account. Personal
-          tracking remains available.
+          {showPersonalTracking
+            ? 'That challenge context is unavailable for this account. Personal tracking remains available.'
+            : 'That group challenge is unavailable for this account.'}
         </p>
       ) : challenges.length === 0 ? (
         <p className="text-sm text-ink-muted">
-          No authorized challenge contexts. Personal tracking needs no
-          challenge.
+          {showPersonalTracking
+            ? 'No authorized challenge contexts. Personal tracking needs no challenge.'
+            : 'No authorized group challenges are available.'}
         </p>
       ) : null}
     </nav>
@@ -123,6 +138,7 @@ export function ChallengeTabs({
 export function ChallengeContextTabs() {
   const { state: auth } = useOptionalAuth()
   const { pathname } = useLocation()
+  const groupPage = pathname === '/group'
   const persistence = useMemo(() => createPersistence(auth), [auth])
   const key = `${auth.status}:${auth.user?.id ?? ''}:${persistence.mode}`
   const [snapshot, setSnapshot] = useState({
@@ -181,5 +197,14 @@ export function ChallengeContextTabs() {
     snapshot.key === key
       ? snapshot
       : { challenges: [], loading: true, error: '' }
-  return <ChallengeTabs {...current} />
+  const challenges = groupPage
+    ? current.challenges.filter(({ kind }) => kind === 'group')
+    : current.challenges
+  return (
+    <ChallengeTabs
+      {...current}
+      challenges={challenges}
+      showPersonalTracking={!groupPage}
+    />
+  )
 }

@@ -88,18 +88,59 @@ describe('Challenge context navigation', () => {
       expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
     },
   )
-  it('routes a personal challenge out of Group without implying a shared dashboard', () => {
+  it('supports a group-only context row without a personal destination', () => {
     render(
       <MemoryRouter initialEntries={['/group?challenge=group']}>
-        <ChallengeTabs challenges={[group, personal]} />
+        <ChallengeTabs
+          challenges={[group]}
+          selectedId="group"
+          showPersonalTracking={false}
+        />
       </MemoryRouter>,
     )
     expect(
-      screen.getByRole('link', { name: 'Personal · Personal goal' }),
-    ).toHaveAttribute('href', '/progress?challenge=personal')
+      screen.getByRole('link', { name: /Group · Joined group/ }),
+    ).toHaveAttribute('aria-current', 'page')
     expect(
-      screen.getByRole('link', { name: 'Personal tracking' }),
-    ).toHaveAttribute('href', '/dashboard')
+      screen.queryByRole('link', { name: /Personal ·/ }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: /Personal tracking/ }),
+    ).not.toBeInTheDocument()
+  })
+  it('keeps an unavailable group selection truthful without a personal fallback', () => {
+    render(
+      <MemoryRouter initialEntries={['/group?challenge=missing']}>
+        <ChallengeTabs
+          challenges={[group]}
+          selectedId="missing"
+          showPersonalTracking={false}
+        />
+      </MemoryRouter>,
+    )
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'That group challenge is unavailable for this account.',
+    )
+    expect(
+      screen.getByRole('link', { name: /Group · Joined group/ }),
+    ).not.toHaveAttribute('aria-current', 'page')
+    expect(
+      screen.queryByRole('link', { name: /Personal tracking/ }),
+    ).not.toBeInTheDocument()
+  })
+  it('keeps the empty group context state free of personal tracking options', () => {
+    render(
+      <MemoryRouter initialEntries={['/group']}>
+        <ChallengeTabs challenges={[]} showPersonalTracking={false} />
+      </MemoryRouter>,
+    )
+    expect(
+      screen.getByText('No authorized group challenges are available.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/Personal tracking/)).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: /Personal/ }),
+    ).not.toBeInTheDocument()
   })
   it('lists only owned/active-joined contexts and hides previous-account contexts on switch', async () => {
     localStorage.setItem(

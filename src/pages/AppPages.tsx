@@ -1469,7 +1469,7 @@ export function GroupDashboardPage() {
       const visibleChallenges = allVisibleChallenges.filter(
         ({ kind }) => kind === 'group',
       )
-      setChallenges(allVisibleChallenges)
+      setChallenges(visibleChallenges)
       const challenge = challengeParam
         ? visibleChallenges.find(({ id }) => id === challengeParam)
         : visibleChallenges[0]
@@ -1580,11 +1580,9 @@ export function GroupDashboardPage() {
     ? `?challenge=${encodeURIComponent(data.challenge.id)}`
     : ''
   const selectedChallengeId =
-    (challengeParam && challenges.some(({ id }) => id === challengeParam)
-      ? challengeParam
-      : null) ??
-    data?.challenge.id ??
-    challenges.find(({ kind }) => kind === 'group')?.id ??
+    challengeParam ||
+    data?.challenge.id ||
+    challenges.find(({ kind }) => kind === 'group')?.id ||
     ''
   const selectedChallenge = challenges.find(
     ({ id }) => id === selectedChallengeId,
@@ -1604,49 +1602,50 @@ export function GroupDashboardPage() {
       className="mx-auto w-full max-w-6xl space-y-6"
       aria-labelledby="group-title"
     >
+      <div className="space-y-6">
+        <WeightPageHeader onRecorded={() => setReloadKey((value) => value + 1)}>
+          <PageHeader
+            description="Your shared home. Track weight and progress with other challenge members."
+            title="Group"
+            titleId="group-title"
+          />
+        </WeightPageHeader>
+        <ChallengeTabs
+          challenges={challenges}
+          selectedId={selectedChallengeId}
+          loading={isLoading}
+          showPersonalTracking={false}
+        />
+        <div>
+          <StatusPill>
+            {selectedChallenge?.name ??
+              data?.challenge.name ??
+              'Shared progress'}
+          </StatusPill>
+          <p className="mt-4 text-ink-muted">
+            Shared summary, this week’s provisional leader, and Sunday-based
+            results for the selected challenge. History includes only explicitly
+            shared weights; notes stay private.
+          </p>
+        </div>
+      </div>
       <GroupChartHistory
         challengeId={data?.challenge.id ?? selectedChallengeId}
         viewerId={ownerId ?? ''}
         persistence={persistence}
         refreshVersion={reloadKey}
         enabled={Boolean(summary)}
-        navigation={
-          <>
-            <WeightPageHeader
-              onRecorded={() => setReloadKey((value) => value + 1)}
-            >
-              <PageHeader
-                description="Shared summary, this week’s provisional leader, and Sunday-based results for the selected challenge. History includes only explicitly shared weights; notes stay private."
-                title="Group dashboard"
-                titleId="group-title"
-              >
-                <StatusPill>
-                  {selectedChallenge?.name ??
-                    data?.challenge.name ??
-                    'Shared progress'}
-                </StatusPill>
-              </PageHeader>
-            </WeightPageHeader>
-            <div className="mt-6 flex flex-wrap items-end gap-4">
-              <div className="w-full min-w-0">
-                <ChallengeTabs
-                  challenges={challenges}
-                  selectedId={selectedChallengeId}
-                  loading={isLoading}
-                />
-              </div>
-              <button
-                className="min-h-11 rounded-xl border border-stone-300 px-4 py-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
-                onClick={() => setReloadKey((value) => value + 1)}
-                type="button"
-              >
-                Refresh shared progress
-              </button>
-            </div>
-          </>
-        }
       >
         <Card className="p-5 sm:p-8 lg:p-10">
+          <div className="mt-6 flex flex-wrap items-end gap-4">
+            <button
+              className="min-h-11 rounded-xl border border-stone-300 px-4 py-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+              onClick={() => setReloadKey((value) => value + 1)}
+              type="button"
+            >
+              Refresh shared progress
+            </button>
+          </div>
           <DashboardState
             isLoading={isLoading}
             message={message}
