@@ -6,6 +6,10 @@ import type { PersonalWeighIn } from '../models/personalWeighIn'
 import { isEligibleSharingGroup } from '../models/groupSharingEligibility'
 import { participantFixture } from '../models/fixtures'
 import { createPersistence } from './persistence'
+import {
+  notifyPersonalWeightChange,
+  usePersonalWeightRevision,
+} from './personalWeightChanges'
 
 type Snapshot<T> = {
   key: string
@@ -27,7 +31,7 @@ export function usePersonalWorkspace() {
     auth.user?.id ??
     (persistence.mode === 'local' ? participantFixture.userId : '')
   const ownerKey = `${auth.status}:${userId}:${auth.user?.email ?? ''}:${persistence.mode}`
-  const [revision, setRevision] = useState(0)
+  const revision = usePersonalWeightRevision(userId)
   const requestKey = `${ownerKey}:${revision}`
   const [personal, setPersonal] = useState<Snapshot<PersonalWeighIn[]>>({
     key: '',
@@ -154,7 +158,7 @@ export function usePersonalWorkspace() {
         currentContexts.data.participants,
       ),
     ),
-    refresh: () => setRevision((value) => value + 1),
+    refresh: () => notifyPersonalWeightChange(userId),
   }
 }
 

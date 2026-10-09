@@ -12,7 +12,6 @@ const liveNavigation = [
   { label: 'My progress', path: '/progress' },
   { label: 'Group', path: '/group' },
   { label: 'Goals', path: '/goals' },
-  { label: 'Weigh-in', path: '/weigh-ins' },
 ]
 
 function renderLayout(path: string, state: AuthState) {
@@ -43,7 +42,7 @@ const signedOut: AuthState = { error: null, status: 'signed-out', user: null }
 afterEach(() => cleanup())
 
 describe('AppLayout', () => {
-  it('renders accessible landmarks and all six existing live destinations', () => {
+  it('renders retained destinations without standalone Weigh-in navigation', () => {
     renderLayout('/', signedOut)
 
     expect(screen.getByRole('banner')).toHaveTextContent('Slimpossible')
@@ -52,6 +51,9 @@ describe('AppLayout', () => {
     ).toBeInTheDocument()
     expect(screen.getByRole('main')).toHaveTextContent('Live route content')
     expect(screen.getByRole('contentinfo')).toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: 'Weigh-in' }),
+    ).not.toBeInTheDocument()
 
     for (const { label, path } of liveNavigation) {
       expect(screen.getByRole('link', { name: label })).toHaveAttribute(

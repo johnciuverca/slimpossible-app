@@ -9,13 +9,93 @@ function shiftDate(dateOnly: string, days: number) {
   return date.toISOString().slice(0, 10)
 }
 
-async function installGroupFixtures(page: Page, multiple = false) {
+async function installGroupFixtures(
+  page: Page,
+  multiple = false,
+  ownEntries = false,
+) {
   const requests: string[] = []
+  let ownWeight: number | null = 88.5
   page.on('request', (request) => requests.push(request.url()))
 
   await page.route(`${supabaseRestUrl}/**`, async (route) => {
     const request = route.request()
     const url = new URL(request.url())
+    if (ownEntries && url.pathname === '/rest/v1/participants') {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            id: 'own-membership',
+            challenge_id: challengeId,
+            user_id: 'e2e-user',
+            display_name: 'Own viewer',
+            starting_weight_kg: 100,
+            target_weight_kg: 80,
+            status: 'active',
+            created_at: '2026-09-01T00:00:00Z',
+            updated_at: '2026-09-01T00:00:00Z',
+            joined_at: '2026-09-01T00:00:00Z',
+          },
+          {
+            id: 'own-second-membership',
+            challenge_id: 'e2e-second-group',
+            user_id: 'e2e-user',
+            display_name: 'Own viewer',
+            starting_weight_kg: 100,
+            target_weight_kg: 80,
+            status: 'active',
+            created_at: '2026-09-01T00:00:00Z',
+            updated_at: '2026-09-01T00:00:00Z',
+            joined_at: '2026-09-01T00:00:00Z',
+          },
+        ]),
+      })
+      return
+    }
+    const ownRow = () => ({
+      id: 'disposable-own-entry',
+      recorded_date: '2026-09-22',
+      weight_kg: ownWeight,
+      note: 'Author-only disposable private note',
+      shared_challenge_ids: [challengeId, 'e2e-second-group'],
+    })
+    if (
+      ownEntries &&
+      url.pathname === '/rest/v1/rpc/list_my_personal_weigh_ins'
+    ) {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify(ownWeight === null ? [] : [ownRow()]),
+      })
+      return
+    }
+    if (ownEntries && url.pathname === '/rest/v1/rpc/save_personal_weigh_in') {
+      const body = request.postDataJSON()
+      expect(body.target_weigh_in_id).toBe('disposable-own-entry')
+      expect(body.target_note).toBe('Author-only disposable private note')
+      expect(body.target_shared_challenge_ids).toEqual([
+        challengeId,
+        'e2e-second-group',
+      ])
+      ownWeight = body.target_weight_kg
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify([ownRow()]),
+      })
+      return
+    }
+    if (
+      ownEntries &&
+      url.pathname === '/rest/v1/rpc/delete_personal_weigh_in'
+    ) {
+      expect(request.postDataJSON()).toEqual({
+        target_weigh_in_id: 'disposable-own-entry',
+      })
+      ownWeight = null
+      await route.fulfill({ contentType: 'application/json', body: 'true' })
+      return
+    }
 
     if (url.pathname === '/rest/v1/rpc/get_group_chart_history') {
       const { target_challenge_id } = request.postDataJSON() as {
@@ -33,12 +113,16 @@ async function installGroupFixtures(page: Page, multiple = false) {
             note: 'fixture private note must never render',
             email: 'private@example.invalid',
           },
-          {
-            member_key: 'opaque-member-a',
-            display_name: name,
-            recorded_date: '2026-09-22',
-            weight_kg: 88.5,
-          },
+          ...(ownEntries && ownWeight === null
+            ? []
+            : [
+                {
+                  member_key: 'opaque-member-a',
+                  display_name: name,
+                  recorded_date: '2026-09-22',
+                  weight_kg: ownEntries ? ownWeight : 88.5,
+                },
+              ]),
           {
             member_key: 'opaque-member-b',
             display_name: name,
@@ -185,6 +269,103 @@ for (const viewport of [
   { label: 'desktop', width: 1280 },
   { label: 'mobile', width: 390 },
 ]) {
+  test(`only own shared entries edit/delete and refresh all selected groups on ${viewport.label}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: 700 })
+    const requests = await installGroupFixtures(page, true, true)
+    await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    const own = page.getByRole('list', {
+      name: 'Your own shared group entries',
+    })
+    const matrix = page.getByRole('table', {
+      name: 'Shared group weight history',
+    })
+    await expect(
+      own.getByRole('button', { name: 'Edit weight 2026-09-22' }),
+    ).toBeVisible()
+    await expect(own.getByRole('button')).toHaveCount(2)
+    await expect(matrix.getByRole('button')).toHaveCount(0)
+    await expect(
+      page.getByText('Author-only disposable private note', { exact: true }),
+    ).toHaveCount(0)
+    await own.getByRole('button', { name: 'Edit weight 2026-09-22' }).click()
+    const editor = page.getByRole('dialog', {
+      name: 'Edit weight',
+      exact: true,
+    })
+    await expect(editor.getByLabel('Weight in kg')).toBeFocused()
+    await expect(editor.getByLabel('Weight in kg')).toHaveValue('88.5')
+    await expect(editor.getByLabel('Private note (optional)')).toHaveValue(
+      'Author-only disposable private note',
+    )
+    await expect(editor.getByRole('checkbox')).toHaveCount(2)
+    await expect(editor.getByRole('checkbox').first()).toBeChecked()
+    await expect(editor.getByRole('checkbox').last()).toBeChecked()
+    await editor.getByLabel('Weight in kg').fill('87')
+    await editor.getByRole('button', { name: 'Update weight' }).click()
+    await expect(own.getByText('87 kg', { exact: false })).toBeVisible()
+    await expect(matrix.getByText('87 kg', { exact: true })).toBeVisible()
+    await expect(
+      page.getByText('Author-only disposable private note', { exact: true }),
+    ).toHaveCount(0)
+    const countBefore = requests.filter((url) =>
+      url.includes('get_group_chart_history'),
+    ).length
+    await page
+      .getByRole('navigation', { name: 'Primary navigation' })
+      .getByRole('link', { name: 'My progress', exact: true })
+      .click()
+    const personalActions = page.getByRole('list', {
+      name: 'Your own personal entry actions',
+    })
+    await personalActions
+      .getByRole('button', { name: 'Edit weight 2026-09-22' })
+      .click()
+    await expect(editor.getByLabel('Weight in kg')).toHaveValue('87')
+    await expect(editor.getByLabel('Private note (optional)')).toHaveValue(
+      'Author-only disposable private note',
+    )
+    await page.keyboard.press('Escape')
+    await page
+      .getByRole('navigation', { name: 'Primary navigation' })
+      .getByRole('link', { name: 'Group', exact: true })
+      .click()
+    await own.getByRole('button', { name: 'Delete 2026-09-22' }).click()
+    const deletion = page.getByRole('dialog', { name: 'Delete weight?' })
+    await expect(deletion).toContainText('87 kg recorded 2026-09-22')
+    await expect(deletion).toContainText('ALL shared groups')
+    await expect(deletion.getByRole('form')).toHaveCount(0)
+    await deletion.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await expect(
+      own.getByRole('button', { name: 'Delete 2026-09-22' }),
+    ).toBeFocused()
+    await expect(matrix.getByText('87 kg', { exact: true })).toBeVisible()
+    await own.getByRole('button', { name: 'Delete 2026-09-22' }).click()
+    await deletion
+      .getByRole('button', { name: 'Delete weight', exact: true })
+      .click()
+    await expect(
+      page.getByText('No own entries shared with this group.'),
+    ).toBeVisible()
+    await expect(matrix.getByText('87 kg', { exact: true })).toHaveCount(0)
+    expect(
+      requests.filter((url) => url.includes('get_group_chart_history')).length,
+    ).toBeGreaterThan(countBefore)
+    await page
+      .getByRole('navigation', { name: 'Challenge contexts' })
+      .getByRole('link', {
+        name: 'Group · Second authorized group',
+        exact: true,
+      })
+      .click()
+    await expect(page.getByText('73.2%', { exact: true })).toBeVisible()
+    await expect(
+      page.getByText('No own entries shared with this group.'),
+    ).toBeVisible()
+    await expect(matrix.getByText('87 kg', { exact: true })).toHaveCount(0)
+    await expect(matrix.getByText('70 kg', { exact: true })).toBeVisible()
+  })
   test(`spreadsheet member tabs and sticky navigation stay usable on ${viewport.label}`, async ({
     page,
   }) => {

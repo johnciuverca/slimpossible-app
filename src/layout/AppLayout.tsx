@@ -5,6 +5,7 @@ import { AuthSessionUI } from '../auth/AuthSessionUI'
 import { useOptionalAuth } from '../auth/useAuth'
 import { Button } from '../components/ui'
 import { ChallengeContextTabs } from '../components/ChallengeContextTabs'
+import { UnsavedChangesDialog } from '../components/UnsavedChangesDialog'
 import {
   NavigationSafetyContext,
   type NavigationBlock,
@@ -20,7 +21,6 @@ const navigationItems = [
   { label: 'My progress', to: '/progress' },
   { label: 'Group', to: '/group' },
   { label: 'Goals', to: '/goals' },
-  { label: 'Weigh-in', to: '/weigh-ins' },
 ]
 
 function withSelectedChallenge(to: string, search: string, from: string) {
@@ -66,13 +66,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   useEffect(() => {
     setPending(null)
   }, [owner])
-  const confirmDialog = useRef<HTMLDialogElement>(null)
   const currentPending = pending?.owner === owner ? pending : null
-  useEffect(() => {
-    const dialog = confirmDialog.current
-    if (currentPending) dialog?.showModal()
-    return () => dialog?.close()
-  }, [currentPending])
   const contextPage =
     ['/challenges', '/progress', '/goals', '/weigh-ins'].includes(pathname) ||
     (pathname === '/' && new URLSearchParams(search).has('challenge'))
@@ -183,46 +177,15 @@ export function AppLayout({ children }: AppLayoutProps) {
           {children}
         </main>
         {currentPending ? (
-          <dialog
-            ref={confirmDialog}
-            aria-labelledby="discard-editor-title"
-            onCancel={(event) => {
-              event.preventDefault()
+          <UnsavedChangesDialog
+            saving={currentPending.saving}
+            onStay={() => setPending(null)}
+            onDiscard={() => {
+              const to = currentPending.to
               setPending(null)
+              navigate(to)
             }}
-            className="m-auto max-w-sm rounded-2xl border border-line bg-panel p-6 text-ink backdrop:bg-black/40"
-          >
-            <h2 id="discard-editor-title" className="text-xl font-bold">
-              {currentPending.saving
-                ? 'Save in progress'
-                : 'Discard unsaved input?'}
-            </h2>
-            <p className="mt-3 text-sm text-ink-muted">
-              {currentPending.saving
-                ? 'Stay here until the save or deletion finishes. It cannot be cancelled by switching contexts.'
-                : 'Your unsaved input will not be carried to another view or saved. Stay here to keep editing, or discard it and leave.'}
-            </p>
-            <div className="mt-5 flex gap-3">
-              <Button
-                variant="secondary"
-                autoFocus
-                onClick={() => setPending(null)}
-              >
-                Stay
-              </Button>
-              {!currentPending.saving ? (
-                <Button
-                  onClick={() => {
-                    const to = currentPending.to
-                    setPending(null)
-                    navigate(to)
-                  }}
-                >
-                  Discard and leave
-                </Button>
-              ) : null}
-            </div>
-          </dialog>
+          />
         ) : null}
 
         <footer className="border-t border-line bg-panel">

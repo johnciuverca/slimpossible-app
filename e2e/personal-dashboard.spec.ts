@@ -201,14 +201,18 @@ for (const viewport of [
       .getByRole('link', { name: 'Back to My Progress', exact: true })
       .click()
     await expect(table.getByText('84 kg', { exact: true })).toBeVisible()
-    page.once('dialog', (confirm) => confirm.dismiss())
     await table
       .getByRole('button', { name: `Delete ${date}`, exact: true })
       .click()
+    const deletion = page.getByRole('dialog', { name: 'Delete weight?' })
+    await expect(deletion).toContainText('ALL shared groups')
+    await deletion.getByRole('button', { name: 'Cancel', exact: true }).click()
     await expect(table.getByText('84 kg', { exact: true })).toBeVisible()
-    page.once('dialog', (confirm) => confirm.accept())
     await table
       .getByRole('button', { name: `Delete ${date}`, exact: true })
+      .click()
+    await deletion
+      .getByRole('button', { name: 'Delete weight', exact: true })
       .click()
     await expect(page.getByText(/No personal entries yet/)).toBeVisible()
     await expect(

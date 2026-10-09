@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { usePersonalWorkspace } from '../data/usePersonalWorkspace'
 import {
@@ -10,6 +10,7 @@ import {
 } from '../components/ui'
 import { PersonalProgressChart } from '../components/PersonalProgressChart'
 import { RecordWeightDialog } from '../components/RecordWeightDialog'
+import { DeleteWeightDialog } from '../components/DeleteWeightDialog'
 import {
   WeightPageHeader,
   RecordWeightAction,
@@ -19,7 +20,6 @@ import { ChallengeSummaryCards } from '../components/ChallengeSummaryCards'
 import {
   personalHistory,
   formatPersonalChange,
-  formatPersonalWeight,
 } from '../models/personalHistory'
 import {
   personalWeighInToday,
@@ -36,8 +36,6 @@ export function MyProgressPage() {
 
 function PersonalHistoryPage() {
   const workspace = usePersonalWorkspace()
-  const owner = useRef(workspace.ownerKey)
-  owner.current = workspace.ownerKey
   const [editor, setEditor] = useState<{
     key: string
     entry?: PersonalWeighIn
@@ -47,9 +45,10 @@ function PersonalHistoryPage() {
     message: string
     error?: boolean
   } | null>(null)
-  const [deleting, setDeleting] = useState<{ key: string; id: string } | null>(
-    null,
-  )
+  const [deleting, setDeleting] = useState<{
+    key: string
+    entry: PersonalWeighIn
+  } | null>(null)
   const { history, changeKg } = personalHistory(
     workspace.personal.data,
     personalWeighInToday(),
@@ -59,51 +58,6 @@ function PersonalHistoryPage() {
     setNotice(null)
     setDeleting(null)
   }, [workspace.ownerKey])
-
-  async function deleteEntry(entry: PersonalWeighIn) {
-    if (
-      !window.confirm(
-        `Delete ${formatPersonalWeight(entry.weightKg)} recorded ${entry.date}? Its group shares will also be removed.`,
-      ) ||
-      workspace.persistence.mode === 'unavailable'
-    )
-      return
-    const key = workspace.ownerKey
-    setDeleting({ key, id: entry.id })
-    try {
-      const result =
-        await workspace.persistence.repositories.personalWeighIns.delete(
-          workspace.userId,
-          entry.id,
-        )
-      if (owner.current !== key) return
-      setDeleting(null)
-      if (result.state !== 'success' || !result.data) {
-        setNotice({
-          key,
-          error: true,
-          message:
-            'Deletion could not be confirmed. Your displayed history has not been changed; refresh or try again.',
-        })
-        return
-      }
-      setNotice({
-        key,
-        message:
-          'Entry and linked group shares deleted. Your personal and challenge summaries are refreshing.',
-      })
-      workspace.refresh()
-    } catch {
-      if (owner.current === key) {
-        setDeleting(null)
-        setNotice({
-          key,
-          error: true,
-          message: 'Deletion could not be confirmed. Try again.',
-        })
-      }
-    }
-  }
 
   return (
     <section
@@ -182,11 +136,8 @@ function PersonalHistoryPage() {
                       )?.name ?? 'an unavailable group'
                     }
                     onEdit={() => setEditor({ key: workspace.ownerKey, entry })}
-                    onDelete={() => void deleteEntry(entry)}
-                    disabled={deleting?.key === workspace.ownerKey}
-                    deleting={
-                      deleting?.key === workspace.ownerKey &&
-                      deleting.id === entry.id
+                    onDelete={() =>
+                      setDeleting({ key: workspace.ownerKey, entry })
                     }
                   />
                 ))}
@@ -225,6 +176,23 @@ function PersonalHistoryPage() {
               key: workspace.ownerKey,
               message:
                 'Personal weight saved. Your history and challenge summaries are refreshing.',
+            })
+            workspace.refresh()
+          }}
+        />
+      ) : null}
+      {deleting?.key === workspace.ownerKey ? (
+        <DeleteWeightDialog
+          key={`${deleting.key}:${deleting.entry.id}`}
+          workspace={workspace}
+          entry={deleting.entry}
+          onClose={() => setDeleting(null)}
+          onDeleted={() => {
+            setDeleting(null)
+            setNotice({
+              key: workspace.ownerKey,
+              message:
+                'Entry and linked group shares deleted. Your personal and challenge summaries are refreshing.',
             })
             workspace.refresh()
           }}

@@ -37,6 +37,10 @@ vi.mock('../components/WeightPageHeader', () => ({
     </header>
   ),
 }))
+// Entry-action data loading is covered independently with author-scoped fixtures.
+vi.mock('../components/WeightEntryActions', () => ({
+  PersonalEntryActions: () => null,
+}))
 import {
   localDateOnly,
   provisionalWeekDates,
@@ -369,8 +373,8 @@ describe('HomePage', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Update weight' }))
     await screen.findByText(/90 kg/)
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     fireEvent.click(screen.getByRole('button', { name: `Delete ${today}` }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete weight' }))
     await screen.findByText('Weigh-in and its group shares were deleted.')
     cleanup()
 

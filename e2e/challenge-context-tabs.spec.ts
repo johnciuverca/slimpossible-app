@@ -207,10 +207,7 @@ for (const width of [1280, 390]) {
       .getByRole('button', { name: 'Discard and leave', exact: true })
       .click()
     await expect(page.getByTestId('fixture-route')).toHaveText('/goals')
-    await page
-      .getByRole('navigation', { name: 'Primary navigation' })
-      .getByRole('link', { name: 'Weigh-in', exact: true })
-      .click()
+    await page.goto(fixture('/weigh-ins'))
     await expect(weight).toHaveValue('')
     await expect(page.getByLabel('Private note (optional)')).toHaveValue('')
     await expect(draft).not.toBeChecked()
