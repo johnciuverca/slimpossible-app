@@ -16,7 +16,6 @@ export function GroupChartHistory({
   viewerId,
   persistence,
   refreshVersion,
-  navigation,
   children,
   enabled = true,
 }: {
@@ -24,7 +23,6 @@ export function GroupChartHistory({
   viewerId: string
   persistence: Persistence
   refreshVersion: number
-  navigation?: ReactNode
   children?: ReactNode
   enabled?: boolean
 }) {
@@ -126,11 +124,6 @@ export function GroupChartHistory({
         ref={navigationRef}
         className="sticky top-0 z-20 min-w-0 rounded-xl border border-stone-200 bg-page shadow-sm"
       >
-        {navigation ? (
-          <div className="max-h-[32dvh] overflow-y-auto p-3 sm:p-4">
-            {navigation}
-          </div>
-        ) : null}
         <div
           ref={tabs}
           role="tablist"

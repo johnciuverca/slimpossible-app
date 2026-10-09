@@ -1369,6 +1369,20 @@ describe('GroupDashboardPage', () => {
         target_weight_kg: null,
         updated_at: '2026-09-17T10:00:00.000Z',
       },
+      {
+        challenge_kind: 'personal',
+        created_at: '2026-09-17T10:00:00.000Z',
+        created_by: 'owner-1',
+        description: null,
+        end_date: '2026-10-01',
+        id: 'personal-1',
+        name: 'Private plan',
+        owner_id: 'owner-1',
+        start_date: '2026-09-17',
+        status: 'active',
+        target_weight_kg: 75,
+        updated_at: '2026-09-17T10:00:00.000Z',
+      },
     ]
     const fetchMock = vi
       .fn()
@@ -1460,6 +1474,12 @@ describe('GroupDashboardPage', () => {
     expect(
       screen.getByRole('link', { name: /Group · Autumn challenge/ }),
     ).toHaveAttribute('aria-current', 'page')
+    expect(
+      screen.queryByRole('link', { name: /Personal tracking/ }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: /Personal ·/ }),
+    ).not.toBeInTheDocument()
     expect(screen.getByText('48.5%')).toBeInTheDocument()
     expect(screen.getByText(/Shared weekly winners/)).toBeInTheDocument()
     expect(
@@ -2010,6 +2030,9 @@ describe('personal/group challenge boundaries', () => {
     expect(
       await screen.findByText(/Personal challenges are private/),
     ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: /Personal/ }),
+    ).not.toBeInTheDocument()
     expect(
       fetchMock.mock.calls.some(([url]) =>
         String(url).includes('/rpc/get_group_progress_summary'),

@@ -6,15 +6,15 @@ Latest staging was merged into the existing PR branch without rewriting history.
 
 ## Result
 
-- Group's existing authorized challenge row is now above the heading, outside
-  the summary card, inside #246's preserved sticky navigation shell. Its 24px
-  header gap matches Challenges, My progress and Goals, with exactly one row.
+- Group's authorized group-only challenge row sits above the heading, with no
+  Personal tracking pill or personal challenge links. Its 24px header gap
+  matches Challenges, My progress and Goals, with exactly one context row.
 - The unchanged shared Record weight header now has matching desktop top/right
   placement and mobile spacing below the heading text. Canonical recording,
   private notes, correction behavior and explicit sharing remain unchanged.
-- No-query Group keeps its existing first-group default. Explicit selections
-  remain truthful: an unavailable ID no longer highlights a different default
-  group. Personal contexts retain their existing My progress destination.
+- No-query and empty-query Group keep the first-group default. Explicit group
+  selections remain truthful; unavailable or personal challenge IDs do not
+  highlight a substitute or expose a personal destination from Group.
 - Horizontal tab overflow, keyboard activation, loading/error guidance and
   account isolation remain in place. Personal Dashboard/home/Today remain free
   of challenge tabs and cards as delivered in #240.
@@ -23,10 +23,11 @@ Latest staging was merged into the existing PR branch without rewriting history.
 - The merged spreadsheet matrix, All members/member tabs, shared-history RPC,
   selected-member/context resets and recording refresh callback remain intact.
   Refresh shared progress stays in the content card below the sticky bar.
-- Short screens retain #246's bounded, internally scrollable upper header. A
-  demonstrated focus-offset bug is fixed: controls inside that bar use zero
-  scroll margin, while content below it retains the measured sticky offset.
-  Keyboard focus brings Record weight fully into view without page overflow.
+- The challenge row and page header are in normal page flow, matching the
+  shared context/header layout on Challenges, My progress and Goals. Only the
+  member tabs remain sticky; no nested vertical scroll traps the context row or
+  Record weight on short/mobile screens. Keyboard focus offsets remain scoped
+  to the sticky member tabs and scrollable history content.
 
 ## Local validation — 2026-10-08
 
@@ -47,18 +48,18 @@ Latest staging was merged into the existing PR branch without rewriting history.
 ## Refreshed integration validation — 2026-10-09
 
 - Format, lint, typecheck, build and diff checks pass; existing bundle warning
-  remains. 446 unit tests across 74 files pass, including the empty challenge
-  query defaulting to the first visible group.
+  remains. 448 unit tests across 74 files pass, including empty-query default,
+  group-only contexts and truthful unavailable selection.
 - 79 browser tests pass: 71 application and 8 Group tests. The alignment cases
   compare desktop/mobile geometry with other challenge pages, check one context
-  row, default/explicit/unavailable selections and account isolation, and now
-  require focused Record weight to be fully inside the bounded upper bar.
+  row, default/explicit/unavailable selections and account isolation. Group
+  checks verify no nested vertical scroll and focused-action visibility on a
+  short mobile viewport.
   The merged matrix/member/keyboard/sticky/privacy/refresh tests remain green.
 - Read-only in-app synthetic visual checks confirmed challenge-row order and
-  desktop action position. Mobile inspection reproduced the clipped focus
-  issue, then confirmed keyboard focus fully reveals the action after the scoped
-  CSS fix with no horizontal page overflow. Viewport was reset and local server
-  stopped. No connected data was modified or used as synthetic evidence.
+  desktop action position. Browser checks at 390x568 confirmed that the normal
+  page flow keeps the focused action visible without horizontal overflow. No
+  connected data was modified or used as synthetic evidence.
 - Against refreshed staging, only the Group page layout/selection, scoped focus
   CSS, alignment/browser assertions and this issue's notes differ. The merged
   chart/matrix/member components, model, repositories and SQL are unchanged.
@@ -67,15 +68,16 @@ Latest staging was merged into the existing PR branch without rewriting history.
 
 PM/owner should check the immutable PR preview on desktop and mobile:
 
-1. Compare Group with Challenges, My progress and Goals: one context row above
-   the heading, consistent header gap and Record weight placement.
-2. Refresh Group without a query and with explicit group selections. Active
-   highlights match the displayed context; unavailable IDs do not highlight a
-   substitute group. A personal tab leads to its My progress view.
-3. Use keyboard navigation and a narrow viewport with many contexts. Tabs scroll
-   horizontally without page overflow and focused links remain usable. The
-   sticky upper area still scrolls internally on short screens; tab to Record
-   weight and confirm it becomes fully visible rather than clipped.
+1. Compare Group with Challenges, My progress and Goals: one group-only context
+   row above the heading, consistent header gap and Record weight placement.
+2. Refresh Group without a query, with an empty query, and with explicit group
+   selections. Active highlights match the displayed group; unavailable and
+   personal IDs do not highlight a substitute. Confirm no Personal tracking
+   pill or personal link appears on Group.
+3. Use keyboard navigation and a short mobile viewport with many group
+   contexts. The page scrolls normally, member tabs remain sticky, no nested
+   vertical scroll traps the context row, and focused actions stay visible.
+   Horizontal tab scrolling must not overflow the page.
 4. Switch accounts: previous contexts and summaries disappear. Dashboard,
    personal home and Today still have no challenge tabs or cards.
 5. Record weight still opens today's existing canonical entry with note/shares

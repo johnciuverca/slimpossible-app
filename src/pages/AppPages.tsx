@@ -1469,7 +1469,7 @@ export function GroupDashboardPage() {
       const visibleChallenges = allVisibleChallenges.filter(
         ({ kind }) => kind === 'group',
       )
-      setChallenges(allVisibleChallenges)
+      setChallenges(visibleChallenges)
       const challenge = challengeParam
         ? visibleChallenges.find(({ id }) => id === challengeParam)
         : visibleChallenges[0]
@@ -1602,36 +1602,33 @@ export function GroupDashboardPage() {
       className="mx-auto w-full max-w-6xl space-y-6"
       aria-labelledby="group-title"
     >
+      <div className="space-y-6">
+        <ChallengeTabs
+          challenges={challenges}
+          selectedId={selectedChallengeId}
+          loading={isLoading}
+          showPersonalTracking={false}
+        />
+        <WeightPageHeader onRecorded={() => setReloadKey((value) => value + 1)}>
+          <PageHeader
+            description="Shared summary, this week’s provisional leader, and Sunday-based results for the selected challenge. History includes only explicitly shared weights; notes stay private."
+            title="Group dashboard"
+            titleId="group-title"
+          >
+            <StatusPill>
+              {selectedChallenge?.name ??
+                data?.challenge.name ??
+                'Shared progress'}
+            </StatusPill>
+          </PageHeader>
+        </WeightPageHeader>
+      </div>
       <GroupChartHistory
         challengeId={data?.challenge.id ?? selectedChallengeId}
         viewerId={ownerId ?? ''}
         persistence={persistence}
         refreshVersion={reloadKey}
         enabled={Boolean(summary)}
-        navigation={
-          <div className="space-y-6">
-            <ChallengeTabs
-              challenges={challenges}
-              selectedId={selectedChallengeId}
-              loading={isLoading}
-            />
-            <WeightPageHeader
-              onRecorded={() => setReloadKey((value) => value + 1)}
-            >
-              <PageHeader
-                description="Shared summary, this week’s provisional leader, and Sunday-based results for the selected challenge. History includes only explicitly shared weights; notes stay private."
-                title="Group dashboard"
-                titleId="group-title"
-              >
-                <StatusPill>
-                  {selectedChallenge?.name ??
-                    data?.challenge.name ??
-                    'Shared progress'}
-                </StatusPill>
-              </PageHeader>
-            </WeightPageHeader>
-          </div>
-        }
       >
         <Card className="p-5 sm:p-8 lg:p-10">
           <div className="mt-6 flex flex-wrap items-end gap-4">
