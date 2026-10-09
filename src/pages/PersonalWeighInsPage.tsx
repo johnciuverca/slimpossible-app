@@ -314,6 +314,7 @@ export function PersonalWeighInsPage() {
       <WeightPageHeader
         action={
           <Button
+            data-weight-owner={workspace.ownerKey}
             disabled={isLoading || !!loadError || isSaving}
             onClick={recordWeight}
           >

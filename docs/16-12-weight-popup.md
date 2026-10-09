@@ -8,6 +8,8 @@ Issue #245, parent #199. Based on staging
 - Dashboard retains no-challenge Record weight. Record and Edit reuse
   `RecordWeightDialog` and the canonical `PersonalWeighInEditor`, with initial
   weight focus, explicit Tab boundaries, native modal semantics and focus return.
+  Cancel/clean dismissal returns to the trigger; successful mutation returns to
+  the stable Record weight action after refresh, since the original row may vanish.
 - Dirty Escape, Close and Cancel edit use the same Stay/Discard confirmation as
   navigation. In-flight forms cannot change inputs or submit twice.
 - Delete is a separate confirmation, not a recording form. It shows date/weight,

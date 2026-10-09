@@ -307,6 +307,9 @@ for (const viewport of [
     await expect(own.getByText('87 kg', { exact: false })).toBeVisible()
     await expect(matrix.getByText('87 kg', { exact: true })).toBeVisible()
     await expect(
+      page.getByRole('button', { name: 'Record weight', exact: true }),
+    ).toBeFocused()
+    await expect(
       page.getByText('Author-only disposable private note', { exact: true }),
     ).toHaveCount(0)
     const countBefore = requests.filter((url) =>
@@ -349,6 +352,9 @@ for (const viewport of [
       page.getByText('No own entries shared with this group.'),
     ).toBeVisible()
     await expect(matrix.getByText('87 kg', { exact: true })).toHaveCount(0)
+    await expect(
+      page.getByRole('button', { name: 'Record weight', exact: true }),
+    ).toBeFocused()
     expect(
       requests.filter((url) => url.includes('get_group_chart_history')).length,
     ).toBeGreaterThan(countBefore)

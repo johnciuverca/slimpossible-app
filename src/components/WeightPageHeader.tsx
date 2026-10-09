@@ -58,6 +58,7 @@ export function RecordWeightAction({
   return (
     <>
       <Button
+        data-weight-owner={workspace.ownerKey}
         disabled={workspace.personal.state !== 'ready'}
         onClick={() => setOpenOwner(workspace.ownerKey)}
       >

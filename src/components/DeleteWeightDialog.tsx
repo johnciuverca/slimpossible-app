@@ -4,7 +4,7 @@ import type { PersonalWeighIn } from '../models/personalWeighIn'
 import { formatPersonalWeight } from '../models/personalHistory'
 import { useUnsavedNavigation } from './navigationSafety'
 import { Button } from './ui'
-import { trapDialogFocus } from './dialogFocus'
+import { focusAfterWeightMutation, trapDialogFocus } from './dialogFocus'
 
 export function DeleteWeightDialog({
   workspace,
@@ -67,14 +67,7 @@ export function DeleteWeightDialog({
         return
       }
       dialog.current?.close()
-      // Deleted row's trigger disappears on refresh: return to the page action.
-      trigger.current
-        ?.closest(
-          '[aria-labelledby="group-title"], [aria-labelledby="my-progress-title"], [aria-labelledby="personal-weigh-ins-title"], [aria-labelledby="progress-title"]',
-        )
-        ?.querySelector<HTMLElement>('[data-weight-page-header] button')
-        ?.focus()
-      onDeleted()
+      focusAfterWeightMutation(trigger.current, onDeleted)
     } catch {
       if (active.current) {
         setDeleting(false)

@@ -19,3 +19,49 @@ export function trapDialogFocus(event: KeyboardEvent<HTMLDialogElement>) {
     first.focus()
   }
 }
+
+/** A refreshed/deleted row may disappear. Return to the stable page action once ready. */
+export function focusAfterWeightMutation(
+  trigger: HTMLElement | null,
+  changed: () => void = () => undefined,
+) {
+  const button = trigger
+    ?.closest('main')
+    ?.querySelector<HTMLButtonElement>('[data-weight-page-header] button')
+  // Resolve the stable action before refresh can detach the originating row.
+  changed()
+  if (!button) {
+    if (trigger?.isConnected) trigger.focus()
+    return
+  }
+  const owner = button.dataset.weightOwner
+  // Let React commit refresh/loading first; don't focus a temporarily disabled action.
+  window.setTimeout(() => {
+    const observer = new MutationObserver(ready)
+    let sawLoading = false
+    const timeout = window.setTimeout(() => observer.disconnect(), 5000)
+    function ready() {
+      if (!button!.isConnected || button!.dataset.weightOwner !== owner) {
+        observer.disconnect()
+        window.clearTimeout(timeout)
+        return
+      }
+      if (button!.disabled) {
+        sawLoading = true
+      } else {
+        button!.focus()
+        // A passive-effect refresh can begin after the first enabled render.
+        // Keep watching until that loading cycle has finished.
+        if (sawLoading) {
+          observer.disconnect()
+          window.clearTimeout(timeout)
+        }
+      }
+    }
+    observer.observe(button, {
+      attributes: true,
+      attributeFilter: ['disabled', 'data-weight-owner'],
+    })
+    ready()
+  }, 0)
+}

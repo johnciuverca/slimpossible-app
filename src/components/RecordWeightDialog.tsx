@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Button } from './ui'
 import { UnsavedChangesDialog } from './UnsavedChangesDialog'
-import { trapDialogFocus } from './dialogFocus'
+import { focusAfterWeightMutation, trapDialogFocus } from './dialogFocus'
 import {
   PersonalWeighInEditor,
   type PersonalWeighInFormValues,
@@ -142,8 +142,7 @@ export function RecordWeightDialog({
         return
       }
       dialog.current?.close()
-      if (trigger.current?.isConnected) trigger.current.focus()
-      onSaved()
+      focusAfterWeightMutation(trigger.current, onSaved)
     } catch {
       if (active.current) {
         setError('Your weigh-in could not be saved. Try again.')
