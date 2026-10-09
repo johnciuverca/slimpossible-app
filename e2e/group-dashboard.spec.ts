@@ -185,6 +185,99 @@ for (const viewport of [
   { label: 'desktop', width: 1280 },
   { label: 'mobile', width: 390 },
 ]) {
+  test(`spreadsheet member tabs and sticky navigation stay usable on ${viewport.label}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ height: 900, width: viewport.width })
+    const requests = await installGroupFixtures(page, true)
+    await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    const table = page.getByRole('table', {
+      name: 'Shared group weight history',
+    })
+    await expect(table.getByRole('columnheader')).toHaveText([
+      'Recorded date',
+      'Ava (member 1) (kg)',
+      'Ava (member 2) (kg)',
+    ])
+    const missing = table
+      .getByRole('row')
+      .filter({ has: page.getByRole('rowheader', { name: '2026-09-21' }) })
+    await expect(missing.getByRole('cell')).toHaveText([
+      '—',
+      '71 kg; change from first shared entry +1 kg',
+    ])
+    const tabs = page.getByRole('tablist', { name: 'Shared group members' })
+    const all = tabs.getByRole('tab', { name: 'All members' })
+    await all.focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(
+      tabs.getByRole('tab', { name: 'Ava (member 1)' }),
+    ).toBeFocused()
+    await expect(table.getByRole('columnheader')).toHaveCount(2)
+    await expect(table).toContainText('88.5 kg')
+    await expect(table).not.toContainText('70 kg')
+    await expect(page.getByRole('img').locator('circle')).toHaveCount(2)
+    await page.keyboard.press('End')
+    await expect(
+      tabs.getByRole('tab', { name: 'Ava (member 2)' }),
+    ).toBeFocused()
+    await expect(table).toContainText('71 kg')
+    await expect(table).not.toContainText('88.5 kg')
+    await page.keyboard.press('Home')
+    await expect(all).toBeFocused()
+    const weights = page.getByRole('region', {
+      name: 'Scrollable shared group weights',
+    })
+    await weights.focus()
+    await page.keyboard.press('ArrowRight')
+    if (viewport.width === 390) {
+      await expect
+        .poll(() => weights.evaluate((el) => el.scrollLeft))
+        .toBeGreaterThan(0)
+    }
+    const navigation = page.locator('.group-history-workspace > .sticky')
+    await expect
+      .poll(() =>
+        navigation.evaluate((el) => Math.round(el.getBoundingClientRect().top)),
+      )
+      .toBe(0)
+    const navBounds = await navigation.boundingBox()
+    expect(navBounds!.height).toBeLessThan(450)
+    const focusBounds = await weights.boundingBox()
+    expect(focusBounds!.y).toBeGreaterThanOrEqual(
+      navBounds!.y + navBounds!.height,
+    )
+    await expect(table.getByRole('columnheader').first()).toHaveCSS(
+      'position',
+      'sticky',
+    )
+    await expect(table.getByRole('rowheader').first()).toHaveCSS(
+      'position',
+      'sticky',
+    )
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+      .toBeLessThanOrEqual(viewport.width)
+    expect(
+      requests.some((url) =>
+        /\/(personal_weigh_ins|weigh_ins)(?:\?|$)/.test(url),
+      ),
+    ).toBe(false)
+    const contexts = page.getByRole('navigation', {
+      name: 'Challenge contexts',
+    })
+    await contexts
+      .getByRole('link', {
+        name: 'Group · Second authorized group',
+        exact: true,
+      })
+      .press('Enter')
+    await expect(
+      tabs.getByRole('tab', { name: 'All members' }),
+    ).toHaveAttribute('aria-selected', 'true')
+    await expect(table).toContainText('Jo (member 1)')
+    await expect(tabs.getByRole('tab', { name: /Ava/ })).toHaveCount(0)
+  })
   test(`chart refresh handles gains, corrections, unsharing, loading and errors on ${viewport.label}`, async ({
     page,
   }) => {

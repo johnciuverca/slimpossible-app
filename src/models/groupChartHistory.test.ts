@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   createGroupChartHistory,
+  createGroupHistoryMatrix,
   type GroupChartEntry,
 } from './groupChartHistory'
 const row = (
@@ -10,6 +11,38 @@ const row = (
 ): GroupChartEntry => ({ memberKey, displayName: 'Same name', date, weightKg })
 const today = '2026-10-08'
 describe('authorized Group chart aggregation', () => {
+  it('pivots only real dates into exact-weight cells with null gaps and distinct duplicate-name columns', () => {
+    const series = createGroupChartHistory(
+      [
+        row('a', '2026-10-01', 90),
+        row('a', '2026-10-03', 88.55),
+        row('b', '2026-10-02', 70),
+        row('c', '2026-10-01', 60),
+        row('b', '2099-10-01', 10),
+      ],
+      today,
+    )
+    const matrix = createGroupHistoryMatrix(series)
+    expect(matrix.map(({ date }) => date)).toEqual([
+      '2026-10-03',
+      '2026-10-02',
+      '2026-10-01',
+    ])
+    expect(
+      matrix.map(({ cells }) => cells.map((point) => point?.weightKg ?? null)),
+    ).toEqual([
+      [88.55, null, null],
+      [null, 70, null],
+      [90, null, 60],
+    ])
+    expect(
+      createGroupHistoryMatrix([series[1]]).map(({ date, cells }) => [
+        date,
+        cells[0]?.weightKg,
+      ]),
+    ).toEqual([['2026-10-02', 70]])
+    expect(createGroupHistoryMatrix([])).toEqual([])
+  })
   it('keeps duplicate names separate and compares each own baseline, not absolute weights', () => {
     const series = createGroupChartHistory(
       [

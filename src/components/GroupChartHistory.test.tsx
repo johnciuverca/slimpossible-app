@@ -1,4 +1,11 @@
-import { act, cleanup, render, screen, within } from '@testing-library/react'
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { GroupChartHistory } from './GroupChartHistory'
 import type { Persistence } from '../data/persistence'
@@ -17,6 +24,139 @@ const persistence = (
     repositories: { groupProgress: { getChartHistory: load } },
   }) as unknown as Persistence
 describe('Group chart history', () => {
+  it('shows a date/member matrix and keyboard-selects only one duplicate-name member without fetching personal data', async () => {
+    const load = vi.fn().mockResolvedValue({
+      state: 'success',
+      data: [
+        { ...rows[0], displayName: 'Same name' },
+        { ...rows[1], displayName: 'Same name' },
+        {
+          ...rows[0],
+          memberKey: 'b',
+          displayName: 'Same name',
+          date: '2026-09-02',
+          weightKg: 70.25,
+        },
+      ],
+    })
+    render(
+      <GroupChartHistory
+        challengeId="group"
+        viewerId="viewer"
+        persistence={persistence(load)}
+        refreshVersion={0}
+      />,
+    )
+    const table = await screen.findByRole('table')
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((cell) => cell.textContent),
+    ).toEqual([
+      'Recorded date',
+      'Same name (member 1) (kg)',
+      'Same name (member 2) (kg)',
+    ])
+    const dateRow = within(table)
+      .getByRole('rowheader', { name: '2026-09-02' })
+      .closest('tr')!
+    expect(within(dateRow).getByLabelText('No shared entry')).toHaveTextContent(
+      '—',
+    )
+    expect(dateRow).toHaveTextContent('70.25 kg')
+    const all = screen.getByRole('tab', { name: 'All members' })
+    fireEvent.keyDown(all, { key: 'End' })
+    expect(
+      screen.getByRole('tab', { name: 'Same name (member 2)' }),
+    ).toHaveFocus()
+    expect(
+      screen.getByRole('tab', { name: 'Same name (member 2)' }),
+    ).toHaveAttribute('aria-selected', 'true')
+    expect(table).not.toHaveTextContent('88.5 kg')
+    expect(table).toHaveTextContent('70.25 kg')
+    expect(screen.getByRole('img').querySelectorAll('circle')).toHaveLength(1)
+    expect(screen.getByRole('tabpanel')).toHaveAccessibleName(
+      'Same name (member 2)',
+    )
+    fireEvent.keyDown(
+      screen.getByRole('tab', { name: 'Same name (member 2)' }),
+      { key: 'Home' },
+    )
+    expect(all).toHaveFocus()
+    expect(table).toHaveTextContent('88.5 kg')
+    expect(load).toHaveBeenCalledTimes(1)
+    expect(load).toHaveBeenCalledWith('group')
+  })
+  it('retains a shared member on correction refresh but falls back to All members when its last share disappears', async () => {
+    const load = vi
+      .fn()
+      .mockResolvedValueOnce({ state: 'success', data: rows })
+      .mockResolvedValueOnce({
+        state: 'success',
+        data: [{ ...rows[0], weightKg: 91 }],
+      })
+      .mockResolvedValueOnce({
+        state: 'success',
+        data: [{ ...rows[0], memberKey: 'b', displayName: 'Ben' }],
+      })
+    const remote = persistence(load)
+    const view = (version: number) => (
+      <GroupChartHistory
+        challengeId="group"
+        viewerId="viewer"
+        persistence={remote}
+        refreshVersion={version}
+      />
+    )
+    const { rerender } = render(view(0))
+    fireEvent.click(await screen.findByRole('tab', { name: 'Ava' }))
+    rerender(view(1))
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    await screen.findByText('91 kg')
+    expect(screen.getByRole('tab', { name: 'Ava' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    rerender(view(2))
+    await screen.findByRole('tab', { name: 'Ben' })
+    expect(screen.queryByRole('tab', { name: 'Ava' })).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'All members' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+  })
+  it('clears selected-member state across account or challenge changes even with the same opaque key', async () => {
+    const load = vi.fn().mockResolvedValue({
+      state: 'success',
+      data: [rows[0], { ...rows[1], memberKey: 'b', displayName: 'Ben' }],
+    })
+    const remote = persistence(load)
+    const view = (viewer: string, challenge: string) => (
+      <GroupChartHistory
+        challengeId={challenge}
+        viewerId={viewer}
+        persistence={remote}
+        refreshVersion={0}
+      />
+    )
+    const { rerender } = render(view('one', 'a'))
+    fireEvent.click(await screen.findByRole('tab', { name: 'Ben' }))
+    rerender(view('two', 'a'))
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    await screen.findByRole('table')
+    expect(screen.getByRole('tab', { name: 'All members' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    fireEvent.click(screen.getByRole('tab', { name: 'Ben' }))
+    rerender(view('two', 'b'))
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    await screen.findByRole('table')
+    expect(screen.getByRole('tab', { name: 'All members' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+  })
   it('uses authorized projection, exact weights and missing-date gaps with accessible equivalents', async () => {
     const load = vi.fn().mockResolvedValue({ state: 'success', data: rows })
     render(
