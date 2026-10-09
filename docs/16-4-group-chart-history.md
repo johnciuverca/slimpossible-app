@@ -84,6 +84,36 @@ only temporary challenge/member/weight fixtures and rolls them back; it never
 creates Auth users. Never use real personal accounts or Production. Credentials
 and populated identities must not be committed.
 
+## Harness safety fix and regression — 2026-10-09
+
+Review found that fixed fixture dates could collide with existing disposable
+entries, and a null-ID save could upsert an existing account/date. The harness
+now chooses bounded unused past/future dates before DML, uses generated fixture
+IDs for every correction/unshare/delete, and fails closed when no dates exist.
+Existing entry/share snapshots are compared privately inside SQL; only named
+boolean assertions are returned, never identity values or snapshot contents.
+All fixture DML remains one atomic statement inside BEGIN/ROLLBACK. If SQL Editor
+reports an error, issue ROLLBACK before reusing the session.
+
+The local socket-only runner passed 12 chart assertions and five denial guards
+on both empty and populated synthetic accounts, plus the 32 existing canonical
+checks and additive inverse/reapply. Populated fixtures occupy every formerly
+fixed date and retain existing shares. Exact profile/challenge/participant/entry/
+share fingerprints stayed unchanged after successful rollback and after an
+injected failure following correction, deletion and withdrawal. An exhausted
+future-date test also aborted before DML with the exact state unchanged.
+Format/lint/typecheck/build and all 442 unit tests passed again; shell syntax and
+diff checks passed. Existing 75-browser-test evidence above is reused because
+application code is unchanged; these are not new connected browser results.
+
+Hosted execution is still NOT EXECUTED: PM requested exact-scope owner approval
+before generated fixture writes and private resolution of the three existing
+disposable identities. The available preview browser is signed into test1;
+remaining member mobile/keyboard checks need the owner to sign into the existing
+disposable member at the named preview and leave Group open. The withdrawn
+browser gate remains pending; transaction-local SQL denial and synthetic browser
+403 handling are separate evidence, not a silent replacement for that gate.
+
 ## Local validation — 2026-10-08
 
 - Format/lint/typecheck/build/diff checks pass; existing bundle warning remains.

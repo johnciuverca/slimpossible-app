@@ -37,6 +37,13 @@ describe('Group chart history SQL contract', () => {
     )
     expect(harness).toContain('duplicate_names_distinct_member_keys')
     expect(harness).toContain('withdrawn_author_rows_hidden')
+    expect(harness).toContain('existing_entries_and_shares_unchanged')
+    expect(harness).toContain('No unused fixture dates available')
+    expect(harness).not.toMatch(/save_personal_weigh_in\(null/)
+    expect(harness.indexOf('No unused fixture dates available')).toBeLessThan(
+      harness.indexOf('insert into public.profiles'),
+    )
+    expect(harness).toContain('passed is distinct from true')
     const rollback = read(
       'supabase/rollback/20261009000000_add_group_chart_history.sql',
     )
