@@ -12,6 +12,7 @@ import type {
   InviteAcceptanceValues,
 } from '../../models/challengeInvite'
 import type { WeighIn } from '../../models/weighIn'
+import type { GroupChartEntry } from '../../models/groupChartHistory'
 import type {
   GroupProgressSummary,
   GroupWeighInHistoryEntry,
@@ -125,6 +126,9 @@ export type PersonalWeighInRepository = {
 }
 
 export type GroupProgressRepository = {
+  getChartHistory: (
+    challengeId: string,
+  ) => Promise<RepositoryListResult<GroupChartEntry>>
   getForChallenge: (
     challengeId: string,
     currentSunday: string,
@@ -553,6 +557,31 @@ export function createRepositories(client: DatabaseClient): Repositories {
       },
     },
     groupProgress: {
+      async getChartHistory(challengeId) {
+        const { data, error } = await client.rpc('get_group_chart_history', {
+          target_challenge_id: challengeId,
+        })
+        if (error)
+          return {
+            error: requestError('load shared group chart history', error),
+            state: 'error',
+          }
+        return mapList(
+          data,
+          (row) => {
+            if (typeof row.member_key !== 'string' || !row.member_key) {
+              throw new Error('Missing authorized member key')
+            }
+            return {
+              memberKey: row.member_key,
+              displayName: row.display_name,
+              date: row.recorded_date,
+              weightKg: row.weight_kg,
+            }
+          },
+          'shared group chart history',
+        )
+      },
       async getForChallenge(challengeId, currentSunday) {
         const { data, error } = await client.rpc('get_group_progress_summary', {
           target_challenge_id: challengeId,

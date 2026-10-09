@@ -290,6 +290,15 @@ export type Database = {
           weight_kg: number
         }[]
       }
+      get_group_chart_history: {
+        Args: { target_challenge_id: string }
+        Returns: {
+          member_key: string
+          display_name: string
+          recorded_date: string
+          weight_kg: number
+        }[]
+      }
       get_provisional_group_leader_summary: {
         Args: { target_challenge_id: string; target_current_date: string }
         Returns: {

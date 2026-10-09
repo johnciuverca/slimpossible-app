@@ -606,6 +606,15 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
   }
 
   const groupProgress: GroupProgressRepository = {
+    async getChartHistory() {
+      return {
+        error: {
+          kind: 'request',
+          message: 'Shared group history requires a signed-in server session.',
+        },
+        state: 'error',
+      }
+    },
     async getForChallenge() {
       return {
         error: {

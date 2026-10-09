@@ -47,6 +47,22 @@ for (const width of [1280, 390]) {
         })
         expect(actionBox.y - textBox.bottom).toBeCloseTo(16, 0)
       }
+      if (path === '/group') {
+        await action.focus()
+        await expect(action).toBeFocused()
+        await expect
+          .poll(() =>
+            action.evaluate((element) => {
+              const action = element.getBoundingClientRect()
+              const bar = element
+                .closest('.group-history-workspace')!
+                .querySelector('.sticky > div')!
+                .getBoundingClientRect()
+              return action.top >= bar.top && action.bottom <= bar.bottom
+            }),
+          )
+          .toBe(true)
+      }
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth),
       ).toBe(width)

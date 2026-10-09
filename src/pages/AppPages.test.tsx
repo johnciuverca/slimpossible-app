@@ -1446,7 +1446,11 @@ describe('GroupDashboardPage', () => {
 
     renderDashboard(
       <GroupDashboardPage />,
-      fetchMock,
+      vi.fn((url: RequestInfo | URL, init?: RequestInit) =>
+        String(url).includes('/rpc/get_group_chart_history')
+          ? Promise.resolve(response([]))
+          : fetchMock(url, init),
+      ),
       '/group?challenge=challenge-1',
     )
 
@@ -1471,9 +1475,9 @@ describe('GroupDashboardPage', () => {
     const unavailableHistory = screen.getByRole('region', {
       name: 'Group chart and weigh-in history',
     })
-    expect(unavailableHistory).toHaveAttribute('aria-disabled', 'true')
+    expect(unavailableHistory).not.toHaveAttribute('aria-disabled')
     expect(unavailableHistory).toHaveTextContent(
-      'Not available yet · Chapter 16',
+      'Explicitly shared dates and weights only.',
     )
     expect(
       within(unavailableHistory).queryByRole('img'),

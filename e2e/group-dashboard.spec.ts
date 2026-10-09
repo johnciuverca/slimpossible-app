@@ -17,6 +17,45 @@ async function installGroupFixtures(page: Page, multiple = false) {
     const request = route.request()
     const url = new URL(request.url())
 
+    if (url.pathname === '/rest/v1/rpc/get_group_chart_history') {
+      const { target_challenge_id } = request.postDataJSON() as {
+        target_challenge_id: string
+      }
+      const name = target_challenge_id === challengeId ? 'Ava' : 'Jo'
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            member_key: 'opaque-member-a',
+            display_name: name,
+            recorded_date: '2026-09-20',
+            weight_kg: 90,
+            note: 'fixture private note must never render',
+            email: 'private@example.invalid',
+          },
+          {
+            member_key: 'opaque-member-a',
+            display_name: name,
+            recorded_date: '2026-09-22',
+            weight_kg: 88.5,
+          },
+          {
+            member_key: 'opaque-member-b',
+            display_name: name,
+            recorded_date: '2026-09-20',
+            weight_kg: 70,
+          },
+          {
+            member_key: 'opaque-member-b',
+            display_name: name,
+            recorded_date: '2026-09-21',
+            weight_kg: 71,
+          },
+        ]),
+      })
+      return
+    }
+
     if (url.pathname === '/rest/v1/challenges') {
       await route.fulfill({
         contentType: 'application/json',
@@ -146,6 +185,200 @@ for (const viewport of [
   { label: 'desktop', width: 1280 },
   { label: 'mobile', width: 390 },
 ]) {
+  test(`spreadsheet member tabs and sticky navigation stay usable on ${viewport.label}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ height: 900, width: viewport.width })
+    const requests = await installGroupFixtures(page, true)
+    await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    const table = page.getByRole('table', {
+      name: 'Shared group weight history',
+    })
+    await expect(table.getByRole('columnheader')).toHaveText([
+      'Recorded date',
+      'Ava (member 1) (kg)',
+      'Ava (member 2) (kg)',
+    ])
+    const missing = table
+      .getByRole('row')
+      .filter({ has: page.getByRole('rowheader', { name: '2026-09-21' }) })
+    await expect(missing.getByRole('cell')).toHaveText([
+      '—',
+      '71 kg; change from first shared entry +1 kg',
+    ])
+    const tabs = page.getByRole('tablist', { name: 'Shared group members' })
+    const all = tabs.getByRole('tab', { name: 'All members' })
+    await all.focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(
+      tabs.getByRole('tab', { name: 'Ava (member 1)' }),
+    ).toBeFocused()
+    await expect(table.getByRole('columnheader')).toHaveCount(2)
+    await expect(table).toContainText('88.5 kg')
+    await expect(table).not.toContainText('70 kg')
+    await expect(page.getByRole('img').locator('circle')).toHaveCount(2)
+    await page.keyboard.press('End')
+    await expect(
+      tabs.getByRole('tab', { name: 'Ava (member 2)' }),
+    ).toBeFocused()
+    await expect(table).toContainText('71 kg')
+    await expect(table).not.toContainText('88.5 kg')
+    await page.keyboard.press('Home')
+    await expect(all).toBeFocused()
+    const weights = page.getByRole('region', {
+      name: 'Scrollable shared group weights',
+    })
+    await weights.focus()
+    await page.keyboard.press('ArrowRight')
+    if (viewport.width === 390) {
+      await expect
+        .poll(() => weights.evaluate((el) => el.scrollLeft))
+        .toBeGreaterThan(0)
+    }
+    const navigation = page.locator('.group-history-workspace > .sticky')
+    await expect
+      .poll(() =>
+        navigation.evaluate((el) => Math.round(el.getBoundingClientRect().top)),
+      )
+      .toBe(0)
+    const navBounds = await navigation.boundingBox()
+    expect(navBounds!.height).toBeLessThan(450)
+    const focusBounds = await weights.boundingBox()
+    expect(focusBounds!.y).toBeGreaterThanOrEqual(
+      navBounds!.y + navBounds!.height,
+    )
+    await expect(table.getByRole('columnheader').first()).toHaveCSS(
+      'position',
+      'sticky',
+    )
+    await expect(table.getByRole('rowheader').first()).toHaveCSS(
+      'position',
+      'sticky',
+    )
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+      .toBeLessThanOrEqual(viewport.width)
+    expect(
+      requests.some((url) =>
+        /\/(personal_weigh_ins|weigh_ins)(?:\?|$)/.test(url),
+      ),
+    ).toBe(false)
+    const contexts = page.getByRole('navigation', {
+      name: 'Challenge contexts',
+    })
+    await contexts
+      .getByRole('link', {
+        name: 'Group · Second authorized group',
+        exact: true,
+      })
+      .press('Enter')
+    await expect(
+      tabs.getByRole('tab', { name: 'All members' }),
+    ).toHaveAttribute('aria-selected', 'true')
+    await expect(table).toContainText('Jo (member 1)')
+    await expect(tabs.getByRole('tab', { name: /Ava/ })).toHaveCount(0)
+  })
+  test(`chart refresh handles gains, corrections, unsharing, loading and errors on ${viewport.label}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ height: 900, width: viewport.width })
+    await installGroupFixtures(page)
+    let phase: 'rows' | 'corrected' | 'empty' | 'denied' | 'loading' = 'loading'
+    let release!: () => void
+    const pending = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    await page.route(
+      `${supabaseRestUrl}/rpc/get_group_chart_history`,
+      async (route) => {
+        if (phase === 'loading') await pending
+        if (phase === 'denied') {
+          await route.fulfill({
+            status: 403,
+            contentType: 'application/json',
+            body: JSON.stringify({ message: 'Group membership required.' }),
+          })
+          return
+        }
+        const rows =
+          phase === 'empty'
+            ? []
+            : [
+                {
+                  member_key: 'one',
+                  display_name: 'Maintenance member',
+                  recorded_date: '2026-09-20',
+                  weight_kg: 80,
+                },
+                {
+                  member_key: 'one',
+                  display_name: 'Maintenance member',
+                  recorded_date: '2026-09-21',
+                  weight_kg: phase === 'corrected' ? 80.25 : 80,
+                },
+                {
+                  member_key: 'two',
+                  display_name: 'Gain member',
+                  recorded_date: '2026-09-22',
+                  weight_kg: 70,
+                },
+                {
+                  member_key: 'two',
+                  display_name: 'Gain member',
+                  recorded_date: '2026-09-23',
+                  weight_kg: 71,
+                },
+                {
+                  member_key: 'two',
+                  display_name: 'Gain member',
+                  recorded_date: '2099-09-23',
+                  weight_kg: 12,
+                },
+              ]
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify(rows),
+        })
+      },
+    )
+    await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    await expect(page.getByText('Loading shared group history…')).toBeVisible()
+    phase = 'rows'
+    release()
+    const table = page.getByRole('table', {
+      name: 'Shared group weight history',
+    })
+    await expect(table).toContainText('+1 kg')
+    await expect(table).toContainText('0 kg')
+    await expect(table).not.toContainText('2099')
+    const scroll = page.getByRole('region', {
+      name: 'Scrollable shared group weights',
+    })
+    await scroll.focus()
+    await expect(scroll).toBeFocused()
+    await page.keyboard.press('ArrowRight')
+    phase = 'corrected'
+    await page.getByRole('button', { name: 'Refresh shared progress' }).click()
+    await expect(table).toContainText('80.25 kg')
+    await expect(table).toContainText('+0.25 kg')
+    phase = 'empty'
+    await page.getByRole('button', { name: 'Refresh shared progress' }).click()
+    await expect(
+      page.getByText('No entries have been shared with this group.'),
+    ).toBeVisible()
+    await expect(table).toHaveCount(0)
+    phase = 'denied'
+    await page.getByRole('button', { name: 'Refresh shared progress' }).click()
+    await expect(
+      page.getByText(
+        'Shared group history is unavailable. Refresh shared progress to retry.',
+      ),
+    ).toBeVisible()
+    await expect(table).toHaveCount(0)
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(viewport.width)
+  })
   test(`pill switch and direct refresh keep distinct authorized group records on ${viewport.label}`, async ({
     page,
   }) => {
@@ -153,6 +386,9 @@ for (const viewport of [
     await installGroupFixtures(page, true)
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
     await expect(page.getByText('42.5%', { exact: true })).toBeVisible()
+    await expect(
+      page.getByRole('table', { name: 'Shared group weight history' }),
+    ).toContainText('Ava')
     const contexts = page.getByRole('navigation', {
       name: 'Challenge contexts',
     })
@@ -169,6 +405,12 @@ for (const viewport of [
     await second.focus()
     await page.keyboard.press('Enter')
     await expect(page.getByText('73.2%', { exact: true })).toBeVisible()
+    await expect(
+      page.getByRole('table', { name: 'Shared group weight history' }),
+    ).toContainText('Jo')
+    await expect(
+      page.getByRole('table', { name: 'Shared group weight history' }),
+    ).not.toContainText('Ava')
     await expect(page.getByText('42.5%', { exact: true })).toHaveCount(0)
     await expect(
       contexts.getByRole('link', { name: /Second authorized group/ }),
@@ -214,11 +456,17 @@ for (const viewport of [
     const historyPanel = page.getByRole('region', {
       name: 'Group chart and weigh-in history',
     })
-    await expect(historyPanel).toHaveAttribute('aria-disabled', 'true')
-    await expect(historyPanel).toContainText('Not available yet · Chapter 16')
+    await expect(historyPanel.getByRole('table')).toContainText('88.5 kg')
+    await expect(historyPanel.getByRole('table')).toContainText('-1.5 kg')
+    await expect(historyPanel.getByRole('table')).toContainText(
+      'Ava (member 1)',
+    )
+    await expect(historyPanel.getByRole('table')).toContainText(
+      'Ava (member 2)',
+    )
     const contrast = await historyPanel.evaluate((panel) => {
       const label = panel.querySelector('p')
-      const body = panel.querySelector('#group-history-unavailable-copy')
+      const body = panel.querySelector('p')
       if (!label || !body) {
         throw new Error('Unavailable history label or body copy is missing')
       }
@@ -265,8 +513,8 @@ for (const viewport of [
     expect(contrast.opacity).toBe(1)
     expect(contrast.label).toBeGreaterThanOrEqual(4.5)
     expect(contrast.body).toBeGreaterThanOrEqual(4.5)
-    await expect(historyPanel.getByRole('img')).toHaveCount(0)
-    await expect(historyPanel.getByRole('table')).toHaveCount(0)
+    await expect(historyPanel.getByRole('img')).toHaveCount(1)
+    await expect(historyPanel.getByRole('table')).toHaveCount(1)
     await expect(historyPanel.getByRole('button')).toHaveCount(0)
 
     await expect(

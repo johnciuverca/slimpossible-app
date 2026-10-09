@@ -41,3 +41,13 @@ body {
 .app-nav-scroll::-webkit-scrollbar {
   display: none;
 }
+
+/* Scoped Group navigation offsets: focused content stays below the sticky bar. */
+.group-history-workspace :is(a, button, [tabindex], tr) {
+  scroll-margin-top: calc(var(--group-navigation-height, 0px) + 12px);
+}
+
+/* Navigation controls scroll inside the bar, not below that same bar. */
+.group-history-workspace > .sticky :is(a, button, [tabindex]) {
+  scroll-margin-top: 0;
+}
