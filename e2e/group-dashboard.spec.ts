@@ -395,9 +395,9 @@ for (const viewport of [
     await expect(contexts).toHaveCount(1)
     const row = (await contexts.boundingBox())!
     const heading = (await page
-      .getByRole('heading', { name: 'Group dashboard' })
+      .getByRole('heading', { name: 'Group', exact: true })
       .boundingBox())!
-    expect(row.y + row.height).toBeLessThan(heading.y)
+    expect(heading.y + heading.height).toBeLessThan(row.y)
     const second = contexts.getByRole('link', {
       name: 'Group · Second authorized group',
       exact: true,
@@ -442,7 +442,7 @@ for (const viewport of [
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
 
     await expect(
-      page.getByRole('heading', { name: 'Group dashboard' }),
+      page.getByRole('heading', { name: 'Group', exact: true }),
     ).toBeVisible()
     await expect(page.getByText('42.5%', { exact: true })).toBeVisible()
     await expect(page.getByText('Shared provisional leaders')).toBeVisible()

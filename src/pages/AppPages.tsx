@@ -1603,25 +1603,31 @@ export function GroupDashboardPage() {
       aria-labelledby="group-title"
     >
       <div className="space-y-6">
+        <WeightPageHeader onRecorded={() => setReloadKey((value) => value + 1)}>
+          <PageHeader
+            description="Your shared home. Track weight and progress with other challenge members."
+            title="Group"
+            titleId="group-title"
+          />
+        </WeightPageHeader>
         <ChallengeTabs
           challenges={challenges}
           selectedId={selectedChallengeId}
           loading={isLoading}
           showPersonalTracking={false}
         />
-        <WeightPageHeader onRecorded={() => setReloadKey((value) => value + 1)}>
-          <PageHeader
-            description="Shared summary, this week’s provisional leader, and Sunday-based results for the selected challenge. History includes only explicitly shared weights; notes stay private."
-            title="Group dashboard"
-            titleId="group-title"
-          >
-            <StatusPill>
-              {selectedChallenge?.name ??
-                data?.challenge.name ??
-                'Shared progress'}
-            </StatusPill>
-          </PageHeader>
-        </WeightPageHeader>
+        <div>
+          <StatusPill>
+            {selectedChallenge?.name ??
+              data?.challenge.name ??
+              'Shared progress'}
+          </StatusPill>
+          <p className="mt-4 text-ink-muted">
+            Shared summary, this week’s provisional leader, and Sunday-based
+            results for the selected challenge. History includes only explicitly
+            shared weights; notes stay private.
+          </p>
+        </div>
       </div>
       <GroupChartHistory
         challengeId={data?.challenge.id ?? selectedChallengeId}

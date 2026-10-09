@@ -6,6 +6,8 @@ const fixture = (path: string) =>
 for (const viewport of [
   { width: 1280, height: 900 },
   { width: 390, height: 568 },
+  { width: 320, height: 568 },
+  { width: 768, height: 900 },
 ]) {
   test(`Group tabs/header/action align without nested scrolling at ${viewport.width}x${viewport.height}`, async ({
     page,
@@ -14,6 +16,19 @@ for (const viewport of [
     const contexts = page.getByRole('navigation', {
       name: 'Challenge contexts',
     })
+    await page.goto(fixture('/dashboard'))
+    const navbar = page
+      .getByRole('navigation', { name: 'Primary navigation' })
+      .locator('xpath=ancestor::header')
+    const dashboardAction = page.getByRole('button', {
+      name: 'Record weight',
+      exact: true,
+    })
+    await expect(dashboardAction).toBeEnabled()
+    const dashboardNavbarBox = (await navbar.boundingBox())!
+    const dashboardActionBox = (await dashboardAction.boundingBox())!
+    const dashboardOffset =
+      dashboardActionBox.y - dashboardNavbarBox.y - dashboardNavbarBox.height
     for (const path of [
       '/goals?challenge=dashboard-active',
       '/challenges?challenge=dashboard-active',
@@ -37,7 +52,15 @@ for (const viewport of [
       const navBox = (await contexts.boundingBox())!
       const headerBox = (await header.boundingBox())!
       const actionBox = (await action.boundingBox())!
-      expect(headerBox.y - navBox.y - navBox.height).toBeCloseTo(24, 0)
+      if (path !== '/group') {
+        expect(headerBox.y - navBox.y - navBox.height).toBeCloseTo(24, 0)
+      } else {
+        expect(navBox.y - headerBox.y - headerBox.height).toBeCloseTo(24, 0)
+        const navbarBox = (await navbar.boundingBox())!
+        const groupOffset = actionBox.y - navbarBox.y - navbarBox.height
+        console.log(JSON.stringify({ viewport, dashboardOffset, groupOffset }))
+        expect(groupOffset).toBeCloseTo(dashboardOffset, 0)
+      }
       if (viewport.width > 600) {
         expect(actionBox.y - headerBox.y).toBeCloseTo(0, 0)
         expect(

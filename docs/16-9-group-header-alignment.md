@@ -6,11 +6,10 @@ Latest staging was merged into the existing PR branch without rewriting history.
 
 ## Result
 
-- Group's authorized group-only challenge row sits above the heading, with no
-  Personal tracking pill or personal challenge links. Its 24px header gap
-  matches Challenges, My progress and Goals, with exactly one context row.
-- The unchanged shared Record weight header now has matching desktop top/right
-  placement and mobile spacing below the heading text. Canonical recording,
+- Group's header now precedes its authorized group-only challenge row, with no
+  Personal tracking pill or personal challenge links and exactly one context row.
+- Record weight matches Dashboard's distance from the main app navbar on desktop
+  and mobile. Challenges, My progress and Goals are unchanged. Canonical recording,
   private notes, correction behavior and explicit sharing remain unchanged.
 - No-query and empty-query Group keep the first-group default. Explicit group
   selections remain truthful; unavailable or personal challenge IDs do not
@@ -23,8 +22,7 @@ Latest staging was merged into the existing PR branch without rewriting history.
 - The merged spreadsheet matrix, All members/member tabs, shared-history RPC,
   selected-member/context resets and recording refresh callback remain intact.
   Refresh shared progress stays in the content card below the sticky bar.
-- The challenge row and page header are in normal page flow, matching the
-  shared context/header layout on Challenges, My progress and Goals. Only the
+- The challenge row and page header are in normal page flow. Only the
   member tabs remain sticky; no nested vertical scroll traps the context row or
   Record weight on short/mobile screens. Keyboard focus offsets remain scoped
   to the sticky member tabs and scrollable history content.
@@ -64,12 +62,28 @@ Latest staging was merged into the existing PR branch without rewriting history.
   CSS, alignment/browser assertions and this issue's notes differ. The merged
   chart/matrix/member components, model, repositories and SQL are unchanged.
 
-## Updated connected preview acceptance — NOT EXECUTED
+## Navbar-reference correction — 2026-10-09
+
+- Owner accepted group-only contexts and normal scrolling; requested Dashboard,
+  not the other challenge pages, as the Record weight spacing reference.
+- Group's compact header/action now precedes context tabs. The selected-group
+  label and detailed shared-summary/privacy copy remain below the tabs. No other
+  page or shared header component changed.
+- Measured from the entire main app navbar's bottom to the action's top:
+  Dashboard and Group both 40px at 1280x900 and 768x900, 212px at 390x568,
+  and 244px at 320x568. Mobile retains the shared stacked header layout.
+- Focused validation: 50 page/context unit tests, four responsive geometry
+  browser tests, and eight Group history/member/sticky/privacy browser tests
+  pass. Lint, app typecheck, production build, formatting and diff checks pass.
+  No repeated full local suite; required CI runs on the updated commit.
+- These are synthetic local measurements, not new connected owner acceptance.
+
+## Updated connected preview acceptance — correction NOT EXECUTED
 
 PM/owner should check the immutable PR preview on desktop and mobile:
 
-1. Compare Group with Challenges, My progress and Goals: one group-only context
-   row above the heading, consistent header gap and Record weight placement.
+1. Compare Group with Dashboard: Record weight has the same vertical distance
+   from the main app navbar. Group's group-only context row is below its header.
 2. Refresh Group without a query, with an empty query, and with explicit group
    selections. Active highlights match the displayed group; unavailable and
    personal IDs do not highlight a substitute. Confirm no Personal tracking
