@@ -73,7 +73,8 @@ Latest staging was merged into the existing PR branch without rewriting history.
   Dashboard and Group both 40px at 1280x900 and 768x900, 212px at 390x568,
   and 244px at 320x568. Mobile retains the shared stacked header layout.
 - Focused validation: 50 page/context unit tests, four responsive geometry
-  browser tests, and eight Group history/member/sticky/privacy browser tests
+  browser tests, eight Group history/member/sticky/privacy browser tests, and
+  nine context/navigation/protected-route browser tests
   pass. Lint, app typecheck, production build, formatting and diff checks pass.
   No repeated full local suite; required CI runs on the updated commit.
 - These are synthetic local measurements, not new connected owner acceptance.
