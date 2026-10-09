@@ -13,6 +13,20 @@ export type GroupChartSeries = {
   points: GroupChartPoint[]
 }
 
+// Union of real shared dates only. A missing member/date cell is null, never zero.
+export function createGroupHistoryMatrix(series: GroupChartSeries[]) {
+  const dates = [
+    ...new Set(series.flatMap(({ points }) => points.map(({ date }) => date))),
+  ].sort((a, b) => b.localeCompare(a))
+  const byMember = series.map(
+    ({ points }) => new Map(points.map((point) => [point.date, point])),
+  )
+  return dates.map((date) => ({
+    date,
+    cells: byMember.map((points) => points.get(date) ?? null),
+  }))
+}
+
 // Input is exclusively the authorized RPC projection, never personal rows.
 export function createGroupChartHistory(
   entries: GroupChartEntry[],
