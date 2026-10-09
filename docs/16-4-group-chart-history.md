@@ -135,10 +135,18 @@ delayed response or account switch. No entry/share/membership mutation or sign-o
 occurred. The viewport was reset and the authorized Group tab left open. Private
 names, identities, dates, weights, notes and screenshots are not published.
 
-The actual withdrawn-session browser gate remains pending; hosted role denial
-and synthetic browser 403 handling are distinct evidence. The owner has not
-approved substituting layered evidence for that written gate. Quality, Vercel
-and Preview Comments all passed on `954caebb`; no merge is authorized.
+## Explicit staging acceptance adjustment — 2026-10-09
+
+The owner approved PM's recommendation with “do it like that, its approved”:
+accept the combined automated, hosted database and executed real-browser evidence
+for staging instead of the remaining exhaustive manual rendered matrix and an
+actual withdrawn-browser run. Those unexecuted manual variants remain NOT
+EXECUTED; hosted withdrawal denial and automated browser denial are distinct
+evidence, not claims of a real withdrawn-browser test. This explicitly supersedes
+those staging-only test gates. Production release #212 remains separately gated.
+PM reviewed the hardened harness before executing it; final independent PR
+sign-off and explicit merge approval are still required. Quality, Vercel and
+Preview Comments passed on `954caebb`; this acceptance is not merge authority.
 
 ## Local validation — 2026-10-08
 
@@ -236,24 +244,18 @@ was performed.
 
 ## Remaining hard merge gates — PENDING
 
-Basic migration checks and partial connected observations above do not complete
-the acceptance matrix. Before merge:
+Staging test acceptance is complete under the explicit owner-approved adjustment
+above. Before merge:
 
-- Complete withdrawn-session browser denial and the remaining connected matrix:
-  owner/member selected-group privacy across draft/active groups, late entries,
-  duplicate names, gains/maintenance/ties/future data, controlled account/challenge
-  switches during loading. Hosted authorization/projection/late/correction/
-  removal/draft/future/duplicate-key checks and member mobile/keyboard/natural
-  group switching are now completed as specifically described above. Remaining
-  browser rendering variants and controlled switching must not be described as
-  connected passes solely from local/CI coverage. Owner reports above remain
-  source-qualified; no written gate has been waived.
 - Obtain independent PM review sign-off and explicit owner merge approval. None
   is inferred from hosted migration approval or partial acceptance. PR #243 stays
   unmerged. Separately, #242's owner visual acceptance is still pending; its
   layout work and queued #244/#245 remain separate with no new implementation.
 
-Retain this owner/PM checklist when completing the remaining matrix:
+The original manual checklist is retained for traceability and possible future
+supplemental checks, not as unmet staging gates after the approved adjustment.
+Its unexecuted variants are not recorded as passed; production #212 has its own
+release gates:
 
 1. Use approved disposable owner/member accounts. In Group, verify only selected
    group's explicitly shared dates/weights appear; private notes/emails and other
