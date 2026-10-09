@@ -1451,12 +1451,15 @@ describe('GroupDashboardPage', () => {
           ? Promise.resolve(response([]))
           : fetchMock(url, init),
       ),
-      '/group?challenge=challenge-1',
+      '/group?challenge=',
     )
 
     expect(
       await screen.findByRole('heading', { name: 'Weekly result' }),
     ).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: /Group · Autumn challenge/ }),
+    ).toHaveAttribute('aria-current', 'page')
     expect(screen.getByText('48.5%')).toBeInTheDocument()
     expect(screen.getByText(/Shared weekly winners/)).toBeInTheDocument()
     expect(

@@ -47,7 +47,8 @@ Latest staging was merged into the existing PR branch without rewriting history.
 ## Refreshed integration validation — 2026-10-09
 
 - Format, lint, typecheck, build and diff checks pass; existing bundle warning
-  remains. 446 unit tests across 74 files pass.
+  remains. 446 unit tests across 74 files pass, including the empty challenge
+  query defaulting to the first visible group.
 - 79 browser tests pass: 71 application and 8 Group tests. The alignment cases
   compare desktop/mobile geometry with other challenge pages, check one context
   row, default/explicit/unavailable selections and account isolation, and now

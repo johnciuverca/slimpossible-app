@@ -1580,9 +1580,9 @@ export function GroupDashboardPage() {
     ? `?challenge=${encodeURIComponent(data.challenge.id)}`
     : ''
   const selectedChallengeId =
-    challengeParam ??
-    data?.challenge.id ??
-    challenges.find(({ kind }) => kind === 'group')?.id ??
+    challengeParam ||
+    data?.challenge.id ||
+    challenges.find(({ kind }) => kind === 'group')?.id ||
     ''
   const selectedChallenge = challenges.find(
     ({ id }) => id === selectedChallengeId,
