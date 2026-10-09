@@ -11,9 +11,11 @@ import { Button } from './ui'
 export function WeightPageHeader({
   children,
   action,
+  onRecorded,
 }: {
   children: ReactNode
   action?: ReactNode
+  onRecorded?: () => void
 }) {
   return (
     <header
@@ -22,21 +24,27 @@ export function WeightPageHeader({
     >
       <div className="min-w-0 flex-1">{children}</div>
       <div className="shrink-0 self-start">
-        {action ?? <StandaloneRecordWeightAction />}
+        {action ?? <StandaloneRecordWeightAction onRecorded={onRecorded} />}
       </div>
     </header>
   )
 }
 
-function StandaloneRecordWeightAction() {
+function StandaloneRecordWeightAction({
+  onRecorded,
+}: {
+  onRecorded?: () => void
+}) {
   const workspace = usePersonalWorkspace()
-  return <RecordWeightAction workspace={workspace} />
+  return <RecordWeightAction workspace={workspace} onRecorded={onRecorded} />
 }
 
 export function RecordWeightAction({
   workspace,
+  onRecorded,
 }: {
   workspace: PersonalWorkspace
+  onRecorded?: () => void
 }) {
   const [openOwner, setOpenOwner] = useState<string | null>(null)
   const [savedOwner, setSavedOwner] = useState<string | null>(null)
@@ -75,6 +83,7 @@ export function RecordWeightAction({
             setOpenOwner(null)
             setSavedOwner(workspace.ownerKey)
             workspace.refresh()
+            onRecorded?.()
           }}
         />
       ) : null}
