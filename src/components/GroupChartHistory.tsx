@@ -120,10 +120,22 @@ export function GroupChartHistory({
   const start = Math.min(...dates)
   const end = Math.max(...dates)
   const changes = points.map((point) => point.changeKg)
-  const min = Math.min(0, ...changes) - 0.5
-  const max = Math.max(0, ...changes) + 0.5
+  const absolute = !selectedKey
+  const weights = points.map((point) => point.weightKg)
+  const weightMin = Math.min(...weights)
+  const weightMax = Math.max(...weights)
+  const padding = Math.max(0.5, (weightMax - weightMin) * 0.05)
+  const min = absolute
+    ? Math.max(0, weightMin - padding)
+    : Math.min(0, ...changes) - 0.5
+  const max = absolute ? weightMax + padding : Math.max(0, ...changes) + 0.5
+  const ticks = absolute ? [min, (min + max) / 2, max] : [min, 0, max]
+  const pointValue = (point: (typeof points)[number]) =>
+    absolute ? point.weightKg : point.changeKg
+  const plotLeft = absolute ? 100 : 65
   const x = (date: string) =>
-    65 + ((day(date) - start) / Math.max(1, end - start)) * 610
+    plotLeft +
+    ((day(date) - start) / Math.max(1, end - start)) * (675 - plotLeft)
   const y = (value: number) => 25 + ((max - value) / (max - min)) * 190
   return (
     <div ref={workspace} className="group-history-workspace min-w-0 space-y-6">
@@ -201,10 +213,17 @@ export function GroupChartHistory({
               </p>
             ) : null}
             <p className="mt-2 text-sm leading-6 text-slate-700">
-              Explicitly shared dates and weights only. Change is measured in kg
-              from each member’s first shared entry, not their private starting
-              weight. Negative means loss; positive means gain. This chart is
-              not a winner ranking. Notes and emails are never included.
+              {absolute ? (
+                'All members plots actual shared Weight (kg), not change from zero. A lower absolute weight is not a winner ranking. Notes and emails are never included.'
+              ) : (
+                <>
+                  Explicitly shared dates and weights only. Change is measured
+                  in kg from each member’s first shared entry, not their private
+                  starting weight. Negative means loss; positive means gain.
+                  This chart is not a winner ranking. Notes and emails are never
+                  included.
+                </>
+              )}
             </p>
             {!data ? (
               <p role="status" className="mt-4">
@@ -222,10 +241,16 @@ export function GroupChartHistory({
             ) : (
               <>
                 <p className="mt-4 text-sm text-slate-700">
-                  Missing dates are gaps, not estimated weights. A single shared
-                  entry establishes a zero-change baseline. Late entries,
-                  corrections and removed shares recalculate the baseline on
-                  refresh.
+                  {absolute ? (
+                    'Missing dates are gaps, not estimated weights. Each member starts at their first explicitly shared weight; unshared starting values are not added. Corrections and removed shares update this chart on refresh.'
+                  ) : (
+                    <>
+                      Missing dates are gaps, not estimated weights. A single
+                      shared entry establishes a zero-change baseline. Late
+                      entries, corrections and removed shares recalculate the
+                      baseline on refresh.
+                    </>
+                  )}
                 </p>
                 <div
                   role="region"
@@ -236,34 +261,48 @@ export function GroupChartHistory({
                   <svg
                     viewBox="0 0 720 265"
                     role="img"
-                    aria-labelledby="group-chart-title group-chart-description"
+                    aria-labelledby={`${id}-chart-title`}
+                    aria-describedby={`${id}-chart-description`}
                     className="w-full min-w-[36rem]"
                   >
-                    <title id="group-chart-title">
-                      Change from first shared weight (kg)
+                    <title id={`${id}-chart-title`}>
+                      {absolute
+                        ? 'Weight (kg) — shared group history'
+                        : 'Change from first shared weight (kg)'}
                     </title>
-                    <desc id="group-chart-description">
-                      Each member has their own zero baseline. Points represent
-                      shared recorded dates. Lines connect only consecutive
-                      days. The table below provides every date, exact weight
-                      and kg change.
+                    <desc id={`${id}-chart-description`}>
+                      {absolute ? (
+                        'Each member is plotted at their actual shared weight in kilograms, not a common zero baseline. Points represent shared dates; lines connect only consecutive days. The table below provides every exact recorded weight.'
+                      ) : (
+                        <>
+                          Each member has their own zero baseline. Points
+                          represent shared recorded dates. Lines connect only
+                          consecutive days. The table below provides every date,
+                          exact weight and kg change.
+                        </>
+                      )}
                     </desc>
-                    {[min, 0, max].map((value) => (
+                    <text x={plotLeft} y={14} fontSize={12}>
+                      {absolute ? 'Weight (kg)' : 'Change (kg)'}
+                    </text>
+                    {ticks.map((value) => (
                       <g key={value}>
                         <line
-                          x1={65}
+                          x1={plotLeft}
                           x2={675}
                           y1={y(value)}
                           y2={y(value)}
                           stroke="#cbd5e1"
                         />
                         <text
-                          x={60}
+                          x={plotLeft - 5}
                           y={y(value) + 4}
                           textAnchor="end"
                           fontSize={12}
                         >
-                          {signed(Math.round(value * 100) / 100)}
+                          {absolute
+                            ? `${Math.round(value * 100) / 100} kg`
+                            : signed(Math.round(value * 100) / 100)}
                         </text>
                       </g>
                     ))}
@@ -281,9 +320,9 @@ export function GroupChartHistory({
                               day(point.date) - day(previous.date) === 1 ? (
                                 <line
                                   x1={x(previous.date)}
-                                  y1={y(previous.changeKg)}
+                                  y1={y(pointValue(previous))}
                                   x2={x(point.date)}
-                                  y2={y(point.changeKg)}
+                                  y2={y(pointValue(point))}
                                   strokeWidth={2}
                                   strokeDasharray={
                                     index % 2 ? '5 3' : undefined
@@ -292,12 +331,14 @@ export function GroupChartHistory({
                               ) : null}
                               <circle
                                 cx={x(point.date)}
-                                cy={y(point.changeKg)}
+                                cy={y(pointValue(point))}
                                 r={4}
                               >
                                 <title>
                                   {member.label}: {point.date},{' '}
-                                  {signed(point.changeKg)}
+                                  {absolute
+                                    ? `${point.weightKg} kg`
+                                    : signed(point.changeKg)}
                                 </title>
                               </circle>
                             </g>
@@ -305,7 +346,7 @@ export function GroupChartHistory({
                         })}
                       </g>
                     ))}
-                    <text x={65} y={242} fontSize={12}>
+                    <text x={plotLeft} y={242} fontSize={12}>
                       {new Date(start * 86400000).toISOString().slice(0, 10)}
                     </text>
                     <text x={675} y={242} textAnchor="end" fontSize={12}>
@@ -325,7 +366,7 @@ export function GroupChartHistory({
                       >
                         ●{' '}
                       </span>
-                      {member.label} · baseline{' '}
+                      {member.label} · {absolute ? 'first shared' : 'baseline'}{' '}
                       <time dateTime={member.baselineDate}>
                         {member.baselineDate}
                       </time>

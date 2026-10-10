@@ -24,6 +24,67 @@ const persistence = (
     repositories: { groupProgress: { getChartHistory: load } },
   }) as unknown as Persistence
 describe('Group chart history', () => {
+  it('plots four actual-kg member series with padded axes, preserves gaps and keeps individual change view', async () => {
+    const records = [80, 100, 90, 110].map((weightKg, index) => ({
+      memberKey: String(index),
+      displayName: `Member ${index}`,
+      date: '2026-09-01',
+      weightKg,
+    }))
+    records.push({
+      memberKey: '0',
+      displayName: 'Member 0',
+      date: '2026-09-02',
+      weightKg: 79,
+    })
+    records.push({
+      memberKey: '1',
+      displayName: 'Member 1',
+      date: '2026-09-03',
+      weightKg: 98,
+    })
+    render(
+      <GroupChartHistory
+        challengeId="group"
+        viewerId="viewer"
+        persistence={persistence(
+          vi.fn().mockResolvedValue({ state: 'success', data: records }),
+        )}
+        refreshVersion={0}
+      />,
+    )
+    await screen.findByRole('table')
+    const chart = screen.getByRole('img', {
+      name: 'Weight (kg) — shared group history',
+    })
+    expect(chart).toHaveTextContent('Weight (kg)')
+    const circles = Array.from(chart.querySelectorAll('circle'))
+    const eighty = circles.find(
+      (circle) => circle.textContent === 'Member 0: 2026-09-01, 80 kg',
+    )!
+    const hundred = circles.find(
+      (circle) => circle.textContent === 'Member 1: 2026-09-01, 100 kg',
+    )!
+    expect(Number(hundred.getAttribute('cy'))).toBeLessThan(
+      Number(eighty.getAttribute('cy')),
+    )
+    expect(Number(eighty.getAttribute('cy'))).toBeCloseTo(
+      25 + ((111.55 - 80) / (111.55 - 77.45)) * 190,
+    )
+    for (const circle of circles) {
+      expect(Number(circle.getAttribute('cy'))).toBeGreaterThan(25)
+      expect(Number(circle.getAttribute('cy'))).toBeLessThan(215)
+    }
+    expect(chart.querySelectorAll('g[stroke] line')).toHaveLength(1)
+    fireEvent.click(screen.getByRole('tab', { name: 'Member 0' }))
+    const individual = screen.getByRole('img', {
+      name: 'Change from first shared weight (kg)',
+    })
+    expect(individual.querySelector('circle title')).toHaveTextContent(
+      'Member 0: 2026-09-01, 0 kg',
+    )
+    expect(individual).toHaveTextContent('-1 kg')
+  })
   it('shows a date/member matrix and keyboard-selects only one duplicate-name member without fetching personal data', async () => {
     const load = vi.fn().mockResolvedValue({
       state: 'success',
@@ -112,7 +173,10 @@ describe('Group chart history', () => {
     fireEvent.click(await screen.findByRole('tab', { name: 'Ava' }))
     rerender(view(1))
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
-    await screen.findByText('91 kg')
+    await screen.findByRole('table')
+    expect(
+      within(screen.getByRole('table')).getByText('91 kg'),
+    ).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Ava' })).toHaveAttribute(
       'aria-selected',
       'true',
@@ -181,7 +245,7 @@ describe('Group chart history', () => {
     ).toHaveAttribute('tabindex', '0')
     expect(
       screen.getByRole('list', { name: 'Group chart legend' }),
-    ).toHaveTextContent('baseline 2026-09-01')
+    ).toHaveTextContent('first shared 2026-09-01')
   })
   it('hides old account/challenge data immediately and ignores late results', async () => {
     let resolveOld!: (result: RepositoryListResult<GroupChartEntry>) => void

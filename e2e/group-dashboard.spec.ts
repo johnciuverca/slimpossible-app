@@ -335,6 +335,22 @@ for (const layout of [
       ).toHaveCount(2)
       const cards = matrix.locator('td > div')
       await expect(cards).toHaveCount(9)
+      const comparison = page.getByRole('img', {
+        name: 'Weight (kg) — shared group history',
+      })
+      expect(
+        await comparison.locator('text').evaluateAll((elements) =>
+          elements.every((element) => {
+            const box = (element as SVGGraphicsElement).getBBox()
+            return (
+              box.x >= 0 &&
+              box.x + box.width <= 720 &&
+              box.y >= 0 &&
+              box.y + box.height <= 265
+            )
+          }),
+        ),
+      ).toBe(true)
       expect(
         (await matrix
           .getByRole('columnheader', { name: 'Recorded date' })
@@ -610,6 +626,33 @@ for (const viewport of [
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
     const table = page.getByRole('table', {
       name: 'Shared group weight history',
+    })
+    const chart = page.getByRole('img', {
+      name: 'Weight (kg) — shared group history',
+    })
+    await expect(chart).toBeVisible()
+    const originalPoints = await chart
+      .locator('circle')
+      .evaluateAll((elements) =>
+        elements.map((circle) => ({
+          label: circle.textContent,
+          y: Number(circle.getAttribute('cy')),
+        })),
+      )
+    const heavier = originalPoints.find(
+      (point) => point.label === 'Ava (member 1): 2026-09-20, 90 kg',
+    )!
+    const lighter = originalPoints.find(
+      (point) => point.label === 'Ava (member 2): 2026-09-20, 70 kg',
+    )!
+    expect(heavier.y).toBeLessThan(lighter.y)
+    for (const point of originalPoints) {
+      expect(point.y).toBeGreaterThan(25)
+      expect(point.y).toBeLessThan(215)
+    }
+    await expect(chart).toContainText('Weight (kg)')
+    await chart.screenshot({
+      path: test.info().outputPath('actual-kg-chart.png'),
     })
     await expect(table.getByRole('columnheader')).toHaveText([
       'Date',
