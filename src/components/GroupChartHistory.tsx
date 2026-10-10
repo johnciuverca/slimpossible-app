@@ -213,15 +213,15 @@ export function GroupChartHistory({
               </p>
             ) : null}
             <p className="mt-2 text-sm leading-6 text-slate-700">
+              Explicitly shared dates and weights only.{' '}
               {absolute ? (
                 'All members plots actual shared Weight (kg), not change from zero. A lower absolute weight is not a winner ranking. Notes and emails are never included.'
               ) : (
                 <>
-                  Explicitly shared dates and weights only. Change is measured
-                  in kg from each member’s first shared entry, not their private
-                  starting weight. Negative means loss; positive means gain.
-                  This chart is not a winner ranking. Notes and emails are never
-                  included.
+                  Change is measured in kg from each member’s first shared
+                  entry, not their private starting weight. Negative means loss;
+                  positive means gain. This chart is not a winner ranking. Notes
+                  and emails are never included.
                 </>
               )}
             </p>
