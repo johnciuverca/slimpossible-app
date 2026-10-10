@@ -37,10 +37,6 @@ vi.mock('../components/WeightPageHeader', () => ({
     </header>
   ),
 }))
-// Entry-action data loading is covered independently with author-scoped fixtures.
-vi.mock('../components/WeightEntryActions', () => ({
-  PersonalEntryActions: () => null,
-}))
 import {
   localDateOnly,
   provisionalWeekDates,
@@ -1060,9 +1056,15 @@ describe('HomePage', () => {
       name: 'Your saved personal weigh-ins',
     })
     const historyRows = within(historyTable).getAllByRole('row')
-    expect(historyRows[1]).toHaveTextContent('90 kg')
+    expect(historyRows[1]).toHaveTextContent('90.00 kg')
     expect(historyRows[1]).toHaveTextContent('−5 kg')
-    expect(historyRows[2]).toHaveTextContent('95 kg')
+    expect(historyRows[2]).toHaveTextContent('95.00 kg')
+    expect(
+      within(historyTable).getAllByRole('button', { name: /^Edit weight/ }),
+    ).toHaveLength(2)
+    expect(
+      screen.queryByRole('list', { name: 'Your own personal entry actions' }),
+    ).not.toBeInTheDocument()
     expect(
       screen.getByText(/Change from first to latest saved check-in: −5 kg/),
     ).toBeInTheDocument()
