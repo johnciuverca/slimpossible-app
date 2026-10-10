@@ -284,6 +284,43 @@ async function installGroupFixtures(
   return requests
 }
 
+test('single-line matrix card retains 44px touch targets on a coarse pointer', async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    hasTouch: true,
+    viewport: { width: 390, height: 700 },
+  })
+  try {
+    const page = await context.newPage()
+    await installGroupFixtures(page, true, true)
+    await page.goto(
+      `http://127.0.0.1:4174/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
+    )
+    const matrix = page.getByRole('table', {
+      name: 'Shared group weight history',
+    })
+    const edit = matrix.getByRole('button', { name: /^Edit weight/ })
+    await expect(edit).toBeVisible()
+    const remove = matrix.getByRole('button', { name: /^Delete / })
+    const editBox = (await edit.boundingBox())!
+    const removeBox = (await remove.boundingBox())!
+    expect(editBox.width).toBeGreaterThanOrEqual(44)
+    expect(editBox.height).toBeGreaterThanOrEqual(44)
+    expect(removeBox.width).toBeGreaterThanOrEqual(44)
+    expect(removeBox.height).toBeGreaterThanOrEqual(44)
+    expect(removeBox.y).toBe(editBox.y)
+    expect(
+      (await edit.locator('xpath=../..').boundingBox())!.height,
+    ).toBeLessThanOrEqual(50)
+    await page.screenshot({
+      path: test.info().outputPath('compact-matrix-touch.png'),
+    })
+  } finally {
+    await context.close()
+  }
+})
+
 for (const viewport of [
   { label: 'desktop', width: 1280 },
   { label: 'mobile', width: 390 },
@@ -316,6 +353,30 @@ for (const viewport of [
     await expect(edit).toBeVisible()
     await expect(matrix.getByRole('button')).toHaveCount(2)
     await expect(matrix.getByText('88.5 kg', { exact: true })).toHaveCount(2)
+    const card = edit.locator('xpath=../..')
+    const value = card.getByText('88.5 kg', { exact: true })
+    const valueBox = (await value.boundingBox())!
+    const editBox = (await edit.boundingBox())!
+    const deleteBox = (await remove.boundingBox())!
+    const cardBox = (await card.boundingBox())!
+    expect(editBox.x).toBeGreaterThanOrEqual(valueBox.x + valueBox.width)
+    expect(deleteBox.x).toBeGreaterThanOrEqual(editBox.x + editBox.width)
+    expect(
+      Math.abs(
+        valueBox.y + valueBox.height / 2 - editBox.y - editBox.height / 2,
+      ),
+    ).toBeLessThan(1)
+    expect(
+      Math.abs(
+        editBox.y + editBox.height / 2 - deleteBox.y - deleteBox.height / 2,
+      ),
+    ).toBeLessThan(1)
+    expect(cardBox.height).toBeLessThanOrEqual(50)
+    expect(editBox.width).toBeGreaterThanOrEqual(32)
+    expect(deleteBox.width).toBeGreaterThanOrEqual(32)
+    await edit.focus()
+    await page.keyboard.press('Tab')
+    await expect(remove).toBeFocused()
     await expect(
       page.getByRole('list', { name: 'Your own shared group entries' }),
     ).toHaveCount(0)

@@ -96,6 +96,11 @@ Issue #245, parent #199. Based on staging
 
 ## Owner preview checks (disposable entries only)
 
+Styling follow-up: weight and small unfilled Edit/Delete icons share one
+horizontal line, with reduced card padding/gaps. Keyboard focus stays visible;
+coarse-pointer devices retain 44px hit targets. Ownership, dialogs and privacy
+behavior are unchanged. Connected visual acceptance is pending.
+
 1. On Dashboard without a challenge, Record weight. Confirm private default,
    today's existing-entry correction and optional explicit group shares.
 2. From My progress, Edit a disposable entry. Confirm date/weight/private note

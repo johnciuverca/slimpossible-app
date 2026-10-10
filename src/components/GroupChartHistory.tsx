@@ -379,7 +379,7 @@ export function GroupChartHistory({
                               className="relative px-4 py-3"
                             >
                               {point ? (
-                                <div className="inline-flex flex-col gap-2 rounded-xl border border-line bg-page p-3">
+                                <div className="inline-flex flex-nowrap items-center gap-1 rounded-lg border border-line bg-page px-2 py-0.5">
                                   <span className="whitespace-nowrap">
                                     {point.weightKg} kg
                                   </span>

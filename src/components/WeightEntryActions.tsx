@@ -41,10 +41,20 @@ export function WeightEntryActions({
   }
   return (
     <>
-      <div className="flex flex-wrap gap-2">
+      <div
+        className={
+          compact
+            ? 'inline-flex flex-nowrap items-center gap-0.5'
+            : 'flex flex-wrap gap-2'
+        }
+      >
         <Button
-          variant="secondary"
-          className={compact ? 'min-h-11 min-w-11 p-2' : undefined}
+          variant={compact ? 'ghost' : 'secondary'}
+          className={
+            compact
+              ? 'size-9 shrink-0 p-0! text-forest-800! sm:size-8 pointer-coarse:size-11'
+              : undefined
+          }
           aria-label={`Edit weight ${date}${memberLabel ? ` for ${memberLabel}` : ''}`}
           onClick={() =>
             setSelection({ key: workspace.ownerKey, action: 'edit' })
@@ -69,9 +79,11 @@ export function WeightEntryActions({
           )}
         </Button>
         <Button
-          variant="secondary"
+          variant={compact ? 'ghost' : 'secondary'}
           className={
-            compact ? 'min-h-11 min-w-11 p-2 text-danger-800' : undefined
+            compact
+              ? 'size-9 shrink-0 p-0! text-danger-800! sm:size-8 pointer-coarse:size-11'
+              : undefined
           }
           aria-label={`Delete ${date}${memberLabel ? ` for ${memberLabel}` : ''}`}
           onClick={() =>
