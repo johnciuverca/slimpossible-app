@@ -335,6 +335,17 @@ for (const layout of [
       ).toHaveCount(2)
       const cards = matrix.locator('td > div')
       await expect(cards).toHaveCount(9)
+      expect(
+        (await matrix
+          .getByRole('columnheader', { name: 'Recorded date' })
+          .boundingBox())!.width,
+      ).toBe(76)
+      expect(
+        (await matrix.getByRole('columnheader').nth(1).boundingBox())!.width,
+      ).toBe(156)
+      await expect(
+        matrix.getByRole('rowheader', { name: '2026-09-22' }).locator('time'),
+      ).toHaveAttribute('title', '2026-09-22')
       const boxes = await cards.evaluateAll((elements) =>
         elements.map((card) => {
           const bounds = card.getBoundingClientRect()
@@ -365,9 +376,9 @@ for (const layout of [
         expect.arrayContaining(['9.5 kg', '95 kg', '105.5 kg', '88.5 kg']),
       )
       for (const box of boxes) {
-        expect(box.width).toBe(168)
+        expect(box.width).toBe(148)
         expect(box.height).toBeLessThanOrEqual(50)
-        expect(box.fits).toBe(true)
+        expect(box.fits, `${box.value} fits the compact value area`).toBe(true)
         for (const button of box.buttons) {
           expect(button.width).toBe(44)
           expect(button.height).toBeGreaterThanOrEqual(
@@ -386,6 +397,10 @@ for (const layout of [
         name: 'Scrollable shared group weights',
       })
       await scroll.scrollIntoViewIfNeeded()
+      if (layout.width >= 500)
+        await scroll.evaluate((element) => {
+          element.style.maxWidth = '700px'
+        })
       expect(
         await scroll.evaluate(
           (element) => element.scrollWidth > element.clientWidth,
@@ -597,7 +612,7 @@ for (const viewport of [
       name: 'Shared group weight history',
     })
     await expect(table.getByRole('columnheader')).toHaveText([
-      'Recorded date',
+      'Date',
       'Ava (member 1) (kg)',
       'Ava (member 2) (kg)',
     ])

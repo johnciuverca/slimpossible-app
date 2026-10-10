@@ -340,8 +340,15 @@ export function GroupChartHistory({
                 >
                   <table
                     aria-label="Shared group weight history"
-                    className="w-full min-w-[36rem] border-collapse text-left text-sm"
+                    className="table-fixed border-collapse text-left text-xs"
+                    style={{ width: 76 + series.length * 156 }}
                   >
+                    <colgroup>
+                      <col style={{ width: 76 }} />
+                      {series.map((member) => (
+                        <col key={member.memberKey} style={{ width: 156 }} />
+                      ))}
+                    </colgroup>
                     <caption className="p-3 text-left font-semibold">
                       Exact shared weights (kg). A dash means no shared entry.
                     </caption>
@@ -349,15 +356,16 @@ export function GroupChartHistory({
                       <tr>
                         <th
                           scope="col"
-                          className="sticky left-0 top-0 z-30 bg-stone-50 px-4 py-3"
+                          aria-label="Recorded date"
+                          className="sticky left-0 top-0 z-30 bg-stone-50 px-1 py-2"
                         >
-                          Recorded date
+                          Date
                         </th>
                         {series.map((member) => (
                           <th
                             key={member.memberKey}
                             scope="col"
-                            className="sticky top-0 z-20 bg-stone-50 px-4 py-3"
+                            className="sticky top-0 z-20 break-words bg-stone-50 px-1 py-2"
                           >
                             {member.label} (kg)
                           </th>
@@ -369,18 +377,24 @@ export function GroupChartHistory({
                         <tr key={row.date}>
                           <th
                             scope="row"
-                            className="sticky left-0 z-10 bg-white px-4 py-3 font-medium"
+                            aria-label={row.date}
+                            className="sticky left-0 z-10 whitespace-nowrap bg-white px-1 py-1 font-medium"
                           >
-                            <time dateTime={row.date}>{row.date}</time>
+                            <time dateTime={row.date} title={row.date}>
+                              {row.date.slice(8)}/{row.date.slice(5, 7)}
+                              <span className="sr-only">
+                                /{row.date.slice(0, 4)}
+                              </span>
+                            </time>
                           </th>
                           {row.cells.map((point, index) => (
                             <td
                               key={series[index].memberKey}
-                              className="relative z-0 px-4 py-3"
+                              className="relative z-0 px-1 py-1"
                             >
                               {point ? (
-                                <div className="inline-flex h-11 w-[168px] shrink-0 flex-nowrap items-center gap-0.5 rounded-lg border border-line bg-page px-1 py-0.5 pointer-coarse:h-12">
-                                  <span className="min-w-0 flex-1 whitespace-nowrap text-xs tabular-nums">
+                                <div className="inline-flex h-11 w-[148px] shrink-0 flex-nowrap items-center gap-0.5 rounded-lg border border-line bg-page px-0.5 py-0.5 pointer-coarse:h-12">
+                                  <span className="min-w-0 flex-1 whitespace-nowrap text-[10px] tabular-nums">
                                     {point.weightKg} kg
                                   </span>
                                   <span className="sr-only">

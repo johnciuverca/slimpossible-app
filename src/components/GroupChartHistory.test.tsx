@@ -53,7 +53,7 @@ describe('Group chart history', () => {
         .getAllByRole('columnheader')
         .map((cell) => cell.textContent),
     ).toEqual([
-      'Recorded date',
+      'Date',
       'Same name (member 1) (kg)',
       'Same name (member 2) (kg)',
     ])
