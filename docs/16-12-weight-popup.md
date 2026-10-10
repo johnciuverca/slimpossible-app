@@ -16,10 +16,11 @@ Issue #245, parent #199. Based on staging
   warns that the personal entry is removed from ALL shared groups and cannot be
   undone, defaults focus to Cancel and preserves data on cancel/failure.
 - My progress's personal cards and challenge-linked progress offer own actions.
-  Group adds a clearly labeled own-entry list in All members overview only, below its unchanged chart/matrix,
-  filtered by the selected group's explicit shares. Other members' matrix rows
-  have no edit/delete controls. Personal notes are never rendered in this list;
-  they are loaded only by the author's authorized personal workspace/editor.
+  Group uses compact cards inside its existing date/member history matrix, with
+  accessible Edit/Delete icons only in the viewer's explicitly shared cells.
+  These controls work in All members and the viewer's individual tab. Other
+  members stay read-only, even with duplicate names and identical dates/weights.
+  There is no duplicate Group entry list. Personal notes stay inside the editor.
 - Save/delete triggers an account-scoped signal so mounted personal histories,
   summaries and group chart/history refresh. Existing keyed snapshots and
   active-request guards hide prior account/challenge data and ignore late work.
@@ -46,7 +47,7 @@ Issue #245, parent #199. Based on staging
 - Required full CI runs on the published PR head. These synthetic observations
   are not connected owner acceptance, which is **NOT EXECUTED** for this issue.
 
-## Member-tab visibility correction — 2026-10-10
+## Member-tab visibility correction — 2026-10-10 (superseded)
 
 - PM relayed owner acceptance of the original popup, unsaved guard, personal
   save/edit/delete and Group own-entry/refresh/read-only behavior. Owner found
@@ -64,15 +65,45 @@ Issue #245, parent #199. Based on staging
   keyboard to All members, retaining canonical own edit/delete/refresh checks.
 - Connected owner retest of this visibility correction is pending; no merge.
 
+## Single-matrix card revision — 2026-10-10
+
+- Replaces the overview-only list/fallback above at the owner's request. The
+  existing date rows, member columns, tabs and chart remain; weight cells are
+  compact cards and only proven own cells receive accessible icon actions.
+- PM approved exact `js-md5@0.9.2` (MIT, no runtime dependencies) to reproduce
+  PostgreSQL's existing `md5(canonicalGroupUuid:canonicalAuthUserUuid)` key.
+  MD5 compatibility is not authorization: author-scoped RPC/RLS still controls
+  reads/writes. No SQL/schema/RLS/RPC-output changes or raw identity exposure.
+- Personal date lookup occurs only after exact own-column identification. The
+  workspace must be remote, current-account and ready (including contexts), and
+  the personal entry must explicitly share with the selected group. Otherwise
+  controls fail closed. Group weights continue to come from the Group RPC.
+- Independent Node-crypto vectors cover canonicalization and group/viewer
+  isolation. Ownership unit checks cover duplicate names/identical values,
+  unshared entries, loading/error, local persistence and account change.
+- Desktop/mobile browser checks cover own/other tabs, identical values, edit
+  Escape cancellation, preserved private note/shares, selected-group edit,
+  delete cancellation, cross-group delete refresh and focus return. Existing
+  Group matrix/sticky/privacy/selection tests remain passing.
+- The lockfile adds only the pinned dependency; existing packages are unchanged.
+  Current audit has two pre-existing high dev-dependency findings
+  (`brace-expansion`, `source-map-js`), none for `js-md5`; no unrelated upgrades.
+- Connected owner acceptance of this new matrix-card revision: **NOT EXECUTED**.
+  Draft staging PR remains unmerged pending independent review/owner approval.
+- Local revision validation: 470 unit tests across 78 files; 10 Group browser
+  tests; six popup/header browser tests (four header viewport sizes); lint,
+  typecheck, format, build and diff checks pass. Existing bundle warning remains.
+
 ## Owner preview checks (disposable entries only)
 
 1. On Dashboard without a challenge, Record weight. Confirm private default,
    today's existing-entry correction and optional explicit group shares.
 2. From My progress, Edit a disposable entry. Confirm date/weight/private note
    and checked shares; change a value, Escape, Stay, then Discard. Nothing saves.
-3. On Group's All members overview, confirm only your selected-group shared entries
-   offer Edit/Delete. Select any individual member: own actions disappear. Return
-   to All members: they reappear. Individual tabs/matrix stay read-only; no notes.
+3. On Group, confirm one history matrix and no duplicate own-entry section.
+   Your shared weight cards have Edit/Delete icons in All members and your own
+   tab. Another member's tab/cells stay read-only, including duplicate names and
+   identical values. Switch groups: actions follow only your explicit shares.
 4. Delete a disposable entry shared with two groups: check warning/date/weight,
    Cancel first, then confirm. Check personal history and both groups refresh.
 5. At narrow mobile width, use keyboard Tab/Shift+Tab/Escape and check focus

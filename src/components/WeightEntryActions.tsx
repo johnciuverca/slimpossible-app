@@ -9,9 +9,15 @@ import { Button } from './ui'
 export function WeightEntryActions({
   workspace,
   date,
+  compact = false,
+  memberLabel,
+  requiredSharedChallengeId,
 }: {
   workspace: PersonalWorkspace
   date: string
+  compact?: boolean
+  memberLabel?: string
+  requiredSharedChallengeId?: string
 }) {
   const [selection, setSelection] = useState<{
     key: string
@@ -19,7 +25,12 @@ export function WeightEntryActions({
   } | null>(null)
   const entry =
     workspace.personal.state === 'ready'
-      ? workspace.personal.data.find((row) => row.date === date)
+      ? workspace.personal.data.find(
+          (row) =>
+            row.date === date &&
+            (!requiredSharedChallengeId ||
+              row.sharedChallengeIds.includes(requiredSharedChallengeId)),
+        )
       : undefined
   if (!entry) return null
   const action = selection?.key === workspace.ownerKey ? selection.action : null
@@ -33,21 +44,56 @@ export function WeightEntryActions({
       <div className="flex flex-wrap gap-2">
         <Button
           variant="secondary"
-          aria-label={`Edit weight ${date}`}
+          className={compact ? 'min-h-11 min-w-11 p-2' : undefined}
+          aria-label={`Edit weight ${date}${memberLabel ? ` for ${memberLabel}` : ''}`}
           onClick={() =>
             setSelection({ key: workspace.ownerKey, action: 'edit' })
           }
         >
-          Edit
+          {compact ? (
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="m16 3 5 5-12 12-6 1 1-6Z" />
+              <path d="m14 5 5 5" />
+            </svg>
+          ) : (
+            'Edit'
+          )}
         </Button>
         <Button
           variant="secondary"
-          aria-label={`Delete ${date}`}
+          className={
+            compact ? 'min-h-11 min-w-11 p-2 text-danger-800' : undefined
+          }
+          aria-label={`Delete ${date}${memberLabel ? ` for ${memberLabel}` : ''}`}
           onClick={() =>
             setSelection({ key: workspace.ownerKey, action: 'delete' })
           }
         >
-          Delete
+          {compact ? (
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7" />
+            </svg>
+          ) : (
+            'Delete'
+          )}
         </Button>
       </div>
       {action === 'edit' ? (

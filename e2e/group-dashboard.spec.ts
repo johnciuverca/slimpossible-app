@@ -1,6 +1,12 @@
 import { expect, test, type Page } from '@playwright/test'
+import { createHash } from 'node:crypto'
 
-const challengeId = 'e2e-challenge'
+const ownGroupId = '11111111-1111-4111-8111-111111111111'
+const secondGroupId = '22222222-2222-4222-8222-222222222222'
+const viewerId = '33333333-3333-4333-8333-333333333333'
+const otherViewerId = '44444444-4444-4444-8444-444444444444'
+const memberKey = (group: string, viewer: string) =>
+  createHash('md5').update(`${group}:${viewer}`).digest('hex')
 const supabaseRestUrl = 'https://group-preview.supabase.co/rest/v1'
 
 function shiftDate(dateOnly: string, days: number) {
@@ -14,6 +20,8 @@ async function installGroupFixtures(
   multiple = false,
   ownEntries = false,
 ) {
+  const challengeId = ownEntries ? ownGroupId : 'e2e-challenge'
+  const secondId = ownEntries ? secondGroupId : 'e2e-second-group'
   const requests: string[] = []
   let ownWeight: number | null = 88.5
   page.on('request', (request) => requests.push(request.url()))
@@ -28,7 +36,7 @@ async function installGroupFixtures(
           {
             id: 'own-membership',
             challenge_id: challengeId,
-            user_id: 'e2e-user',
+            user_id: viewerId,
             display_name: 'Own viewer',
             starting_weight_kg: 100,
             target_weight_kg: 80,
@@ -39,8 +47,8 @@ async function installGroupFixtures(
           },
           {
             id: 'own-second-membership',
-            challenge_id: 'e2e-second-group',
-            user_id: 'e2e-user',
+            challenge_id: secondId,
+            user_id: viewerId,
             display_name: 'Own viewer',
             starting_weight_kg: 100,
             target_weight_kg: 80,
@@ -58,7 +66,7 @@ async function installGroupFixtures(
       recorded_date: '2026-09-22',
       weight_kg: ownWeight,
       note: 'Author-only disposable private note',
-      shared_challenge_ids: [challengeId, 'e2e-second-group'],
+      shared_challenge_ids: [challengeId, secondId],
     })
     if (
       ownEntries &&
@@ -74,10 +82,7 @@ async function installGroupFixtures(
       const body = request.postDataJSON()
       expect(body.target_weigh_in_id).toBe('disposable-own-entry')
       expect(body.target_note).toBe('Author-only disposable private note')
-      expect(body.target_shared_challenge_ids).toEqual([
-        challengeId,
-        'e2e-second-group',
-      ])
+      expect(body.target_shared_challenge_ids).toEqual([challengeId, secondId])
       ownWeight = body.target_weight_kg
       await route.fulfill({
         contentType: 'application/json',
@@ -102,11 +107,17 @@ async function installGroupFixtures(
         target_challenge_id: string
       }
       const name = target_challenge_id === challengeId ? 'Ava' : 'Jo'
+      const ownKey = ownEntries
+        ? memberKey(target_challenge_id, viewerId)
+        : 'opaque-member-a'
+      const otherKey = ownEntries
+        ? memberKey(target_challenge_id, otherViewerId)
+        : 'opaque-member-b'
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify([
           {
-            member_key: 'opaque-member-a',
+            member_key: ownKey,
             display_name: name,
             recorded_date: '2026-09-20',
             weight_kg: 90,
@@ -117,24 +128,34 @@ async function installGroupFixtures(
             ? []
             : [
                 {
-                  member_key: 'opaque-member-a',
+                  member_key: ownKey,
                   display_name: name,
                   recorded_date: '2026-09-22',
                   weight_kg: ownEntries ? ownWeight : 88.5,
                 },
               ]),
           {
-            member_key: 'opaque-member-b',
+            member_key: otherKey,
             display_name: name,
             recorded_date: '2026-09-20',
             weight_kg: 70,
           },
           {
-            member_key: 'opaque-member-b',
+            member_key: otherKey,
             display_name: name,
             recorded_date: '2026-09-21',
             weight_kg: 71,
           },
+          ...(ownEntries
+            ? [
+                {
+                  member_key: otherKey,
+                  display_name: name,
+                  recorded_date: '2026-09-22',
+                  weight_kg: 88.5,
+                },
+              ]
+            : []),
         ]),
       })
       return
@@ -164,7 +185,7 @@ async function installGroupFixtures(
                   created_by: 'e2e-owner',
                   description: null,
                   end_date: '2026-12-01',
-                  id: 'e2e-second-group',
+                  id: secondId,
                   name: 'Second authorized group',
                   owner_id: 'e2e-owner',
                   start_date: '2026-09-17',
@@ -184,10 +205,9 @@ async function installGroupFixtures(
         target_challenge_id: string
         target_current_sunday: string
       }
-      expect([
-        challengeId,
-        ...(multiple ? ['e2e-second-group'] : []),
-      ]).toContain(body.target_challenge_id)
+      expect([challengeId, ...(multiple ? [secondId] : [])]).toContain(
+        body.target_challenge_id,
+      )
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify([
@@ -220,10 +240,9 @@ async function installGroupFixtures(
         target_challenge_id: string
         target_current_date: string
       }
-      expect([
-        challengeId,
-        ...(multiple ? ['e2e-second-group'] : []),
-      ]).toContain(body.target_challenge_id)
+      expect([challengeId, ...(multiple ? [secondId] : [])]).toContain(
+        body.target_challenge_id,
+      )
       const currentDate = new Date(`${body.target_current_date}T00:00:00.000Z`)
       const mondayOffset = (currentDate.getUTCDay() + 6) % 7
       const currentWeekStart = shiftDate(
@@ -269,48 +288,46 @@ for (const viewport of [
   { label: 'desktop', width: 1280 },
   { label: 'mobile', width: 390 },
 ]) {
-  test(`only own shared entries edit/delete and refresh all selected groups on ${viewport.label}`, async ({
+  test(`only own matrix cards edit/delete and refresh selected groups on ${viewport.label}`, async ({
     page,
   }) => {
     await page.setViewportSize({ width: viewport.width, height: 700 })
     const requests = await installGroupFixtures(page, true, true)
-    await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
-    const own = page.getByRole('list', {
-      name: 'Your own shared group entries',
-    })
+    await page.goto(
+      `/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
+    )
     const matrix = page.getByRole('table', {
       name: 'Shared group weight history',
     })
+    const ownOrdinal =
+      memberKey(ownGroupId, viewerId) < memberKey(ownGroupId, otherViewerId)
+        ? 1
+        : 2
+    const ownName = `Ava (member ${ownOrdinal})`
+    const otherName = `Ava (member ${3 - ownOrdinal})`
+    const edit = matrix.getByRole('button', {
+      name: `Edit weight 2026-09-22 for ${ownName}`,
+      exact: true,
+    })
+    const remove = matrix.getByRole('button', {
+      name: `Delete 2026-09-22 for ${ownName}`,
+      exact: true,
+    })
+    await expect(edit).toBeVisible()
+    await expect(matrix.getByRole('button')).toHaveCount(2)
+    await expect(matrix.getByText('88.5 kg', { exact: true })).toHaveCount(2)
     await expect(
-      own.getByRole('button', { name: 'Edit weight 2026-09-22' }),
-    ).toBeVisible()
-    await expect(own.getByRole('button')).toHaveCount(2)
-    await expect(matrix.getByRole('button')).toHaveCount(0)
-    // Duplicate display names must never establish ownership. Opaque tabs are
-    // read-only; author actions are conservatively available in All members only.
-    for (const name of ['Ava (member 1)', 'Ava (member 2)']) {
-      const member = page.getByRole('tab', { name, exact: true })
-      await member.focus()
-      await page.keyboard.press('Enter')
-      await expect(member).toHaveAttribute('aria-selected', 'true')
-      await expect(own).toHaveCount(0)
-      await expect(
-        page.getByRole('button', { name: 'Edit weight 2026-09-22' }),
-      ).toHaveCount(0)
-      await expect(
-        page.getByRole('button', { name: 'Delete 2026-09-22' }),
-      ).toHaveCount(0)
-      await expect(matrix.getByRole('button')).toHaveCount(0)
-    }
-    await page.keyboard.press('Home')
-    await expect(
-      page.getByRole('tab', { name: 'All members', exact: true }),
-    ).toHaveAttribute('aria-selected', 'true')
-    await expect(own.getByRole('button')).toHaveCount(2)
-    await expect(
-      page.getByText('Author-only disposable private note', { exact: true }),
+      page.getByRole('list', { name: 'Your own shared group entries' }),
     ).toHaveCount(0)
-    await own.getByRole('button', { name: 'Edit weight 2026-09-22' }).click()
+    await page.getByRole('tab', { name: ownName, exact: true }).click()
+    await expect(edit).toBeVisible()
+    await expect(matrix.getByRole('button')).toHaveCount(2)
+    await page.getByRole('tab', { name: otherName, exact: true }).click()
+    await expect(matrix.getByRole('button')).toHaveCount(0)
+    await expect(matrix.getByText('88.5 kg', { exact: true })).toBeVisible()
+    await page.keyboard.press('Home')
+    await expect(edit).toBeVisible()
+    await edit.click()
     const editor = page.getByRole('dialog', {
       name: 'Edit weight',
       exact: true,
@@ -323,10 +340,13 @@ for (const viewport of [
     await expect(editor.getByRole('checkbox')).toHaveCount(2)
     await expect(editor.getByRole('checkbox').first()).toBeChecked()
     await expect(editor.getByRole('checkbox').last()).toBeChecked()
+    await page.keyboard.press('Escape')
+    await expect(edit).toBeFocused()
+    await edit.click()
     await editor.getByLabel('Weight in kg').fill('87')
     await editor.getByRole('button', { name: 'Update weight' }).click()
-    await expect(own.getByText('87 kg', { exact: false })).toBeVisible()
     await expect(matrix.getByText('87 kg', { exact: true })).toBeVisible()
+    await expect(matrix.getByText('88.5 kg', { exact: true })).toBeVisible()
     await expect(
       page.getByRole('button', { name: 'Record weight', exact: true }),
     ).toBeFocused()
@@ -337,42 +357,37 @@ for (const viewport of [
       url.includes('get_group_chart_history'),
     ).length
     await page
-      .getByRole('navigation', { name: 'Primary navigation' })
-      .getByRole('link', { name: 'My progress', exact: true })
+      .getByRole('navigation', { name: 'Challenge contexts' })
+      .getByRole('link', {
+        name: 'Group · Second authorized group',
+        exact: true,
+      })
       .click()
-    const personalActions = page.getByRole('list', {
-      name: 'Your own personal entry actions',
-    })
-    await personalActions
-      .getByRole('button', { name: 'Edit weight 2026-09-22' })
+    await expect(matrix.getByText('87 kg', { exact: true })).toBeVisible()
+    await expect(matrix.getByRole('button')).toHaveCount(2)
+    await matrix
+      .getByRole('button', { name: /^Edit weight 2026-09-22 for Jo/ })
       .click()
     await expect(editor.getByLabel('Weight in kg')).toHaveValue('87')
-    await expect(editor.getByLabel('Private note (optional)')).toHaveValue(
-      'Author-only disposable private note',
-    )
     await page.keyboard.press('Escape')
     await page
-      .getByRole('navigation', { name: 'Primary navigation' })
-      .getByRole('link', { name: 'Group', exact: true })
+      .getByRole('navigation', { name: 'Challenge contexts' })
+      .getByRole('link', { name: 'Group · E2E authorized group', exact: true })
       .click()
-    await own.getByRole('button', { name: 'Delete 2026-09-22' }).click()
+    await remove.click()
     const deletion = page.getByRole('dialog', { name: 'Delete weight?' })
     await expect(deletion).toContainText('87 kg recorded 2026-09-22')
     await expect(deletion).toContainText('ALL shared groups')
-    await expect(deletion.getByRole('form')).toHaveCount(0)
     await deletion.getByRole('button', { name: 'Cancel', exact: true }).click()
-    await expect(
-      own.getByRole('button', { name: 'Delete 2026-09-22' }),
-    ).toBeFocused()
+    await expect(remove).toBeFocused()
     await expect(matrix.getByText('87 kg', { exact: true })).toBeVisible()
-    await own.getByRole('button', { name: 'Delete 2026-09-22' }).click()
+    await remove.click()
     await deletion
       .getByRole('button', { name: 'Delete weight', exact: true })
       .click()
-    await expect(
-      page.getByText('No own entries shared with this group.'),
-    ).toBeVisible()
+    await expect(matrix.getByRole('button')).toHaveCount(0)
     await expect(matrix.getByText('87 kg', { exact: true })).toHaveCount(0)
+    await expect(matrix.getByText('88.5 kg', { exact: true })).toBeVisible()
     await expect(
       page.getByRole('button', { name: 'Record weight', exact: true }),
     ).toBeFocused()
@@ -387,11 +402,9 @@ for (const viewport of [
       })
       .click()
     await expect(page.getByText('73.2%', { exact: true })).toBeVisible()
-    await expect(
-      page.getByText('No own entries shared with this group.'),
-    ).toBeVisible()
+    await expect(matrix.getByRole('button')).toHaveCount(0)
     await expect(matrix.getByText('87 kg', { exact: true })).toHaveCount(0)
-    await expect(matrix.getByText('70 kg', { exact: true })).toBeVisible()
+    await expect(matrix.getByText('88.5 kg', { exact: true })).toBeVisible()
   })
   test(`spreadsheet member tabs and sticky navigation stay usable on ${viewport.label}`, async ({
     page,

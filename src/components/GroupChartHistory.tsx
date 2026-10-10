@@ -1,5 +1,8 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import type { Persistence } from '../data/persistence'
+import { usePersonalWorkspace } from '../data/usePersonalWorkspace'
+import { ownGroupMemberKey } from '../models/ownGroupMemberKey'
+import { WeightEntryActions } from './WeightEntryActions'
 import {
   createGroupChartHistory,
   createGroupHistoryMatrix,
@@ -17,7 +20,6 @@ export function GroupChartHistory({
   persistence,
   refreshVersion,
   children,
-  overviewActions,
   enabled = true,
 }: {
   challengeId: string
@@ -25,9 +27,12 @@ export function GroupChartHistory({
   persistence: Persistence
   refreshVersion: number
   children?: ReactNode
-  overviewActions?: ReactNode
   enabled?: boolean
 }) {
+  const ownMemberKey = ownGroupMemberKey(challengeId, viewerId)
+  const personalWorkspace = usePersonalWorkspace({
+    enabled: enabled && ownMemberKey !== null,
+  })
   const key = `${viewerId}:${challengeId}:${refreshVersion}:${persistence.mode}`
   const context = `${viewerId}:${challengeId}:${persistence.mode}`
   const [selection, setSelection] = useState({ context, memberKey: '' })
@@ -374,7 +379,7 @@ export function GroupChartHistory({
                               className="relative px-4 py-3"
                             >
                               {point ? (
-                                <>
+                                <div className="inline-flex flex-col gap-2 rounded-xl border border-line bg-page p-3">
                                   <span className="whitespace-nowrap">
                                     {point.weightKg} kg
                                   </span>
@@ -382,7 +387,25 @@ export function GroupChartHistory({
                                     ; change from first shared entry{' '}
                                     {signed(point.changeKg)}
                                   </span>
-                                </>
+                                  {point.memberKey === ownMemberKey &&
+                                  personalWorkspace.userId ===
+                                    viewerId.toLowerCase() &&
+                                  personalWorkspace.persistence.mode ===
+                                    'remote' &&
+                                  personalWorkspace.personal.state ===
+                                    'ready' &&
+                                  personalWorkspace.contexts.state ===
+                                    'ready' ? (
+                                    <WeightEntryActions
+                                      key={`${personalWorkspace.ownerKey}:${challengeId}:${point.date}`}
+                                      workspace={personalWorkspace}
+                                      date={point.date}
+                                      compact
+                                      memberLabel={series[index].label}
+                                      requiredSharedChallengeId={challengeId}
+                                    />
+                                  ) : null}
+                                </div>
                               ) : (
                                 <span aria-label="No shared entry">—</span>
                               )}
@@ -398,9 +421,6 @@ export function GroupChartHistory({
           </section>
         </div>
       ) : null}
-      {enabled && (selection.context !== context || !selection.memberKey)
-        ? overviewActions
-        : null}
     </div>
   )
 }

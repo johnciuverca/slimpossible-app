@@ -1640,14 +1640,6 @@ export function GroupDashboardPage() {
         persistence={persistence}
         refreshVersion={reloadKey + weightRevision}
         enabled={Boolean(summary)}
-        overviewActions={
-          data ? (
-            <PersonalEntryActions
-              key={`${ownerId}:${data.challenge.id}`}
-              challengeId={data.challenge.id}
-            />
-          ) : null
-        }
       >
         <Card className="p-5 sm:p-8 lg:p-10">
           <div className="mt-6 flex flex-wrap items-end gap-4">

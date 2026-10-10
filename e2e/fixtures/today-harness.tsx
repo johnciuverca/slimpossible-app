@@ -17,7 +17,8 @@ import {
 } from '../../src/pages/AppPages'
 import '../../src/index.css'
 
-const fixtureUserId = 'e2e-user'
+const fixtureUserId =
+  new URLSearchParams(window.location.search).get('user') ?? 'e2e-user'
 const scenario = new URLSearchParams(window.location.search).get('scenario')
 const challengeId = 'e2e-challenge'
 const isProgress = scenario === 'progress'
