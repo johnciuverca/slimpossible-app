@@ -133,7 +133,7 @@ describe('Group chart history', () => {
     expect(
       screen.getByRole('tab', { name: 'Same name (member 2)' }),
     ).toHaveAttribute('aria-selected', 'true')
-    expect(table).not.toHaveTextContent('88.5 kg')
+    expect(table).not.toHaveTextContent('88.50 kg')
     expect(table).toHaveTextContent('70.25 kg')
     expect(screen.getByRole('img').querySelectorAll('circle')).toHaveLength(1)
     expect(screen.getByRole('tabpanel')).toHaveAccessibleName(
@@ -144,7 +144,7 @@ describe('Group chart history', () => {
       { key: 'Home' },
     )
     expect(all).toHaveFocus()
-    expect(table).toHaveTextContent('88.5 kg')
+    expect(table).toHaveTextContent('88.50 kg')
     expect(load).toHaveBeenCalledTimes(1)
     expect(load).toHaveBeenCalledWith('group')
   })
@@ -175,7 +175,7 @@ describe('Group chart history', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
     await screen.findByRole('table')
     expect(
-      within(screen.getByRole('table')).getByText('91 kg'),
+      within(screen.getByRole('table')).getByText('91.00'),
     ).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Ava' })).toHaveAttribute(
       'aria-selected',
@@ -234,7 +234,7 @@ describe('Group chart history', () => {
     const table = await screen.findByRole('table', {
       name: 'Shared group weight history',
     })
-    expect(table).toHaveTextContent('88.5 kg')
+    expect(table).toHaveTextContent('88.50 kg')
     expect(table).toHaveTextContent('-1.5 kg')
     expect(load).toHaveBeenCalledWith('group-a')
     const chart = screen.getByRole('img')

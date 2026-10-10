@@ -24,7 +24,7 @@ async function installGroupFixtures(
   const challengeId = ownEntries ? ownGroupId : 'e2e-challenge'
   const secondId = ownEntries ? secondGroupId : 'e2e-second-group'
   const requests: string[] = []
-  let ownWeight: number | null = 88.5
+  let ownWeight: number | null = differentWeights ? 95.1 : 88.5
   page.on('request', (request) => requests.push(request.url()))
 
   await page.route(`${supabaseRestUrl}/**`, async (route) => {
@@ -86,7 +86,7 @@ async function installGroupFixtures(
                         ...ownRow(),
                         id: 'disposable-own-baseline',
                         recorded_date: '2026-09-20',
-                        weight_kg: 9.5,
+                        weight_kg: 9,
                       },
                     ]
                   : []),
@@ -137,7 +137,7 @@ async function installGroupFixtures(
             member_key: ownKey,
             display_name: name,
             recorded_date: '2026-09-20',
-            weight_kg: differentWeights ? 9.5 : 90,
+            weight_kg: differentWeights ? 9 : 90,
             note: 'fixture private note must never render',
             email: 'private@example.invalid',
           },
@@ -155,16 +155,16 @@ async function installGroupFixtures(
             member_key: otherKey,
             display_name: name,
             recorded_date: '2026-09-20',
-            weight_kg: differentWeights ? 95 : 70,
+            weight_kg: differentWeights ? 95.1 : 70,
           },
           {
             member_key: otherKey,
             display_name: name,
             recorded_date: '2026-09-21',
-            weight_kg: differentWeights ? 105.5 : 71,
+            weight_kg: differentWeights ? 105.25 : 71,
           },
           ...(differentWeights
-            ? [999.99, 1000.5, 75, 80].map((weight, index) => ({
+            ? [999.95, 1000.5, 75, 80].map((weight, index) => ({
                 member_key: `layout-readonly-${index}`,
                 display_name: `Fixture member ${index + 1}`,
                 recorded_date: '2026-09-22',
@@ -314,7 +314,7 @@ for (const layout of [
   { label: 'mobile', width: 390, hasTouch: false },
   { label: 'coarse pointer', width: 390, hasTouch: true },
 ]) {
-  test(`editable cards keep adjacent icons and read-only cards fit values on ${layout.label}`, async ({
+  test(`fixed cards align numbers and units with equal heights on ${layout.label}`, async ({
     browser,
   }) => {
     const context = await browser.newContext({
@@ -385,23 +385,40 @@ for (const layout of [
             fits: value.scrollWidth <= value.clientWidth,
             center: valueBounds.y + valueBounds.height / 2,
             valueWidth: valueBounds.width,
+            numberWidth: value.firstElementChild!.getBoundingClientRect().width,
+            numberFits:
+              value.firstElementChild!.scrollWidth <=
+              value.firstElementChild!.clientWidth,
+            unitOffset:
+              value.lastElementChild!.getBoundingClientRect().x - bounds.x,
+            numberAlign: getComputedStyle(value.firstElementChild!).textAlign,
             childCount: card.children.length,
             buttons,
           }
         }),
       )
       expect(boxes.map((box) => box.value)).toEqual(
-        expect.arrayContaining(['9.5 kg', '95 kg', '105.5 kg', '88.5 kg']),
+        expect.arrayContaining([
+          '9.00 kg',
+          '95.10 kg',
+          '105.25 kg',
+          '999.95 kg',
+          '1000.50 kg',
+        ]),
       )
       for (const box of boxes) {
         if (box.buttons.length)
-          expect(box.width).toBe(layout.hasTouch ? 152 : 128)
+          expect(box.width).toBe(layout.hasTouch ? 148 : 124)
         else {
-          expect(box.width).toBeLessThan(80)
-          expect(box.width).toBeCloseTo(box.valueWidth + 10, 0)
+          expect(box.width).toBe(60)
           expect(box.childCount).toBe(2)
         }
-        expect(box.height).toBeLessThanOrEqual(50)
+        expect(box.height).toBe(layout.hasTouch ? 48 : 40)
+        expect(box.valueWidth).toBe(50)
+        expect(box.numberWidth).toBe(36)
+        expect(box.numberFits).toBe(true)
+        expect(box.numberAlign).toBe('right')
+        expect(box.unitOffset).toBe(43)
         expect(box.fits, `${box.value} fits the compact value area`).toBe(true)
         for (const button of box.buttons) {
           expect(button.width).toBe(layout.hasTouch ? 44 : 32)
@@ -425,6 +442,9 @@ for (const layout of [
         name: 'Scrollable shared group weights',
       })
       await scroll.scrollIntoViewIfNeeded()
+      await scroll.screenshot({
+        path: test.info().outputPath('fixed-weight-cards.png'),
+      })
       if (layout.width >= 500)
         await scroll.evaluate((element) => {
           element.style.maxWidth = '700px'
@@ -515,14 +535,14 @@ for (const viewport of [
     })
     await expect(edit).toBeVisible()
     await expect(matrix.getByRole('button')).toHaveCount(2)
-    await expect(matrix.getByText('88.5 kg', { exact: true })).toHaveCount(2)
+    await expect(matrix.getByText('88.50 kg', { exact: true })).toHaveCount(2)
     const ownReadonly = matrix
-      .getByText('90 kg', { exact: true })
+      .getByText('90.00 kg', { exact: true })
       .locator('xpath=..')
     await expect(ownReadonly.getByRole('button')).toHaveCount(0)
     expect((await ownReadonly.boundingBox())!.width).toBeLessThan(80)
     const card = edit.locator('xpath=../..')
-    const value = card.getByText('88.5 kg', { exact: true })
+    const value = card.getByText('88.50 kg', { exact: true })
     const valueBox = (await value.boundingBox())!
     const editBox = (await edit.boundingBox())!
     const deleteBox = (await remove.boundingBox())!
@@ -553,7 +573,7 @@ for (const viewport of [
     await expect(matrix.getByRole('button')).toHaveCount(2)
     await page.getByRole('tab', { name: otherName, exact: true }).click()
     await expect(matrix.getByRole('button')).toHaveCount(0)
-    await expect(matrix.getByText('88.5 kg', { exact: true })).toBeVisible()
+    await expect(matrix.getByText('88.50 kg', { exact: true })).toBeVisible()
     await page.keyboard.press('Home')
     await expect(edit).toBeVisible()
     await edit.click()
@@ -574,8 +594,8 @@ for (const viewport of [
     await edit.click()
     await editor.getByLabel('Weight in kg').fill('87')
     await editor.getByRole('button', { name: 'Update weight' }).click()
-    await expect(matrix.getByText('87 kg', { exact: true })).toBeVisible()
-    await expect(matrix.getByText('88.5 kg', { exact: true })).toBeVisible()
+    await expect(matrix.getByText('87.00 kg', { exact: true })).toBeVisible()
+    await expect(matrix.getByText('88.50 kg', { exact: true })).toBeVisible()
     await expect(
       page.getByRole('button', { name: 'Record weight', exact: true }),
     ).toBeFocused()
@@ -592,7 +612,7 @@ for (const viewport of [
         exact: true,
       })
       .click()
-    await expect(matrix.getByText('87 kg', { exact: true })).toBeVisible()
+    await expect(matrix.getByText('87.00 kg', { exact: true })).toBeVisible()
     await expect(matrix.getByRole('button')).toHaveCount(2)
     await matrix
       .getByRole('button', { name: /^Edit weight 2026-09-22 for Jo/ })
@@ -609,14 +629,14 @@ for (const viewport of [
     await expect(deletion).toContainText('ALL shared groups')
     await deletion.getByRole('button', { name: 'Cancel', exact: true }).click()
     await expect(remove).toBeFocused()
-    await expect(matrix.getByText('87 kg', { exact: true })).toBeVisible()
+    await expect(matrix.getByText('87.00 kg', { exact: true })).toBeVisible()
     await remove.click()
     await deletion
       .getByRole('button', { name: 'Delete weight', exact: true })
       .click()
     await expect(matrix.getByRole('button')).toHaveCount(0)
-    await expect(matrix.getByText('87 kg', { exact: true })).toHaveCount(0)
-    await expect(matrix.getByText('88.5 kg', { exact: true })).toBeVisible()
+    await expect(matrix.getByText('87.00 kg', { exact: true })).toHaveCount(0)
+    await expect(matrix.getByText('88.50 kg', { exact: true })).toBeVisible()
     await expect(
       page.getByRole('button', { name: 'Record weight', exact: true }),
     ).toBeFocused()
@@ -632,8 +652,8 @@ for (const viewport of [
       .click()
     await expect(page.getByText('73.2%', { exact: true })).toBeVisible()
     await expect(matrix.getByRole('button')).toHaveCount(0)
-    await expect(matrix.getByText('87 kg', { exact: true })).toHaveCount(0)
-    await expect(matrix.getByText('88.5 kg', { exact: true })).toBeVisible()
+    await expect(matrix.getByText('87.00 kg', { exact: true })).toHaveCount(0)
+    await expect(matrix.getByText('88.50 kg', { exact: true })).toBeVisible()
   })
   test(`spreadsheet member tabs and sticky navigation stay usable on ${viewport.label}`, async ({
     page,
@@ -681,7 +701,7 @@ for (const viewport of [
       .filter({ has: page.getByRole('rowheader', { name: '2026-09-21' }) })
     await expect(missing.getByRole('cell')).toHaveText([
       '—',
-      '71 kg; change from first shared entry +1 kg',
+      '71.00 kg; change from first shared entry +1 kg',
     ])
     const tabs = page.getByRole('tablist', { name: 'Shared group members' })
     const all = tabs.getByRole('tab', { name: 'All members' })
@@ -691,15 +711,15 @@ for (const viewport of [
       tabs.getByRole('tab', { name: 'Ava (member 1)' }),
     ).toBeFocused()
     await expect(table.getByRole('columnheader')).toHaveCount(2)
-    await expect(table).toContainText('88.5 kg')
-    await expect(table).not.toContainText('70 kg')
+    await expect(table).toContainText('88.50 kg')
+    await expect(table).not.toContainText('70.00 kg')
     await expect(page.getByRole('img').locator('circle')).toHaveCount(2)
     await page.keyboard.press('End')
     await expect(
       tabs.getByRole('tab', { name: 'Ava (member 2)' }),
     ).toBeFocused()
-    await expect(table).toContainText('71 kg')
-    await expect(table).not.toContainText('88.5 kg')
+    await expect(table).toContainText('71.00 kg')
+    await expect(table).not.toContainText('88.50 kg')
     await page.keyboard.press('Home')
     await expect(all).toBeFocused()
     const weights = page.getByRole('region', {
@@ -933,7 +953,7 @@ for (const viewport of [
     const historyPanel = page.getByRole('region', {
       name: 'Group chart and weigh-in history',
     })
-    await expect(historyPanel.getByRole('table')).toContainText('88.5 kg')
+    await expect(historyPanel.getByRole('table')).toContainText('88.50 kg')
     await expect(historyPanel.getByRole('table')).toContainText('-1.5 kg')
     await expect(historyPanel.getByRole('table')).toContainText(
       'Ava (member 1)',

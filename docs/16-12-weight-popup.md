@@ -130,7 +130,7 @@ fill the panel. Practical 44px coarse-pointer targets and opaque sticky layering
 remain. Reference inspection establishes the actual-weight metric only; it does
 not establish exact visual matching or owner acceptance of this preview.
 
-Latest owner sizing override: equal own/read-only widths are no longer wanted.
+Superseded owner sizing override: equal own/read-only widths were no longer wanted.
 Editable cards now use compact 128px width (152px on coarse-pointer devices),
 with adjacent icon buttons and zero inter-button gap. Targets are 32px wide on
 fine pointers and 44px square on coarse pointers; keyboard labels/focus remain.
@@ -139,6 +139,18 @@ own-column cells with no editable record. Rendered controls determine styling,
 not ownership guesses. Accepted 76px dates/156px columns, sticky layering and
 actual-kg graph remain unchanged. PM relayed owner acceptance of the preceding
 version except sizing; connected acceptance of this sizing revision is pending.
+
+Latest owner revision fixes every read-only card at 60px, with a 36px
+right-aligned tabular number slot and separate 12px kg slot. All matrix weights
+display two decimals without changing stored values, chart values or validation.
+Supported outliers such as 1000.5 display fully as 1000.50 using a smaller font
+inside the same numeric slot. Editable cards append adjacent non-overlapping
+32px buttons (44px on coarse pointers), making widths 124px/148px. All cards
+have identical visible heights: 40px fine pointer, 48px coarse pointer. There
+are no blank action slots on read-only cards. Date columns, chart, sticky
+stacking, ownership and dialogs are unchanged. Browser coverage checks 9.00,
+95.10, 105.25, 999.95 and the outlier on desktop/mobile/coarse pointers.
+Owner visual acceptance of this latest revision remains pending.
 
 1. On Dashboard without a challenge, Record weight. Confirm private default,
    today's existing-entry correction and optional explicit group shares.
