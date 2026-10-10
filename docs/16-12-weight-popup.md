@@ -101,11 +101,16 @@ horizontal line, with reduced card padding/gaps. Keyboard focus stays visible;
 coarse-pointer devices retain 44px hit targets. Ownership, dialogs and privacy
 behavior are unchanged. Connected visual acceptance is pending.
 
-Fixed-width correction: every populated card is 224px wide, including read-only
+Fixed-width correction: every populated card is 168px wide, including read-only
 cards. The weight area flexes inside that boundary; the trailing 90px reserves
 two aligned 44px icon slots (blank on read-only cards). Values stay on one line,
 without truncation of normal weights; narrow matrices scroll horizontally.
 Desktop/mobile/coarse-pointer tests compare 9.5, 95 and 105.5 kg with own cards.
+The latest compact revision uses 12px values, 14px icons and reduced padding;
+999.99/1000.5 kg also fit without truncation. The isolated scroll region layers
+body cells below opaque sticky dates, column headers and the top-left corner.
+Horizontal-scroll regressions check real card/date overlap and date/header
+hit-test precedence on desktop/mobile/coarse pointer; no behavior changes.
 
 1. On Dashboard without a challenge, Record weight. Confirm private default,
    today's existing-entry correction and optional explicit group shares.

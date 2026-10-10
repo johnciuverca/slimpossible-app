@@ -62,8 +62,8 @@ export function WeightEntryActions({
         >
           {compact ? (
             <svg
-              width="16"
-              height="16"
+              width="14"
+              height="14"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -92,8 +92,8 @@ export function WeightEntryActions({
         >
           {compact ? (
             <svg
-              width="16"
-              height="16"
+              width="14"
+              height="14"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"

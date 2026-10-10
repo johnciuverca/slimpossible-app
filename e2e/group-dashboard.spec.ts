@@ -163,6 +163,14 @@ async function installGroupFixtures(
             recorded_date: '2026-09-21',
             weight_kg: differentWeights ? 105.5 : 71,
           },
+          ...(differentWeights
+            ? [999.99, 1000.5, 75, 80].map((weight, index) => ({
+                member_key: `layout-readonly-${index}`,
+                display_name: `Fixture member ${index + 1}`,
+                recorded_date: '2026-09-22',
+                weight_kg: weight,
+              }))
+            : []),
           ...(ownEntries
             ? [
                 {
@@ -326,7 +334,7 @@ for (const layout of [
         matrix.getByRole('button', { name: /^Edit weight/ }),
       ).toHaveCount(2)
       const cards = matrix.locator('td > div')
-      await expect(cards).toHaveCount(5)
+      await expect(cards).toHaveCount(9)
       const boxes = await cards.evaluateAll((elements) =>
         elements.map((card) => {
           const bounds = card.getBoundingClientRect()
@@ -357,7 +365,7 @@ for (const layout of [
         expect.arrayContaining(['9.5 kg', '95 kg', '105.5 kg', '88.5 kg']),
       )
       for (const box of boxes) {
-        expect(box.width).toBe(224)
+        expect(box.width).toBe(168)
         expect(box.height).toBeLessThanOrEqual(50)
         expect(box.fits).toBe(true)
         for (const button of box.buttons) {
@@ -373,19 +381,59 @@ for (const layout of [
       expect(own[0].buttons.map((button) => button.offset)).toEqual(
         own[1].buttons.map((button) => button.offset),
       )
-      expect(boxes.filter((box) => box.buttons.length === 0)).toHaveLength(3)
-      if (layout.width < 500) {
-        const scroll = page.getByRole('region', {
-          name: 'Scrollable shared group weights',
-        })
-        expect(
-          await scroll.evaluate(
-            (element) => element.scrollWidth > element.clientWidth,
-          ),
-        ).toBe(true)
-      }
-      await matrix.screenshot({
-        path: test.info().outputPath('fixed-width-matrix.png'),
+      expect(boxes.filter((box) => box.buttons.length === 0)).toHaveLength(7)
+      const scroll = page.getByRole('region', {
+        name: 'Scrollable shared group weights',
+      })
+      await scroll.scrollIntoViewIfNeeded()
+      expect(
+        await scroll.evaluate(
+          (element) => element.scrollWidth > element.clientWidth,
+        ),
+      ).toBe(true)
+      await scroll.evaluate((element) => {
+        element.scrollLeft = 180
+      })
+      await expect
+        .poll(() => scroll.evaluate((element) => element.scrollLeft))
+        .toBeGreaterThan(0)
+      const date = matrix.getByRole('rowheader', { name: '2026-09-22' })
+      const firstCard = date.locator('xpath=../td[1]/div')
+      const dateBox = (await date.boundingBox())!
+      const scrolledCardBox = (await firstCard.boundingBox())!
+      expect(scrolledCardBox.x).toBeLessThan(dateBox.x + dateBox.width)
+      expect(scrolledCardBox.x + scrolledCardBox.width).toBeGreaterThan(
+        dateBox.x,
+      )
+      expect(
+        await date.evaluate((element) => {
+          const box = element.getBoundingClientRect()
+          return [box.x + 8, box.x + box.width / 2, box.right - 8].every(
+            (x) =>
+              document
+                .elementFromPoint(x, box.y + box.height / 2)
+                ?.closest('th') === element,
+          )
+        }),
+      ).toBe(true)
+      expect(
+        await date.evaluate(
+          (element) => getComputedStyle(element).backgroundColor,
+        ),
+      ).toBe('rgb(255, 255, 255)')
+      const corner = matrix.getByRole('columnheader', { name: 'Recorded date' })
+      expect(
+        await corner.evaluate((element) => {
+          const box = element.getBoundingClientRect()
+          return (
+            document
+              .elementFromPoint(box.right - 8, box.y + box.height / 2)
+              ?.closest('th') === element
+          )
+        }),
+      ).toBe(true)
+      await scroll.screenshot({
+        path: test.info().outputPath('compact-scrolled-matrix.png'),
       })
     } finally {
       await context.close()

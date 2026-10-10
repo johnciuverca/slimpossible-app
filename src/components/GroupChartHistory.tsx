@@ -336,7 +336,7 @@ export function GroupChartHistory({
                   role="region"
                   aria-label="Scrollable shared group weights"
                   tabIndex={0}
-                  className="mt-5 max-h-[28rem] overflow-auto rounded-xl border border-stone-200 focus-visible:outline-2 focus-visible:outline-emerald-700"
+                  className="relative isolate mt-5 max-h-[28rem] overflow-auto rounded-xl border border-stone-200 focus-visible:outline-2 focus-visible:outline-emerald-700"
                 >
                   <table
                     aria-label="Shared group weight history"
@@ -349,7 +349,7 @@ export function GroupChartHistory({
                       <tr>
                         <th
                           scope="col"
-                          className="sticky left-0 top-0 z-10 bg-stone-50 px-4 py-3"
+                          className="sticky left-0 top-0 z-30 bg-stone-50 px-4 py-3"
                         >
                           Recorded date
                         </th>
@@ -357,7 +357,7 @@ export function GroupChartHistory({
                           <th
                             key={member.memberKey}
                             scope="col"
-                            className="sticky top-0 bg-stone-50 px-4 py-3"
+                            className="sticky top-0 z-20 bg-stone-50 px-4 py-3"
                           >
                             {member.label} (kg)
                           </th>
@@ -369,18 +369,18 @@ export function GroupChartHistory({
                         <tr key={row.date}>
                           <th
                             scope="row"
-                            className="sticky left-0 bg-white px-4 py-3 font-medium"
+                            className="sticky left-0 z-10 bg-white px-4 py-3 font-medium"
                           >
                             <time dateTime={row.date}>{row.date}</time>
                           </th>
                           {row.cells.map((point, index) => (
                             <td
                               key={series[index].memberKey}
-                              className="relative px-4 py-3"
+                              className="relative z-0 px-4 py-3"
                             >
                               {point ? (
-                                <div className="inline-flex h-11 w-56 shrink-0 flex-nowrap items-center gap-1 rounded-lg border border-line bg-page px-2 py-0.5 pointer-coarse:h-12">
-                                  <span className="min-w-0 flex-1 whitespace-nowrap">
+                                <div className="inline-flex h-11 w-[168px] shrink-0 flex-nowrap items-center gap-0.5 rounded-lg border border-line bg-page px-1 py-0.5 pointer-coarse:h-12">
+                                  <span className="min-w-0 flex-1 whitespace-nowrap text-xs tabular-nums">
                                     {point.weightKg} kg
                                   </span>
                                   <span className="sr-only">
