@@ -434,13 +434,13 @@ export function GroupChartHistory({
                               className="relative z-0 px-1 py-1"
                             >
                               {point ? (
-                                <div className="inline-flex h-10 w-[60px] shrink-0 flex-nowrap items-center gap-0 rounded-lg border border-line bg-page px-1 py-0 has-[button]:w-[124px] pointer-coarse:h-12 pointer-coarse:has-[button]:w-[148px]">
+                                <div className="group/weight inline-flex h-10 shrink-0 flex-nowrap items-center gap-0 rounded-lg border border-line bg-page px-1 py-0 has-[button]:w-[124px] pointer-coarse:h-12 pointer-coarse:has-[button]:w-[148px]">
                                   <span
-                                    className="inline-flex shrink-0 items-baseline gap-0.5 whitespace-nowrap text-[10px]"
+                                    className="inline-flex shrink-0 items-baseline justify-end gap-0.5 whitespace-nowrap text-[10px] group-has-[button]/weight:w-[50px]"
                                     title={`${point.weightKg} kg`}
                                   >
                                     <span
-                                      className="w-9 text-right tabular-nums"
+                                      className="text-right tabular-nums group-has-[button]/weight:w-9 group-not-has-[button]/weight:text-[10px]!"
                                       style={
                                         point.weightKg.toFixed(2).length > 6
                                           ? {
@@ -451,7 +451,7 @@ export function GroupChartHistory({
                                     >
                                       {point.weightKg.toFixed(2)}
                                     </span>{' '}
-                                    <span className="w-3">kg</span>
+                                    <span>kg</span>
                                   </span>
                                   <span className="sr-only">
                                     ; change from first shared entry{' '}

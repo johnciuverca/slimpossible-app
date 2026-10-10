@@ -61,7 +61,10 @@ export function WeightEntryActions({
           }
         >
           {compact ? (
+            // Offset by one quarter of the unused target width so the two
+            // visible gaps match, without moving or overlapping hit areas.
             <svg
+              className="translate-x-[4.5px] pointer-coarse:translate-x-[7.5px]"
               width="14"
               height="14"
               viewBox="0 0 24 24"

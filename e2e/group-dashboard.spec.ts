@@ -164,7 +164,7 @@ async function installGroupFixtures(
             weight_kg: differentWeights ? 105.25 : 71,
           },
           ...(differentWeights
-            ? [999.95, 1000.5, 75, 80].map((weight, index) => ({
+            ? [99.95, 1000.5, 9, 80].map((weight, index) => ({
                 member_key: `layout-readonly-${index}`,
                 display_name: `Fixture member ${index + 1}`,
                 recorded_date: '2026-09-22',
@@ -314,7 +314,7 @@ for (const layout of [
   { label: 'mobile', width: 390, hasTouch: false },
   { label: 'coarse pointer', width: 390, hasTouch: true },
 ]) {
-  test(`fixed cards align numbers and units with equal heights on ${layout.label}`, async ({
+  test(`centered read-only labels and equal editable icon gaps on ${layout.label}`, async ({
     browser,
   }) => {
     const context = await browser.newContext({
@@ -370,11 +370,16 @@ for (const layout of [
           const buttons = Array.from(card.querySelectorAll('button')).map(
             (button) => {
               const box = button.getBoundingClientRect()
+              const icon = button.querySelector('svg')!.getBoundingClientRect()
               return {
                 offset: box.x - bounds.x,
                 width: box.width,
                 height: box.height,
                 center: box.y + box.height / 2,
+                iconLeft: icon.left,
+                iconRight: icon.right,
+                iconInsideTarget:
+                  icon.left >= box.left && icon.right <= box.right,
               }
             },
           )
@@ -385,6 +390,10 @@ for (const layout of [
             fits: value.scrollWidth <= value.clientWidth,
             center: valueBounds.y + valueBounds.height / 2,
             valueWidth: valueBounds.width,
+            leftPadding: valueBounds.left - bounds.left,
+            rightPadding: bounds.right - valueBounds.right,
+            unitRight: value.lastElementChild!.getBoundingClientRect().right,
+            numberFontSize: getComputedStyle(value.firstElementChild!).fontSize,
             numberWidth: value.firstElementChild!.getBoundingClientRect().width,
             numberFits:
               value.firstElementChild!.scrollWidth <=
@@ -402,7 +411,7 @@ for (const layout of [
           '9.00 kg',
           '95.10 kg',
           '105.25 kg',
-          '999.95 kg',
+          '99.95 kg',
           '1000.50 kg',
         ]),
       )
@@ -410,17 +419,25 @@ for (const layout of [
         if (box.buttons.length)
           expect(box.width).toBe(layout.hasTouch ? 148 : 124)
         else {
-          expect(box.width).toBe(60)
+          expect(box.width).toBeCloseTo(box.valueWidth + 10, 1)
+          expect(box.leftPadding).toBeCloseTo(box.rightPadding, 1)
+          expect(box.numberFontSize).toBe('10px')
           expect(box.childCount).toBe(2)
         }
         expect(box.height).toBe(layout.hasTouch ? 48 : 40)
-        expect(box.valueWidth).toBe(50)
-        expect(box.numberWidth).toBe(36)
+        if (box.buttons.length) {
+          expect(box.valueWidth).toBe(50)
+          expect(box.numberWidth).toBe(36)
+          expect(box.buttons[0].iconLeft - box.unitRight).toBeCloseTo(
+            box.buttons[1].iconLeft - box.buttons[0].iconRight,
+            1,
+          )
+        }
         expect(box.numberFits).toBe(true)
         expect(box.numberAlign).toBe('right')
-        expect(box.unitOffset).toBe(43)
         expect(box.fits, `${box.value} fits the compact value area`).toBe(true)
         for (const button of box.buttons) {
+          expect(button.iconInsideTarget).toBe(true)
           expect(button.width).toBe(layout.hasTouch ? 44 : 32)
           expect(button.height).toBeGreaterThanOrEqual(
             layout.hasTouch ? 44 : 32,
@@ -438,6 +455,13 @@ for (const layout of [
         own[1].buttons.map((button) => button.offset),
       )
       expect(boxes.filter((box) => box.buttons.length === 0)).toHaveLength(7)
+      const readonlyWidth = (label: string) =>
+        boxes.find((box) => !box.buttons.length && box.value === label)!.width
+      expect(readonlyWidth('9.00 kg')).toBeLessThan(readonlyWidth('99.95 kg'))
+      expect(readonlyWidth('99.95 kg')).toBeLessThan(readonlyWidth('105.25 kg'))
+      expect(readonlyWidth('105.25 kg')).toBeLessThan(
+        readonlyWidth('1000.50 kg'),
+      )
       const scroll = page.getByRole('region', {
         name: 'Scrollable shared group weights',
       })

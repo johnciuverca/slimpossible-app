@@ -140,7 +140,7 @@ not ownership guesses. Accepted 76px dates/156px columns, sticky layering and
 actual-kg graph remain unchanged. PM relayed owner acceptance of the preceding
 version except sizing; connected acceptance of this sizing revision is pending.
 
-Latest owner revision fixes every read-only card at 60px, with a 36px
+Superseded owner revision fixed every read-only card at 60px, with a 36px
 right-aligned tabular number slot and separate 12px kg slot. All matrix weights
 display two decimals without changing stored values, chart values or validation.
 Supported outliers such as 1000.5 display fully as 1000.50 using a smaller font
@@ -151,6 +151,19 @@ are no blank action slots on read-only cards. Date columns, chart, sticky
 stacking, ownership and dialogs are unchanged. Browser coverage checks 9.00,
 95.10, 105.25, 999.95 and the outlier on desktop/mobile/coarse pointers.
 Owner visual acceptance of this latest revision remains pending.
+
+Latest owner feedback on 93ffcf2 accepts the preceding layout except two
+styling details. Read-only cards now fit and center the complete natural
+two-decimal value/unit label, with equal 5px outer edge spacing. Two-digit
+99.95/99.99 labels define the standard width; one-digit labels shrink and
+three/four-digit labels extend naturally. Read-only outliers retain the normal
+10px font, with no reserved leading number slot. Editable widths/heights and
+32px/44px non-overlapping targets remain unchanged; the Edit glyph moves within
+its target so visible kg-to-Edit and Edit-to-Delete gaps match. All card heights
+remain equal per pointer type. Browser coverage measures label centering,
+natural digit-based sizing, equal icon gaps and glyph containment on
+desktop/mobile/coarse pointers. Chart/date/columns/sticky/ownership/dialogs are
+unchanged. Owner acceptance of this latest preview remains pending.
 
 1. On Dashboard without a challenge, Record weight. Confirm private default,
    today's existing-entry correction and optional explicit group shares.
