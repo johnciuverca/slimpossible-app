@@ -19,6 +19,7 @@ async function installGroupFixtures(
   page: Page,
   multiple = false,
   ownEntries = false,
+  differentWeights = false,
 ) {
   const challengeId = ownEntries ? ownGroupId : 'e2e-challenge'
   const secondId = ownEntries ? secondGroupId : 'e2e-second-group'
@@ -74,7 +75,23 @@ async function installGroupFixtures(
     ) {
       await route.fulfill({
         contentType: 'application/json',
-        body: JSON.stringify(ownWeight === null ? [] : [ownRow()]),
+        body: JSON.stringify(
+          ownWeight === null
+            ? []
+            : [
+                ownRow(),
+                ...(differentWeights
+                  ? [
+                      {
+                        ...ownRow(),
+                        id: 'disposable-own-baseline',
+                        recorded_date: '2026-09-20',
+                        weight_kg: 9.5,
+                      },
+                    ]
+                  : []),
+              ],
+        ),
       })
       return
     }
@@ -120,7 +137,7 @@ async function installGroupFixtures(
             member_key: ownKey,
             display_name: name,
             recorded_date: '2026-09-20',
-            weight_kg: 90,
+            weight_kg: differentWeights ? 9.5 : 90,
             note: 'fixture private note must never render',
             email: 'private@example.invalid',
           },
@@ -138,13 +155,13 @@ async function installGroupFixtures(
             member_key: otherKey,
             display_name: name,
             recorded_date: '2026-09-20',
-            weight_kg: 70,
+            weight_kg: differentWeights ? 95 : 70,
           },
           {
             member_key: otherKey,
             display_name: name,
             recorded_date: '2026-09-21',
-            weight_kg: 71,
+            weight_kg: differentWeights ? 105.5 : 71,
           },
           ...(ownEntries
             ? [
@@ -284,42 +301,97 @@ async function installGroupFixtures(
   return requests
 }
 
-test('single-line matrix card retains 44px touch targets on a coarse pointer', async ({
-  browser,
-}) => {
-  const context = await browser.newContext({
-    hasTouch: true,
-    viewport: { width: 390, height: 700 },
+for (const layout of [
+  { label: 'desktop', width: 1280, hasTouch: false },
+  { label: 'mobile', width: 390, hasTouch: false },
+  { label: 'coarse pointer', width: 390, hasTouch: true },
+]) {
+  test(`fixed-width cards align values and own icons on ${layout.label}`, async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({
+      hasTouch: layout.hasTouch,
+      viewport: { width: layout.width, height: 700 },
+    })
+    try {
+      const page = await context.newPage()
+      await installGroupFixtures(page, true, true, true)
+      await page.goto(
+        `http://127.0.0.1:4174/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
+      )
+      const matrix = page.getByRole('table', {
+        name: 'Shared group weight history',
+      })
+      await expect(
+        matrix.getByRole('button', { name: /^Edit weight/ }),
+      ).toHaveCount(2)
+      const cards = matrix.locator('td > div')
+      await expect(cards).toHaveCount(5)
+      const boxes = await cards.evaluateAll((elements) =>
+        elements.map((card) => {
+          const bounds = card.getBoundingClientRect()
+          const value = card.firstElementChild!
+          const valueBounds = value.getBoundingClientRect()
+          const buttons = Array.from(card.querySelectorAll('button')).map(
+            (button) => {
+              const box = button.getBoundingClientRect()
+              return {
+                offset: box.x - bounds.x,
+                width: box.width,
+                height: box.height,
+                center: box.y + box.height / 2,
+              }
+            },
+          )
+          return {
+            width: bounds.width,
+            height: bounds.height,
+            value: value.textContent,
+            fits: value.scrollWidth <= value.clientWidth,
+            center: valueBounds.y + valueBounds.height / 2,
+            buttons,
+          }
+        }),
+      )
+      expect(boxes.map((box) => box.value)).toEqual(
+        expect.arrayContaining(['9.5 kg', '95 kg', '105.5 kg', '88.5 kg']),
+      )
+      for (const box of boxes) {
+        expect(box.width).toBe(224)
+        expect(box.height).toBeLessThanOrEqual(50)
+        expect(box.fits).toBe(true)
+        for (const button of box.buttons) {
+          expect(button.width).toBe(44)
+          expect(button.height).toBeGreaterThanOrEqual(
+            layout.hasTouch ? 44 : 32,
+          )
+          expect(Math.abs(button.center - box.center)).toBeLessThan(1)
+        }
+      }
+      const own = boxes.filter((box) => box.buttons.length > 0)
+      expect(own).toHaveLength(2)
+      expect(own[0].buttons.map((button) => button.offset)).toEqual(
+        own[1].buttons.map((button) => button.offset),
+      )
+      expect(boxes.filter((box) => box.buttons.length === 0)).toHaveLength(3)
+      if (layout.width < 500) {
+        const scroll = page.getByRole('region', {
+          name: 'Scrollable shared group weights',
+        })
+        expect(
+          await scroll.evaluate(
+            (element) => element.scrollWidth > element.clientWidth,
+          ),
+        ).toBe(true)
+      }
+      await matrix.screenshot({
+        path: test.info().outputPath('fixed-width-matrix.png'),
+      })
+    } finally {
+      await context.close()
+    }
   })
-  try {
-    const page = await context.newPage()
-    await installGroupFixtures(page, true, true)
-    await page.goto(
-      `http://127.0.0.1:4174/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
-    )
-    const matrix = page.getByRole('table', {
-      name: 'Shared group weight history',
-    })
-    const edit = matrix.getByRole('button', { name: /^Edit weight/ })
-    await expect(edit).toBeVisible()
-    const remove = matrix.getByRole('button', { name: /^Delete / })
-    const editBox = (await edit.boundingBox())!
-    const removeBox = (await remove.boundingBox())!
-    expect(editBox.width).toBeGreaterThanOrEqual(44)
-    expect(editBox.height).toBeGreaterThanOrEqual(44)
-    expect(removeBox.width).toBeGreaterThanOrEqual(44)
-    expect(removeBox.height).toBeGreaterThanOrEqual(44)
-    expect(removeBox.y).toBe(editBox.y)
-    expect(
-      (await edit.locator('xpath=../..').boundingBox())!.height,
-    ).toBeLessThanOrEqual(50)
-    await page.screenshot({
-      path: test.info().outputPath('compact-matrix-touch.png'),
-    })
-  } finally {
-    await context.close()
-  }
-})
+}
 
 for (const viewport of [
   { label: 'desktop', width: 1280 },

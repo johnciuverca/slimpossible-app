@@ -379,8 +379,8 @@ export function GroupChartHistory({
                               className="relative px-4 py-3"
                             >
                               {point ? (
-                                <div className="inline-flex flex-nowrap items-center gap-1 rounded-lg border border-line bg-page px-2 py-0.5">
-                                  <span className="whitespace-nowrap">
+                                <div className="inline-flex h-11 w-56 shrink-0 flex-nowrap items-center gap-1 rounded-lg border border-line bg-page px-2 py-0.5 pointer-coarse:h-12">
+                                  <span className="min-w-0 flex-1 whitespace-nowrap">
                                     {point.weightKg} kg
                                   </span>
                                   <span className="sr-only">
@@ -404,7 +404,12 @@ export function GroupChartHistory({
                                       memberLabel={series[index].label}
                                       requiredSharedChallengeId={challengeId}
                                     />
-                                  ) : null}
+                                  ) : (
+                                    <span
+                                      className="w-[90px] shrink-0"
+                                      aria-hidden="true"
+                                    />
+                                  )}
                                 </div>
                               ) : (
                                 <span aria-label="No shared entry">—</span>

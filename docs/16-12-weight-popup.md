@@ -101,6 +101,12 @@ horizontal line, with reduced card padding/gaps. Keyboard focus stays visible;
 coarse-pointer devices retain 44px hit targets. Ownership, dialogs and privacy
 behavior are unchanged. Connected visual acceptance is pending.
 
+Fixed-width correction: every populated card is 224px wide, including read-only
+cards. The weight area flexes inside that boundary; the trailing 90px reserves
+two aligned 44px icon slots (blank on read-only cards). Values stay on one line,
+without truncation of normal weights; narrow matrices scroll horizontally.
+Desktop/mobile/coarse-pointer tests compare 9.5, 95 and 105.5 kg with own cards.
+
 1. On Dashboard without a challenge, Record weight. Confirm private default,
    today's existing-entry correction and optional explicit group shares.
 2. From My progress, Edit a disposable entry. Confirm date/weight/private note
