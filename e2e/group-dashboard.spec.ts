@@ -314,7 +314,7 @@ for (const layout of [
   { label: 'mobile', width: 390, hasTouch: false },
   { label: 'coarse pointer', width: 390, hasTouch: true },
 ]) {
-  test(`fixed-width cards align values and own icons on ${layout.label}`, async ({
+  test(`editable cards keep adjacent icons and read-only cards fit values on ${layout.label}`, async ({
     browser,
   }) => {
     const context = await browser.newContext({
@@ -384,6 +384,8 @@ for (const layout of [
             value: value.textContent,
             fits: value.scrollWidth <= value.clientWidth,
             center: valueBounds.y + valueBounds.height / 2,
+            valueWidth: valueBounds.width,
+            childCount: card.children.length,
             buttons,
           }
         }),
@@ -392,11 +394,17 @@ for (const layout of [
         expect.arrayContaining(['9.5 kg', '95 kg', '105.5 kg', '88.5 kg']),
       )
       for (const box of boxes) {
-        expect(box.width).toBe(148)
+        if (box.buttons.length)
+          expect(box.width).toBe(layout.hasTouch ? 152 : 128)
+        else {
+          expect(box.width).toBeLessThan(80)
+          expect(box.width).toBeCloseTo(box.valueWidth + 10, 0)
+          expect(box.childCount).toBe(2)
+        }
         expect(box.height).toBeLessThanOrEqual(50)
         expect(box.fits, `${box.value} fits the compact value area`).toBe(true)
         for (const button of box.buttons) {
-          expect(button.width).toBe(44)
+          expect(button.width).toBe(layout.hasTouch ? 44 : 32)
           expect(button.height).toBeGreaterThanOrEqual(
             layout.hasTouch ? 44 : 32,
           )
@@ -405,6 +413,10 @@ for (const layout of [
       }
       const own = boxes.filter((box) => box.buttons.length > 0)
       expect(own).toHaveLength(2)
+      for (const box of own)
+        expect(
+          box.buttons[1].offset - box.buttons[0].offset - box.buttons[0].width,
+        ).toBe(0)
       expect(own[0].buttons.map((button) => button.offset)).toEqual(
         own[1].buttons.map((button) => button.offset),
       )
@@ -504,6 +516,11 @@ for (const viewport of [
     await expect(edit).toBeVisible()
     await expect(matrix.getByRole('button')).toHaveCount(2)
     await expect(matrix.getByText('88.5 kg', { exact: true })).toHaveCount(2)
+    const ownReadonly = matrix
+      .getByText('90 kg', { exact: true })
+      .locator('xpath=..')
+    await expect(ownReadonly.getByRole('button')).toHaveCount(0)
+    expect((await ownReadonly.boundingBox())!.width).toBeLessThan(80)
     const card = edit.locator('xpath=../..')
     const value = card.getByText('88.5 kg', { exact: true })
     const valueBox = (await value.boundingBox())!

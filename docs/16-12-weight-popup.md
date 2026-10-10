@@ -113,7 +113,7 @@ horizontal line, with reduced card padding/gaps. Keyboard focus stays visible;
 coarse-pointer devices retain 44px hit targets. Ownership, dialogs and privacy
 behavior are unchanged. Connected visual acceptance is pending.
 
-Fixed-width correction: every populated card is 148px wide, including read-only
+Previous fixed-width correction (superseded below): every populated card was 148px wide, including read-only
 cards. The weight area flexes inside that boundary; the trailing 90px reserves
 two aligned 44px icon slots (blank on read-only cards). Values stay on one line,
 without truncation of normal weights; narrow matrices scroll horizontally.
@@ -129,6 +129,16 @@ in the accessible row label and hover title). It no longer stretches columns to
 fill the panel. Practical 44px coarse-pointer targets and opaque sticky layering
 remain. Reference inspection establishes the actual-weight metric only; it does
 not establish exact visual matching or owner acceptance of this preview.
+
+Latest owner sizing override: equal own/read-only widths are no longer wanted.
+Editable cards now use compact 128px width (152px on coarse-pointer devices),
+with adjacent icon buttons and zero inter-button gap. Targets are 32px wide on
+fine pointers and 44px square on coarse pointers; keyboard labels/focus remain.
+Read-only cards fit just their weight, without blank action slots, including
+own-column cells with no editable record. Rendered controls determine styling,
+not ownership guesses. Accepted 76px dates/156px columns, sticky layering and
+actual-kg graph remain unchanged. PM relayed owner acceptance of the preceding
+version except sizing; connected acceptance of this sizing revision is pending.
 
 1. On Dashboard without a challenge, Record weight. Confirm private default,
    today's existing-entry correction and optional explicit group shares.

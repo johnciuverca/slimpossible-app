@@ -44,7 +44,7 @@ export function WeightEntryActions({
       <div
         className={
           compact
-            ? 'inline-flex w-[90px] shrink-0 flex-nowrap items-center justify-end gap-0.5'
+            ? 'inline-flex shrink-0 flex-nowrap items-center gap-0'
             : 'flex flex-wrap gap-2'
         }
       >
@@ -52,7 +52,7 @@ export function WeightEntryActions({
           variant={compact ? 'ghost' : 'secondary'}
           className={
             compact
-              ? 'h-9 w-11 shrink-0 p-0! text-forest-800! sm:h-8 pointer-coarse:h-11'
+              ? 'h-9 w-8 shrink-0 p-0! text-forest-800! sm:h-8 pointer-coarse:h-11 pointer-coarse:w-11'
               : undefined
           }
           aria-label={`Edit weight ${date}${memberLabel ? ` for ${memberLabel}` : ''}`}
@@ -82,7 +82,7 @@ export function WeightEntryActions({
           variant={compact ? 'ghost' : 'secondary'}
           className={
             compact
-              ? 'h-9 w-11 shrink-0 p-0! text-danger-800! sm:h-8 pointer-coarse:h-11'
+              ? 'h-9 w-8 shrink-0 p-0! text-danger-800! sm:h-8 pointer-coarse:h-11 pointer-coarse:w-11'
               : undefined
           }
           aria-label={`Delete ${date}${memberLabel ? ` for ${memberLabel}` : ''}`}
