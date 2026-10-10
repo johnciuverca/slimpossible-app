@@ -42,10 +42,14 @@ test('shows all live destinations without horizontal overflow on desktop', async
     'My progress',
     'Group',
     'Goals',
-    'Weigh-in',
   ]) {
     await expect(page.getByRole('link', { name: label })).toBeVisible()
   }
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Primary navigation' })
+      .getByRole('link', { name: 'Weigh-in', exact: true }),
+  ).toHaveCount(0)
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
     .toBe(1440)

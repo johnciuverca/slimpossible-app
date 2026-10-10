@@ -75,19 +75,23 @@ for (const width of [1280, 390]) {
           .getByRole('button', { name: 'Cancel edit', exact: true })
           .click()
       }
-      page.once('dialog', async (dialog) => {
-        expect(dialog.message()).toContain(`90 kg recorded ${date}`)
-        await dialog.dismiss()
-      })
       await remove.focus()
       await page.keyboard.press('Enter')
+      {
+        const deletion = page.getByRole('dialog', { name: 'Delete weight?' })
+        await expect(deletion).toContainText('ALL shared groups')
+        await deletion
+          .getByRole('button', { name: 'Cancel', exact: true })
+          .click()
+        await expect(remove).toBeFocused()
+      }
       await expect(history.getByText('90 kg', { exact: true })).toBeVisible()
-      page.once('dialog', async (dialog) => {
-        expect(dialog.message()).toContain(`90 kg recorded ${date}`)
-        await dialog.accept()
-      })
       await remove.focus()
       await page.keyboard.press('Enter')
+      await page
+        .getByRole('dialog', { name: 'Delete weight?' })
+        .getByRole('button', { name: 'Delete weight', exact: true })
+        .click()
       await expect(history).toHaveCount(0)
       await expect(
         page.getByText(

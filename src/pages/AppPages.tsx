@@ -13,6 +13,8 @@ import { PersonalProgressChart } from '../components/PersonalProgressChart'
 import { ChallengeTabs } from '../components/ChallengeContextTabs'
 import { WeightPageHeader } from '../components/WeightPageHeader'
 import { GroupChartHistory } from '../components/GroupChartHistory'
+import { PersonalEntryActions } from '../components/WeightEntryActions'
+import { usePersonalWeightRevision } from '../data/personalWeightChanges'
 import type { ParticipantMilestones } from '../models/participantMilestones'
 import { createParticipantMilestones } from '../models/participantMilestones'
 import {
@@ -147,6 +149,7 @@ function usePersonalDashboard({ preferJoinedChallenge = false } = {}) {
   const [searchParams] = useSearchParams()
   const challengeParam = searchParams.get('challenge')
   const ownerId = authState.user?.id
+  const weightRevision = usePersonalWeightRevision(ownerId ?? '')
   const persistence = useMemo(() => createPersistence(authState), [authState])
   const requestKey = JSON.stringify([
     authState.status,
@@ -154,6 +157,7 @@ function usePersonalDashboard({ preferJoinedChallenge = false } = {}) {
     challengeParam,
     persistence.mode,
     preferJoinedChallenge,
+    weightRevision,
   ])
   const [snapshot, setSnapshot] = useState<PersonalDashboardSnapshot>({
     data: null,
@@ -1412,7 +1416,8 @@ export function GroupDashboardPage() {
   const persistence = useMemo(() => createPersistence(authState), [authState])
   const [savedData, setData] = useState<GroupDashboardData | null>(null)
   const [savedChallenges, setChallenges] = useState<Challenge[]>([])
-  const requestKey = `${authState.status}:${ownerId ?? ''}:${challengeParam ?? ''}:${persistence.mode}`
+  const weightRevision = usePersonalWeightRevision(ownerId ?? '')
+  const requestKey = `${authState.status}:${ownerId ?? ''}:${challengeParam ?? ''}:${persistence.mode}:${weightRevision}`
   const [loadedKey, setLoadedKey] = useState('')
   const data = loadedKey === requestKey ? savedData : null
   const challenges = loadedKey === requestKey ? savedChallenges : []
@@ -1633,7 +1638,7 @@ export function GroupDashboardPage() {
         challengeId={data?.challenge.id ?? selectedChallengeId}
         viewerId={ownerId ?? ''}
         persistence={persistence}
-        refreshVersion={reloadKey}
+        refreshVersion={reloadKey + weightRevision}
         enabled={Boolean(summary)}
       >
         <Card className="p-5 sm:p-8 lg:p-10">
@@ -2292,6 +2297,7 @@ export function ProgressPage({
                 )}
               </section>
 
+              <PersonalEntryActions key={data.viewerId} />
               {data.challenge.kind === 'group' ? (
                 <section
                   aria-labelledby="group-history-title"

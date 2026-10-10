@@ -4,7 +4,9 @@ import { Link } from 'react-router-dom'
 import { Button, Card, PageHeader, StatusPill } from '../components/ui'
 import { WeightPageHeader } from '../components/WeightPageHeader'
 import { PersonalWeightRecordCard } from '../components/PersonalWeightRecordCard'
-import { formatPersonalWeight } from '../models/personalHistory'
+import { DeleteWeightDialog } from '../components/DeleteWeightDialog'
+import { usePersonalWorkspace } from '../data/usePersonalWorkspace'
+import { notifyPersonalWeightChange } from '../data/personalWeightChanges'
 import {
   PersonalWeighInEditor,
   type PersonalWeighInFormValues,
@@ -28,6 +30,11 @@ const emptyForm: PersonalWeighInFormValues = {
 }
 
 export function PersonalWeighInsPage() {
+  const workspace = usePersonalWorkspace()
+  const [deleteTarget, setDeleteTarget] = useState<{
+    key: string
+    entry: PersonalWeighIn
+  } | null>(null)
   const { state: authState } = useOptionalAuth()
   const persistence = useMemo(() => createPersistence(authState), [authState])
   const userId =
@@ -52,7 +59,6 @@ export function PersonalWeighInsPage() {
   const [submitError, setSubmitError] = useState('')
   const [sharesWarning, setSharesWarning] = useState('')
   const [success, setSuccess] = useState('')
-  const [deletingId, setDeletingId] = useState<string | null>(null)
   const editorRegion = useRef<HTMLDivElement>(null)
   const draftChanged = useRef(false)
   const [focusRevision, setFocusRevision] = useState(0)
@@ -71,7 +77,7 @@ export function PersonalWeighInsPage() {
     let current = true
     setIsLoading(true)
     setIsSaving(false)
-    setDeletingId(null)
+    setDeleteTarget(null)
     setEntries([])
     setGroups([])
     setValues(emptyForm)
@@ -292,49 +298,12 @@ export function PersonalWeighInsPage() {
     setSharesWarning('')
     setValues(emptyForm)
     setErrors({})
+    notifyPersonalWeightChange(userId)
     setSuccess(
       persistence.mode === 'remote'
         ? 'Personal weigh-in saved.'
         : 'Personal weigh-in saved in this browser.',
     )
-  }
-
-  async function deleteEntry(entry: PersonalWeighIn) {
-    if (
-      !window.confirm(
-        `Delete ${formatPersonalWeight(entry.weightKg)} recorded ${entry.date}? This also removes its group shares.`,
-      )
-    ) {
-      return
-    }
-    if (persistence.mode === 'unavailable') {
-      setSubmitError(persistence.message)
-      return
-    }
-    setSubmitError('')
-    setSuccess('')
-    setDeletingId(entry.id)
-    try {
-      const result = await persistence.repositories.personalWeighIns.delete(
-        userId,
-        entry.id,
-      )
-      if (latestRequestKey.current !== requestKey) return
-      setDeletingId(null)
-      if (result.state !== 'success' || !result.data) {
-        setSubmitError(
-          'Deletion could not be confirmed. Your history has not been changed; try again.',
-        )
-        return
-      }
-      setEntries((current) => current.filter(({ id }) => id !== entry.id))
-      if (editingId === entry.id) cancelEditing()
-      setSuccess('Weigh-in and its group shares were deleted.')
-    } catch {
-      if (latestRequestKey.current !== requestKey) return
-      setDeletingId(null)
-      setSubmitError('Deletion could not be confirmed. Try again.')
-    }
   }
 
   return (
@@ -345,9 +314,8 @@ export function PersonalWeighInsPage() {
       <WeightPageHeader
         action={
           <Button
-            disabled={
-              isLoading || !!loadError || isSaving || deletingId !== null
-            }
+            data-weight-owner={workspace.ownerKey}
+            disabled={isLoading || !!loadError || isSaving}
             onClick={recordWeight}
           >
             Record weight
@@ -393,7 +361,7 @@ export function PersonalWeighInsPage() {
                 key={editingId ?? 'new'}
                 errors={errors}
                 groups={groups}
-                isSaving={isSaving || deletingId !== null}
+                isSaving={isSaving}
                 onCancel={editingId ? cancelEditing : undefined}
                 onChange={updateValue}
                 onSubmit={handleSubmit}
@@ -463,9 +431,10 @@ export function PersonalWeighInsPage() {
                       'an unavailable group'
                     }
                     onEdit={() => startEditing(entry)}
-                    onDelete={() => void deleteEntry(entry)}
-                    disabled={isSaving || deletingId !== null}
-                    deleting={deletingId === entry.id}
+                    onDelete={() =>
+                      setDeleteTarget({ key: workspace.ownerKey, entry })
+                    }
+                    disabled={isSaving}
                   />
                 ))}
             </ul>
@@ -483,6 +452,22 @@ export function PersonalWeighInsPage() {
       >
         Back to today
       </Link>
+      {deleteTarget?.key === workspace.ownerKey ? (
+        <DeleteWeightDialog
+          key={`${deleteTarget.key}:${deleteTarget.entry.id}`}
+          workspace={workspace}
+          entry={deleteTarget.entry}
+          onClose={() => setDeleteTarget(null)}
+          onDeleted={() => {
+            const entry = deleteTarget.entry
+            setDeleteTarget(null)
+            setEntries((current) => current.filter(({ id }) => id !== entry.id))
+            if (editingId === entry.id) cancelEditing()
+            setSuccess('Weigh-in and its group shares were deleted.')
+            workspace.refresh()
+          }}
+        />
+      ) : null}
     </section>
   )
 }

@@ -19,6 +19,7 @@ import { personalWeighInToday } from '../models/personalWeighIn'
 import { PersonalDashboardPage } from './PersonalDashboardPage'
 import { MyProgressPage } from './MyProgressPage'
 import { GoalsPage, GroupDashboardPage } from './AppPages'
+import { PersonalEntryActions } from '../components/WeightEntryActions'
 
 function authValue(id = 'user-alex'): AuthContextValue {
   return {
@@ -104,6 +105,101 @@ afterEach(() => {
 })
 
 describe('personal Dashboard and My Progress', () => {
+  it('keeps a failed deletion in the separate dialog and does not remove the author record', async () => {
+    const storage = local()
+    await storage.repositories.personalWeighIns.save('user-alex', {
+      date: '2026-01-01',
+      weightKg: 90,
+      sharedChallengeIds: [],
+    })
+    vi.spyOn(storage.repositories.personalWeighIns, 'delete').mockRejectedValue(
+      new Error('Unavailable'),
+    )
+    vi.spyOn(persistenceModule, 'createPersistence').mockReturnValue(storage)
+    render(page(<MyProgressPage />, 'user-alex', '/progress'))
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Delete 2026-01-01' }),
+    )
+    const deletion = await screen.findByRole('dialog', {
+      name: 'Delete weight?',
+    })
+    fireEvent.click(
+      within(deletion).getByRole('button', { name: 'Delete weight' }),
+    )
+    expect(await within(deletion).findByRole('alert')).toHaveTextContent(
+      'Deletion could not be confirmed',
+    )
+    fireEvent.click(within(deletion).getByRole('button', { name: 'Cancel' }))
+    expect(
+      await storage.repositories.personalWeighIns.listForUser('user-alex'),
+    ).toMatchObject({ state: 'success', data: [{ weightKg: 90 }] })
+  })
+  it('Group actions resolve only current-author entries explicitly shared with the selected group, without displaying notes', async () => {
+    seedGroups()
+    window.localStorage.setItem(
+      'slimpossible.local.personal-weigh-ins',
+      JSON.stringify([
+        {
+          id: 'own-shared',
+          userId: 'user-alex',
+          date: '2026-01-01',
+          weightKg: 90,
+          note: 'Own private note',
+          sharedChallengeIds: ['challenge-1'],
+        },
+        {
+          id: 'own-unshared',
+          userId: 'user-alex',
+          date: '2026-01-02',
+          weightKg: 89,
+          note: 'Other private note',
+          sharedChallengeIds: [],
+        },
+        {
+          id: 'other-author',
+          userId: 'second-account',
+          date: '2026-01-03',
+          weightKg: 70,
+          note: 'Never authorized',
+          sharedChallengeIds: ['challenge-1'],
+        },
+      ]),
+    )
+    const view = render(
+      page(<PersonalEntryActions challengeId="challenge-1" />),
+    )
+    const own = await screen.findByRole('list', {
+      name: 'Your own shared group entries',
+    })
+    await waitFor(() =>
+      expect(within(own).getAllByRole('button')).toHaveLength(2),
+    )
+    expect(screen.queryByText('Own private note')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Edit weight 2026-01-02' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Edit weight 2026-01-03' }),
+    ).not.toBeInTheDocument()
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Edit weight 2026-01-01' }),
+    )
+    expect(screen.getByLabelText('Private note (optional)')).toHaveValue(
+      'Own private note',
+    )
+    view.rerender(
+      page(
+        <PersonalEntryActions challengeId="challenge-1" />,
+        'second-account',
+      ),
+    )
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByText('Own private note')).not.toBeInTheDocument()
+    await screen.findByRole('button', { name: 'Edit weight 2026-01-03' })
+    expect(
+      screen.queryByRole('button', { name: 'Edit weight 2026-01-01' }),
+    ).not.toBeInTheDocument()
+  })
   it.each([0, 1, 2])(
     'offers invite destinations for %s owned eligible groups only, without creating invitations',
     async (count) => {
@@ -385,11 +481,16 @@ describe('personal Dashboard and My Progress', () => {
     expect(
       screen.getByRole('img', { name: /1 saved weigh-ins/ }),
     ).toBeInTheDocument()
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
     fireEvent.click(screen.getByRole('button', { name: 'Delete 2026-01-01' }))
+    let deletion = await screen.findByRole('dialog', { name: 'Delete weight?' })
+    expect(deletion).toHaveTextContent('ALL shared groups')
+    fireEvent.click(within(deletion).getByRole('button', { name: 'Cancel' }))
     expect(within(table).getByText('90 kg')).toBeInTheDocument()
-    confirm.mockReturnValue(true)
     fireEvent.click(screen.getByRole('button', { name: 'Delete 2026-01-01' }))
+    deletion = await screen.findByRole('dialog', { name: 'Delete weight?' })
+    fireEvent.click(
+      within(deletion).getByRole('button', { name: 'Delete weight' }),
+    )
     await screen.findByText(/No personal entries yet/)
     expect(
       await storage.repositories.personalWeighIns.listForUser('user-alex'),

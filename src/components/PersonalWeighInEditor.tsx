@@ -64,6 +64,7 @@ export function PersonalWeighInEditor({
     >
       <TextInput
         error={errors.date}
+        disabled={isSaving}
         id="personal-weigh-in-date"
         label="Date"
         max={today}
@@ -73,6 +74,7 @@ export function PersonalWeighInEditor({
       />
       <TextInput
         error={errors.weightKg}
+        disabled={isSaving}
         id="personal-weigh-in-weight"
         inputMode="decimal"
         label="Weight in kg"
@@ -91,6 +93,7 @@ export function PersonalWeighInEditor({
           <span className="font-normal text-ink-muted">(optional)</span>
         </label>
         <textarea
+          disabled={isSaving}
           aria-describedby={
             errors.note ? 'personal-weigh-in-note-error' : undefined
           }
@@ -135,6 +138,7 @@ export function PersonalWeighInEditor({
                   key={group.id}
                 >
                   <input
+                    disabled={isSaving}
                     checked={values.sharedChallengeIds.includes(group.id)}
                     className="mt-1 size-4 accent-forest-800"
                     onChange={(event) =>
@@ -160,7 +164,12 @@ export function PersonalWeighInEditor({
           {isSaving ? 'Saving…' : submitLabel}
         </Button>
         {onCancel ? (
-          <Button onClick={onCancel} type="button" variant="secondary">
+          <Button
+            disabled={isSaving}
+            onClick={onCancel}
+            type="button"
+            variant="secondary"
+          >
             Cancel edit
           </Button>
         ) : null}

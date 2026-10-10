@@ -6,6 +6,10 @@ import type { PersonalWeighIn } from '../models/personalWeighIn'
 import { isEligibleSharingGroup } from '../models/groupSharingEligibility'
 import { participantFixture } from '../models/fixtures'
 import { createPersistence } from './persistence'
+import {
+  notifyPersonalWeightChange,
+  usePersonalWeightRevision,
+} from './personalWeightChanges'
 
 type Snapshot<T> = {
   key: string
@@ -20,15 +24,17 @@ const emptyChallenges = {
 
 // Personal history is independent from optional challenge/membership loading.
 // Keyed snapshots hide prior-account data synchronously, before effects run.
-export function usePersonalWorkspace() {
+export function usePersonalWorkspace({
+  enabled = true,
+}: { enabled?: boolean } = {}) {
   const { state: auth } = useOptionalAuth()
   const persistence = useMemo(() => createPersistence(auth), [auth])
   const userId =
     auth.user?.id ??
     (persistence.mode === 'local' ? participantFixture.userId : '')
   const ownerKey = `${auth.status}:${userId}:${auth.user?.email ?? ''}:${persistence.mode}`
-  const [revision, setRevision] = useState(0)
-  const requestKey = `${ownerKey}:${revision}`
+  const revision = usePersonalWeightRevision(userId)
+  const requestKey = `${ownerKey}:${revision}:${enabled}`
   const [personal, setPersonal] = useState<Snapshot<PersonalWeighIn[]>>({
     key: '',
     state: 'loading',
@@ -53,6 +59,7 @@ export function usePersonalWorkspace() {
     setPersonal({ ...personalBase, state: 'loading' })
     setContexts({ ...contextBase, state: 'loading' })
     if (
+      !enabled ||
       auth.status !== 'signed-in' ||
       !userId ||
       persistence.mode === 'unavailable'
@@ -126,7 +133,7 @@ export function usePersonalWorkspace() {
     return () => {
       current = false
     }
-  }, [auth.status, persistence, requestKey, userId])
+  }, [auth.status, persistence, requestKey, userId, enabled])
 
   const currentPersonal =
     personal.key === requestKey
@@ -154,7 +161,7 @@ export function usePersonalWorkspace() {
         currentContexts.data.participants,
       ),
     ),
-    refresh: () => setRevision((value) => value + 1),
+    refresh: () => notifyPersonalWeightChange(userId),
   }
 }
 

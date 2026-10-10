@@ -1,5 +1,8 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import type { Persistence } from '../data/persistence'
+import { usePersonalWorkspace } from '../data/usePersonalWorkspace'
+import { ownGroupMemberKey } from '../models/ownGroupMemberKey'
+import { WeightEntryActions } from './WeightEntryActions'
 import {
   createGroupChartHistory,
   createGroupHistoryMatrix,
@@ -26,6 +29,10 @@ export function GroupChartHistory({
   children?: ReactNode
   enabled?: boolean
 }) {
+  const ownMemberKey = ownGroupMemberKey(challengeId, viewerId)
+  const personalWorkspace = usePersonalWorkspace({
+    enabled: enabled && ownMemberKey !== null,
+  })
   const key = `${viewerId}:${challengeId}:${refreshVersion}:${persistence.mode}`
   const context = `${viewerId}:${challengeId}:${persistence.mode}`
   const [selection, setSelection] = useState({ context, memberKey: '' })
@@ -113,10 +120,22 @@ export function GroupChartHistory({
   const start = Math.min(...dates)
   const end = Math.max(...dates)
   const changes = points.map((point) => point.changeKg)
-  const min = Math.min(0, ...changes) - 0.5
-  const max = Math.max(0, ...changes) + 0.5
+  const absolute = !selectedKey
+  const weights = points.map((point) => point.weightKg)
+  const weightMin = Math.min(...weights)
+  const weightMax = Math.max(...weights)
+  const padding = Math.max(0.5, (weightMax - weightMin) * 0.05)
+  const min = absolute
+    ? Math.max(0, weightMin - padding)
+    : Math.min(0, ...changes) - 0.5
+  const max = absolute ? weightMax + padding : Math.max(0, ...changes) + 0.5
+  const ticks = absolute ? [min, (min + max) / 2, max] : [min, 0, max]
+  const pointValue = (point: (typeof points)[number]) =>
+    absolute ? point.weightKg : point.changeKg
+  const plotLeft = absolute ? 100 : 65
   const x = (date: string) =>
-    65 + ((day(date) - start) / Math.max(1, end - start)) * 610
+    plotLeft +
+    ((day(date) - start) / Math.max(1, end - start)) * (675 - plotLeft)
   const y = (value: number) => 25 + ((max - value) / (max - min)) * 190
   return (
     <div ref={workspace} className="group-history-workspace min-w-0 space-y-6">
@@ -194,10 +213,17 @@ export function GroupChartHistory({
               </p>
             ) : null}
             <p className="mt-2 text-sm leading-6 text-slate-700">
-              Explicitly shared dates and weights only. Change is measured in kg
-              from each member’s first shared entry, not their private starting
-              weight. Negative means loss; positive means gain. This chart is
-              not a winner ranking. Notes and emails are never included.
+              Explicitly shared dates and weights only.{' '}
+              {absolute ? (
+                'All members plots actual shared Weight (kg), not change from zero. A lower absolute weight is not a winner ranking. Notes and emails are never included.'
+              ) : (
+                <>
+                  Change is measured in kg from each member’s first shared
+                  entry, not their private starting weight. Negative means loss;
+                  positive means gain. This chart is not a winner ranking. Notes
+                  and emails are never included.
+                </>
+              )}
             </p>
             {!data ? (
               <p role="status" className="mt-4">
@@ -215,10 +241,16 @@ export function GroupChartHistory({
             ) : (
               <>
                 <p className="mt-4 text-sm text-slate-700">
-                  Missing dates are gaps, not estimated weights. A single shared
-                  entry establishes a zero-change baseline. Late entries,
-                  corrections and removed shares recalculate the baseline on
-                  refresh.
+                  {absolute ? (
+                    'Missing dates are gaps, not estimated weights. Each member starts at their first explicitly shared weight; unshared starting values are not added. Corrections and removed shares update this chart on refresh.'
+                  ) : (
+                    <>
+                      Missing dates are gaps, not estimated weights. A single
+                      shared entry establishes a zero-change baseline. Late
+                      entries, corrections and removed shares recalculate the
+                      baseline on refresh.
+                    </>
+                  )}
                 </p>
                 <div
                   role="region"
@@ -229,34 +261,48 @@ export function GroupChartHistory({
                   <svg
                     viewBox="0 0 720 265"
                     role="img"
-                    aria-labelledby="group-chart-title group-chart-description"
+                    aria-labelledby={`${id}-chart-title`}
+                    aria-describedby={`${id}-chart-description`}
                     className="w-full min-w-[36rem]"
                   >
-                    <title id="group-chart-title">
-                      Change from first shared weight (kg)
+                    <title id={`${id}-chart-title`}>
+                      {absolute
+                        ? 'Weight (kg) — shared group history'
+                        : 'Change from first shared weight (kg)'}
                     </title>
-                    <desc id="group-chart-description">
-                      Each member has their own zero baseline. Points represent
-                      shared recorded dates. Lines connect only consecutive
-                      days. The table below provides every date, exact weight
-                      and kg change.
+                    <desc id={`${id}-chart-description`}>
+                      {absolute ? (
+                        'Each member is plotted at their actual shared weight in kilograms, not a common zero baseline. Points represent shared dates; lines connect only consecutive days. The table below provides every exact recorded weight.'
+                      ) : (
+                        <>
+                          Each member has their own zero baseline. Points
+                          represent shared recorded dates. Lines connect only
+                          consecutive days. The table below provides every date,
+                          exact weight and kg change.
+                        </>
+                      )}
                     </desc>
-                    {[min, 0, max].map((value) => (
+                    <text x={plotLeft} y={14} fontSize={12}>
+                      {absolute ? 'Weight (kg)' : 'Change (kg)'}
+                    </text>
+                    {ticks.map((value) => (
                       <g key={value}>
                         <line
-                          x1={65}
+                          x1={plotLeft}
                           x2={675}
                           y1={y(value)}
                           y2={y(value)}
                           stroke="#cbd5e1"
                         />
                         <text
-                          x={60}
+                          x={plotLeft - 5}
                           y={y(value) + 4}
                           textAnchor="end"
                           fontSize={12}
                         >
-                          {signed(Math.round(value * 100) / 100)}
+                          {absolute
+                            ? `${Math.round(value * 100) / 100} kg`
+                            : signed(Math.round(value * 100) / 100)}
                         </text>
                       </g>
                     ))}
@@ -274,9 +320,9 @@ export function GroupChartHistory({
                               day(point.date) - day(previous.date) === 1 ? (
                                 <line
                                   x1={x(previous.date)}
-                                  y1={y(previous.changeKg)}
+                                  y1={y(pointValue(previous))}
                                   x2={x(point.date)}
-                                  y2={y(point.changeKg)}
+                                  y2={y(pointValue(point))}
                                   strokeWidth={2}
                                   strokeDasharray={
                                     index % 2 ? '5 3' : undefined
@@ -285,12 +331,14 @@ export function GroupChartHistory({
                               ) : null}
                               <circle
                                 cx={x(point.date)}
-                                cy={y(point.changeKg)}
+                                cy={y(pointValue(point))}
                                 r={4}
                               >
                                 <title>
                                   {member.label}: {point.date},{' '}
-                                  {signed(point.changeKg)}
+                                  {absolute
+                                    ? `${point.weightKg} kg`
+                                    : signed(point.changeKg)}
                                 </title>
                               </circle>
                             </g>
@@ -298,7 +346,7 @@ export function GroupChartHistory({
                         })}
                       </g>
                     ))}
-                    <text x={65} y={242} fontSize={12}>
+                    <text x={plotLeft} y={242} fontSize={12}>
                       {new Date(start * 86400000).toISOString().slice(0, 10)}
                     </text>
                     <text x={675} y={242} textAnchor="end" fontSize={12}>
@@ -318,7 +366,7 @@ export function GroupChartHistory({
                       >
                         ●{' '}
                       </span>
-                      {member.label} · baseline{' '}
+                      {member.label} · {absolute ? 'first shared' : 'baseline'}{' '}
                       <time dateTime={member.baselineDate}>
                         {member.baselineDate}
                       </time>
@@ -329,12 +377,19 @@ export function GroupChartHistory({
                   role="region"
                   aria-label="Scrollable shared group weights"
                   tabIndex={0}
-                  className="mt-5 max-h-[28rem] overflow-auto rounded-xl border border-stone-200 focus-visible:outline-2 focus-visible:outline-emerald-700"
+                  className="relative isolate mt-5 max-h-[28rem] overflow-auto rounded-xl border border-stone-200 focus-visible:outline-2 focus-visible:outline-emerald-700"
                 >
                   <table
                     aria-label="Shared group weight history"
-                    className="w-full min-w-[36rem] border-collapse text-left text-sm"
+                    className="table-fixed border-collapse text-left text-xs"
+                    style={{ width: 76 + series.length * 156 }}
                   >
+                    <colgroup>
+                      <col style={{ width: 76 }} />
+                      {series.map((member) => (
+                        <col key={member.memberKey} style={{ width: 156 }} />
+                      ))}
+                    </colgroup>
                     <caption className="p-3 text-left font-semibold">
                       Exact shared weights (kg). A dash means no shared entry.
                     </caption>
@@ -342,15 +397,16 @@ export function GroupChartHistory({
                       <tr>
                         <th
                           scope="col"
-                          className="sticky left-0 top-0 z-10 bg-stone-50 px-4 py-3"
+                          aria-label="Recorded date"
+                          className="sticky left-0 top-0 z-30 bg-stone-50 px-1 py-2"
                         >
-                          Recorded date
+                          Date
                         </th>
                         {series.map((member) => (
                           <th
                             key={member.memberKey}
                             scope="col"
-                            className="sticky top-0 bg-stone-50 px-4 py-3"
+                            className="sticky top-0 z-20 break-words bg-stone-50 px-1 py-2"
                           >
                             {member.label} (kg)
                           </th>
@@ -362,25 +418,64 @@ export function GroupChartHistory({
                         <tr key={row.date}>
                           <th
                             scope="row"
-                            className="sticky left-0 bg-white px-4 py-3 font-medium"
+                            aria-label={row.date}
+                            className="sticky left-0 z-10 whitespace-nowrap bg-white px-1 py-1 font-medium"
                           >
-                            <time dateTime={row.date}>{row.date}</time>
+                            <time dateTime={row.date} title={row.date}>
+                              {row.date.slice(8)}/{row.date.slice(5, 7)}
+                              <span className="sr-only">
+                                /{row.date.slice(0, 4)}
+                              </span>
+                            </time>
                           </th>
                           {row.cells.map((point, index) => (
                             <td
                               key={series[index].memberKey}
-                              className="relative px-4 py-3"
+                              className="relative z-0 px-1 py-1"
                             >
                               {point ? (
-                                <>
-                                  <span className="whitespace-nowrap">
-                                    {point.weightKg} kg
+                                <div className="group/weight inline-flex h-10 shrink-0 flex-nowrap items-center gap-0 rounded-lg border border-line bg-page px-1 py-0 has-[button]:w-[124px] pointer-coarse:h-12 pointer-coarse:has-[button]:w-[148px]">
+                                  <span
+                                    className="inline-flex shrink-0 items-baseline justify-end gap-0.5 whitespace-nowrap text-[10px] group-has-[button]/weight:w-[50px]"
+                                    title={`${point.weightKg} kg`}
+                                  >
+                                    <span
+                                      className="text-right tabular-nums group-has-[button]/weight:w-9 group-not-has-[button]/weight:text-[10px]!"
+                                      style={
+                                        point.weightKg.toFixed(2).length > 6
+                                          ? {
+                                              fontSize: `${60 / point.weightKg.toFixed(2).length}px`,
+                                            }
+                                          : undefined
+                                      }
+                                    >
+                                      {point.weightKg.toFixed(2)}
+                                    </span>{' '}
+                                    <span>kg</span>
                                   </span>
                                   <span className="sr-only">
                                     ; change from first shared entry{' '}
                                     {signed(point.changeKg)}
                                   </span>
-                                </>
+                                  {point.memberKey === ownMemberKey &&
+                                  personalWorkspace.userId ===
+                                    viewerId.toLowerCase() &&
+                                  personalWorkspace.persistence.mode ===
+                                    'remote' &&
+                                  personalWorkspace.personal.state ===
+                                    'ready' &&
+                                  personalWorkspace.contexts.state ===
+                                    'ready' ? (
+                                    <WeightEntryActions
+                                      key={`${personalWorkspace.ownerKey}:${challengeId}:${point.date}`}
+                                      workspace={personalWorkspace}
+                                      date={point.date}
+                                      compact
+                                      memberLabel={series[index].label}
+                                      requiredSharedChallengeId={challengeId}
+                                    />
+                                  ) : null}
+                                </div>
                               ) : (
                                 <span aria-label="No shared entry">—</span>
                               )}

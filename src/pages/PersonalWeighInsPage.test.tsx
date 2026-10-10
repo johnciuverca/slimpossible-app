@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
@@ -29,7 +30,15 @@ afterEach(() => {
 function renderPage() {
   render(
     <MemoryRouter>
-      <PersonalWeighInsPage />
+      <AuthProvider
+        initialState={{
+          status: 'signed-in',
+          error: null,
+          user: { id: 'user-alex', email: 'alex@example.invalid' },
+        }}
+      >
+        <PersonalWeighInsPage />
+      </AuthProvider>
     </MemoryRouter>,
   )
 }
@@ -60,18 +69,22 @@ describe('PersonalWeighInsPage', () => {
     vi.spyOn(persistenceModule, 'createPersistence').mockReturnValue(
       persistence,
     )
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     renderPage()
     await screen.findByText('82 kg')
     fireEvent.click(screen.getByRole('button', { name: /Delete/ }))
+    fireEvent.click(
+      within(
+        await screen.findByRole('dialog', { name: 'Delete weight?' }),
+      ).getByRole('button', { name: 'Delete weight' }),
+    )
     expect(
-      screen.getByText(/Deleting entry and group shares/),
+      screen.getByRole('button', { name: 'Deleting…' }),
     ).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Delete/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Deleting…' })).toBeDisabled()
     complete({ state: 'success', data: false })
     await screen.findByRole('alert')
-    expect(screen.getByText('82 kg')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Delete/ })).toBeEnabled()
+    expect(screen.getAllByText(/82 kg/).length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: 'Delete weight' })).toBeEnabled()
     expect(
       screen.queryByText('Weigh-in and its group shares were deleted.'),
     ).not.toBeInTheDocument()
@@ -375,14 +388,20 @@ describe('PersonalWeighInsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Update weight' }))
     await screen.findByText(/82.9 kg/)
 
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
     fireEvent.click(screen.getByRole('button', { name: /Delete/ }))
-    expect(confirm).toHaveBeenCalledWith(
-      expect.stringContaining('82.9 kg recorded'),
-    )
+    const deletion = await screen.findByRole('dialog', {
+      name: 'Delete weight?',
+    })
+    expect(deletion).toHaveTextContent('82.9 kg recorded')
+    expect(deletion).toHaveTextContent('ALL shared groups')
+    fireEvent.click(within(deletion).getByRole('button', { name: 'Cancel' }))
     expect(screen.getByText(/82.9 kg/)).toBeInTheDocument()
-    confirm.mockReturnValue(true)
     fireEvent.click(screen.getByRole('button', { name: /Delete/ }))
+    fireEvent.click(
+      within(
+        await screen.findByRole('dialog', { name: 'Delete weight?' }),
+      ).getByRole('button', { name: 'Delete weight' }),
+    )
     await waitFor(() => {
       expect(
         screen.getByText(/No personal weigh-ins saved yet/),

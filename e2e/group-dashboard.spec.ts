@@ -1,6 +1,12 @@
 import { expect, test, type Page } from '@playwright/test'
+import { createHash } from 'node:crypto'
 
-const challengeId = 'e2e-challenge'
+const ownGroupId = '11111111-1111-4111-8111-111111111111'
+const secondGroupId = '22222222-2222-4222-8222-222222222222'
+const viewerId = '33333333-3333-4333-8333-333333333333'
+const otherViewerId = '44444444-4444-4444-8444-444444444444'
+const memberKey = (group: string, viewer: string) =>
+  createHash('md5').update(`${group}:${viewer}`).digest('hex')
 const supabaseRestUrl = 'https://group-preview.supabase.co/rest/v1'
 
 function shiftDate(dateOnly: string, days: number) {
@@ -9,48 +15,172 @@ function shiftDate(dateOnly: string, days: number) {
   return date.toISOString().slice(0, 10)
 }
 
-async function installGroupFixtures(page: Page, multiple = false) {
+async function installGroupFixtures(
+  page: Page,
+  multiple = false,
+  ownEntries = false,
+  differentWeights = false,
+) {
+  const challengeId = ownEntries ? ownGroupId : 'e2e-challenge'
+  const secondId = ownEntries ? secondGroupId : 'e2e-second-group'
   const requests: string[] = []
+  let ownWeight: number | null = differentWeights ? 95.1 : 88.5
   page.on('request', (request) => requests.push(request.url()))
 
   await page.route(`${supabaseRestUrl}/**`, async (route) => {
     const request = route.request()
     const url = new URL(request.url())
+    if (ownEntries && url.pathname === '/rest/v1/participants') {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            id: 'own-membership',
+            challenge_id: challengeId,
+            user_id: viewerId,
+            display_name: 'Own viewer',
+            starting_weight_kg: 100,
+            target_weight_kg: 80,
+            status: 'active',
+            created_at: '2026-09-01T00:00:00Z',
+            updated_at: '2026-09-01T00:00:00Z',
+            joined_at: '2026-09-01T00:00:00Z',
+          },
+          {
+            id: 'own-second-membership',
+            challenge_id: secondId,
+            user_id: viewerId,
+            display_name: 'Own viewer',
+            starting_weight_kg: 100,
+            target_weight_kg: 80,
+            status: 'active',
+            created_at: '2026-09-01T00:00:00Z',
+            updated_at: '2026-09-01T00:00:00Z',
+            joined_at: '2026-09-01T00:00:00Z',
+          },
+        ]),
+      })
+      return
+    }
+    const ownRow = () => ({
+      id: 'disposable-own-entry',
+      recorded_date: '2026-09-22',
+      weight_kg: ownWeight,
+      note: 'Author-only disposable private note',
+      shared_challenge_ids: [challengeId, secondId],
+    })
+    if (
+      ownEntries &&
+      url.pathname === '/rest/v1/rpc/list_my_personal_weigh_ins'
+    ) {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify(
+          ownWeight === null
+            ? []
+            : [
+                ownRow(),
+                ...(differentWeights
+                  ? [
+                      {
+                        ...ownRow(),
+                        id: 'disposable-own-baseline',
+                        recorded_date: '2026-09-20',
+                        weight_kg: 9,
+                      },
+                    ]
+                  : []),
+              ],
+        ),
+      })
+      return
+    }
+    if (ownEntries && url.pathname === '/rest/v1/rpc/save_personal_weigh_in') {
+      const body = request.postDataJSON()
+      expect(body.target_weigh_in_id).toBe('disposable-own-entry')
+      expect(body.target_note).toBe('Author-only disposable private note')
+      expect(body.target_shared_challenge_ids).toEqual([challengeId, secondId])
+      ownWeight = body.target_weight_kg
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify([ownRow()]),
+      })
+      return
+    }
+    if (
+      ownEntries &&
+      url.pathname === '/rest/v1/rpc/delete_personal_weigh_in'
+    ) {
+      expect(request.postDataJSON()).toEqual({
+        target_weigh_in_id: 'disposable-own-entry',
+      })
+      ownWeight = null
+      await route.fulfill({ contentType: 'application/json', body: 'true' })
+      return
+    }
 
     if (url.pathname === '/rest/v1/rpc/get_group_chart_history') {
       const { target_challenge_id } = request.postDataJSON() as {
         target_challenge_id: string
       }
       const name = target_challenge_id === challengeId ? 'Ava' : 'Jo'
+      const ownKey = ownEntries
+        ? memberKey(target_challenge_id, viewerId)
+        : 'opaque-member-a'
+      const otherKey = ownEntries
+        ? memberKey(target_challenge_id, otherViewerId)
+        : 'opaque-member-b'
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify([
           {
-            member_key: 'opaque-member-a',
+            member_key: ownKey,
             display_name: name,
             recorded_date: '2026-09-20',
-            weight_kg: 90,
+            weight_kg: differentWeights ? 9 : 90,
             note: 'fixture private note must never render',
             email: 'private@example.invalid',
           },
+          ...(ownEntries && ownWeight === null
+            ? []
+            : [
+                {
+                  member_key: ownKey,
+                  display_name: name,
+                  recorded_date: '2026-09-22',
+                  weight_kg: ownEntries ? ownWeight : 88.5,
+                },
+              ]),
           {
-            member_key: 'opaque-member-a',
-            display_name: name,
-            recorded_date: '2026-09-22',
-            weight_kg: 88.5,
-          },
-          {
-            member_key: 'opaque-member-b',
+            member_key: otherKey,
             display_name: name,
             recorded_date: '2026-09-20',
-            weight_kg: 70,
+            weight_kg: differentWeights ? 95.1 : 70,
           },
           {
-            member_key: 'opaque-member-b',
+            member_key: otherKey,
             display_name: name,
             recorded_date: '2026-09-21',
-            weight_kg: 71,
+            weight_kg: differentWeights ? 105.25 : 71,
           },
+          ...(differentWeights
+            ? [99.95, 1000.5, 9, 80].map((weight, index) => ({
+                member_key: `layout-readonly-${index}`,
+                display_name: `Fixture member ${index + 1}`,
+                recorded_date: '2026-09-22',
+                weight_kg: weight,
+              }))
+            : []),
+          ...(ownEntries
+            ? [
+                {
+                  member_key: otherKey,
+                  display_name: name,
+                  recorded_date: '2026-09-22',
+                  weight_kg: 88.5,
+                },
+              ]
+            : []),
         ]),
       })
       return
@@ -80,7 +210,7 @@ async function installGroupFixtures(page: Page, multiple = false) {
                   created_by: 'e2e-owner',
                   description: null,
                   end_date: '2026-12-01',
-                  id: 'e2e-second-group',
+                  id: secondId,
                   name: 'Second authorized group',
                   owner_id: 'e2e-owner',
                   start_date: '2026-09-17',
@@ -100,10 +230,9 @@ async function installGroupFixtures(page: Page, multiple = false) {
         target_challenge_id: string
         target_current_sunday: string
       }
-      expect([
-        challengeId,
-        ...(multiple ? ['e2e-second-group'] : []),
-      ]).toContain(body.target_challenge_id)
+      expect([challengeId, ...(multiple ? [secondId] : [])]).toContain(
+        body.target_challenge_id,
+      )
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify([
@@ -136,10 +265,9 @@ async function installGroupFixtures(page: Page, multiple = false) {
         target_challenge_id: string
         target_current_date: string
       }
-      expect([
-        challengeId,
-        ...(multiple ? ['e2e-second-group'] : []),
-      ]).toContain(body.target_challenge_id)
+      expect([challengeId, ...(multiple ? [secondId] : [])]).toContain(
+        body.target_challenge_id,
+      )
       const currentDate = new Date(`${body.target_current_date}T00:00:00.000Z`)
       const mondayOffset = (currentDate.getUTCDay() + 6) % 7
       const currentWeekStart = shiftDate(
@@ -181,10 +309,376 @@ async function installGroupFixtures(page: Page, multiple = false) {
   return requests
 }
 
+for (const layout of [
+  { label: 'desktop', width: 1280, hasTouch: false },
+  { label: 'mobile', width: 390, hasTouch: false },
+  { label: 'coarse pointer', width: 390, hasTouch: true },
+]) {
+  test(`centered read-only labels and equal editable icon gaps on ${layout.label}`, async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({
+      hasTouch: layout.hasTouch,
+      viewport: { width: layout.width, height: 700 },
+    })
+    try {
+      const page = await context.newPage()
+      await installGroupFixtures(page, true, true, true)
+      await page.goto(
+        `http://127.0.0.1:4174/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
+      )
+      const matrix = page.getByRole('table', {
+        name: 'Shared group weight history',
+      })
+      await expect(
+        matrix.getByRole('button', { name: /^Edit weight/ }),
+      ).toHaveCount(2)
+      const cards = matrix.locator('td > div')
+      await expect(cards).toHaveCount(9)
+      const comparison = page.getByRole('img', {
+        name: 'Weight (kg) — shared group history',
+      })
+      expect(
+        await comparison.locator('text').evaluateAll((elements) =>
+          elements.every((element) => {
+            const box = (element as SVGGraphicsElement).getBBox()
+            return (
+              box.x >= 0 &&
+              box.x + box.width <= 720 &&
+              box.y >= 0 &&
+              box.y + box.height <= 265
+            )
+          }),
+        ),
+      ).toBe(true)
+      expect(
+        (await matrix
+          .getByRole('columnheader', { name: 'Recorded date' })
+          .boundingBox())!.width,
+      ).toBe(76)
+      expect(
+        (await matrix.getByRole('columnheader').nth(1).boundingBox())!.width,
+      ).toBe(156)
+      await expect(
+        matrix.getByRole('rowheader', { name: '2026-09-22' }).locator('time'),
+      ).toHaveAttribute('title', '2026-09-22')
+      const boxes = await cards.evaluateAll((elements) =>
+        elements.map((card) => {
+          const bounds = card.getBoundingClientRect()
+          const value = card.firstElementChild!
+          const valueBounds = value.getBoundingClientRect()
+          const buttons = Array.from(card.querySelectorAll('button')).map(
+            (button) => {
+              const box = button.getBoundingClientRect()
+              const icon = button.querySelector('svg')!.getBoundingClientRect()
+              return {
+                offset: box.x - bounds.x,
+                width: box.width,
+                height: box.height,
+                center: box.y + box.height / 2,
+                iconLeft: icon.left,
+                iconRight: icon.right,
+                iconInsideTarget:
+                  icon.left >= box.left && icon.right <= box.right,
+              }
+            },
+          )
+          return {
+            width: bounds.width,
+            height: bounds.height,
+            value: value.textContent,
+            fits: value.scrollWidth <= value.clientWidth,
+            center: valueBounds.y + valueBounds.height / 2,
+            valueWidth: valueBounds.width,
+            leftPadding: valueBounds.left - bounds.left,
+            rightPadding: bounds.right - valueBounds.right,
+            unitRight: value.lastElementChild!.getBoundingClientRect().right,
+            numberFontSize: getComputedStyle(value.firstElementChild!).fontSize,
+            numberWidth: value.firstElementChild!.getBoundingClientRect().width,
+            numberFits:
+              value.firstElementChild!.scrollWidth <=
+              value.firstElementChild!.clientWidth,
+            unitOffset:
+              value.lastElementChild!.getBoundingClientRect().x - bounds.x,
+            numberAlign: getComputedStyle(value.firstElementChild!).textAlign,
+            childCount: card.children.length,
+            buttons,
+          }
+        }),
+      )
+      expect(boxes.map((box) => box.value)).toEqual(
+        expect.arrayContaining([
+          '9.00 kg',
+          '95.10 kg',
+          '105.25 kg',
+          '99.95 kg',
+          '1000.50 kg',
+        ]),
+      )
+      for (const box of boxes) {
+        if (box.buttons.length)
+          expect(box.width).toBe(layout.hasTouch ? 148 : 124)
+        else {
+          expect(box.width).toBeCloseTo(box.valueWidth + 10, 1)
+          expect(box.leftPadding).toBeCloseTo(box.rightPadding, 1)
+          expect(box.numberFontSize).toBe('10px')
+          expect(box.childCount).toBe(2)
+        }
+        expect(box.height).toBe(layout.hasTouch ? 48 : 40)
+        if (box.buttons.length) {
+          expect(box.valueWidth).toBe(50)
+          expect(box.numberWidth).toBe(36)
+          expect(box.buttons[0].iconLeft - box.unitRight).toBeCloseTo(
+            box.buttons[1].iconLeft - box.buttons[0].iconRight,
+            1,
+          )
+        }
+        expect(box.numberFits).toBe(true)
+        expect(box.numberAlign).toBe('right')
+        expect(box.fits, `${box.value} fits the compact value area`).toBe(true)
+        for (const button of box.buttons) {
+          expect(button.iconInsideTarget).toBe(true)
+          expect(button.width).toBe(layout.hasTouch ? 44 : 32)
+          expect(button.height).toBeGreaterThanOrEqual(
+            layout.hasTouch ? 44 : 32,
+          )
+          expect(Math.abs(button.center - box.center)).toBeLessThan(1)
+        }
+      }
+      const own = boxes.filter((box) => box.buttons.length > 0)
+      expect(own).toHaveLength(2)
+      for (const box of own)
+        expect(
+          box.buttons[1].offset - box.buttons[0].offset - box.buttons[0].width,
+        ).toBe(0)
+      expect(own[0].buttons.map((button) => button.offset)).toEqual(
+        own[1].buttons.map((button) => button.offset),
+      )
+      expect(boxes.filter((box) => box.buttons.length === 0)).toHaveLength(7)
+      const readonlyWidth = (label: string) =>
+        boxes.find((box) => !box.buttons.length && box.value === label)!.width
+      expect(readonlyWidth('9.00 kg')).toBeLessThan(readonlyWidth('99.95 kg'))
+      expect(readonlyWidth('99.95 kg')).toBeLessThan(readonlyWidth('105.25 kg'))
+      expect(readonlyWidth('105.25 kg')).toBeLessThan(
+        readonlyWidth('1000.50 kg'),
+      )
+      const scroll = page.getByRole('region', {
+        name: 'Scrollable shared group weights',
+      })
+      await scroll.scrollIntoViewIfNeeded()
+      await scroll.screenshot({
+        path: test.info().outputPath('fixed-weight-cards.png'),
+      })
+      if (layout.width >= 500)
+        await scroll.evaluate((element) => {
+          element.style.maxWidth = '700px'
+        })
+      expect(
+        await scroll.evaluate(
+          (element) => element.scrollWidth > element.clientWidth,
+        ),
+      ).toBe(true)
+      await scroll.evaluate((element) => {
+        element.scrollLeft = 180
+      })
+      await expect
+        .poll(() => scroll.evaluate((element) => element.scrollLeft))
+        .toBeGreaterThan(0)
+      const date = matrix.getByRole('rowheader', { name: '2026-09-22' })
+      const firstCard = date.locator('xpath=../td[1]/div')
+      const dateBox = (await date.boundingBox())!
+      const scrolledCardBox = (await firstCard.boundingBox())!
+      expect(scrolledCardBox.x).toBeLessThan(dateBox.x + dateBox.width)
+      expect(scrolledCardBox.x + scrolledCardBox.width).toBeGreaterThan(
+        dateBox.x,
+      )
+      expect(
+        await date.evaluate((element) => {
+          const box = element.getBoundingClientRect()
+          return [box.x + 8, box.x + box.width / 2, box.right - 8].every(
+            (x) =>
+              document
+                .elementFromPoint(x, box.y + box.height / 2)
+                ?.closest('th') === element,
+          )
+        }),
+      ).toBe(true)
+      expect(
+        await date.evaluate(
+          (element) => getComputedStyle(element).backgroundColor,
+        ),
+      ).toBe('rgb(255, 255, 255)')
+      const corner = matrix.getByRole('columnheader', { name: 'Recorded date' })
+      expect(
+        await corner.evaluate((element) => {
+          const box = element.getBoundingClientRect()
+          return (
+            document
+              .elementFromPoint(box.right - 8, box.y + box.height / 2)
+              ?.closest('th') === element
+          )
+        }),
+      ).toBe(true)
+      await scroll.screenshot({
+        path: test.info().outputPath('compact-scrolled-matrix.png'),
+      })
+    } finally {
+      await context.close()
+    }
+  })
+}
+
 for (const viewport of [
   { label: 'desktop', width: 1280 },
   { label: 'mobile', width: 390 },
 ]) {
+  test(`only own matrix cards edit/delete and refresh selected groups on ${viewport.label}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: 700 })
+    const requests = await installGroupFixtures(page, true, true)
+    await page.goto(
+      `/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
+    )
+    const matrix = page.getByRole('table', {
+      name: 'Shared group weight history',
+    })
+    const ownOrdinal =
+      memberKey(ownGroupId, viewerId) < memberKey(ownGroupId, otherViewerId)
+        ? 1
+        : 2
+    const ownName = `Ava (member ${ownOrdinal})`
+    const otherName = `Ava (member ${3 - ownOrdinal})`
+    const edit = matrix.getByRole('button', {
+      name: `Edit weight 2026-09-22 for ${ownName}`,
+      exact: true,
+    })
+    const remove = matrix.getByRole('button', {
+      name: `Delete 2026-09-22 for ${ownName}`,
+      exact: true,
+    })
+    await expect(edit).toBeVisible()
+    await expect(matrix.getByRole('button')).toHaveCount(2)
+    await expect(matrix.getByText('88.50 kg', { exact: true })).toHaveCount(2)
+    const ownReadonly = matrix
+      .getByText('90.00 kg', { exact: true })
+      .locator('xpath=..')
+    await expect(ownReadonly.getByRole('button')).toHaveCount(0)
+    expect((await ownReadonly.boundingBox())!.width).toBeLessThan(80)
+    const card = edit.locator('xpath=../..')
+    const value = card.getByText('88.50 kg', { exact: true })
+    const valueBox = (await value.boundingBox())!
+    const editBox = (await edit.boundingBox())!
+    const deleteBox = (await remove.boundingBox())!
+    const cardBox = (await card.boundingBox())!
+    expect(editBox.x).toBeGreaterThanOrEqual(valueBox.x + valueBox.width)
+    expect(deleteBox.x).toBeGreaterThanOrEqual(editBox.x + editBox.width)
+    expect(
+      Math.abs(
+        valueBox.y + valueBox.height / 2 - editBox.y - editBox.height / 2,
+      ),
+    ).toBeLessThan(1)
+    expect(
+      Math.abs(
+        editBox.y + editBox.height / 2 - deleteBox.y - deleteBox.height / 2,
+      ),
+    ).toBeLessThan(1)
+    expect(cardBox.height).toBeLessThanOrEqual(50)
+    expect(editBox.width).toBeGreaterThanOrEqual(32)
+    expect(deleteBox.width).toBeGreaterThanOrEqual(32)
+    await edit.focus()
+    await page.keyboard.press('Tab')
+    await expect(remove).toBeFocused()
+    await expect(
+      page.getByRole('list', { name: 'Your own shared group entries' }),
+    ).toHaveCount(0)
+    await page.getByRole('tab', { name: ownName, exact: true }).click()
+    await expect(edit).toBeVisible()
+    await expect(matrix.getByRole('button')).toHaveCount(2)
+    await page.getByRole('tab', { name: otherName, exact: true }).click()
+    await expect(matrix.getByRole('button')).toHaveCount(0)
+    await expect(matrix.getByText('88.50 kg', { exact: true })).toBeVisible()
+    await page.keyboard.press('Home')
+    await expect(edit).toBeVisible()
+    await edit.click()
+    const editor = page.getByRole('dialog', {
+      name: 'Edit weight',
+      exact: true,
+    })
+    await expect(editor.getByLabel('Weight in kg')).toBeFocused()
+    await expect(editor.getByLabel('Weight in kg')).toHaveValue('88.5')
+    await expect(editor.getByLabel('Private note (optional)')).toHaveValue(
+      'Author-only disposable private note',
+    )
+    await expect(editor.getByRole('checkbox')).toHaveCount(2)
+    await expect(editor.getByRole('checkbox').first()).toBeChecked()
+    await expect(editor.getByRole('checkbox').last()).toBeChecked()
+    await page.keyboard.press('Escape')
+    await expect(edit).toBeFocused()
+    await edit.click()
+    await editor.getByLabel('Weight in kg').fill('87')
+    await editor.getByRole('button', { name: 'Update weight' }).click()
+    await expect(matrix.getByText('87.00 kg', { exact: true })).toBeVisible()
+    await expect(matrix.getByText('88.50 kg', { exact: true })).toBeVisible()
+    await expect(
+      page.getByRole('button', { name: 'Record weight', exact: true }),
+    ).toBeFocused()
+    await expect(
+      page.getByText('Author-only disposable private note', { exact: true }),
+    ).toHaveCount(0)
+    const countBefore = requests.filter((url) =>
+      url.includes('get_group_chart_history'),
+    ).length
+    await page
+      .getByRole('navigation', { name: 'Challenge contexts' })
+      .getByRole('link', {
+        name: 'Group · Second authorized group',
+        exact: true,
+      })
+      .click()
+    await expect(matrix.getByText('87.00 kg', { exact: true })).toBeVisible()
+    await expect(matrix.getByRole('button')).toHaveCount(2)
+    await matrix
+      .getByRole('button', { name: /^Edit weight 2026-09-22 for Jo/ })
+      .click()
+    await expect(editor.getByLabel('Weight in kg')).toHaveValue('87')
+    await page.keyboard.press('Escape')
+    await page
+      .getByRole('navigation', { name: 'Challenge contexts' })
+      .getByRole('link', { name: 'Group · E2E authorized group', exact: true })
+      .click()
+    await remove.click()
+    const deletion = page.getByRole('dialog', { name: 'Delete weight?' })
+    await expect(deletion).toContainText('87 kg recorded 2026-09-22')
+    await expect(deletion).toContainText('ALL shared groups')
+    await deletion.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await expect(remove).toBeFocused()
+    await expect(matrix.getByText('87.00 kg', { exact: true })).toBeVisible()
+    await remove.click()
+    await deletion
+      .getByRole('button', { name: 'Delete weight', exact: true })
+      .click()
+    await expect(matrix.getByRole('button')).toHaveCount(0)
+    await expect(matrix.getByText('87.00 kg', { exact: true })).toHaveCount(0)
+    await expect(matrix.getByText('88.50 kg', { exact: true })).toBeVisible()
+    await expect(
+      page.getByRole('button', { name: 'Record weight', exact: true }),
+    ).toBeFocused()
+    expect(
+      requests.filter((url) => url.includes('get_group_chart_history')).length,
+    ).toBeGreaterThan(countBefore)
+    await page
+      .getByRole('navigation', { name: 'Challenge contexts' })
+      .getByRole('link', {
+        name: 'Group · Second authorized group',
+        exact: true,
+      })
+      .click()
+    await expect(page.getByText('73.2%', { exact: true })).toBeVisible()
+    await expect(matrix.getByRole('button')).toHaveCount(0)
+    await expect(matrix.getByText('87.00 kg', { exact: true })).toHaveCount(0)
+    await expect(matrix.getByText('88.50 kg', { exact: true })).toBeVisible()
+  })
   test(`spreadsheet member tabs and sticky navigation stay usable on ${viewport.label}`, async ({
     page,
   }) => {
@@ -194,8 +688,35 @@ for (const viewport of [
     const table = page.getByRole('table', {
       name: 'Shared group weight history',
     })
+    const chart = page.getByRole('img', {
+      name: 'Weight (kg) — shared group history',
+    })
+    await expect(chart).toBeVisible()
+    const originalPoints = await chart
+      .locator('circle')
+      .evaluateAll((elements) =>
+        elements.map((circle) => ({
+          label: circle.textContent,
+          y: Number(circle.getAttribute('cy')),
+        })),
+      )
+    const heavier = originalPoints.find(
+      (point) => point.label === 'Ava (member 1): 2026-09-20, 90 kg',
+    )!
+    const lighter = originalPoints.find(
+      (point) => point.label === 'Ava (member 2): 2026-09-20, 70 kg',
+    )!
+    expect(heavier.y).toBeLessThan(lighter.y)
+    for (const point of originalPoints) {
+      expect(point.y).toBeGreaterThan(25)
+      expect(point.y).toBeLessThan(215)
+    }
+    await expect(chart).toContainText('Weight (kg)')
+    await chart.screenshot({
+      path: test.info().outputPath('actual-kg-chart.png'),
+    })
     await expect(table.getByRole('columnheader')).toHaveText([
-      'Recorded date',
+      'Date',
       'Ava (member 1) (kg)',
       'Ava (member 2) (kg)',
     ])
@@ -204,7 +725,7 @@ for (const viewport of [
       .filter({ has: page.getByRole('rowheader', { name: '2026-09-21' }) })
     await expect(missing.getByRole('cell')).toHaveText([
       '—',
-      '71 kg; change from first shared entry +1 kg',
+      '71.00 kg; change from first shared entry +1 kg',
     ])
     const tabs = page.getByRole('tablist', { name: 'Shared group members' })
     const all = tabs.getByRole('tab', { name: 'All members' })
@@ -214,15 +735,15 @@ for (const viewport of [
       tabs.getByRole('tab', { name: 'Ava (member 1)' }),
     ).toBeFocused()
     await expect(table.getByRole('columnheader')).toHaveCount(2)
-    await expect(table).toContainText('88.5 kg')
-    await expect(table).not.toContainText('70 kg')
+    await expect(table).toContainText('88.50 kg')
+    await expect(table).not.toContainText('70.00 kg')
     await expect(page.getByRole('img').locator('circle')).toHaveCount(2)
     await page.keyboard.press('End')
     await expect(
       tabs.getByRole('tab', { name: 'Ava (member 2)' }),
     ).toBeFocused()
-    await expect(table).toContainText('71 kg')
-    await expect(table).not.toContainText('88.5 kg')
+    await expect(table).toContainText('71.00 kg')
+    await expect(table).not.toContainText('88.50 kg')
     await page.keyboard.press('Home')
     await expect(all).toBeFocused()
     const weights = page.getByRole('region', {
@@ -456,7 +977,7 @@ for (const viewport of [
     const historyPanel = page.getByRole('region', {
       name: 'Group chart and weigh-in history',
     })
-    await expect(historyPanel.getByRole('table')).toContainText('88.5 kg')
+    await expect(historyPanel.getByRole('table')).toContainText('88.50 kg')
     await expect(historyPanel.getByRole('table')).toContainText('-1.5 kg')
     await expect(historyPanel.getByRole('table')).toContainText(
       'Ava (member 1)',
