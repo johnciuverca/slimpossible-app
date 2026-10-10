@@ -13,8 +13,14 @@ import { PersonalProgressChart } from '../components/PersonalProgressChart'
 import { ChallengeTabs } from '../components/ChallengeContextTabs'
 import { WeightPageHeader } from '../components/WeightPageHeader'
 import { GroupChartHistory } from '../components/GroupChartHistory'
-import { PersonalEntryActions } from '../components/WeightEntryActions'
-import { usePersonalWeightRevision } from '../data/personalWeightChanges'
+import { WeightEntryActions } from '../components/WeightEntryActions'
+import { WeightEntryCard } from '../components/WeightEntryCard'
+import type { PersonalWorkspace } from '../data/usePersonalWorkspace'
+import {
+  notifyPersonalWeightChange,
+  usePersonalWeightRevision,
+} from '../data/personalWeightChanges'
+import { isEligibleSharingGroup } from '../models/groupSharingEligibility'
 import type { ParticipantMilestones } from '../models/participantMilestones'
 import { createParticipantMilestones } from '../models/participantMilestones'
 import {
@@ -105,6 +111,7 @@ type PersonalDashboardData = {
   participant: Participant
   viewerId: string
   weighIns: WeighIn[]
+  personalWorkspace: PersonalWorkspace
 }
 
 type GroupDashboardData = {
@@ -154,6 +161,7 @@ function usePersonalDashboard({ preferJoinedChallenge = false } = {}) {
   const requestKey = JSON.stringify([
     authState.status,
     ownerId ?? null,
+    authState.user?.email ?? null,
     challengeParam,
     persistence.mode,
     preferJoinedChallenge,
@@ -301,6 +309,30 @@ function usePersonalDashboard({ preferJoinedChallenge = false } = {}) {
             participant,
             viewerId: ownerId,
             weighIns: records,
+            personalWorkspace: {
+              ownerKey: `${authState.status}:${ownerId}:${authState.user?.email ?? ''}:${persistence.mode}`,
+              userId: ownerId,
+              persistence,
+              personal: {
+                key: requestKey,
+                state: 'ready',
+                data: weighIns.data,
+                error: '',
+              },
+              contexts: {
+                key: requestKey,
+                state: 'ready',
+                data: {
+                  challenges: savedChallenges,
+                  participants: participantRows,
+                },
+                error: '',
+              },
+              groups: savedChallenges.filter((candidate) =>
+                isEligibleSharingGroup(candidate, ownerId, participantRows),
+              ),
+              refresh: () => notifyPersonalWeightChange(ownerId),
+            },
           },
         })
       } catch {
@@ -319,6 +351,7 @@ function usePersonalDashboard({ preferJoinedChallenge = false } = {}) {
     }
   }, [
     authState.status,
+    authState.user?.email,
     challengeParam,
     ownerId,
     persistence,
@@ -2278,7 +2311,14 @@ export function ProgressPage({
                                 </time>
                               </td>
                               <td className="whitespace-nowrap px-4 py-3 font-semibold">
-                                {formatWeight(weighIn.weightKg)}
+                                <WeightEntryCard weightKg={weighIn.weightKg}>
+                                  <WeightEntryActions
+                                    key={`${data.personalWorkspace.ownerKey}:${data.challenge.id}:${weighIn.date}`}
+                                    workspace={data.personalWorkspace}
+                                    date={weighIn.date}
+                                    compact
+                                  />
+                                </WeightEntryCard>
                               </td>
                               <td className="whitespace-nowrap px-4 py-3">
                                 {dailyChange === null
@@ -2297,7 +2337,6 @@ export function ProgressPage({
                 )}
               </section>
 
-              <PersonalEntryActions key={data.viewerId} />
               {data.challenge.kind === 'group' ? (
                 <section
                   aria-labelledby="group-history-title"

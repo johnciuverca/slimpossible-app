@@ -219,7 +219,9 @@ createRoot(document.getElementById('root')!).render(
           : isGoals
             ? [`/goals?challenge=${challengeId}`]
             : isProgress
-              ? [`/progress?challenge=${challengeId}`]
+              ? [
+                  `/progress?challenge=${encodeURIComponent(initialHomeSelection ?? challengeId)}`,
+                ]
               : isGroup
                 ? [
                     `/group?challenge=${encodeURIComponent(initialHomeSelection ?? challengeId)}`,
