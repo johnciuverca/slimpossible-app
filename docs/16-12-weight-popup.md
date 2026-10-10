@@ -101,8 +101,12 @@ domain spanning all visible recorded weights, kg axis/tooltip labels and separat
 member series. First shared 80kg/100kg points begin at 80/100, not a common zero.
 Consecutive-day lines and missing-date gaps remain. Individual tabs retain the
 existing change-from-first-share view for now. No ranking/winner/model/RPC/SQL
-logic changes; lower absolute weight is not a winner ranking. Reference
-spreadsheet comparison remains pending until the owner provides the reference.
+logic changes; lower absolute weight is not a winner ranking. The historical
+reference was subsequently recovered and inspected read-only: its visible
+master chart has four participant series on an actual-weight axis, and the table
+separates actual measurements from daily changes. This confirms the metric,
+not identical styling. Private names/measurements and source copies are not
+included here or in fixtures; exact visual matching is not claimed.
 
 Styling follow-up: weight and small unfilled Edit/Delete icons share one
 horizontal line, with reduced card padding/gaps. Keyboard focus stays visible;
@@ -123,7 +127,8 @@ The matrix uses fixed 76px date and 156px member columns, just 4px cell-side
 padding, and short DD/MM dates (year retained for screen readers, full ISO date
 in the accessible row label and hover title). It no longer stretches columns to
 fill the panel. Practical 44px coarse-pointer targets and opaque sticky layering
-remain. Reference-spreadsheet visual comparison is not executed without a link.
+remain. Reference inspection establishes the actual-weight metric only; it does
+not establish exact visual matching or owner acceptance of this preview.
 
 1. On Dashboard without a challenge, Record weight. Confirm private default,
    today's existing-entry correction and optional explicit group shares.
