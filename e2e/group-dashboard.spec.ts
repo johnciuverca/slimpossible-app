@@ -286,6 +286,27 @@ for (const viewport of [
     ).toBeVisible()
     await expect(own.getByRole('button')).toHaveCount(2)
     await expect(matrix.getByRole('button')).toHaveCount(0)
+    // Duplicate display names must never establish ownership. Opaque tabs are
+    // read-only; author actions are conservatively available in All members only.
+    for (const name of ['Ava (member 1)', 'Ava (member 2)']) {
+      const member = page.getByRole('tab', { name, exact: true })
+      await member.focus()
+      await page.keyboard.press('Enter')
+      await expect(member).toHaveAttribute('aria-selected', 'true')
+      await expect(own).toHaveCount(0)
+      await expect(
+        page.getByRole('button', { name: 'Edit weight 2026-09-22' }),
+      ).toHaveCount(0)
+      await expect(
+        page.getByRole('button', { name: 'Delete 2026-09-22' }),
+      ).toHaveCount(0)
+      await expect(matrix.getByRole('button')).toHaveCount(0)
+    }
+    await page.keyboard.press('Home')
+    await expect(
+      page.getByRole('tab', { name: 'All members', exact: true }),
+    ).toHaveAttribute('aria-selected', 'true')
+    await expect(own.getByRole('button')).toHaveCount(2)
     await expect(
       page.getByText('Author-only disposable private note', { exact: true }),
     ).toHaveCount(0)

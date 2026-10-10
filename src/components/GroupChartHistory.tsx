@@ -17,6 +17,7 @@ export function GroupChartHistory({
   persistence,
   refreshVersion,
   children,
+  overviewActions,
   enabled = true,
 }: {
   challengeId: string
@@ -24,6 +25,7 @@ export function GroupChartHistory({
   persistence: Persistence
   refreshVersion: number
   children?: ReactNode
+  overviewActions?: ReactNode
   enabled?: boolean
 }) {
   const key = `${viewerId}:${challengeId}:${refreshVersion}:${persistence.mode}`
@@ -396,6 +398,9 @@ export function GroupChartHistory({
           </section>
         </div>
       ) : null}
+      {enabled && (selection.context !== context || !selection.memberKey)
+        ? overviewActions
+        : null}
     </div>
   )
 }

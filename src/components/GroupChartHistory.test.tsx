@@ -45,6 +45,7 @@ describe('Group chart history', () => {
         viewerId="viewer"
         persistence={persistence(load)}
         refreshVersion={0}
+        overviewActions={<button>Own entry actions</button>}
       />,
     )
     const table = await screen.findByRole('table')
@@ -65,7 +66,13 @@ describe('Group chart history', () => {
     )
     expect(dateRow).toHaveTextContent('70.25 kg')
     const all = screen.getByRole('tab', { name: 'All members' })
+    expect(
+      screen.getByRole('button', { name: 'Own entry actions' }),
+    ).toBeInTheDocument()
     fireEvent.keyDown(all, { key: 'End' })
+    expect(
+      screen.queryByRole('button', { name: 'Own entry actions' }),
+    ).not.toBeInTheDocument()
     expect(
       screen.getByRole('tab', { name: 'Same name (member 2)' }),
     ).toHaveFocus()
@@ -83,6 +90,9 @@ describe('Group chart history', () => {
       { key: 'Home' },
     )
     expect(all).toHaveFocus()
+    expect(
+      screen.getByRole('button', { name: 'Own entry actions' }),
+    ).toBeInTheDocument()
     expect(table).toHaveTextContent('88.5 kg')
     expect(load).toHaveBeenCalledTimes(1)
     expect(load).toHaveBeenCalledWith('group')
@@ -106,13 +116,20 @@ describe('Group chart history', () => {
         viewerId="viewer"
         persistence={remote}
         refreshVersion={version}
+        overviewActions={<button>Own entry actions</button>}
       />
     )
     const { rerender } = render(view(0))
     fireEvent.click(await screen.findByRole('tab', { name: 'Ava' }))
     rerender(view(1))
+    expect(
+      screen.queryByRole('button', { name: 'Own entry actions' }),
+    ).not.toBeInTheDocument()
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
     await screen.findByText('91 kg')
+    expect(
+      screen.queryByRole('button', { name: 'Own entry actions' }),
+    ).not.toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Ava' })).toHaveAttribute(
       'aria-selected',
       'true',
@@ -124,6 +141,9 @@ describe('Group chart history', () => {
       'aria-selected',
       'true',
     )
+    expect(
+      screen.getByRole('button', { name: 'Own entry actions' }),
+    ).toBeInTheDocument()
   })
   it('clears selected-member state across account or challenge changes even with the same opaque key', async () => {
     const load = vi.fn().mockResolvedValue({
