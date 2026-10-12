@@ -140,6 +140,7 @@ begin
     join public.challenges as challenge on challenge.id = member.challenge_id
     where member.challenge_id = target_challenge_id
       and member.user_id = auth.uid()
+      and member.status = 'active'
       and challenge.challenge_kind is distinct from 'personal'
   ) then
     raise exception using errcode = '42501', message = 'Challenge ownership required.';
@@ -151,6 +152,7 @@ begin
   join public.participants as member on member.id = milestone.participant_id
   where milestone.challenge_id = target_challenge_id
     and member.user_id = auth.uid()
+    and member.status = 'active'
   order by milestone.created_at, milestone.id;
 end;
 $$;
