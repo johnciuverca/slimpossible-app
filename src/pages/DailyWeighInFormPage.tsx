@@ -456,6 +456,7 @@ export function DailyWeighInFormPage() {
                 onChange={(event) =>
                   updateValue('weightKg', event.target.value)
                 }
+                onWheel={(event) => event.currentTarget.blur()}
                 step="0.1"
                 type="number"
                 value={values.weightKg}
