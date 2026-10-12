@@ -152,6 +152,28 @@ describe('MilestoneProgress', () => {
     )
   })
 
+  it('formats a fractional loss-goal distance without exposing float precision', () => {
+    render(
+      <MilestoneProgress
+        direction="loss"
+        milestones={availableMilestones(26)}
+        personalGoal={{
+          currentWeightKg: 94.8,
+          remainingWeightKg: 94.8 - 90,
+          startingWeightKg: 100,
+          statusLabel: 'In progress',
+          targetWeightKg: 90,
+        }}
+      />,
+    )
+
+    expect(screen.getAllByRole('status')[0]).toHaveTextContent(
+      'You are 4.8 kg away from your target weight.',
+    )
+    expect(screen.getByText('4.8 kg')).toBeInTheDocument()
+    expect(screen.queryByText(/4\.799999999999997/)).not.toBeInTheDocument()
+  })
+
   it('shows maintenance distance without a loss-or-gain progress scale', () => {
     render(
       <MilestoneProgress
