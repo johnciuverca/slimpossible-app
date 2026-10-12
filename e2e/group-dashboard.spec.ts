@@ -225,6 +225,35 @@ async function installGroupFixtures(
       return
     }
 
+    if (
+      ownEntries &&
+      url.pathname === '/rest/v1/rpc/get_group_weigh_in_history'
+    ) {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify([
+          ...(ownWeight === null
+            ? []
+            : [
+                {
+                  display_name: 'Own member',
+                  recorded_date: '2026-09-22',
+                  weight_kg: ownWeight,
+                  change_since_previous_kg: null,
+                },
+              ]),
+          {
+            display_name: 'Other member',
+            recorded_date: '2026-09-22',
+            weight_kg: 88.5,
+            change_since_previous_kg: null,
+            note: 'Other member private note must never render',
+          },
+        ]),
+      })
+      return
+    }
+
     if (url.pathname === '/rest/v1/rpc/get_group_progress_summary') {
       const body = request.postDataJSON() as {
         target_challenge_id: string
@@ -532,6 +561,72 @@ for (const viewport of [
   { label: 'desktop', width: 1280 },
   { label: 'mobile', width: 390 },
 ]) {
+  test(`Progress integrates own controls without duplicating history on ${viewport.label}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: 900 })
+    await installGroupFixtures(page, true, true)
+    await page.goto(
+      `http://127.0.0.1:4174/e2e/fixtures/today-harness.html?scenario=progress&selected=${ownGroupId}&user=${viewerId}`,
+    )
+    const personal = page.getByRole('table', {
+      name: 'Your saved personal weigh-ins',
+    })
+    const shared = page.getByRole('table', { name: 'Shared group weigh-ins' })
+    const edit = personal.getByRole('button', {
+      name: 'Edit weight 2026-09-22',
+      exact: true,
+    })
+    const remove = personal.getByRole('button', {
+      name: 'Delete 2026-09-22',
+      exact: true,
+    })
+    await expect(edit).toBeVisible()
+    await expect(personal.getByRole('row')).toHaveCount(2)
+    await expect(
+      page.getByRole('list', { name: 'Your own personal entry actions' }),
+    ).toHaveCount(0)
+    await expect(personal).toContainText('Author-only disposable private note')
+    await personal.screenshot({
+      path: test.info().outputPath('integrated-progress-history.png'),
+    })
+    await expect(shared).toContainText('Other member')
+    await expect(shared.getByRole('button')).toHaveCount(0)
+    await expect(shared).not.toContainText('private note')
+    await expect(
+      page.getByText('Other member private note must never render'),
+    ).toHaveCount(0)
+    await edit.click()
+    const editor = page.getByRole('dialog', { name: 'Edit weight' })
+    await expect(editor.getByLabel('Private note')).toHaveValue(
+      'Author-only disposable private note',
+    )
+    await editor.getByLabel('Weight in kg').fill('87')
+    await editor.getByRole('button', { name: 'Update weight' }).click()
+    await expect(personal).toContainText('87.00 kg')
+    await expect(shared).toContainText('87 kg')
+    await expect(shared).toContainText('88.5 kg')
+    await page
+      .getByRole('link', { name: /Group · Second authorized group/ })
+      .click()
+    await expect(edit).toBeVisible()
+    await expect(personal).toContainText('87.00 kg')
+    await remove.click()
+    const deletion = page.getByRole('dialog', { name: 'Delete weight?' })
+    await expect(deletion).toContainText('ALL shared groups')
+    await deletion.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await expect(remove).toBeFocused()
+    await remove.click()
+    await deletion
+      .getByRole('button', { name: 'Delete weight', exact: true })
+      .click()
+    await expect(personal).toHaveCount(0)
+    await expect(shared).not.toContainText('Own member')
+    await expect(shared).toContainText('Other member')
+    await expect(
+      page.getByRole('list', { name: 'Your own personal entry actions' }),
+    ).toHaveCount(0)
+  })
   test(`only own matrix cards edit/delete and refresh selected groups on ${viewport.label}`, async ({
     page,
   }) => {

@@ -89,7 +89,8 @@ test('renders private, saved Progress records accessibly at a mobile viewport', 
   await page.goto(fixture('progress'))
 
   await expect(page.getByRole('heading', { name: 'Progress' })).toBeVisible()
-  await expect(page.getByText('88.4 kg', { exact: true })).toHaveCount(2)
+  await expect(page.getByText('88.4 kg', { exact: true })).toHaveCount(1)
+  await expect(page.getByText('88.40 kg', { exact: true })).toHaveCount(1)
   await expect(page.getByText('−1.6 kg', { exact: true })).toHaveCount(2)
   await expect(
     page.getByText('E2E private note for the signed-in participant.'),

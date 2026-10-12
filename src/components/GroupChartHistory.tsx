@@ -9,6 +9,7 @@ import {
   type GroupChartEntry,
 } from '../models/groupChartHistory'
 import { localDateOnly } from '../models/provisionalGroupLeader'
+import { WeightEntryCard } from './WeightEntryCard'
 
 const colors = ['#166534', '#1d4ed8', '#9f1239', '#6b21a8', '#92400e']
 const day = (date: string) => Date.parse(`${date}T00:00:00Z`) / 86400000
@@ -434,25 +435,7 @@ export function GroupChartHistory({
                               className="relative z-0 px-1 py-1"
                             >
                               {point ? (
-                                <div className="group/weight inline-flex h-10 shrink-0 flex-nowrap items-center gap-0 rounded-lg border border-line bg-page px-1 py-0 has-[button]:w-[124px] pointer-coarse:h-12 pointer-coarse:has-[button]:w-[148px]">
-                                  <span
-                                    className="inline-flex shrink-0 items-baseline justify-end gap-0.5 whitespace-nowrap text-[10px] group-has-[button]/weight:w-[50px]"
-                                    title={`${point.weightKg} kg`}
-                                  >
-                                    <span
-                                      className="text-right tabular-nums group-has-[button]/weight:w-9 group-not-has-[button]/weight:text-[10px]!"
-                                      style={
-                                        point.weightKg.toFixed(2).length > 6
-                                          ? {
-                                              fontSize: `${60 / point.weightKg.toFixed(2).length}px`,
-                                            }
-                                          : undefined
-                                      }
-                                    >
-                                      {point.weightKg.toFixed(2)}
-                                    </span>{' '}
-                                    <span>kg</span>
-                                  </span>
+                                <WeightEntryCard weightKg={point.weightKg}>
                                   <span className="sr-only">
                                     ; change from first shared entry{' '}
                                     {signed(point.changeKg)}
@@ -475,7 +458,7 @@ export function GroupChartHistory({
                                       requiredSharedChallengeId={challengeId}
                                     />
                                   ) : null}
-                                </div>
+                                </WeightEntryCard>
                               ) : (
                                 <span aria-label="No shared entry">—</span>
                               )}

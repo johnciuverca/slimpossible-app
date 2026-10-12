@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react'
 import { Link, MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -206,6 +212,54 @@ afterEach(() => {
 })
 
 describe('ProgressPage', () => {
+  it('renders one personal table with real integrated actions and a separate read-only shared dataset', async () => {
+    installRemoteFixtures({
+      groupHistory: [
+        {
+          display_name: 'Other member',
+          recorded_date: '2026-09-19',
+          weight_kg: 88,
+          change_since_previous_kg: null,
+        },
+      ],
+    })
+    render(
+      <AuthContext.Provider value={authValue('member-1')}>
+        <MemoryRouter initialEntries={['/progress?challenge=challenge-1']}>
+          <ProgressPage />
+        </MemoryRouter>
+      </AuthContext.Provider>,
+    )
+    const personal = await screen.findByRole('table', {
+      name: 'Your saved personal weigh-ins',
+    })
+    expect(within(personal).getAllByRole('row')).toHaveLength(3)
+    expect(
+      within(personal).getAllByRole('button', { name: /^Edit weight/ }),
+    ).toHaveLength(2)
+    expect(
+      within(personal).getAllByRole('button', { name: /^Delete/ }),
+    ).toHaveLength(2)
+    expect(
+      screen.queryByRole('list', { name: 'Your own personal entry actions' }),
+    ).not.toBeInTheDocument()
+    fireEvent.click(
+      within(personal).getByRole('button', {
+        name: 'Edit weight 2026-09-19',
+      }),
+    )
+    const editor = screen.getByRole('dialog', { name: 'Edit weight' })
+    expect(within(editor).getByLabelText(/Private note/)).toHaveValue(
+      'Second challenge private note',
+    )
+    expect(within(editor).getByLabelText('Weight in kg')).toHaveValue(88)
+    const shared = await screen.findByRole('table', {
+      name: 'Shared group weigh-ins',
+    })
+    expect(shared).toHaveTextContent('Other member')
+    expect(within(shared).queryByRole('button')).not.toBeInTheDocument()
+    expect(shared).not.toHaveTextContent('private note')
+  })
   it('shows an honest no-record state without inventing a chart or weekly change', async () => {
     installRemoteFixtures({ emptyWeighIns: true })
     render(
@@ -251,6 +305,9 @@ describe('ProgressPage', () => {
     expect(
       screen.getByText('Second challenge private note'),
     ).toBeInTheDocument()
+    expect(
+      screen.getAllByRole('button', { name: /^Edit weight/ }),
+    ).toHaveLength(2)
     fireEvent.click(
       screen.getByRole('link', { name: 'Select the second challenge' }),
     )
@@ -262,6 +319,9 @@ describe('ProgressPage', () => {
     expect(
       screen.getByText('Second challenge private note'),
     ).toBeInTheDocument()
+    expect(
+      screen.getAllByRole('button', { name: /^Edit weight/ }),
+    ).toHaveLength(2)
   })
 
   it('removes one account’s history before showing another account’s selected history', async () => {
@@ -277,6 +337,12 @@ describe('ProgressPage', () => {
     expect(
       await screen.findByText('Second challenge private note'),
     ).toBeInTheDocument()
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Edit weight 2026-09-19',
+      }),
+    )
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
     rerender(
       <AuthContext.Provider value={authValue('member-2')}>
         <MemoryRouter initialEntries={['/progress?challenge=challenge-2']}>
@@ -288,12 +354,24 @@ describe('ProgressPage', () => {
     expect(
       screen.queryByText('Second challenge private note'),
     ).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(
       await screen.findByText('Second account private note'),
     ).toBeInTheDocument()
     expect(
       screen.queryByText('First challenge private note'),
     ).not.toBeInTheDocument()
+    expect(
+      screen.getAllByRole('button', { name: /^Edit weight/ }),
+    ).toHaveLength(1)
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Edit weight 2026-09-20',
+      }),
+    )
+    expect(
+      within(screen.getByRole('dialog')).getByLabelText(/Private note/),
+    ).toHaveValue('Second account private note')
   })
 
   it('renders only server-authorized shared history and never private notes', async () => {
