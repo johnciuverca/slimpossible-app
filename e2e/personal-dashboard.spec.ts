@@ -81,7 +81,7 @@ for (const viewport of [
       .getByRole('link', { name: 'My progress', exact: true })
       .click()
     await expect(
-      page.getByRole('heading', { name: 'My Progress', exact: true }),
+      page.getByRole('heading', { name: 'Dashboard', exact: true }),
     ).toBeVisible()
     const table = page.getByRole('list', {
       name: 'Your saved personal weigh-ins',
@@ -190,16 +190,13 @@ for (const viewport of [
     await expect(page.getByRole('img', { name: /84 kilograms/ })).toBeVisible()
     await page
       .getByRole('link', {
-        name: 'Challenge progress: Synthetic personal goal',
+        name: 'Synthetic personal goal',
         exact: true,
       })
       .click()
     await expect(
-      page.getByRole('heading', { name: 'Challenge progress', exact: true }),
+      page.getByRole('heading', { name: 'Goals', exact: true }),
     ).toBeVisible()
-    await page
-      .getByRole('link', { name: 'Back to My Progress', exact: true })
-      .click()
     await expect(table.getByText('84 kg', { exact: true })).toBeVisible()
     await table
       .getByRole('button', { name: `Delete ${date}`, exact: true })
@@ -218,9 +215,7 @@ for (const viewport of [
     await expect(
       page.getByRole('img', { name: /Personal weight history chart/ }),
     ).toHaveCount(0)
-    await page
-      .getByRole('link', { name: 'Back to Dashboard', exact: true })
-      .click()
+    await page.getByRole('tab', { name: 'Overview', exact: true }).click()
     await expect(
       page.getByText('Not logged today', { exact: true }),
     ).toBeVisible()
@@ -257,9 +252,7 @@ for (const viewport of [
       page.getByText('Synthetic first-account private note', { exact: true }),
     ).toHaveCount(0)
     await expect(table.getByText('75 kg', { exact: true })).toBeVisible()
-    await page
-      .getByRole('link', { name: 'Back to Dashboard', exact: true })
-      .click()
+    await page.getByRole('tab', { name: 'Overview', exact: true }).click()
     await expect(page.getByText('75 kg', { exact: true })).toBeVisible()
     await expect(
       page.getByText('Synthetic second-account private note', { exact: true }),

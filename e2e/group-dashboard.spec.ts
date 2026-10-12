@@ -561,7 +561,7 @@ for (const viewport of [
   { label: 'desktop', width: 1280 },
   { label: 'mobile', width: 390 },
 ]) {
-  test(`Progress integrates own controls without duplicating history on ${viewport.label}`, async ({
+  test(`Progress keeps author controls and links group history on ${viewport.label}`, async ({
     page,
   }) => {
     await page.setViewportSize({ width: viewport.width, height: 900 })
@@ -569,10 +569,9 @@ for (const viewport of [
     await page.goto(
       `http://127.0.0.1:4174/e2e/fixtures/today-harness.html?scenario=progress&selected=${ownGroupId}&user=${viewerId}`,
     )
-    const personal = page.getByRole('table', {
+    const personal = page.getByRole('list', {
       name: 'Your saved personal weigh-ins',
     })
-    const shared = page.getByRole('table', { name: 'Shared group weigh-ins' })
     const edit = personal.getByRole('button', {
       name: 'Edit weight 2026-09-22',
       exact: true,
@@ -582,20 +581,14 @@ for (const viewport of [
       exact: true,
     })
     await expect(edit).toBeVisible()
-    await expect(personal.getByRole('row')).toHaveCount(2)
+    await expect(personal.getByRole('listitem')).toHaveCount(1)
     await expect(
-      page.getByRole('list', { name: 'Your own personal entry actions' }),
+      page.getByRole('table', { name: 'Shared group weigh-ins' }),
     ).toHaveCount(0)
-    await expect(personal).toContainText('Author-only disposable private note')
-    await personal.screenshot({
-      path: test.info().outputPath('integrated-progress-history.png'),
-    })
-    await expect(shared).toContainText('Other member')
-    await expect(shared.getByRole('button')).toHaveCount(0)
-    await expect(shared).not.toContainText('private note')
     await expect(
       page.getByText('Other member private note must never render'),
     ).toHaveCount(0)
+    await expect(personal).toContainText('Author-only disposable private note')
     await edit.click()
     const editor = page.getByRole('dialog', { name: 'Edit weight' })
     await expect(editor.getByLabel('Private note')).toHaveValue(
@@ -603,14 +596,16 @@ for (const viewport of [
     )
     await editor.getByLabel('Weight in kg').fill('87')
     await editor.getByRole('button', { name: 'Update weight' }).click()
-    await expect(personal).toContainText('87.00 kg')
-    await expect(shared).toContainText('87 kg')
-    await expect(shared).toContainText('88.5 kg')
+    await expect(personal).toContainText('87 kg')
     await page
-      .getByRole('link', { name: /Group · Second authorized group/ })
+      .getByRole('navigation', { name: 'Your goal challenges' })
+      .getByRole('link', { name: 'Second authorized group', exact: true })
       .click()
     await expect(edit).toBeVisible()
-    await expect(personal).toContainText('87.00 kg')
+    await expect(personal).toContainText('87 kg')
+    await expect(
+      page.getByRole('link', { name: /Open this group’s shared history/ }),
+    ).toHaveAttribute('href', `/group?challenge=${secondGroupId}#group-history`)
     await remove.click()
     const deletion = page.getByRole('dialog', { name: 'Delete weight?' })
     await expect(deletion).toContainText('ALL shared groups')
@@ -621,10 +616,17 @@ for (const viewport of [
       .getByRole('button', { name: 'Delete weight', exact: true })
       .click()
     await expect(personal).toHaveCount(0)
-    await expect(shared).not.toContainText('Own member')
-    await expect(shared).toContainText('Other member')
     await expect(
       page.getByRole('list', { name: 'Your own personal entry actions' }),
+    ).toHaveCount(0)
+    await page
+      .getByRole('link', { name: /Open this group’s shared history/ })
+      .click()
+    await expect(
+      page.getByRole('table', { name: 'Shared group weight history' }),
+    ).toBeVisible()
+    await expect(
+      page.getByText('Other member private note must never render'),
     ).toHaveCount(0)
   })
   test(`only own matrix cards edit/delete and refresh selected groups on ${viewport.label}`, async ({
@@ -820,7 +822,7 @@ for (const viewport of [
       .filter({ has: page.getByRole('rowheader', { name: '2026-09-21' }) })
     await expect(missing.getByRole('cell')).toHaveText([
       '—',
-      '71.00 kg; change from first shared entry +1 kg',
+      '71.00 kg; change from first shared entry +1 kg Previous shared entry: +1 kg',
     ])
     const tabs = page.getByRole('tablist', { name: 'Shared group members' })
     const all = tabs.getByRole('tab', { name: 'All members' })

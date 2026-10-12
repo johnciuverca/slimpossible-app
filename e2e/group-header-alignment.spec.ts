@@ -36,6 +36,23 @@ for (const viewport of [
       '/group',
     ]) {
       await page.goto(fixture(path))
+      const personalWorkspace =
+        path.startsWith('/goals') || path.startsWith('/progress')
+      if (personalWorkspace) {
+        await expect(contexts).toHaveCount(0)
+        await expect(
+          page.getByRole('tab', { name: 'Progress', exact: true }),
+        ).toHaveAttribute('aria-selected', 'true')
+        await expect(
+          page.getByRole('button', { name: 'Record weight', exact: true }),
+        ).toBeEnabled()
+        const box = (await page
+          .getByRole('button', { name: 'Record weight', exact: true })
+          .boundingBox())!
+        const navBox = (await navbar.boundingBox())!
+        expect(box.y - navBox.y - navBox.height).toBeCloseTo(dashboardOffset, 0)
+        continue
+      }
       await expect(contexts).toHaveCount(1)
       await expect(
         contexts.getByRole('link', {
@@ -139,20 +156,23 @@ for (const viewport of [
     await expect(active).toHaveAttribute('aria-current', 'page')
     await expect(draft).not.toHaveAttribute('aria-current', 'page')
     await page.goto(fixture('/progress?challenge=dashboard-active'))
+    const ownGoals = page.getByRole('navigation', {
+      name: 'Your goal challenges',
+    })
     await expect(
-      contexts.getByRole('link', {
-        name: 'Personal · Synthetic personal goal',
+      ownGoals.getByRole('link', {
+        name: 'Synthetic personal goal',
         exact: true,
       }),
     ).toBeVisible()
-    await contexts
+    await ownGoals
       .getByRole('link', {
-        name: 'Personal · Synthetic personal goal',
+        name: 'Synthetic personal goal',
         exact: true,
       })
       .click()
     await expect(page.getByTestId('fixture-route')).toHaveText(
-      '/progress?challenge=dashboard-personal',
+      '/dashboard?tab=progress&challenge=dashboard-personal',
     )
     await page.goto(fixture('/group?challenge=missing'))
     await expect(
@@ -167,11 +187,11 @@ for (const viewport of [
     await page.goto(fixture('/progress'))
     await page.getByRole('button', { name: 'Switch synthetic account' }).click()
     await expect(
-      contexts.getByRole('link', { name: /Synthetic active group/ }),
+      ownGoals.getByRole('link', { name: /Synthetic active group/ }),
     ).toHaveCount(0)
     await expect(
-      contexts.getByRole('link', {
-        name: 'Personal · Second account goal',
+      ownGoals.getByRole('link', {
+        name: 'Second account goal',
         exact: true,
       }),
     ).toBeVisible()

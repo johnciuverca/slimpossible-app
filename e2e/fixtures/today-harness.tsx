@@ -9,13 +9,12 @@ import { PersonalWeighInsPage } from '../../src/pages/PersonalWeighInsPage'
 import { PersonalDashboardPage } from '../../src/pages/PersonalDashboardPage'
 import { ParticipantEnrollmentPage } from '../../src/pages/ParticipantEnrollmentPage'
 import {
-  GoalsPage,
   GroupDashboardPage,
   HomePage,
-  ProgressPage,
   TodayPage,
 } from '../../src/pages/AppPages'
 import '../../src/index.css'
+import { MyProgressPage } from '../../src/pages/MyProgressPage'
 
 const fixtureUserId =
   new URLSearchParams(window.location.search).get('user') ?? 'e2e-user'
@@ -49,11 +48,14 @@ const hasChallenge =
   scenario !== 'no-challenge' &&
   scenario !== 'home-no-challenge' &&
   !isHomeSignedOut
-const challengeOwnerId = isHomeOwner
-  ? fixtureUserId
-  : isMember
-    ? 'e2e-owner'
-    : fixtureUserId
+const personalGoalFixture =
+  scenario === 'goals-gain' || scenario === 'goals-maintenance'
+const challengeOwnerId =
+  isHomeOwner || personalGoalFixture
+    ? fixtureUserId
+    : isMember
+      ? 'e2e-owner'
+      : fixtureUserId
 const goalScenarios = {
   goals: { current: 88.4, starting: 92, target: 80 },
   'goals-gain': { current: 75, starting: 70, target: 80 },
@@ -82,6 +84,7 @@ localStorage.setItem(
           createdBy: challengeOwnerId,
           endDate: '2026-10-17',
           id,
+          kind: personalGoalFixture ? 'personal' : 'group',
           name: isHomeMulti
             ? `E2E ${index === 0 ? 'Autumn' : 'Winter'} challenge`
             : isMember
@@ -187,7 +190,12 @@ localStorage.setItem(
         entry.participantId === 'e2e-participant'
           ? fixtureUserId
           : 'e2e-other-user',
-      sharedChallengeIds: [],
+      sharedChallengeIds:
+        isGoals &&
+        entry.participantId === 'e2e-participant' &&
+        !personalGoalFixture
+          ? [challengeId]
+          : [],
     })),
   ),
 )
@@ -236,8 +244,11 @@ createRoot(document.getElementById('root')!).render(
             <Route path="/dashboard" element={<PersonalDashboardPage />} />
             <Route path="/challenges" element={<HomePage />} />
             <Route path="/today" element={<TodayPage />} />
-            <Route path="/progress" element={<ProgressPage />} />
-            <Route path="/goals" element={<GoalsPage />} />
+            <Route path="/progress" element={<MyProgressPage />} />
+            <Route
+              path="/goals"
+              element={<PersonalDashboardPage initialTab="progress" />}
+            />
             <Route path="/group" element={<GroupDashboardPage />} />
           </Route>
           <Route

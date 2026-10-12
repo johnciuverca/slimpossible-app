@@ -88,10 +88,9 @@ test('renders private, saved Progress records accessibly at a mobile viewport', 
   await page.setViewportSize({ height: 844, width: 390 })
   await page.goto(fixture('progress'))
 
-  await expect(page.getByRole('heading', { name: 'Progress' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
   await expect(page.getByText('88.4 kg', { exact: true })).toHaveCount(1)
-  await expect(page.getByText('88.40 kg', { exact: true })).toHaveCount(1)
-  await expect(page.getByText('−1.6 kg', { exact: true })).toHaveCount(2)
+  await expect(page.getByText(/First-to-latest change: −1.6 kg/)).toBeVisible()
   await expect(
     page.getByText('E2E private note for the signed-in participant.'),
   ).toBeVisible()
@@ -102,19 +101,16 @@ test('renders private, saved Progress records accessibly at a mobile viewport', 
     page.getByRole('img', { name: /2 saved weigh-ins/ }),
   ).toBeVisible()
   await expect(
-    page.getByRole('table', { name: 'Your saved personal weigh-ins' }),
+    page.getByRole('list', { name: 'Your saved personal weigh-ins' }),
   ).toBeVisible()
 
   const groupHistory = page.getByRole('region', {
     name: 'Shared group weigh-ins',
   })
-  await expect(groupHistory).toContainText('Opted-in dates and weights only')
-  await expect(groupHistory).toContainText('Notes are never shown here')
-  await expect(groupHistory).toContainText(
-    'Shared group history is unavailable right now.',
-  )
-  await expect(groupHistory.getByRole('link')).toHaveCount(0)
-  await expect(groupHistory.getByRole('button')).toHaveCount(0)
+  await expect(groupHistory).toHaveCount(0)
+  await expect(
+    page.getByRole('link', { name: /Open this group’s shared history/ }),
+  ).toHaveAttribute('href', '/group?challenge=e2e-challenge#group-history')
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
     .toBe(390)

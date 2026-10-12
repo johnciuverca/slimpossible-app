@@ -11,6 +11,26 @@ const row = (
 ): GroupChartEntry => ({ memberKey, displayName: 'Same name', date, weightKg })
 const today = '2026-10-08'
 describe('authorized Group chart aggregation', () => {
+  it('preserves previous-shared-entry change separately from the chart baseline across date gaps', () => {
+    const series = createGroupChartHistory(
+      [
+        row('a', '2026-10-01', 90),
+        row('a', '2026-10-03', 89),
+        row('a', '2026-10-07', 88.7),
+      ],
+      today,
+    )
+    expect(
+      series[0].points.map((point) => point.previousSharedChangeKg),
+    ).toEqual([null, -1, -0.3])
+    expect(series[0].points.at(-1)?.changeKg).toBe(-1.3)
+    expect(
+      createGroupChartHistory(
+        [row('a', '2026-10-01', 90), row('a', '2026-10-07', 88.7)],
+        today,
+      )[0].points.at(-1)?.previousSharedChangeKg,
+    ).toBe(-1.3)
+  })
   it('pivots only real dates into exact-weight cells with null gaps and distinct duplicate-name columns', () => {
     const series = createGroupChartHistory(
       [

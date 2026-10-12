@@ -14,10 +14,26 @@ async function verifyResponsiveGoal(
   await expect(
     page.getByRole('progressbar', { name: 'Milestone progress: 30% complete' }),
   ).toBeVisible()
-  await expect(page.getByText('92 kg', { exact: true })).toBeVisible()
-  await expect(page.getByText('88.4 kg', { exact: true })).toBeVisible()
-  await expect(page.getByText('65 kg', { exact: true })).toHaveCount(0)
-  await expect(page.getByText('E2E private goal note.')).toHaveCount(0)
+  await expect(
+    page
+      .getByRole('region', { name: 'Goals', exact: true })
+      .getByText('92 kg', { exact: true }),
+  ).toBeVisible()
+  await expect(
+    page
+      .getByRole('region', { name: 'Goals', exact: true })
+      .getByText('88.4 kg', { exact: true }),
+  ).toBeVisible()
+  await expect(
+    page
+      .getByRole('region', { name: 'Goals', exact: true })
+      .getByText('65 kg', { exact: true }),
+  ).toHaveCount(0)
+  await expect(
+    page
+      .getByRole('region', { name: 'Goals', exact: true })
+      .getByText('E2E private goal note.'),
+  ).toHaveCount(0)
 
   const markers = page.locator('[data-milestone-marker]')
   const cards = page.locator('[data-milestone-card]')
@@ -65,9 +81,21 @@ test('shows gain milestones and kg thresholds from the participant goal', async 
   await expect(
     page.getByRole('progressbar', { name: 'Milestone progress: 50% complete' }),
   ).toBeVisible()
-  await expect(page.getByText('Weight-gain goal')).toBeVisible()
-  await expect(page.getByText('72.5 kg')).toBeVisible()
-  await expect(page.getByText('77.5 kg')).toBeVisible()
+  await expect(
+    page
+      .getByRole('region', { name: 'Goals', exact: true })
+      .getByText('Weight-gain goal'),
+  ).toBeVisible()
+  await expect(
+    page
+      .getByRole('region', { name: 'Goals', exact: true })
+      .getByText('72.5 kg'),
+  ).toBeVisible()
+  await expect(
+    page
+      .getByRole('region', { name: 'Goals', exact: true })
+      .getByText('77.5 kg'),
+  ).toBeVisible()
 })
 
 test('presents maintenance fluctuations without a loss/gain milestone scale', async ({
@@ -75,10 +103,20 @@ test('presents maintenance fluctuations without a loss/gain milestone scale', as
 }) => {
   await page.goto(goalsFixture('goals-maintenance'))
 
-  await expect(page.getByText('Maintenance goal')).toBeVisible()
-  await expect(page.getByText('79.9 kg', { exact: true })).toBeVisible()
   await expect(
-    page.getByText('0.1 kg from your maintenance target.'),
+    page
+      .getByRole('region', { name: 'Goals', exact: true })
+      .getByText('Maintenance goal'),
+  ).toBeVisible()
+  await expect(
+    page
+      .getByRole('region', { name: 'Goals', exact: true })
+      .getByText('79.9 kg', { exact: true }),
+  ).toBeVisible()
+  await expect(
+    page
+      .getByRole('region', { name: 'Goals', exact: true })
+      .getByText('0.1 kg from your maintenance target.'),
   ).toBeVisible()
   await expect(page.getByRole('progressbar')).toHaveCount(0)
   await expect(
@@ -96,9 +134,19 @@ test('caps progress after passing the target and shows no negative remaining wei
       name: 'Milestone progress: 100% complete',
     }),
   ).toBeVisible()
-  await expect(page.getByText('Target reached', { exact: true })).toBeVisible()
-  await expect(page.getByText('5 kg beyond your target')).toBeVisible()
-  await expect(page.getByText('-5 kg')).toHaveCount(0)
+  await expect(
+    page
+      .getByRole('region', { name: 'Goals', exact: true })
+      .getByText('Target reached', { exact: true }),
+  ).toBeVisible()
+  await expect(
+    page
+      .getByRole('region', { name: 'Goals', exact: true })
+      .getByText('5 kg beyond your target'),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('region', { name: 'Goals', exact: true }).getByText('-5 kg'),
+  ).toHaveCount(0)
 })
 
 test('keeps first-weigh-in guidance and saved goal metrics when history is empty', async ({
@@ -107,12 +155,26 @@ test('keeps first-weigh-in guidance and saved goal metrics when history is empty
   await page.goto(goalsFixture('goals-empty'))
 
   await expect(
-    page.getByText(
-      'Record your first weigh-in to see progress toward your target.',
-    ),
+    page
+      .getByRole('region', { name: 'Goals', exact: true })
+      .getByText(
+        'Record your first weigh-in to see progress toward your target.',
+      ),
   ).toBeVisible()
-  await expect(page.getByText('92 kg', { exact: true })).toBeVisible()
-  await expect(page.getByText('No weigh-in yet')).toBeVisible()
-  await expect(page.getByText('80 kg', { exact: true })).toBeVisible()
+  await expect(
+    page
+      .getByRole('region', { name: 'Goals', exact: true })
+      .getByText('92 kg', { exact: true }),
+  ).toBeVisible()
+  await expect(
+    page
+      .getByRole('region', { name: 'Goals', exact: true })
+      .getByText('No weigh-in yet'),
+  ).toBeVisible()
+  await expect(
+    page
+      .getByRole('region', { name: 'Goals', exact: true })
+      .getByText('80 kg', { exact: true }),
+  ).toBeVisible()
   await expect(page.getByRole('progressbar')).toHaveCount(0)
 })
