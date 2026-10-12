@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import {
-  BrowserRouter,
+  createBrowserRouter,
+  createRoutesFromElements,
+  RouterProvider,
   Outlet,
   Route,
-  Routes,
   useSearchParams,
 } from 'react-router-dom'
 
@@ -23,7 +25,6 @@ import { MyProgressPage } from './pages/MyProgressPage'
 import { useOptionalAuth } from './auth/useAuth'
 import {
   GroupDashboardPage,
-  GoalsPage,
   HomePage,
   MilestonePreviewPage,
   NotFoundPage,
@@ -48,43 +49,46 @@ function HomeRoute() {
 }
 
 function App() {
+  const [router] = useState(() =>
+    createBrowserRouter(
+      createRoutesFromElements(
+        <Route element={<RoutedLayout />}>
+          <Route index element={<HomeRoute />} />
+          <Route path="login" element={<LoginPage />} />
+          <Route path="register" element={<RegisterPage />} />
+          <Route path="forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="reset-password" element={<ResetPasswordPage />} />
+          <Route path="challenge/setup" element={<ChallengeSetupPage />} />
+          <Route path="invite/:token" element={<InviteAcceptancePage />} />
+          <Route path="weigh-ins" element={<PersonalWeighInsPage />} />
+          <Route path="milestones-preview" element={<MilestonePreviewPage />} />
+          <Route
+            path="challenge/participants/enroll"
+            element={<ParticipantEnrollmentPage />}
+          />
+          <Route element={<ProtectedRoute />}>
+            <Route path="dashboard" element={<PersonalDashboardPage />} />
+            <Route path="today" element={<PersonalDashboardPage />} />
+            <Route path="challenges" element={<HomePage />} />
+            <Route path="progress" element={<MyProgressPage />} />
+            <Route path="group" element={<GroupDashboardPage />} />
+            <Route
+              path="goals"
+              element={<PersonalDashboardPage initialTab="progress" />}
+            />
+            <Route
+              path="challenge/invites"
+              element={<ChallengeInvitesPage />}
+            />
+          </Route>
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>,
+      ),
+    ),
+  )
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route element={<RoutedLayout />}>
-            <Route index element={<HomeRoute />} />
-            <Route path="login" element={<LoginPage />} />
-            <Route path="register" element={<RegisterPage />} />
-            <Route path="forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="reset-password" element={<ResetPasswordPage />} />
-            <Route path="challenge/setup" element={<ChallengeSetupPage />} />
-            <Route path="invite/:token" element={<InviteAcceptancePage />} />
-            <Route path="weigh-ins" element={<PersonalWeighInsPage />} />
-            <Route
-              path="milestones-preview"
-              element={<MilestonePreviewPage />}
-            />
-            <Route
-              path="challenge/participants/enroll"
-              element={<ParticipantEnrollmentPage />}
-            />
-            <Route element={<ProtectedRoute />}>
-              <Route path="dashboard" element={<PersonalDashboardPage />} />
-              <Route path="today" element={<PersonalDashboardPage />} />
-              <Route path="challenges" element={<HomePage />} />
-              <Route path="progress" element={<MyProgressPage />} />
-              <Route path="group" element={<GroupDashboardPage />} />
-              <Route path="goals" element={<GoalsPage />} />
-              <Route
-                path="challenge/invites"
-                element={<ChallengeInvitesPage />}
-              />
-            </Route>
-            <Route path="*" element={<NotFoundPage />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <RouterProvider router={router} />
     </AuthProvider>
   )
 }

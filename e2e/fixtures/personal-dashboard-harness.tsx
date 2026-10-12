@@ -9,11 +9,7 @@ import { MyProgressPage } from '../../src/pages/MyProgressPage'
 import { PersonalWeighInsPage } from '../../src/pages/PersonalWeighInsPage'
 import { ChallengeInvitesPage } from '../../src/pages/ChallengeInvitesPage'
 import { ChallengeSetupPage } from '../../src/pages/ChallengeSetupPage'
-import {
-  GoalsPage,
-  HomePage,
-  GroupDashboardPage,
-} from '../../src/pages/AppPages'
+import { HomePage, GroupDashboardPage } from '../../src/pages/AppPages'
 import {
   createChallengeFixture,
   createParticipantFixture,
@@ -178,7 +174,10 @@ export function Harness() {
             <Route path="/progress" element={<MyProgressPage />} />
             <Route path="/weigh-ins" element={<PersonalWeighInsPage />} />
             <Route path="/group" element={<GroupDashboardPage />} />
-            <Route path="/goals" element={<GoalsPage />} />
+            <Route
+              path="/goals"
+              element={<PersonalDashboardPage initialTab="progress" />}
+            />
             <Route path="/challenges" element={<HomePage />} />
             <Route path="/challenge/setup" element={<ChallengeSetupPage />} />
             <Route

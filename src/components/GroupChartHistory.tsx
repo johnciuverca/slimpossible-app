@@ -139,7 +139,11 @@ export function GroupChartHistory({
     ((day(date) - start) / Math.max(1, end - start)) * (675 - plotLeft)
   const y = (value: number) => 25 + ((max - value) / (max - min)) * 190
   return (
-    <div ref={workspace} className="group-history-workspace min-w-0 space-y-6">
+    <div
+      id="group-history"
+      ref={workspace}
+      className="group-history-workspace min-w-0 space-y-6 scroll-mt-6"
+    >
       <div
         ref={navigationRef}
         className="sticky top-0 z-20 min-w-0 rounded-xl border border-stone-200 bg-page shadow-sm"
@@ -435,30 +439,38 @@ export function GroupChartHistory({
                               className="relative z-0 px-1 py-1"
                             >
                               {point ? (
-                                <WeightEntryCard weightKg={point.weightKg}>
-                                  <span className="sr-only">
-                                    ; change from first shared entry{' '}
-                                    {signed(point.changeKg)}
+                                <>
+                                  <WeightEntryCard weightKg={point.weightKg}>
+                                    <span className="sr-only">
+                                      ; change from first shared entry{' '}
+                                      {signed(point.changeKg)}
+                                    </span>
+                                    {point.memberKey === ownMemberKey &&
+                                    personalWorkspace.userId ===
+                                      viewerId.toLowerCase() &&
+                                    personalWorkspace.persistence.mode ===
+                                      'remote' &&
+                                    personalWorkspace.personal.state ===
+                                      'ready' &&
+                                    personalWorkspace.contexts.state ===
+                                      'ready' ? (
+                                      <WeightEntryActions
+                                        key={`${personalWorkspace.ownerKey}:${challengeId}:${point.date}`}
+                                        workspace={personalWorkspace}
+                                        date={point.date}
+                                        compact
+                                        memberLabel={series[index].label}
+                                        requiredSharedChallengeId={challengeId}
+                                      />
+                                    ) : null}
+                                  </WeightEntryCard>{' '}
+                                  <span className="block text-[10px] text-ink-muted">
+                                    Previous shared entry:{' '}
+                                    {point.previousSharedChangeKg === null
+                                      ? '—'
+                                      : signed(point.previousSharedChangeKg)}
                                   </span>
-                                  {point.memberKey === ownMemberKey &&
-                                  personalWorkspace.userId ===
-                                    viewerId.toLowerCase() &&
-                                  personalWorkspace.persistence.mode ===
-                                    'remote' &&
-                                  personalWorkspace.personal.state ===
-                                    'ready' &&
-                                  personalWorkspace.contexts.state ===
-                                    'ready' ? (
-                                    <WeightEntryActions
-                                      key={`${personalWorkspace.ownerKey}:${challengeId}:${point.date}`}
-                                      workspace={personalWorkspace}
-                                      date={point.date}
-                                      compact
-                                      memberLabel={series[index].label}
-                                      requiredSharedChallengeId={challengeId}
-                                    />
-                                  ) : null}
-                                </WeightEntryCard>
+                                </>
                               ) : (
                                 <span aria-label="No shared entry">—</span>
                               )}

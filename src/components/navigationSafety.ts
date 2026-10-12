@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef } from 'react'
+import { createContext, useContext, useLayoutEffect, useRef } from 'react'
 
 export type NavigationBlock = 'dirty' | 'saving'
 export const NavigationSafetyContext = createContext<{
@@ -9,7 +9,7 @@ export const NavigationSafetyContext = createContext<{
 export function useUnsavedNavigation(state: NavigationBlock | null) {
   const context = useContext(NavigationSafetyContext)
   const token = useRef(Symbol('editor'))
-  useEffect(() => {
+  useLayoutEffect(() => {
     const id = token.current
     context?.register(id, state)
     return () => context?.unregister(id)

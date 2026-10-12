@@ -4,7 +4,7 @@ const fixture = (path: string) =>
   `/e2e/fixtures/personal-dashboard-harness.html?${new URLSearchParams({ scenario: 'tabs', path })}`
 
 for (const width of [1280, 390]) {
-  test(`authorized pills, distinct personal/challenge navigation and overflow at ${width}px`, async ({
+  test(`authorized goal choices keep personal history separate at ${width}px`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 900 })
@@ -12,76 +12,60 @@ for (const width of [1280, 390]) {
     const contexts = page.getByRole('navigation', {
       name: 'Challenge contexts',
     })
+    const goals = page.getByRole('navigation', { name: 'Your goal challenges' })
     const primary = page.getByRole('navigation', { name: 'Primary navigation' })
     await expect(contexts).toHaveCount(0)
-    await primary
-      .getByRole('link', { name: 'My progress', exact: true })
-      .click()
+    await page.getByRole('tab', { name: 'Progress', exact: true }).click()
     await expect(
-      contexts.getByRole('link', { name: /Personal tracking/ }),
-    ).toHaveAttribute('aria-current', 'page')
-    await expect(
-      contexts.getByRole('link', {
-        name: 'Group · Synthetic active group',
-        exact: true,
+      page.getByText('This goal is unavailable for this account.', {
+        exact: false,
       }),
     ).toBeVisible()
     await expect(
-      contexts.getByRole('link', { name: /Second account/ }),
+      goals.getByRole('link', { name: 'Synthetic active group', exact: true }),
+    ).toBeVisible()
+    await expect(
+      goals.getByRole('link', { name: /Second account/ }),
     ).toHaveCount(0)
     const original = await page.evaluate(() =>
       localStorage.getItem('slimpossible.local.personal-weigh-ins'),
     )
-    const last = contexts.getByRole('link', {
-      name: 'Personal · Authorized personal context 12',
+    const last = goals.getByRole('link', {
+      name: 'Authorized personal context 12',
       exact: true,
     })
     await last.focus()
     await page.keyboard.press('Enter')
     await expect(page.getByTestId('fixture-route')).toHaveText(
-      '/progress?challenge=extra-11',
+      '/dashboard?tab=progress&challenge=extra-11',
     )
+    await expect(last).toHaveAttribute('aria-current', 'page')
     await expect(
-      contexts.getByRole('link', { name: /Authorized personal context 12/ }),
-    ).toHaveAttribute('aria-current', 'page')
-    await expect(
-      page.getByRole('heading', { name: 'Challenge progress', exact: true }),
+      page.getByRole('heading', { name: 'Dashboard', exact: true }),
     ).toBeVisible()
     await expect(
-      page.getByRole('heading', { name: 'Group', exact: true }),
-    ).toHaveCount(0)
-    const bounds = await contexts.evaluate((nav) => {
+      page.getByText('Synthetic first-account private note', { exact: true }),
+    ).toBeVisible()
+    const bounds = await goals.evaluate((nav) => {
+      const outer = nav.getBoundingClientRect()
       const active = nav
         .querySelector('[aria-current="page"]')!
         .getBoundingClientRect()
-      const row = nav.querySelector('div')!.getBoundingClientRect()
       return {
+        left: outer.left,
+        right: outer.right,
         activeLeft: active.left,
         activeRight: active.right,
-        left: row.left,
-        right: row.right,
-        overflow:
-          nav.querySelector('div')!.scrollWidth >
-          nav.querySelector('div')!.clientWidth,
       }
     })
-    expect(bounds.overflow).toBe(true)
     expect(bounds.activeLeft).toBeGreaterThanOrEqual(bounds.left - 1)
     expect(bounds.activeRight).toBeLessThanOrEqual(bounds.right + 1)
-    await primary.getByRole('link', { name: 'Goals', exact: true }).click()
-    await expect(page.getByTestId('fixture-route')).toHaveText(
-      '/goals?challenge=extra-11',
-    )
-    await contexts
-      .getByRole('link', {
-        name: 'Group · Synthetic active group',
-        exact: true,
-      })
+    await goals
+      .getByRole('link', { name: 'Synthetic active group', exact: true })
       .click()
-    await expect(page.getByTestId('fixture-route')).toHaveText(
-      '/goals?challenge=dashboard-active',
-    )
-    await primary.getByRole('link', { name: 'Group', exact: true }).click()
+    await page
+      .getByRole('link', { name: /Open this group’s shared history/ })
+      .click()
     await expect(page.getByTestId('fixture-route')).toHaveText(
       '/group?challenge=dashboard-active',
     )
@@ -94,41 +78,17 @@ for (const width of [1280, 390]) {
     await expect(page.getByTestId('fixture-route')).toHaveText(
       '/progress?challenge=dashboard-active',
     )
-    await contexts
-      .getByRole('link', {
-        name: 'Personal · Synthetic personal goal',
-        exact: true,
-      })
+    await goals
+      .getByRole('link', { name: 'Synthetic personal goal', exact: true })
       .click()
     await expect(page.getByTestId('fixture-route')).toHaveText(
-      '/progress?challenge=dashboard-personal',
+      '/dashboard?tab=progress&challenge=dashboard-personal',
     )
     await primary.getByRole('link', { name: 'Challenges', exact: true }).click()
     await expect(page.getByTestId('fixture-route')).toHaveText(
       '/challenges?challenge=dashboard-personal',
     )
-    await contexts
-      .getByRole('link', {
-        name: 'Group · Synthetic active group',
-        exact: true,
-      })
-      .click()
-    await expect(page.getByTestId('fixture-route')).toHaveText(
-      '/challenges?challenge=dashboard-active',
-    )
-    await primary
-      .getByRole('link', { name: 'My progress', exact: true })
-      .click()
-    await expect(page.getByTestId('fixture-route')).toHaveText(
-      '/progress?challenge=dashboard-active',
-    )
-    await contexts
-      .getByRole('link', { name: 'Personal tracking', exact: true })
-      .click()
-    await expect(page.getByTestId('fixture-route')).toHaveText('/progress')
-    await expect(
-      page.getByText('Synthetic first-account private note', { exact: true }),
-    ).toBeVisible()
+    await expect(contexts).toBeVisible()
     expect(
       await page.evaluate(() =>
         localStorage.getItem('slimpossible.local.personal-weigh-ins'),
@@ -137,14 +97,13 @@ for (const width of [1280, 390]) {
     await page.goto(fixture('/progress?challenge=dashboard-personal'))
     await page.reload()
     await expect(
-      contexts.getByRole('link', {
-        name: /Personal · Synthetic personal goal/,
-      }),
+      goals.getByRole('link', { name: 'Synthetic personal goal', exact: true }),
     ).toHaveAttribute('aria-current', 'page')
-    await expect(contexts.getByRole('combobox')).toHaveCount(0)
-    await expect
-      .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
-      .toBeLessThanOrEqual(width)
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true)
   })
 
   test(`Weigh-ins context never changes input/shares and leaving has Stay/Discard at ${width}px`, async ({
@@ -222,7 +181,7 @@ for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: 900 })
     await page.goto(fixture('/progress'))
     const contexts = page.getByRole('navigation', {
-      name: 'Challenge contexts',
+      name: 'Your goal challenges',
     })
     await expect(
       contexts.getByRole('link', { name: /Synthetic personal goal/ }),
@@ -233,7 +192,7 @@ for (const width of [1280, 390]) {
     ).toHaveCount(0)
     await expect(
       contexts.getByRole('link', {
-        name: 'Personal · Second account goal',
+        name: 'Second account goal',
         exact: true,
       }),
     ).toBeVisible()

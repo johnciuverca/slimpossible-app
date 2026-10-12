@@ -1,11 +1,25 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
+import {
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
+import {
+  Link,
+  NavLink,
+  useLocation,
+  useNavigate,
+  UNSAFE_DataRouterContext,
+} from 'react-router-dom'
 
 import { AuthSessionUI } from '../auth/AuthSessionUI'
 import { useOptionalAuth } from '../auth/useAuth'
 import { Button } from '../components/ui'
 import { ChallengeContextTabs } from '../components/ChallengeContextTabs'
 import { UnsavedChangesDialog } from '../components/UnsavedChangesDialog'
+import { RouterNavigationGuard } from '../components/RouterNavigationGuard'
 import {
   NavigationSafetyContext,
   type NavigationBlock,
@@ -63,12 +77,23 @@ export function AppLayout({ children }: AppLayoutProps) {
     owner: string
   } | null>(null)
   const owner = `${state.status}:${state.user?.id ?? ''}`
+  const dataRouter = useContext(UNSAFE_DataRouterContext)
+  useEffect(() => {
+    const guard = (event: BeforeUnloadEvent) => {
+      if (blockers.current.size) {
+        event.preventDefault()
+        event.returnValue = ''
+      }
+    }
+    window.addEventListener('beforeunload', guard)
+    return () => window.removeEventListener('beforeunload', guard)
+  }, [])
   useEffect(() => {
     setPending(null)
   }, [owner])
   const currentPending = pending?.owner === owner ? pending : null
   const contextPage =
-    ['/challenges', '/progress', '/goals', '/weigh-ins'].includes(pathname) ||
+    ['/challenges', '/weigh-ins'].includes(pathname) ||
     (pathname === '/' && new URLSearchParams(search).has('challenge'))
   const personalHome =
     pathname === '/today' ||
@@ -81,6 +106,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       <div
         className="flex min-h-screen flex-col bg-page text-ink"
         onClickCapture={(event) => {
+          if (dataRouter) return
           const anchor =
             event.target instanceof Element ? event.target.closest('a') : null
           if (
@@ -176,6 +202,9 @@ export function AppLayout({ children }: AppLayoutProps) {
           {contextPage ? <ChallengeContextTabs /> : null}
           {children}
         </main>
+        {dataRouter ? (
+          <RouterNavigationGuard blockers={blockers} owner={owner} />
+        ) : null}
         {currentPending ? (
           <UnsavedChangesDialog
             saving={currentPending.saving}

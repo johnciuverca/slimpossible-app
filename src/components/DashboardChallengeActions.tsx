@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import type { PersonalWorkspace } from '../data/usePersonalWorkspace'
 import { Button, Card } from './ui'
 
@@ -16,6 +16,10 @@ export function DashboardChallengeActions({
 }
 
 function OwnedGroupActions({ workspace }: { workspace: PersonalWorkspace }) {
+  const navigate = useNavigate()
+  const [joining, setJoining] = useState(false)
+  const [invitation, setInvitation] = useState('')
+  const [joinError, setJoinError] = useState('')
   const [choosing, setChoosing] = useState(false)
   const [selectedId, setSelectedId] = useState('')
   const { contexts } = workspace
@@ -47,6 +51,15 @@ function OwnedGroupActions({ workspace }: { workspace: PersonalWorkspace }) {
         <Link className={actionClass} to="/challenge/setup">
           Create challenge
         </Link>
+        <Button
+          className="min-h-11"
+          variant="secondary"
+          aria-expanded={joining}
+          aria-controls="dashboard-join"
+          onClick={() => setJoining((value) => !value)}
+        >
+          Join with invitation
+        </Button>
         {groups.length === 1 ? (
           <Link className={actionClass} to={inviteDestination(groups[0].id)}>
             Invite people
@@ -63,6 +76,44 @@ function OwnedGroupActions({ workspace }: { workspace: PersonalWorkspace }) {
           </Button>
         )}
       </div>
+      {joining ? (
+        <form
+          id="dashboard-join"
+          className="space-y-3"
+          onSubmit={(event) => {
+            event.preventDefault()
+            const value = invitation.trim()
+            const match = value.match(/(?:^|\/)invite\/([^/?#]+)/)
+            const token =
+              match?.[1] ?? (/^[a-zA-Z0-9_-]+$/.test(value) ? value : '')
+            if (!token) {
+              setJoinError('Paste the invitation link or token you received.')
+              return
+            }
+            navigate(`/invite/${encodeURIComponent(token)}`)
+          }}
+        >
+          <label
+            htmlFor="dashboard-invitation"
+            className="block text-sm font-semibold"
+          >
+            Invitation link or token
+          </label>
+          <input
+            id="dashboard-invitation"
+            className="min-h-11 w-full rounded-xl border border-line bg-panel px-3 py-2"
+            value={invitation}
+            onChange={(event) => {
+              setInvitation(event.target.value)
+              setJoinError('')
+            }}
+          />
+          {joinError ? <p role="alert">{joinError}</p> : null}
+          <Button className="min-h-11" type="submit">
+            Review invitation
+          </Button>
+        </form>
+      ) : null}
       {contexts.state === 'loading' ? (
         <p role="status" className="text-sm text-ink-muted">
           Loading your invitation choices…

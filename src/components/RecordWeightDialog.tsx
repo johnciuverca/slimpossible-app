@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Button } from './ui'
 import { UnsavedChangesDialog } from './UnsavedChangesDialog'
 import { focusAfterWeightMutation, trapDialogFocus } from './dialogFocus'
+import { useUnsavedNavigation } from './navigationSafety'
 import {
   PersonalWeighInEditor,
   type PersonalWeighInFormValues,
@@ -46,6 +47,13 @@ export function RecordWeightDialog({
   const [saving, setSaving] = useState(false)
   const initial = useRef(JSON.stringify(values))
   const [confirmDiscard, setConfirmDiscard] = useState(false)
+  useUnsavedNavigation(
+    saving
+      ? 'saving'
+      : JSON.stringify(values) !== initial.current
+        ? 'dirty'
+        : null,
+  )
 
   useEffect(() => {
     active.current = true

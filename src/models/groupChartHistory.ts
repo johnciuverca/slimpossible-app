@@ -5,7 +5,10 @@ export type GroupChartEntry = {
   weightKg: number
 }
 
-export type GroupChartPoint = GroupChartEntry & { changeKg: number }
+export type GroupChartPoint = GroupChartEntry & {
+  changeKg: number
+  previousSharedChangeKg: number | null
+}
 export type GroupChartSeries = {
   memberKey: string
   label: string
@@ -66,9 +69,14 @@ export function createGroupChartHistory(
           ? `${baseline.displayName} (member ${ordinal})`
           : baseline.displayName,
       baselineDate: baseline.date,
-      points: rows.map((entry) => ({
+      points: rows.map((entry, index) => ({
         ...entry,
         changeKg: Math.round((entry.weightKg - baseline.weightKg) * 100) / 100,
+        previousSharedChangeKg:
+          index === 0
+            ? null
+            : Math.round((entry.weightKg - rows[index - 1].weightKg) * 100) /
+              100,
       })),
     }
   })
