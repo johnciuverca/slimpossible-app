@@ -272,6 +272,26 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
       }
       return { data: participant, state: 'success' }
     },
+    async changeOwnGroupTarget() {
+      return {
+        error: {
+          kind: 'request',
+          message:
+            'Changing a group target requires a signed-in server session.',
+        },
+        state: 'error',
+      }
+    },
+    async listOwnGroupTargetMilestones() {
+      return {
+        error: {
+          kind: 'request',
+          message:
+            'Target milestone history requires a signed-in server session.',
+        },
+        state: 'error',
+      }
+    },
   }
 
   const invites: ChallengeInviteRepository = {
@@ -638,6 +658,16 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
         error: {
           kind: 'request',
           message: 'Shared group history requires a signed-in server session.',
+        },
+        state: 'error',
+      }
+    },
+    async getReachedTargetMilestones() {
+      return {
+        error: {
+          kind: 'request',
+          message:
+            'Shared target milestones require a signed-in server session.',
         },
         state: 'error',
       }

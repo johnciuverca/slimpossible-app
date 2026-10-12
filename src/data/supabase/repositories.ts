@@ -18,6 +18,11 @@ import type {
   GroupWeighInHistoryEntry,
 } from '../../models/groupProgress'
 import type { ProvisionalGroupLeaderSummary } from '../../models/provisionalGroupLeader'
+import type {
+  GroupReachedTargetMilestone,
+  OwnGroupTargetChange,
+  ReachedTargetMilestone,
+} from '../../models/targetMilestone'
 import type { Database } from './database.types'
 
 export type RepositoryError = {
@@ -55,6 +60,12 @@ type GroupWeighInHistoryRow =
   Database['public']['Functions']['get_group_weigh_in_history']['Returns'][number]
 type ProvisionalGroupLeaderRow =
   Database['public']['Functions']['get_provisional_group_leader_summary']['Returns'][number]
+type OwnGroupTargetChangeRow =
+  Database['public']['Functions']['change_my_group_target']['Returns'][number]
+type ReachedTargetMilestoneRow =
+  Database['public']['Functions']['list_my_group_target_milestones']['Returns'][number]
+type GroupReachedTargetMilestoneRow =
+  Database['public']['Functions']['get_group_target_milestones']['Returns'][number]
 
 export type ChallengeRepository = {
   create: (input: ChallengeWriteInput) => Promise<RepositoryResult<Challenge>>
@@ -88,6 +99,13 @@ export type ParticipantRepository = {
     id: string,
     input: ParticipantWriteInput,
   ) => Promise<RepositoryResult<Participant>>
+  changeOwnGroupTarget: (
+    challengeId: string,
+    targetWeightKg: number,
+  ) => Promise<RepositoryResult<OwnGroupTargetChange>>
+  listOwnGroupTargetMilestones: (
+    challengeId: string,
+  ) => Promise<RepositoryListResult<ReachedTargetMilestone>>
 }
 
 export type Profile = {
@@ -140,6 +158,9 @@ export type GroupProgressRepository = {
   getWeighInHistory: (
     challengeId: string,
   ) => Promise<RepositoryListResult<GroupWeighInHistoryEntry>>
+  getReachedTargetMilestones: (
+    challengeId: string,
+  ) => Promise<RepositoryListResult<GroupReachedTargetMilestone>>
 }
 
 export type CreatedChallengeInvite = {
@@ -268,6 +289,78 @@ function mapGroupWeighInHistory(
     date: row.recorded_date,
     displayName: row.display_name,
     weightKg: row.weight_kg,
+  }
+}
+
+function mapOwnGroupTargetChange(
+  row: OwnGroupTargetChangeRow,
+): OwnGroupTargetChange {
+  if (
+    typeof row.challenge_id !== 'string' ||
+    !Number.isFinite(row.starting_weight_kg) ||
+    !Number.isFinite(row.target_weight_kg) ||
+    (row.previous_target_weight_kg !== null &&
+      !Number.isFinite(row.previous_target_weight_kg)) ||
+    (row.previous_target_achieved_on !== null &&
+      typeof row.previous_target_achieved_on !== 'string') ||
+    ((row.previous_target_weight_kg === null) !==
+      (row.previous_target_achieved_on === null) &&
+      row.previous_target_weight_kg === null)
+  ) {
+    throw new Error('Invalid own group target change response')
+  }
+
+  return {
+    challengeId: row.challenge_id,
+    previousTargetMilestone:
+      row.previous_target_weight_kg === null
+        ? null
+        : {
+            achievedOn: row.previous_target_achieved_on,
+            state: 'reached',
+            targetWeightKg: row.previous_target_weight_kg,
+          },
+    startingWeightKg: row.starting_weight_kg,
+    targetWeightKg: row.target_weight_kg,
+  }
+}
+
+function mapReachedTargetMilestone(
+  row: ReachedTargetMilestoneRow,
+): ReachedTargetMilestone {
+  if (
+    !Number.isFinite(row.target_weight_kg) ||
+    (row.achieved_on !== null && typeof row.achieved_on !== 'string') ||
+    row.state !== 'reached'
+  ) {
+    throw new Error('Invalid reached-target milestone response')
+  }
+  return {
+    achievedOn: row.achieved_on,
+    state: 'reached',
+    targetWeightKg: row.target_weight_kg,
+  }
+}
+
+function mapGroupReachedTargetMilestone(
+  row: GroupReachedTargetMilestoneRow,
+): GroupReachedTargetMilestone {
+  if (
+    typeof row.member_key !== 'string' ||
+    !row.member_key ||
+    typeof row.display_name !== 'string' ||
+    typeof row.achieved_on !== 'string' ||
+    !Number.isFinite(row.target_weight_kg) ||
+    row.state !== 'reached'
+  ) {
+    throw new Error('Invalid group target milestone response')
+  }
+  return {
+    achievedOn: row.achieved_on,
+    displayName: row.display_name,
+    memberKey: row.member_key,
+    state: 'reached',
+    targetWeightKg: row.target_weight_kg,
   }
 }
 
@@ -656,6 +749,23 @@ export function createRepositories(client: DatabaseClient): Repositories {
         }
         return mapList(data, mapGroupWeighInHistory, 'shared group weigh-in')
       },
+      async getReachedTargetMilestones(challengeId) {
+        const { data, error } = await client.rpc(
+          'get_group_target_milestones',
+          { target_challenge_id: challengeId },
+        )
+        if (error) {
+          return {
+            error: requestError('load shared group target milestones', error),
+            state: 'error',
+          }
+        }
+        return mapList(
+          data,
+          mapGroupReachedTargetMilestone,
+          'shared group target milestone',
+        )
+      },
     },
     participants: {
       async create(input) {
@@ -730,6 +840,46 @@ export function createRepositories(client: DatabaseClient): Repositories {
               state: 'error',
             }
           : mapSingle(data, mapParticipant, 'participant')
+      },
+      async changeOwnGroupTarget(challengeId, targetWeightKg) {
+        const { data, error } = await client.rpc('change_my_group_target', {
+          target_challenge_id: challengeId,
+          target_target_weight_kg: targetWeightKg,
+        })
+        if (error) {
+          return {
+            error: requestError('change your group target', error),
+            state: 'error',
+          }
+        }
+        const result = mapSingle(
+          data?.[0] ?? null,
+          mapOwnGroupTargetChange,
+          'own group target change',
+        )
+        if (
+          result.state === 'success' &&
+          result.data.challengeId !== challengeId
+        ) {
+          return {
+            error: mappingError('own group target change'),
+            state: 'error',
+          }
+        }
+        return result
+      },
+      async listOwnGroupTargetMilestones(challengeId) {
+        const { data, error } = await client.rpc(
+          'list_my_group_target_milestones',
+          { target_challenge_id: challengeId },
+        )
+        if (error) {
+          return {
+            error: requestError('load your target milestones', error),
+            state: 'error',
+          }
+        }
+        return mapList(data, mapReachedTargetMilestone, 'own target milestone')
       },
     },
     profiles: {
