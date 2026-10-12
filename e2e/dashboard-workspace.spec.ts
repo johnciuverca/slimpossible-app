@@ -30,7 +30,7 @@ test('Dashboard tabs are addressable, keyboard operated and author-only at 390px
     ),
   ).toBe(true)
   await page.screenshot({
-    path: '/private/tmp/slimpossible-252-progress-390.png',
+    path: test.info().outputPath('dashboard-progress-390.png'),
     fullPage: true,
   })
 })
@@ -65,7 +65,7 @@ test('a fake target save preserves the baseline, history and focus after refresh
   expect(member.targetWeightKg).toBe(85)
   await expect(page.getByText(/95 kg ·/)).toBeVisible()
   await page.screenshot({
-    path: '/private/tmp/slimpossible-252-progress-desktop.png',
+    path: test.info().outputPath('dashboard-progress-desktop.png'),
     fullPage: true,
   })
 })
