@@ -233,6 +233,12 @@ begin
   exception when insufficient_privilege then
     insert into target_change_checks values ('withdrawn_member_milestone_read_denied', true);
   end;
+  begin
+    perform * from public.list_my_group_target_milestones(challenge_id);
+    insert into target_change_checks values ('withdrawn_member_private_milestone_read_denied', false);
+  exception when insufficient_privilege then
+    insert into target_change_checks values ('withdrawn_member_private_milestone_read_denied', true);
+  end;
 
   perform set_config('request.jwt.claim.sub', '', true);
   begin
@@ -247,7 +253,7 @@ $$;
 select name, passed from target_change_checks order by name;
 do $$ begin
   if exists (select 1 from target_change_checks where not passed)
-     or (select count(*) from target_change_checks) <> 34 then
+     or (select count(*) from target_change_checks) <> 35 then
     raise exception 'Target-change authorization regression failed.';
   end if;
 end $$;
