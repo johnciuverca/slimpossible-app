@@ -299,6 +299,19 @@ export type Database = {
           weight_kg: number
         }[]
       }
+      get_group_member_progress: {
+        Args: { target_challenge_id: string }
+        Returns: {
+          member_key: string
+          display_name: string
+          starting_weight_kg: number | null
+          target_weight_kg: number | null
+          latest_recorded_date: string | null
+          completion_percentage: number | null
+          progress_state: string
+          reached_target_milestones: Json
+        }[]
+      }
       change_my_group_target: {
         Args: {
           target_challenge_id: string
