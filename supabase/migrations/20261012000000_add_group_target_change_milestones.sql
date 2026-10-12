@@ -77,6 +77,7 @@ begin
     on personal.id = share.personal_weigh_in_id
   where share.challenge_id = target_challenge_id
     and personal.user_id = actor_id
+    and personal.recorded_date >= participant.joined_at::date
     and personal.recorded_date <= current_date
     and personal.weight_kg <= participant.target_weight_kg
   order by personal.recorded_date, personal.id
@@ -199,6 +200,7 @@ begin
       on personal.id = share.personal_weigh_in_id
     where share.challenge_id = target_challenge_id
       and personal.user_id = member.user_id
+      and personal.recorded_date >= member.joined_at::date
       and personal.recorded_date <= current_date
       and personal.weight_kg <= milestone.target_weight_kg
     order by personal.recorded_date, personal.id
