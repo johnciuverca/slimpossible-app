@@ -195,6 +195,103 @@ describe('Supabase repositories', () => {
     })
   })
 
+  it('maps group target milestones without measurements or raw identities', async () => {
+    stubResponse([
+      {
+        member_key: 'opaque-member',
+        display_name: 'Ava',
+        target_weight_kg: 80,
+        achieved_on: '2026-10-01',
+        state: 'reached',
+        weight_kg: 79,
+        note: 'private',
+        user_id: 'private-user',
+        participant_id: 'private-participant',
+      },
+    ])
+    const result =
+      await createRepositories(client).groupProgress.getReachedTargetMilestones(
+        'challenge-1',
+      )
+    expect(result).toEqual({
+      data: [
+        {
+          achievedOn: '2026-10-01',
+          displayName: 'Ava',
+          memberKey: 'opaque-member',
+          state: 'reached',
+          targetWeightKg: 80,
+        },
+      ],
+      state: 'success',
+    })
+    expect(JSON.stringify(result)).not.toMatch(
+      /private|79|user_id|participant_id/,
+    )
+    const request = vi.mocked(fetch).mock.calls[0]
+    expect(String(request?.[0])).toContain('/rpc/get_group_target_milestones')
+    expect(JSON.parse(String(request?.[1]?.body))).toEqual({
+      target_challenge_id: 'challenge-1',
+    })
+  })
+
+  it('maps the self-scoped target change RPC and its optional reached milestone', async () => {
+    stubResponse([
+      {
+        challenge_id: 'challenge-1',
+        starting_weight_kg: 100,
+        target_weight_kg: 75,
+        previous_target_weight_kg: 80,
+        previous_target_achieved_on: '2026-10-01',
+      },
+    ])
+    const result = await createRepositories(
+      client,
+    ).participants.changeOwnGroupTarget('challenge-1', 75)
+    expect(result).toEqual({
+      data: {
+        challengeId: 'challenge-1',
+        startingWeightKg: 100,
+        targetWeightKg: 75,
+        previousTargetMilestone: {
+          achievedOn: '2026-10-01',
+          state: 'reached',
+          targetWeightKg: 80,
+        },
+      },
+      state: 'success',
+    })
+    const request = vi.mocked(fetch).mock.calls[0]
+    expect(String(request?.[0])).toContain('/rpc/change_my_group_target')
+    expect(JSON.parse(String(request?.[1]?.body))).toEqual({
+      target_challenge_id: 'challenge-1',
+      target_target_weight_kg: 75,
+    })
+  })
+
+  it('maps privately readable target milestones, including a null date without inventing one', async () => {
+    stubResponse([
+      { target_weight_kg: 90, achieved_on: null, state: 'reached' },
+    ])
+    const result =
+      await createRepositories(
+        client,
+      ).participants.listOwnGroupTargetMilestones('challenge-1')
+    expect(result).toEqual({
+      data: [
+        {
+          achievedOn: null,
+          state: 'reached',
+          targetWeightKg: 90,
+        },
+      ],
+      state: 'success',
+    })
+    expect(String(vi.mocked(fetch).mock.calls[0]?.[0])).toContain(
+      '/rpc/list_my_group_target_milestones',
+    )
+  })
+
   it('uses the atomic personal save RPC and keeps its private result owner-scoped', async () => {
     stubResponse([
       {

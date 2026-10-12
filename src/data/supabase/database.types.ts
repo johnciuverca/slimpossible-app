@@ -299,6 +299,37 @@ export type Database = {
           weight_kg: number
         }[]
       }
+      change_my_group_target: {
+        Args: {
+          target_challenge_id: string
+          target_target_weight_kg: number
+        }
+        Returns: {
+          challenge_id: string
+          starting_weight_kg: number
+          target_weight_kg: number
+          previous_target_weight_kg: number | null
+          previous_target_achieved_on: string | null
+        }[]
+      }
+      list_my_group_target_milestones: {
+        Args: { target_challenge_id: string }
+        Returns: {
+          target_weight_kg: number
+          achieved_on: string | null
+          state: string
+        }[]
+      }
+      get_group_target_milestones: {
+        Args: { target_challenge_id: string }
+        Returns: {
+          member_key: string
+          display_name: string
+          target_weight_kg: number
+          achieved_on: string
+          state: string
+        }[]
+      }
       get_provisional_group_leader_summary: {
         Args: { target_challenge_id: string; target_current_date: string }
         Returns: {
