@@ -347,9 +347,15 @@ function SelectedGoal({
       {challenge.ownerId === workspace.userId ? (
         <Link
           className="flex w-fit min-h-11 items-center font-semibold text-forest-800 underline"
-          to={`/challenges?${new URLSearchParams({ challenge: challengeId })}`}
+          to={
+            challenge.kind === 'group'
+              ? `/challenge/invites?${new URLSearchParams({ challenge: challengeId })}`
+              : `/challenge/setup?${new URLSearchParams({ challenge: challengeId })}`
+          }
         >
-          Manage this challenge and invitations
+          {challenge.kind === 'group'
+            ? 'Manage group invitations'
+            : 'Manage this challenge'}
         </Link>
       ) : null}
       {editing && canChange ? (

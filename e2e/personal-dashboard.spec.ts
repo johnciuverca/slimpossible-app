@@ -76,10 +76,7 @@ for (const viewport of [
     await page.reload()
     await expect(page.getByText('Logged today', { exact: true })).toBeVisible()
     await expect(page.getByText('82.4 kg', { exact: true })).toBeVisible()
-    await page
-      .getByRole('navigation', { name: 'Primary navigation' })
-      .getByRole('link', { name: 'My progress', exact: true })
-      .click()
+    await page.getByRole('tab', { name: 'Progress', exact: true }).click()
     await expect(
       page.getByRole('heading', { name: 'Dashboard', exact: true }),
     ).toBeVisible()
@@ -161,10 +158,7 @@ for (const viewport of [
       'dashboard-active',
     ])
 
-    await page
-      .getByRole('navigation', { name: 'Primary navigation' })
-      .getByRole('link', { name: 'My progress', exact: true })
-      .click()
+    await page.getByRole('tab', { name: 'Progress', exact: true }).click()
     const table = page.getByRole('list', {
       name: 'Your saved personal weigh-ins',
     })

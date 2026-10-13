@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App'
@@ -36,11 +36,8 @@ describe('App foundation screen', () => {
 
   it('redirects signed-out users from protected pages to login', async () => {
     vi.useFakeTimers()
+    window.history.pushState({}, '', '/progress?challenge=private-plan#goals')
     render(<App />)
-
-    fireEvent.click(screen.getByRole('link', { name: 'My progress' }))
-
-    expect(window.location.pathname).toBe('/progress')
     await act(async () => {
       vi.advanceTimersByTime(150)
       await Promise.resolve()

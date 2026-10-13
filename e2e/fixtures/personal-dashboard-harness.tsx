@@ -1,15 +1,21 @@
 // Synthetic local-only browser fixture; never a connected acceptance claim.
 import { useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
+import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from 'react-router-dom'
 import { AuthContext, type AuthContextValue } from '../../src/auth/context'
 import { AppLayout } from '../../src/layout/AppLayout'
 import { PersonalDashboardPage } from '../../src/pages/PersonalDashboardPage'
-import { MyProgressPage } from '../../src/pages/MyProgressPage'
 import { PersonalWeighInsPage } from '../../src/pages/PersonalWeighInsPage'
 import { ChallengeInvitesPage } from '../../src/pages/ChallengeInvitesPage'
 import { ChallengeSetupPage } from '../../src/pages/ChallengeSetupPage'
-import { HomePage, GroupDashboardPage } from '../../src/pages/AppPages'
+import { GroupDashboardPage } from '../../src/pages/AppPages'
+import { WorkspaceCompatibilityRoute } from '../../src/App'
 import {
   createChallengeFixture,
   createParticipantFixture,
@@ -148,7 +154,17 @@ export function Harness() {
   }
   return (
     <AuthContext.Provider value={value}>
-      <MemoryRouter initialEntries={[params.get('path') ?? '/dashboard']}>
+      <MemoryRouter
+        initialEntries={
+          scenario === 'tabs'
+            ? [
+                '/dashboard?fixture=previous',
+                params.get('path') ?? '/dashboard',
+              ]
+            : [params.get('path') ?? '/dashboard']
+        }
+        initialIndex={scenario === 'tabs' ? 1 : 0}
+      >
         {scenario === 'accounts' ||
         scenario === 'tabs' ||
         scenario === 'owned-many' ? (
@@ -170,15 +186,24 @@ export function Harness() {
           <Routes>
             <Route path="/" element={<PersonalDashboardPage />} />
             <Route path="/dashboard" element={<PersonalDashboardPage />} />
-            <Route path="/today" element={<PersonalDashboardPage />} />
-            <Route path="/progress" element={<MyProgressPage />} />
+            <Route
+              path="/today"
+              element={<WorkspaceCompatibilityRoute destination="today" />}
+            />
+            <Route
+              path="/progress"
+              element={<WorkspaceCompatibilityRoute destination="progress" />}
+            />
             <Route path="/weigh-ins" element={<PersonalWeighInsPage />} />
             <Route path="/group" element={<GroupDashboardPage />} />
             <Route
               path="/goals"
-              element={<PersonalDashboardPage initialTab="progress" />}
+              element={<WorkspaceCompatibilityRoute destination="goals" />}
             />
-            <Route path="/challenges" element={<HomePage />} />
+            <Route
+              path="/challenges"
+              element={<WorkspaceCompatibilityRoute destination="challenge" />}
+            />
             <Route path="/challenge/setup" element={<ChallengeSetupPage />} />
             <Route
               path="/challenge/invites"
@@ -186,16 +211,29 @@ export function Harness() {
             />
           </Routes>
         </AppLayout>
+        {scenario === 'tabs' ? <FixtureHistoryControls /> : null}
       </MemoryRouter>
     </AuthContext.Provider>
   )
 }
+
+function FixtureHistoryControls() {
+  const navigate = useNavigate()
+  return (
+    <div className="fixed bottom-1 left-1 z-50 flex gap-1 rounded bg-panel p-1 shadow-panel">
+      <button onClick={() => navigate(-1)}>Fixture back</button>
+      <button onClick={() => navigate(1)}>Fixture forward</button>
+    </div>
+  )
+}
+
 function CurrentRoute() {
   const location = useLocation()
   return (
     <output data-testid="fixture-route" className="sr-only">
       {location.pathname}
       {location.search}
+      {location.hash}
     </output>
   )
 }

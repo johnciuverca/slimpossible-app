@@ -127,6 +127,13 @@ export function PersonalDashboardWorkspace({
           </Link>
         ))}
       </nav>
+      {params.get('navigation') === 'challenge-unavailable' ? (
+        <FeedbackPanel tone="info">
+          That challenge is not available to this account. You are viewing your
+          personal Dashboard; choose an authorized Group from the Group
+          workspace if needed.
+        </FeedbackPanel>
+      ) : null}
       <div
         id={`dashboard-${tab === 'overview' ? 'progress' : 'overview'}-panel`}
         role="tabpanel"
