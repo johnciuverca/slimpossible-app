@@ -22,6 +22,7 @@ export function GroupChartHistory({
   refreshVersion,
   children,
   enabled = true,
+  showHistory = true,
 }: {
   challengeId: string
   viewerId: string
@@ -29,6 +30,7 @@ export function GroupChartHistory({
   refreshVersion: number
   children?: ReactNode
   enabled?: boolean
+  showHistory?: boolean
 }) {
   const ownMemberKey = ownGroupMemberKey(challengeId, viewerId)
   const personalWorkspace = usePersonalWorkspace({
@@ -144,58 +146,60 @@ export function GroupChartHistory({
       ref={workspace}
       className="group-history-workspace min-w-0 space-y-6 scroll-mt-6"
     >
-      <div
-        ref={navigationRef}
-        className="sticky top-0 z-20 min-w-0 rounded-xl border border-stone-200 bg-page shadow-sm"
-      >
+      {showHistory ? (
         <div
-          ref={tabs}
-          role="tablist"
-          aria-label="Shared group members"
-          className="app-nav-scroll flex max-w-full gap-2 overflow-x-auto p-3"
+          ref={navigationRef}
+          className="sticky top-0 z-20 min-w-0 rounded-xl border border-stone-200 bg-page shadow-sm"
         >
-          {choices.map((member, index) => (
-            <button
-              key={member.memberKey}
-              id={`${id}-tab-${index}`}
-              role="tab"
-              aria-selected={selectedIndex === index}
-              aria-controls={enabled ? `${id}-panel` : undefined}
-              disabled={!enabled}
-              tabIndex={selectedIndex === index ? 0 : -1}
-              type="button"
-              className={`min-h-11 shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 ${selectedIndex === index ? 'border-emerald-800 bg-emerald-800 text-white' : 'border-stone-300 bg-white text-emerald-800'}`}
-              onClick={() =>
-                setSelection({ context, memberKey: member.memberKey })
-              }
-              onKeyDown={(event) => {
-                const next =
-                  event.key === 'ArrowRight'
-                    ? (index + 1) % choices.length
-                    : event.key === 'ArrowLeft'
-                      ? (index - 1 + choices.length) % choices.length
-                      : event.key === 'Home'
-                        ? 0
-                        : event.key === 'End'
-                          ? choices.length - 1
-                          : null
-                if (next === null) return
-                event.preventDefault()
-                setSelection({ context, memberKey: choices[next].memberKey })
-                const buttons =
-                  tabs.current?.querySelectorAll<HTMLButtonElement>(
-                    '[role="tab"]',
-                  )
-                buttons?.item(next).focus()
-              }}
-            >
-              {member.label}
-            </button>
-          ))}
+          <div
+            ref={tabs}
+            role="tablist"
+            aria-label="Shared group members"
+            className="app-nav-scroll flex max-w-full gap-2 overflow-x-auto p-3"
+          >
+            {choices.map((member, index) => (
+              <button
+                key={member.memberKey}
+                id={`${id}-tab-${index}`}
+                role="tab"
+                aria-selected={selectedIndex === index}
+                aria-controls={enabled ? `${id}-panel` : undefined}
+                disabled={!enabled}
+                tabIndex={selectedIndex === index ? 0 : -1}
+                type="button"
+                className={`min-h-11 shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 ${selectedIndex === index ? 'border-emerald-800 bg-emerald-800 text-white' : 'border-stone-300 bg-white text-emerald-800'}`}
+                onClick={() =>
+                  setSelection({ context, memberKey: member.memberKey })
+                }
+                onKeyDown={(event) => {
+                  const next =
+                    event.key === 'ArrowRight'
+                      ? (index + 1) % choices.length
+                      : event.key === 'ArrowLeft'
+                        ? (index - 1 + choices.length) % choices.length
+                        : event.key === 'Home'
+                          ? 0
+                          : event.key === 'End'
+                            ? choices.length - 1
+                            : null
+                  if (next === null) return
+                  event.preventDefault()
+                  setSelection({ context, memberKey: choices[next].memberKey })
+                  const buttons =
+                    tabs.current?.querySelectorAll<HTMLButtonElement>(
+                      '[role="tab"]',
+                    )
+                  buttons?.item(next).focus()
+                }}
+              >
+                {member.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : null}
       {children}
-      {enabled ? (
+      {enabled && showHistory ? (
         <div
           id={`${id}-panel`}
           role="tabpanel"

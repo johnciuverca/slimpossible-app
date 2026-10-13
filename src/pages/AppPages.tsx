@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 
 import {
   Card,
@@ -13,9 +13,20 @@ import { PersonalProgressChart } from '../components/PersonalProgressChart'
 import { ChallengeTabs } from '../components/ChallengeContextTabs'
 import { WeightPageHeader } from '../components/WeightPageHeader'
 import { GroupChartHistory } from '../components/GroupChartHistory'
+import { ChangeTargetDialog } from '../components/ChangeTargetDialog'
+import { DashboardChallengeActions } from '../components/DashboardChallengeActions'
 import { WeightEntryActions } from '../components/WeightEntryActions'
 import { WeightEntryCard } from '../components/WeightEntryCard'
 import type { PersonalWorkspace } from '../data/usePersonalWorkspace'
+import { usePersonalWorkspace } from '../data/usePersonalWorkspace'
+import { ownGroupMemberKey } from '../models/ownGroupMemberKey'
+import {
+  groupMemberProgressForKey,
+  progressBlocks,
+  type GroupMemberProgress,
+} from '../models/groupMemberProgress'
+import { valueForContext } from '../models/groupMemberProgress'
+import { ownDashboardGoal } from '../models/ownDashboardGoal'
 import {
   notifyPersonalWeightChange,
   usePersonalWeightRevision,
@@ -1444,7 +1455,8 @@ export function TodayPage() {
 export function GroupDashboardPage() {
   const { state: authState } = useOptionalAuth()
   const ownerId = authState.user?.id
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
   const challengeParam = searchParams.get('challenge')
   const persistence = useMemo(() => createPersistence(authState), [authState])
   const [savedData, setData] = useState<GroupDashboardData | null>(null)
@@ -1459,6 +1471,145 @@ export function GroupDashboardPage() {
   const [messageTone, setMessageTone] = useState<FeedbackTone>('info')
   const [reloadKey, setReloadKey] = useState(0)
   const [weeklyAnnouncement, setWeeklyAnnouncement] = useState('')
+  const progressTab =
+    searchParams.get('tab') === 'progress' || location.hash === '#group-history'
+  const [showCreateJoinActions, setShowCreateJoinActions] = useState(false)
+  const personalWorkspace = usePersonalWorkspace({
+    enabled: Boolean(
+      ownerId &&
+      (showCreateJoinActions ||
+        (progressTab &&
+          ownGroupMemberKey(data?.challenge.id ?? '', ownerId) !== null)),
+    ),
+  })
+  const [memberProgressSnapshot, setMemberProgressSnapshot] = useState<{
+    key: string
+    rows: GroupMemberProgress[]
+    state: 'loading' | 'ready' | 'error'
+  }>({ key: '', rows: [], state: 'loading' })
+  const [targetDialogSnapshot, setTargetDialogSnapshot] = useState<{
+    contextKey: string
+    participant: Participant
+  } | null>(null)
+  const targetDialogContextRef = useRef('')
+  const memberProgressKey = data
+    ? JSON.stringify([requestKey, data.challenge.id, reloadKey])
+    : ''
+  const memberProgressKeyRef = useRef(memberProgressKey)
+  memberProgressKeyRef.current = memberProgressKey
+  const visibleMemberProgressSnapshot = groupMemberProgressForKey(
+    memberProgressSnapshot,
+    memberProgressKey,
+  )
+  const memberProgress = visibleMemberProgressSnapshot.rows
+  const memberProgressState = visibleMemberProgressSnapshot.state
+
+  useEffect(() => {
+    let current = true
+    const challengeId = data?.challenge.id
+    const resultKey = memberProgressKey
+    if (!progressTab || !challengeId || persistence.mode !== 'remote') {
+      setMemberProgressSnapshot({
+        key: resultKey,
+        rows: [],
+        state: progressTab && challengeId ? 'error' : 'loading',
+      })
+      return () => {
+        current = false
+      }
+    }
+    setMemberProgressSnapshot({ key: resultKey, rows: [], state: 'loading' })
+    void persistence.repositories.groupProgress
+      .getMemberProgress(challengeId)
+      .then((result) => {
+        if (!current || memberProgressKeyRef.current !== resultKey) return
+        if (result.state === 'success' || result.state === 'empty') {
+          setMemberProgressSnapshot({
+            key: resultKey,
+            rows: result.data,
+            state: 'ready',
+          })
+        } else {
+          setMemberProgressSnapshot({
+            key: resultKey,
+            rows: [],
+            state: 'error',
+          })
+        }
+      })
+      .catch(() => {
+        if (!current || memberProgressKeyRef.current !== resultKey) return
+        setMemberProgressSnapshot({ key: resultKey, rows: [], state: 'error' })
+      })
+    return () => {
+      current = false
+    }
+  }, [data?.challenge.id, memberProgressKey, persistence, progressTab])
+
+  const ownMemberKey =
+    data && ownerId ? ownGroupMemberKey(data.challenge.id, ownerId) : null
+  const ownParticipant =
+    personalWorkspace.contexts.state === 'ready'
+      ? (personalWorkspace.contexts.data.participants.find(
+          (participant) =>
+            participant.challengeId === data?.challenge.id &&
+            participant.userId === ownerId &&
+            participant.status === 'active',
+        ) ?? null)
+      : null
+  const ownProgressRow = memberProgress.find(
+    (member) => member.memberKey === ownMemberKey,
+  )
+  const ownParticipantMatchesProjection = Boolean(
+    ownParticipant &&
+    ownProgressRow &&
+    ownParticipant.challengeId === data?.challenge.id &&
+    ownParticipant.userId === ownerId &&
+    ownParticipant.status === 'active' &&
+    ownParticipant.startingWeightKg === ownProgressRow.startingWeightKg &&
+    ownParticipant.targetWeightKg === ownProgressRow.targetWeightKg,
+  )
+  const ownGoal =
+    data &&
+    ownerId &&
+    ownParticipant &&
+    personalWorkspace.personal.state === 'ready' &&
+    ownParticipantMatchesProjection
+      ? ownDashboardGoal(
+          data.challenge,
+          ownParticipant,
+          ownerId,
+          personalWorkspace.personal.data,
+          localDateOnly(),
+        )
+      : null
+  const targetDialogContextKey = JSON.stringify([
+    location.key,
+    ownerId ?? null,
+    personalWorkspace.ownerKey,
+    personalWorkspace.contexts.key,
+    personalWorkspace.contexts.state,
+    memberProgressKey,
+    ownParticipant?.id ?? null,
+    ownParticipant?.status ?? null,
+    ownParticipant?.startingWeightKg ?? null,
+    ownParticipant?.targetWeightKg ?? null,
+    ownParticipantMatchesProjection,
+  ])
+  targetDialogContextRef.current = targetDialogContextKey
+  useEffect(() => {
+    setTargetDialogSnapshot(null)
+  }, [targetDialogContextKey])
+  const targetDialogParticipant = valueForContext(
+    targetDialogSnapshot
+      ? {
+          contextKey: targetDialogSnapshot.contextKey,
+          value: targetDialogSnapshot.participant,
+        }
+      : null,
+    targetDialogContextKey,
+    ownParticipantMatchesProjection,
+  )
 
   useEffect(() => {
     let isCurrent = true
@@ -1626,6 +1777,12 @@ export function GroupDashboardPage() {
     ({ id }) => id === selectedChallengeId,
   )
 
+  function selectGroupTab(tab: 'overview' | 'progress') {
+    const next = new URLSearchParams(searchParams)
+    next.set('tab', tab)
+    setSearchParams(next)
+  }
+
   function formatDate(date: string) {
     const parsedDate = new Date(`${date}T00:00:00`)
     return Number.isNaN(parsedDate.getTime())
@@ -1667,23 +1824,185 @@ export function GroupDashboardPage() {
           </p>
         </div>
       </div>
+      <nav aria-label="Group sections" className="flex gap-2">
+        <button
+          aria-pressed={!progressTab}
+          className="rounded-xl border border-stone-300 px-4 py-3 font-semibold"
+          onClick={() => selectGroupTab('overview')}
+          type="button"
+        >
+          Overview
+        </button>
+        <button
+          aria-pressed={progressTab}
+          className="rounded-xl border border-stone-300 px-4 py-3 font-semibold"
+          onClick={() => selectGroupTab('progress')}
+          type="button"
+        >
+          Progress &amp; history
+        </button>
+      </nav>
+      {selectedChallenge && selectedChallenge.ownerId === ownerId ? (
+        <nav
+          aria-label="Selected group management"
+          className="flex flex-wrap gap-3"
+        >
+          <Link
+            className="min-h-11 rounded-xl border border-stone-300 px-4 py-3 font-semibold"
+            to={`/challenge/setup?challenge=${encodeURIComponent(selectedChallenge.id)}`}
+          >
+            Manage group
+          </Link>
+          <Link
+            className="min-h-11 rounded-xl border border-stone-300 px-4 py-3 font-semibold"
+            to={`/challenge/participants/enroll?${new URLSearchParams({ challenge: selectedChallenge.id, self: 'owner' })}`}
+          >
+            Manage members
+          </Link>
+          <Link
+            className="min-h-11 rounded-xl border border-stone-300 px-4 py-3 font-semibold"
+            to={`/challenge/invites?challenge=${encodeURIComponent(selectedChallenge.id)}`}
+          >
+            Manage invitations
+          </Link>
+        </nav>
+      ) : null}
+      <section aria-label="Create or join a group" className="space-y-3">
+        <button
+          aria-expanded={showCreateJoinActions}
+          className="min-h-11 rounded-xl border border-stone-300 px-4 py-3 font-semibold"
+          onClick={() => setShowCreateJoinActions((value) => !value)}
+          type="button"
+        >
+          Create or join a group
+        </button>
+        {showCreateJoinActions ? (
+          <DashboardChallengeActions workspace={personalWorkspace} />
+        ) : null}
+      </section>
+      {progressTab ? (
+        <Card className="space-y-5 p-5 sm:p-8">
+          <div>
+            <h2 className="text-xl font-bold">Member progress</h2>
+            <p className="mt-2 text-sm text-ink-muted">
+              Progress uses the original enrolled start and current target.
+              Current weigh-in values remain private unless explicitly shared.
+            </p>
+          </div>
+          {memberProgressState === 'loading' ? (
+            <p role="status">Loading member progress…</p>
+          ) : null}
+          {memberProgressState === 'error' ? (
+            <p role="status">
+              Member progress is unavailable for this session.
+            </p>
+          ) : null}
+          {memberProgress.map((member) => {
+            const percentage =
+              member.completionPercentage === null
+                ? null
+                : Math.max(0, Math.min(100, member.completionPercentage))
+            const canChangeTarget =
+              member.memberKey === ownMemberKey &&
+              ownParticipantMatchesProjection &&
+              ownGoal !== null
+            return (
+              <article
+                className="rounded-xl border border-stone-200 p-4"
+                key={member.memberKey}
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <h3 className="font-semibold">{member.displayName}</h3>
+                  <span>
+                    {percentage === null ? 'Unavailable' : `${percentage}%`}
+                  </span>
+                </div>
+                <p className="mt-1 text-sm text-ink-muted">
+                  Start:{' '}
+                  {member.startingWeightKg === null
+                    ? '—'
+                    : `${member.startingWeightKg} kg`}{' '}
+                  · Current target:{' '}
+                  {member.targetWeightKg === null
+                    ? '—'
+                    : `${member.targetWeightKg} kg`}
+                </p>
+                <div
+                  aria-label={`${member.displayName} goal progress`}
+                  className="mt-3 flex gap-1"
+                  role="img"
+                >
+                  {Array.from({ length: 10 }, (_, index) => (
+                    <span
+                      aria-hidden="true"
+                      className={`h-3 flex-1 rounded-sm ${index < progressBlocks(percentage) ? 'bg-emerald-600' : 'bg-stone-200'}`}
+                      key={index}
+                    />
+                  ))}
+                </div>
+                {member.reachedTargetMilestones.map((milestone) => (
+                  <p
+                    className="mt-2 text-sm text-emerald-800"
+                    key={`${milestone.targetWeightKg}-${milestone.achievedOn}`}
+                  >
+                    Reached {milestone.targetWeightKg} kg ·{' '}
+                    {formatDate(milestone.achievedOn)}
+                  </p>
+                ))}
+                {canChangeTarget ? (
+                  <button
+                    className="mt-3 min-h-11 rounded-xl border border-stone-300 px-4 py-2 font-semibold"
+                    onClick={() =>
+                      setTargetDialogSnapshot({
+                        contextKey: targetDialogContextKey,
+                        participant: ownParticipant!,
+                      })
+                    }
+                    type="button"
+                  >
+                    Change target
+                  </button>
+                ) : null}
+              </article>
+            )
+          })}
+          {targetDialogParticipant ? (
+            <ChangeTargetDialog
+              key={targetDialogContextKey}
+              onClose={() => {
+                if (targetDialogContextRef.current === targetDialogContextKey)
+                  setTargetDialogSnapshot(null)
+              }}
+              onSaved={() => {
+                if (targetDialogContextRef.current !== targetDialogContextKey)
+                  return
+                setTargetDialogSnapshot(null)
+                void personalWorkspace.refresh()
+                setReloadKey((value) => value + 1)
+              }}
+              participant={targetDialogParticipant}
+              reached={ownGoal?.reached ?? false}
+              workspace={personalWorkspace}
+            />
+          ) : null}
+        </Card>
+      ) : null}
+      <button
+        className="min-h-11 rounded-xl border border-stone-300 px-4 py-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+        onClick={() => setReloadKey((value) => value + 1)}
+        type="button"
+      >
+        Refresh shared progress
+      </button>
       <GroupChartHistory
         challengeId={data?.challenge.id ?? selectedChallengeId}
         viewerId={ownerId ?? ''}
         persistence={persistence}
         refreshVersion={reloadKey + weightRevision}
-        enabled={Boolean(summary)}
+        enabled={Boolean(summary && progressTab)}
+        showHistory={progressTab}
       >
         <Card className="p-5 sm:p-8 lg:p-10">
-          <div className="mt-6 flex flex-wrap items-end gap-4">
-            <button
-              className="min-h-11 rounded-xl border border-stone-300 px-4 py-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
-              onClick={() => setReloadKey((value) => value + 1)}
-              type="button"
-            >
-              Refresh shared progress
-            </button>
-          </div>
           <DashboardState
             isLoading={isLoading}
             message={message}
@@ -1905,12 +2224,14 @@ export function GroupDashboardPage() {
                   </dl>
                 </section>
 
-                <Link
-                  className="inline-flex min-h-11 items-center text-sm font-semibold text-emerald-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
-                  to={`/challenge/invites${challengeQuery}`}
-                >
-                  Invite participants
-                </Link>
+                {selectedChallenge?.ownerId === ownerId ? (
+                  <Link
+                    className="inline-flex min-h-11 items-center text-sm font-semibold text-emerald-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+                    to={`/challenge/invites${challengeQuery}`}
+                  >
+                    Invite participants
+                  </Link>
+                ) : null}
               </div>
             ) : null}
           </DashboardState>

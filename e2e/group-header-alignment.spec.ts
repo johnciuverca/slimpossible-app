@@ -91,6 +91,7 @@ for (const viewport of [
         expect(actionBox.y - textBox.bottom).toBeCloseTo(16, 0)
       }
       if (path === '/group') {
+        await page.getByRole('button', { name: 'Progress & history' }).click()
         await expect(
           contexts.getByRole('link', { name: /Personal tracking/ }),
         ).toHaveCount(0)
@@ -151,7 +152,7 @@ for (const viewport of [
     await expect(active).toBeFocused()
     await page.keyboard.press('Enter')
     await expect(page.getByTestId('fixture-route')).toHaveText(
-      '/group?challenge=dashboard-active',
+      '/group?challenge=dashboard-active&tab=progress',
     )
     await expect(active).toHaveAttribute('aria-current', 'page')
     await expect(draft).not.toHaveAttribute('aria-current', 'page')

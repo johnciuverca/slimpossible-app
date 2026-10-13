@@ -4,7 +4,11 @@ import { useOptionalAuth } from '../auth/useAuth'
 import { createPersistence } from '../data/persistence'
 import type { Challenge } from '../models/challenge'
 
-function challengeTabDestination(path: string, challenge?: Challenge) {
+function challengeTabDestination(
+  path: string,
+  challenge?: Challenge,
+  search = '',
+) {
   if (!challenge) {
     return ['/dashboard', '/today', '/', '/weigh-ins', '/progress'].includes(
       path,
@@ -19,7 +23,12 @@ function challengeTabDestination(path: string, challenge?: Challenge) {
     (path === '/group' && challenge.kind === 'personal')
       ? '/progress'
       : path
-  return `${destination}?${new URLSearchParams({ challenge: challenge.id })}`
+  const params = new URLSearchParams({ challenge: challenge.id })
+  if (path === '/group') {
+    const selectedTab = new URLSearchParams(search).get('tab')
+    if (selectedTab) params.set('tab', selectedTab)
+  }
+  return `${destination}?${params}`
 }
 
 export function ChallengeTabs({
@@ -89,7 +98,7 @@ export function ChallengeTabs({
             ...challenges.map((challenge) => ({
               id: challenge.id,
               label: `${challenge.kind === 'personal' ? 'Personal' : 'Group'} · ${challenge.name}`,
-              to: challengeTabDestination(pathname, challenge),
+              to: challengeTabDestination(pathname, challenge, search),
             })),
           ].map(({ id, label, to }) => {
             const active = id ? selected === id : personalPage && !selected

@@ -13,6 +13,7 @@ import type {
 } from '../../models/challengeInvite'
 import type { WeighIn } from '../../models/weighIn'
 import type { GroupChartEntry } from '../../models/groupChartHistory'
+import type { GroupMemberProgress } from '../../models/groupMemberProgress'
 import type {
   GroupProgressSummary,
   GroupWeighInHistoryEntry,
@@ -144,6 +145,9 @@ export type PersonalWeighInRepository = {
 }
 
 export type GroupProgressRepository = {
+  getMemberProgress: (
+    challengeId: string,
+  ) => Promise<RepositoryListResult<GroupMemberProgress>>
   getChartHistory: (
     challengeId: string,
   ) => Promise<RepositoryListResult<GroupChartEntry>>
@@ -650,6 +654,57 @@ export function createRepositories(client: DatabaseClient): Repositories {
       },
     },
     groupProgress: {
+      async getMemberProgress(challengeId) {
+        const { data, error } = await client.rpc('get_group_member_progress', {
+          target_challenge_id: challengeId,
+        })
+        if (error)
+          return {
+            error: requestError('load group member progress', error),
+            state: 'error',
+          }
+        return mapList(
+          data,
+          (row) => {
+            if (
+              !row.member_key ||
+              !row.display_name ||
+              !['unavailable', 'in_progress', 'reached'].includes(
+                row.progress_state,
+              )
+            )
+              throw new Error('Invalid group member progress')
+            const milestones = Array.isArray(row.reached_target_milestones)
+              ? row.reached_target_milestones
+              : []
+            return {
+              memberKey: row.member_key,
+              displayName: row.display_name,
+              startingWeightKg: row.starting_weight_kg,
+              targetWeightKg: row.target_weight_kg,
+              completionPercentage: row.completion_percentage,
+              progressState:
+                row.progress_state as GroupMemberProgress['progressState'],
+              reachedTargetMilestones: milestones.flatMap((milestone) => {
+                if (typeof milestone !== 'object' || milestone === null)
+                  return []
+                const item = milestone as Record<string, unknown>
+                return typeof item.achieved_on === 'string' &&
+                  typeof item.target_weight_kg === 'number'
+                  ? [
+                      {
+                        achievedOn: item.achieved_on,
+                        state: 'reached' as const,
+                        targetWeightKg: item.target_weight_kg,
+                      },
+                    ]
+                  : []
+              }),
+            }
+          },
+          'group member progress',
+        )
+      },
       async getChartHistory(challengeId) {
         const { data, error } = await client.rpc('get_group_chart_history', {
           target_challenge_id: challengeId,

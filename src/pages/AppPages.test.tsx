@@ -1467,7 +1467,8 @@ describe('GroupDashboardPage', () => {
     renderDashboard(
       <GroupDashboardPage />,
       vi.fn((url: RequestInfo | URL, init?: RequestInit) =>
-        String(url).includes('/rpc/get_group_chart_history')
+        String(url).includes('/rpc/get_group_chart_history') ||
+        String(url).includes('/rpc/get_group_member_progress')
           ? Promise.resolve(response([]))
           : fetchMock(url, init),
       ),
@@ -1501,6 +1502,14 @@ describe('GroupDashboardPage', () => {
       name: 'Provisional leader',
     })
     expect(provisionalLeaderRegion).toHaveTextContent('Ties are shared')
+    fireEvent.click(screen.getByRole('button', { name: 'Progress & history' }))
+    await waitFor(() =>
+      expect(
+        screen.getByRole('region', {
+          name: 'Group chart and weigh-in history',
+        }),
+      ).toBeInTheDocument(),
+    )
     const unavailableHistory = screen.getByRole('region', {
       name: 'Group chart and weigh-in history',
     })
@@ -1543,6 +1552,13 @@ describe('GroupDashboardPage', () => {
       target_current_date: localDateOnly(),
     })
 
+    fireEvent.click(screen.getByRole('button', { name: 'Overview' }))
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Overview' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      ),
+    )
     fireEvent.click(
       screen.getByRole('button', { name: 'Refresh shared progress' }),
     )
