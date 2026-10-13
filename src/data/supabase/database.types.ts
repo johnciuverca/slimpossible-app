@@ -325,6 +325,17 @@ export type Database = {
           previous_target_achieved_on: string | null
         }[]
       }
+      correct_my_enrollment_starting_weight: {
+        Args: {
+          target_challenge_id: string
+          target_starting_weight_kg: number
+        }
+        Returns: {
+          challenge_id: string
+          starting_weight_kg: number
+          target_weight_kg: number
+        }[]
+      }
       list_my_group_target_milestones: {
         Args: { target_challenge_id: string }
         Returns: {

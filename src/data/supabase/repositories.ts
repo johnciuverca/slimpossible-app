@@ -1,7 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { Challenge, ChallengeKind } from '../../models/challenge'
-import type { Participant } from '../../models/participant'
+import type {
+  OwnStartingWeightCorrection,
+  Participant,
+} from '../../models/participant'
 import type {
   PersonalWeighIn,
   PersonalWeighInInput,
@@ -63,6 +66,8 @@ type ProvisionalGroupLeaderRow =
   Database['public']['Functions']['get_provisional_group_leader_summary']['Returns'][number]
 type OwnGroupTargetChangeRow =
   Database['public']['Functions']['change_my_group_target']['Returns'][number]
+type OwnStartingWeightCorrectionRow =
+  Database['public']['Functions']['correct_my_enrollment_starting_weight']['Returns'][number]
 type ReachedTargetMilestoneRow =
   Database['public']['Functions']['list_my_group_target_milestones']['Returns'][number]
 type GroupReachedTargetMilestoneRow =
@@ -104,6 +109,10 @@ export type ParticipantRepository = {
     challengeId: string,
     targetWeightKg: number,
   ) => Promise<RepositoryResult<OwnGroupTargetChange>>
+  correctOwnEnrollmentStartingWeight: (
+    challengeId: string,
+    startingWeightKg: number,
+  ) => Promise<RepositoryResult<OwnStartingWeightCorrection>>
   listOwnGroupTargetMilestones: (
     challengeId: string,
   ) => Promise<RepositoryListResult<ReachedTargetMilestone>>
@@ -324,6 +333,23 @@ function mapOwnGroupTargetChange(
             state: 'reached',
             targetWeightKg: row.previous_target_weight_kg,
           },
+    startingWeightKg: row.starting_weight_kg,
+    targetWeightKg: row.target_weight_kg,
+  }
+}
+
+function mapOwnStartingWeightCorrection(
+  row: OwnStartingWeightCorrectionRow,
+): OwnStartingWeightCorrection {
+  if (
+    typeof row.challenge_id !== 'string' ||
+    !Number.isFinite(row.starting_weight_kg) ||
+    !Number.isFinite(row.target_weight_kg)
+  ) {
+    throw new Error('Invalid own starting-weight correction response')
+  }
+  return {
+    challengeId: row.challenge_id,
     startingWeightKg: row.starting_weight_kg,
     targetWeightKg: row.target_weight_kg,
   }
@@ -918,6 +944,39 @@ export function createRepositories(client: DatabaseClient): Repositories {
         ) {
           return {
             error: mappingError('own group target change'),
+            state: 'error',
+          }
+        }
+        return result
+      },
+      async correctOwnEnrollmentStartingWeight(challengeId, startingWeightKg) {
+        const { data, error } = await client.rpc(
+          'correct_my_enrollment_starting_weight',
+          {
+            target_challenge_id: challengeId,
+            target_starting_weight_kg: startingWeightKg,
+          },
+        )
+        if (error) {
+          return {
+            error: requestError(
+              'correct your enrollment starting weight',
+              error,
+            ),
+            state: 'error',
+          }
+        }
+        const result = mapSingle(
+          data?.[0] ?? null,
+          mapOwnStartingWeightCorrection,
+          'own starting-weight correction',
+        )
+        if (
+          result.state === 'success' &&
+          result.data.challengeId !== challengeId
+        ) {
+          return {
+            error: mappingError('own starting-weight correction'),
             state: 'error',
           }
         }
