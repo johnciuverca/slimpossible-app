@@ -112,11 +112,29 @@ export function ChallengeSetupPage() {
   const [submitError, setSubmitError] = useState('')
   const [requestedChallengeUnavailable, setRequestedChallengeUnavailable] =
     useState(false)
+  const [loadedOwnerId, setLoadedOwnerId] = useState(ownerId)
+  const [loadedChallengeId, setLoadedChallengeId] = useState('')
   const previousOwnerId = useRef(ownerId)
+  const previousAuthStatus = useRef(authState.status)
+  const selectedChallengeIdRef = useRef('')
+  const skipKnownChallengeReload = useRef('')
   const loadGeneration = useRef(0)
   const activeLoadAbortController = useRef<AbortController | null>(null)
 
+  function updateSelectedChallengeId(id: string) {
+    selectedChallengeIdRef.current = id
+    setSelectedChallengeId(id)
+  }
+
   useEffect(() => {
+    if (
+      requestedChallengeId &&
+      skipKnownChallengeReload.current === requestedChallengeId
+    ) {
+      skipKnownChallengeReload.current = ''
+      return
+    }
+
     let isCurrent = true
     const requestGeneration = ++loadGeneration.current
     const abortController = new AbortController()
@@ -124,13 +142,23 @@ export function ChallengeSetupPage() {
     let timeoutId: number | undefined
     const ownerChanged = previousOwnerId.current !== ownerId
     previousOwnerId.current = ownerId
+    const preserveRestoringDraft =
+      ownerChanged &&
+      previousAuthStatus.current === 'loading' &&
+      !selectedChallengeIdRef.current &&
+      !requestedChallengeId
+    previousAuthStatus.current = authState.status
     activeLoadAbortController.current = abortController
 
     setIsLoading(true)
-    setRequestedChallengeUnavailable(Boolean(requestedChallengeId))
     if (ownerChanged) {
       setChallenges([])
-      setSelectedChallengeId('')
+      updateSelectedChallengeId('')
+      if (!preserveRestoringDraft) {
+        setValues(initialValues)
+        setChallengeKind(requestedKind)
+      }
+      setRequestedChallengeUnavailable(Boolean(requestedChallengeId))
     }
 
     async function loadSavedChallenge() {
@@ -138,6 +166,8 @@ export function ChallengeSetupPage() {
         if (persistence.mode === 'unavailable') {
           if (isCurrent) {
             setRequestedChallengeUnavailable(Boolean(requestedChallengeId))
+            setLoadedOwnerId(ownerId)
+            setLoadedChallengeId(requestedChallengeId)
             setSubmitError(persistence.message)
             setIsLoading(false)
           }
@@ -163,6 +193,8 @@ export function ChallengeSetupPage() {
 
         if (result.state === 'timeout' || didTimeout) {
           setRequestedChallengeUnavailable(Boolean(requestedChallengeId))
+          setLoadedOwnerId(ownerId)
+          setLoadedChallengeId(requestedChallengeId)
           reportChallengeLoadFailure('timeout')
           setSubmitError(challengeLoadTimeoutMessage)
           setIsLoading(false)
@@ -171,6 +203,8 @@ export function ChallengeSetupPage() {
 
         if (result.state === 'error') {
           setRequestedChallengeUnavailable(Boolean(requestedChallengeId))
+          setLoadedOwnerId(ownerId)
+          setLoadedChallengeId(requestedChallengeId)
           reportChallengeLoadFailure('request')
           setSubmitError(result.error.message)
           setIsLoading(false)
@@ -184,7 +218,7 @@ export function ChallengeSetupPage() {
         )
         if (requestedChallengeId) {
           if (requestedChallenge) {
-            setSelectedChallengeId(requestedChallenge.id)
+            updateSelectedChallengeId(requestedChallenge.id)
             setChallengeKind(requestedChallenge.kind)
             setValues({
               description: requestedChallenge.description ?? '',
@@ -194,12 +228,14 @@ export function ChallengeSetupPage() {
             })
             setRequestedChallengeUnavailable(false)
           } else {
-            setSelectedChallengeId('')
+            updateSelectedChallengeId('')
             setRequestedChallengeUnavailable(true)
           }
         } else {
           setRequestedChallengeUnavailable(false)
         }
+        setLoadedOwnerId(ownerId)
+        setLoadedChallengeId(requestedChallengeId)
         setSubmitError('')
         setIsLoading(false)
       } catch {
@@ -207,6 +243,9 @@ export function ChallengeSetupPage() {
           return
         }
         reportChallengeLoadFailure('unexpected')
+        setRequestedChallengeUnavailable(Boolean(requestedChallengeId))
+        setLoadedOwnerId(ownerId)
+        setLoadedChallengeId(requestedChallengeId)
         setSubmitError('Unable to load saved challenges. Try again.')
         setIsLoading(false)
       } finally {
@@ -230,10 +269,20 @@ export function ChallengeSetupPage() {
         window.clearTimeout(timeoutId)
       }
     }
-  }, [ownerId, persistence, requestedChallengeId])
+  }, [
+    authState.status,
+    ownerId,
+    persistence,
+    requestedChallengeId,
+    requestedKind,
+  ])
+
+  const isRequestedContextReady =
+    loadedOwnerId === ownerId &&
+    (!requestedChallengeId || loadedChallengeId === requestedChallengeId)
 
   function selectChallenge(id: string) {
-    setSelectedChallengeId(id)
+    updateSelectedChallengeId(id)
     const challenge = challenges.find((value) => value.id === id)
     setChallengeKind(challenge?.kind ?? requestedKind)
     setValues(
@@ -251,14 +300,21 @@ export function ChallengeSetupPage() {
     setNewlyCreatedChallengeId('')
     setChoseOrganizerOnly(false)
     setSubmitError('')
+    setIsLoading(false)
+    const nextParams = new URLSearchParams(searchParams)
+    if (id) nextParams.set('challenge', id)
+    else nextParams.delete('challenge')
+    setSearchParams(nextParams, { replace: true })
+    setRequestedChallengeUnavailable(false)
+    setLoadedOwnerId(ownerId)
+    setLoadedChallengeId(id)
+    if (id && challenge && id !== requestedChallengeId) {
+      skipKnownChallengeReload.current = id
+    }
   }
 
   function startNewChallenge() {
     selectChallenge('')
-    const nextParams = new URLSearchParams(searchParams)
-    nextParams.delete('challenge')
-    setSearchParams(nextParams, { replace: true })
-    setRequestedChallengeUnavailable(false)
   }
 
   function updateValue(field: keyof ChallengeSetupValues, value: string) {
@@ -271,7 +327,7 @@ export function ChallengeSetupPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (requestedChallengeUnavailable) return
+    if (!isRequestedContextReady || requestedChallengeUnavailable) return
 
     const nextErrors = validateChallengeSetup(values)
     setErrors(nextErrors)
@@ -335,7 +391,7 @@ export function ChallengeSetupPage() {
         challenge.id === result.data.id ? result.data : challenge,
       )
     })
-    setSelectedChallengeId(result.data.id)
+    updateSelectedChallengeId(result.data.id)
     setIsSaved(true)
     setNewlyCreatedChallengeId(isCreatingChallenge ? result.data.id : '')
     setChoseOrganizerOnly(false)
@@ -367,270 +423,316 @@ export function ChallengeSetupPage() {
           noValidate
           onSubmit={handleSubmit}
         >
-          {requestedChallengeUnavailable && !isLoading ? (
-            <p
-              className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950"
-              role="alert"
-            >
-              That saved challenge is unavailable for this account. Choose an
-              owned challenge or create a new one.
-            </p>
-          ) : null}
-          {!isLoading && challenges.length > 0 ? (
-            <div>
-              <label
-                className="text-sm font-semibold text-slate-700"
-                htmlFor="saved-challenge"
-              >
-                Saved challenge
-              </label>
-              <div className="mt-2 flex flex-wrap gap-3">
-                <select
-                  className="min-w-0 flex-1 rounded-xl border border-stone-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-                  id="saved-challenge"
-                  onChange={(event) => selectChallenge(event.target.value)}
-                  value={selectedChallengeId}
-                >
-                  <option value="">Create a new challenge</option>
-                  {challenges.map((challenge) => (
-                    <option key={challenge.id} value={challenge.id}>
-                      {challenge.name}
-                    </option>
-                  ))}
-                </select>
-                {selectedChallengeId ? (
-                  <Button
-                    onClick={startNewChallenge}
-                    type="button"
-                    variant="secondary"
-                  >
-                    New challenge
-                  </Button>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
-
-          {!isLoading && challenges.length === 0 && !submitError ? (
-            <p className="text-sm text-slate-600" role="status">
-              No saved challenges yet. Create your first challenge below.
-            </p>
-          ) : null}
-
-          {!selectedChallengeId ? (
-            <fieldset className="rounded-2xl border border-stone-200 p-5">
-              <legend className="px-2 text-sm font-semibold text-slate-700">
-                Challenge context
-              </legend>
-              <div className="space-y-4">
-                <label className="flex cursor-pointer items-start gap-3">
-                  <input
-                    checked={challengeKind === 'personal'}
-                    className="mt-1"
-                    name="challenge-kind"
-                    onChange={() => setChallengeKind('personal')}
-                    type="radio"
-                    value="personal"
-                  />
-                  <span>
-                    <span className="block font-semibold text-slate-900">
-                      Personal challenge (private)
-                    </span>
-                    <span className="mt-1 block text-sm leading-6 text-slate-600">
-                      Only you can access this challenge. Creating it does not
-                      enroll you; join explicitly to record your progress.
-                    </span>
-                  </span>
-                </label>
-                <label className="flex cursor-pointer items-start gap-3">
-                  <input
-                    checked={challengeKind === 'group'}
-                    className="mt-1"
-                    name="challenge-kind"
-                    onChange={() => setChallengeKind('group')}
-                    type="radio"
-                    value="group"
-                  />
-                  <span>
-                    <span className="block font-semibold text-slate-900">
-                      Group challenge
-                    </span>
-                    <span className="mt-1 block text-sm leading-6 text-slate-600">
-                      You will be the organizer. Inviting others and joining as
-                      a participant are separate, explicit actions.
-                    </span>
-                  </span>
-                </label>
-              </div>
-            </fieldset>
-          ) : (
-            <p className="text-sm text-slate-600" role="status">
-              This saved challenge is a{' '}
-              {challengeKind === 'personal' ? 'private personal' : 'group'}{' '}
-              context. Its kind cannot be changed here.
-            </p>
-          )}
-
-          <TextInput
-            autoComplete="off"
-            error={errors.name}
-            id="challenge-name"
-            label="Challenge name"
-            onChange={(event) => updateValue('name', event.target.value)}
-            type="text"
-            value={values.name}
-          />
-
-          <div>
-            <label
-              className="text-sm font-semibold text-slate-700"
-              htmlFor="challenge-description"
-            >
-              Description{' '}
-              <span className="font-normal text-slate-500">(optional)</span>
-            </label>
-            <textarea
-              className="mt-2 block min-h-28 w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-              id="challenge-description"
-              onChange={(event) =>
-                updateValue('description', event.target.value)
-              }
-              value={values.description}
-            />
-          </div>
-
-          <div className="grid gap-5 sm:grid-cols-2">
-            <TextInput
-              error={errors.startDate}
-              id="challenge-start-date"
-              label="Start date"
-              onChange={(event) => updateValue('startDate', event.target.value)}
-              type="date"
-              value={values.startDate}
-            />
-            <TextInput
-              error={errors.endDate}
-              id="challenge-end-date"
-              label="End date"
-              onChange={(event) => updateValue('endDate', event.target.value)}
-              type="date"
-              value={values.endDate}
-            />
-          </div>
-
-          {isLoading ? (
+          {!isRequestedContextReady ? (
             <p
               aria-live="polite"
               className="text-sm text-slate-600"
               role="status"
             >
-              Loading saved challenge…
+              Loading the selected challenge for this account…
             </p>
-          ) : null}
-
-          {submitError ? (
-            <p aria-live="polite" className="text-sm text-red-700" role="alert">
-              {submitError}
-            </p>
-          ) : null}
-
-          {isSaved ? (
-            <p
-              aria-live="polite"
-              className="text-sm text-emerald-800"
-              role="status"
-            >
-              {persistence.mode === 'remote'
-                ? 'Challenge was saved remotely.'
-                : 'Challenge was saved in local preview. Nothing has been saved remotely.'}
-            </p>
-          ) : null}
-
-          {isSaved && newlyCreatedChallengeId === selectedChallengeId ? (
-            <section
-              aria-labelledby="challenge-participation-question"
-              className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5"
-              role="group"
-            >
-              <h2
-                className="text-lg font-bold text-slate-950"
-                id="challenge-participation-question"
+          ) : requestedChallengeUnavailable ? (
+            <>
+              <p
+                className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950"
+                role="alert"
               >
-                {challengeKind === 'personal'
-                  ? 'Enroll in your personal challenge?'
-                  : 'Will you participate too?'}
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-700">
-                {challengeKind === 'personal'
-                  ? 'Creating this private challenge does not enroll you or create a participant. Enroll explicitly to save your own starting and target weights.'
-                  : 'Creating this challenge makes you its organizer, but does not enroll you. If you join, you’ll enter your own starting and target weights.'}
+                That saved challenge is unavailable for this account. Choose an
+                owned challenge or explicitly create a new one.
               </p>
-              <div className="mt-4 flex flex-wrap gap-3">
-                <Link
-                  className="inline-flex items-center justify-center rounded-full bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
-                  to={`/challenge/participants/enroll?challenge=${encodeURIComponent(newlyCreatedChallengeId)}&self=owner`}
-                >
-                  {challengeKind === 'personal'
-                    ? 'Enroll me'
-                    : 'Yes, I’ll participate'}
-                </Link>
-                <Button
-                  onClick={() => setChoseOrganizerOnly(true)}
-                  type="button"
-                  variant="secondary"
-                >
-                  {challengeKind === 'personal'
-                    ? 'Not now'
-                    : 'No, I’ll organize only'}
-                </Button>
-              </div>
-              {choseOrganizerOnly ? (
-                <div
-                  aria-live="polite"
-                  className="mt-4 rounded-xl bg-white p-4"
-                  role="status"
-                >
-                  <p className="text-sm leading-6 text-slate-700">
-                    {challengeKind === 'personal'
-                      ? 'You have not enrolled, so this private challenge cannot record weigh-ins yet. You can enroll later from Today.'
-                      : 'You’re the organizer only. You can invite people now or join this challenge later from Today.'}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-4">
-                    {challengeKind === 'group' ? (
-                      <Link
-                        className="text-sm font-semibold text-emerald-700 underline"
-                        to={`/challenge/invites?challenge=${encodeURIComponent(newlyCreatedChallengeId)}`}
-                      >
-                        Invite participants
-                      </Link>
-                    ) : null}
-                    <Link
-                      className="text-sm font-semibold text-emerald-700 underline"
-                      to={`/today?challenge=${encodeURIComponent(newlyCreatedChallengeId)}`}
+              {challenges.length > 0 ? (
+                <div>
+                  <label
+                    className="text-sm font-semibold text-slate-700"
+                    htmlFor="saved-challenge"
+                  >
+                    Choose one of your saved challenges
+                  </label>
+                  <select
+                    className="mt-2 min-h-11 w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                    id="saved-challenge"
+                    onChange={(event) => selectChallenge(event.target.value)}
+                    value=""
+                  >
+                    <option disabled value="">
+                      Choose an owned challenge
+                    </option>
+                    {challenges.map((challenge) => (
+                      <option key={challenge.id} value={challenge.id}>
+                        {challenge.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
+              <Button onClick={startNewChallenge} type="button">
+                Create a new challenge
+              </Button>
+            </>
+          ) : (
+            <>
+              {!isLoading && challenges.length > 0 ? (
+                <div>
+                  <label
+                    className="text-sm font-semibold text-slate-700"
+                    htmlFor="saved-challenge"
+                  >
+                    Saved challenge
+                  </label>
+                  <div className="mt-2 flex flex-wrap gap-3">
+                    <select
+                      className="min-w-0 flex-1 rounded-xl border border-stone-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                      id="saved-challenge"
+                      onChange={(event) => selectChallenge(event.target.value)}
+                      value={selectedChallengeId}
                     >
-                      Join later from Today
-                    </Link>
+                      <option value="">Create a new challenge</option>
+                      {challenges.map((challenge) => (
+                        <option key={challenge.id} value={challenge.id}>
+                          {challenge.name}
+                        </option>
+                      ))}
+                    </select>
+                    {selectedChallengeId ? (
+                      <Button
+                        onClick={startNewChallenge}
+                        type="button"
+                        variant="secondary"
+                      >
+                        New challenge
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
               ) : null}
-            </section>
-          ) : null}
 
-          <Button
-            className="w-full"
-            disabled={
-              isSaving ||
-              persistence.mode === 'unavailable' ||
-              requestedChallengeUnavailable
-            }
-            type="submit"
-          >
-            {isSaving
-              ? 'Saving challenge…'
-              : selectedChallengeId
-                ? 'Update challenge'
-                : 'Save challenge'}
-          </Button>
+              {!isLoading && challenges.length === 0 && !submitError ? (
+                <p className="text-sm text-slate-600" role="status">
+                  No saved challenges yet. Create your first challenge below.
+                </p>
+              ) : null}
+
+              {!selectedChallengeId ? (
+                <fieldset className="rounded-2xl border border-stone-200 p-5">
+                  <legend className="px-2 text-sm font-semibold text-slate-700">
+                    Challenge context
+                  </legend>
+                  <div className="space-y-4">
+                    <label className="flex cursor-pointer items-start gap-3">
+                      <input
+                        checked={challengeKind === 'personal'}
+                        className="mt-1"
+                        name="challenge-kind"
+                        onChange={() => setChallengeKind('personal')}
+                        type="radio"
+                        value="personal"
+                      />
+                      <span>
+                        <span className="block font-semibold text-slate-900">
+                          Personal challenge (private)
+                        </span>
+                        <span className="mt-1 block text-sm leading-6 text-slate-600">
+                          Only you can access this challenge. Creating it does
+                          not enroll you; join explicitly to record your
+                          progress.
+                        </span>
+                      </span>
+                    </label>
+                    <label className="flex cursor-pointer items-start gap-3">
+                      <input
+                        checked={challengeKind === 'group'}
+                        className="mt-1"
+                        name="challenge-kind"
+                        onChange={() => setChallengeKind('group')}
+                        type="radio"
+                        value="group"
+                      />
+                      <span>
+                        <span className="block font-semibold text-slate-900">
+                          Group challenge
+                        </span>
+                        <span className="mt-1 block text-sm leading-6 text-slate-600">
+                          You will be the organizer. Inviting others and joining
+                          as a participant are separate, explicit actions.
+                        </span>
+                      </span>
+                    </label>
+                  </div>
+                </fieldset>
+              ) : (
+                <p className="text-sm text-slate-600" role="status">
+                  This saved challenge is a{' '}
+                  {challengeKind === 'personal' ? 'private personal' : 'group'}{' '}
+                  context. Its kind cannot be changed here.
+                </p>
+              )}
+
+              <TextInput
+                autoComplete="off"
+                error={errors.name}
+                id="challenge-name"
+                label="Challenge name"
+                onChange={(event) => updateValue('name', event.target.value)}
+                type="text"
+                value={values.name}
+              />
+
+              <div>
+                <label
+                  className="text-sm font-semibold text-slate-700"
+                  htmlFor="challenge-description"
+                >
+                  Description{' '}
+                  <span className="font-normal text-slate-500">(optional)</span>
+                </label>
+                <textarea
+                  className="mt-2 block min-h-28 w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                  id="challenge-description"
+                  onChange={(event) =>
+                    updateValue('description', event.target.value)
+                  }
+                  value={values.description}
+                />
+              </div>
+
+              <div className="grid gap-5 sm:grid-cols-2">
+                <TextInput
+                  error={errors.startDate}
+                  id="challenge-start-date"
+                  label="Start date"
+                  onChange={(event) =>
+                    updateValue('startDate', event.target.value)
+                  }
+                  type="date"
+                  value={values.startDate}
+                />
+                <TextInput
+                  error={errors.endDate}
+                  id="challenge-end-date"
+                  label="End date"
+                  onChange={(event) =>
+                    updateValue('endDate', event.target.value)
+                  }
+                  type="date"
+                  value={values.endDate}
+                />
+              </div>
+
+              {isLoading ? (
+                <p
+                  aria-live="polite"
+                  className="text-sm text-slate-600"
+                  role="status"
+                >
+                  Loading saved challenge…
+                </p>
+              ) : null}
+
+              {submitError ? (
+                <p
+                  aria-live="polite"
+                  className="text-sm text-red-700"
+                  role="alert"
+                >
+                  {submitError}
+                </p>
+              ) : null}
+
+              {isSaved ? (
+                <p
+                  aria-live="polite"
+                  className="text-sm text-emerald-800"
+                  role="status"
+                >
+                  {persistence.mode === 'remote'
+                    ? 'Challenge was saved remotely.'
+                    : 'Challenge was saved in local preview. Nothing has been saved remotely.'}
+                </p>
+              ) : null}
+
+              {isSaved && newlyCreatedChallengeId === selectedChallengeId ? (
+                <section
+                  aria-labelledby="challenge-participation-question"
+                  className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5"
+                  role="group"
+                >
+                  <h2
+                    className="text-lg font-bold text-slate-950"
+                    id="challenge-participation-question"
+                  >
+                    {challengeKind === 'personal'
+                      ? 'Enroll in your personal challenge?'
+                      : 'Will you participate too?'}
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-slate-700">
+                    {challengeKind === 'personal'
+                      ? 'Creating this private challenge does not enroll you or create a participant. Enroll explicitly to save your own starting and target weights.'
+                      : 'Creating this challenge makes you its organizer, but does not enroll you. If you join, you’ll enter your own starting and target weights.'}
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <Link
+                      className="inline-flex items-center justify-center rounded-full bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+                      to={`/challenge/participants/enroll?challenge=${encodeURIComponent(newlyCreatedChallengeId)}&self=owner`}
+                    >
+                      {challengeKind === 'personal'
+                        ? 'Enroll me'
+                        : 'Yes, I’ll participate'}
+                    </Link>
+                    <Button
+                      onClick={() => setChoseOrganizerOnly(true)}
+                      type="button"
+                      variant="secondary"
+                    >
+                      {challengeKind === 'personal'
+                        ? 'Not now'
+                        : 'No, I’ll organize only'}
+                    </Button>
+                  </div>
+                  {choseOrganizerOnly ? (
+                    <div
+                      aria-live="polite"
+                      className="mt-4 rounded-xl bg-white p-4"
+                      role="status"
+                    >
+                      <p className="text-sm leading-6 text-slate-700">
+                        {challengeKind === 'personal'
+                          ? 'You have not enrolled, so this private challenge cannot record weigh-ins yet. You can enroll yourself whenever you’re ready.'
+                          : 'You’re the organizer only. You can manage invitations in Group and enroll yourself separately whenever you’re ready.'}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-4">
+                        {challengeKind === 'group' ? (
+                          <Link
+                            className="text-sm font-semibold text-emerald-700 underline"
+                            to={`/challenge/invites?challenge=${encodeURIComponent(newlyCreatedChallengeId)}`}
+                          >
+                            Invite participants
+                          </Link>
+                        ) : null}
+                        <Link
+                          className="text-sm font-semibold text-emerald-700 underline"
+                          to={`/challenge/participants/enroll?challenge=${encodeURIComponent(newlyCreatedChallengeId)}&self=owner`}
+                        >
+                          Enroll me later
+                        </Link>
+                      </div>
+                    </div>
+                  ) : null}
+                </section>
+              ) : null}
+
+              <Button
+                className="w-full"
+                disabled={isSaving || persistence.mode === 'unavailable'}
+                type="submit"
+              >
+                {isSaving
+                  ? 'Saving challenge…'
+                  : selectedChallengeId
+                    ? 'Update challenge'
+                    : 'Save challenge'}
+              </Button>
+            </>
+          )}
         </form>
 
         <nav
