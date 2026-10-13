@@ -151,6 +151,75 @@ describe('ChallengeSetupPage', () => {
     ).not.toBeInTheDocument()
   })
 
+  it('opens the requested owned challenge directly for editing', async () => {
+    window.localStorage.setItem(
+      'slimpossible.local.challenges',
+      JSON.stringify([
+        {
+          createdAt: '2026-09-17T10:00:00.000Z',
+          createdBy: 'local-owner',
+          description: 'Keep this private description',
+          endDate: '2026-12-01',
+          id: 'challenge-to-edit',
+          kind: 'personal',
+          name: 'Selected private challenge',
+          ownerId: 'local-owner',
+          startDate: '2026-09-01',
+          status: 'active',
+          updatedAt: '2026-09-17T10:00:00.000Z',
+        },
+      ]),
+    )
+    renderPage('/challenge/setup?challenge=challenge-to-edit')
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Saved challenge')).toHaveValue(
+        'challenge-to-edit',
+      ),
+    )
+    expect(screen.getByRole('textbox', { name: 'Challenge name' })).toHaveValue(
+      'Selected private challenge',
+    )
+    expect(screen.getByLabelText('Description (optional)')).toHaveValue(
+      'Keep this private description',
+    )
+    fireEvent.change(screen.getByRole('textbox', { name: 'Challenge name' }), {
+      target: { value: 'Edited selected challenge' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Update challenge' }))
+
+    await waitFor(() =>
+      expect(
+        JSON.parse(
+          window.localStorage.getItem('slimpossible.local.challenges') ?? '[]',
+        ),
+      ).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: 'challenge-to-edit',
+            name: 'Edited selected challenge',
+          }),
+        ]),
+      ),
+    )
+    expect(
+      JSON.parse(
+        window.localStorage.getItem('slimpossible.local.challenges') ?? '[]',
+      ),
+    ).toHaveLength(1)
+  })
+
+  it('does not turn an unavailable challenge management link into a new challenge', async () => {
+    renderPage('/challenge/setup?challenge=not-owned')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'That saved challenge is unavailable for this account',
+    )
+    expect(
+      screen.getByRole('button', { name: 'Save challenge' }),
+    ).toBeDisabled()
+  })
+
   it('preserves typed fields when session restoration reloads multiple challenges', async () => {
     vi.stubEnv('VITE_SUPABASE_URL', 'https://project.supabase.co')
     vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-anon-key')

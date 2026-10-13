@@ -83,7 +83,8 @@ function validateChallengeSetup({
 }
 
 export function ChallengeSetupPage() {
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedChallengeId = searchParams.get('challenge') ?? ''
   const requestedKind: ChallengeKind =
     searchParams.get('kind') === 'personal' ? 'personal' : 'group'
   const { state: authState } = useOptionalAuth()
@@ -109,6 +110,8 @@ export function ChallengeSetupPage() {
   const [choseOrganizerOnly, setChoseOrganizerOnly] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [requestedChallengeUnavailable, setRequestedChallengeUnavailable] =
+    useState(false)
   const previousOwnerId = useRef(ownerId)
   const loadGeneration = useRef(0)
   const activeLoadAbortController = useRef<AbortController | null>(null)
@@ -124,6 +127,7 @@ export function ChallengeSetupPage() {
     activeLoadAbortController.current = abortController
 
     setIsLoading(true)
+    setRequestedChallengeUnavailable(Boolean(requestedChallengeId))
     if (ownerChanged) {
       setChallenges([])
       setSelectedChallengeId('')
@@ -133,6 +137,7 @@ export function ChallengeSetupPage() {
       try {
         if (persistence.mode === 'unavailable') {
           if (isCurrent) {
+            setRequestedChallengeUnavailable(Boolean(requestedChallengeId))
             setSubmitError(persistence.message)
             setIsLoading(false)
           }
@@ -157,6 +162,7 @@ export function ChallengeSetupPage() {
         }
 
         if (result.state === 'timeout' || didTimeout) {
+          setRequestedChallengeUnavailable(Boolean(requestedChallengeId))
           reportChallengeLoadFailure('timeout')
           setSubmitError(challengeLoadTimeoutMessage)
           setIsLoading(false)
@@ -164,13 +170,36 @@ export function ChallengeSetupPage() {
         }
 
         if (result.state === 'error') {
+          setRequestedChallengeUnavailable(Boolean(requestedChallengeId))
           reportChallengeLoadFailure('request')
           setSubmitError(result.error.message)
           setIsLoading(false)
           return
         }
 
-        setChallenges(result.state === 'success' ? result.data : [])
+        const ownedChallenges = result.state === 'success' ? result.data : []
+        setChallenges(ownedChallenges)
+        const requestedChallenge = ownedChallenges.find(
+          ({ id }) => id === requestedChallengeId,
+        )
+        if (requestedChallengeId) {
+          if (requestedChallenge) {
+            setSelectedChallengeId(requestedChallenge.id)
+            setChallengeKind(requestedChallenge.kind)
+            setValues({
+              description: requestedChallenge.description ?? '',
+              endDate: requestedChallenge.endDate,
+              name: requestedChallenge.name,
+              startDate: requestedChallenge.startDate,
+            })
+            setRequestedChallengeUnavailable(false)
+          } else {
+            setSelectedChallengeId('')
+            setRequestedChallengeUnavailable(true)
+          }
+        } else {
+          setRequestedChallengeUnavailable(false)
+        }
         setSubmitError('')
         setIsLoading(false)
       } catch {
@@ -201,7 +230,7 @@ export function ChallengeSetupPage() {
         window.clearTimeout(timeoutId)
       }
     }
-  }, [ownerId, persistence])
+  }, [ownerId, persistence, requestedChallengeId])
 
   function selectChallenge(id: string) {
     setSelectedChallengeId(id)
@@ -226,6 +255,10 @@ export function ChallengeSetupPage() {
 
   function startNewChallenge() {
     selectChallenge('')
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('challenge')
+    setSearchParams(nextParams, { replace: true })
+    setRequestedChallengeUnavailable(false)
   }
 
   function updateValue(field: keyof ChallengeSetupValues, value: string) {
@@ -238,6 +271,7 @@ export function ChallengeSetupPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (requestedChallengeUnavailable) return
 
     const nextErrors = validateChallengeSetup(values)
     setErrors(nextErrors)
@@ -333,6 +367,15 @@ export function ChallengeSetupPage() {
           noValidate
           onSubmit={handleSubmit}
         >
+          {requestedChallengeUnavailable && !isLoading ? (
+            <p
+              className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950"
+              role="alert"
+            >
+              That saved challenge is unavailable for this account. Choose an
+              owned challenge or create a new one.
+            </p>
+          ) : null}
           {!isLoading && challenges.length > 0 ? (
             <div>
               <label
@@ -575,7 +618,11 @@ export function ChallengeSetupPage() {
 
           <Button
             className="w-full"
-            disabled={isSaving || persistence.mode === 'unavailable'}
+            disabled={
+              isSaving ||
+              persistence.mode === 'unavailable' ||
+              requestedChallengeUnavailable
+            }
             type="submit"
           >
             {isSaving

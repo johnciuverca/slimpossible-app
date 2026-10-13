@@ -76,7 +76,10 @@ export function WorkspaceCompatibilityRoute({
   useEffect(() => {
     let current = true
     const resolve = async () => {
-      let challengeKind: 'group' | 'personal' | null = null
+      let eligibleChallenge: {
+        kind: 'group' | 'personal'
+        owner: boolean
+      } | null = null
       if (
         requestedChallenge &&
         state.status === 'signed-in' &&
@@ -87,34 +90,55 @@ export function WorkspaceCompatibilityRoute({
           persistence.repositories.challenges.listVisibleToUser(ownerId),
           persistence.repositories.participants.listForUser(ownerId),
         ])
-        if (
-          challenges.state === 'success' &&
-          participants.state === 'success' &&
-          participants.data.some(
-            (participant) =>
-              participant.challengeId === requestedChallenge &&
-              participant.status === 'active',
+        if (challenges.state === 'success') {
+          const challenge = challenges.data.find(
+            ({ id }) => id === requestedChallenge,
           )
-        ) {
-          challengeKind =
-            challenges.data.find(({ id }) => id === requestedChallenge)?.kind ??
-            null
+          const owner = challenge?.ownerId === ownerId
+          const activeMember =
+            participants.state === 'success' &&
+            participants.data.some(
+              (participant) =>
+                participant.challengeId === requestedChallenge &&
+                participant.status === 'active',
+            )
+          if (
+            challenge &&
+            (activeMember || (owner && destination === 'challenge'))
+          ) {
+            eligibleChallenge = {
+              kind: challenge.kind,
+              owner: owner && !activeMember,
+            }
+          }
         }
       }
       if (!current) return
 
       const params = new URLSearchParams(location.search)
       let path = '/dashboard'
+      if (destination === 'today') params.set('tab', 'overview')
       if (destination === 'progress' || destination === 'goals') {
         path = '/dashboard'
         params.set('tab', 'progress')
-      } else if (destination === 'challenge' && challengeKind === 'group') {
+      } else if (
+        destination === 'challenge' &&
+        eligibleChallenge?.kind === 'group'
+      ) {
         path = '/group'
-      } else if (destination === 'challenge' && challengeKind === 'personal') {
-        params.set('tab', 'progress')
+      } else if (
+        destination === 'challenge' &&
+        eligibleChallenge?.kind === 'personal'
+      ) {
+        if (eligibleChallenge.owner) {
+          path = '/challenge/participants/enroll'
+          params.set('self', 'owner')
+        } else {
+          params.set('tab', 'progress')
+        }
       }
 
-      if (requestedChallenge && !challengeKind) {
+      if (requestedChallenge && !eligibleChallenge) {
         params.delete('challenge')
         params.set('navigation', 'challenge-unavailable')
       }
@@ -130,6 +154,7 @@ export function WorkspaceCompatibilityRoute({
         params.delete('challenge')
         params.set('navigation', 'challenge-unavailable')
       }
+      if (destination === 'today') params.set('tab', 'overview')
       if (destination === 'progress' || destination === 'goals')
         params.set('tab', 'progress')
       const query = params.toString()

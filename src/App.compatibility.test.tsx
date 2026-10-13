@@ -38,6 +38,10 @@ function renderRoute(
           />
           <Route path="/dashboard" element={<CurrentLocation />} />
           <Route path="/group" element={<CurrentLocation />} />
+          <Route
+            path="/challenge/participants/enroll"
+            element={<CurrentLocation />}
+          />
         </Routes>
       </MemoryRouter>
     </AuthProvider>,
@@ -52,8 +56,10 @@ function mockEligibleContexts() {
         listVisibleToUser: vi.fn().mockResolvedValue({
           state: 'success',
           data: [
-            { id: 'group-one', kind: 'group' },
-            { id: 'personal-one', kind: 'personal' },
+            { id: 'group-one', kind: 'group', ownerId: 'someone-else' },
+            { id: 'personal-one', kind: 'personal', ownerId: 'someone-else' },
+            { id: 'owned-group', kind: 'group', ownerId: 'member-1' },
+            { id: 'owned-personal', kind: 'personal', ownerId: 'member-1' },
           ],
         }),
       },
@@ -117,7 +123,50 @@ describe('legacy workspace navigation', () => {
     renderRoute('/today?challenge=group-one&day=recent#overview', 'today')
     await waitFor(() =>
       expect(screen.getByTestId('location')).toHaveTextContent(
-        '/dashboard?challenge=group-one&day=recent#overview',
+        '/dashboard?challenge=group-one&day=recent&tab=overview#overview',
+      ),
+    )
+  })
+
+  it('normalizes a stale Today tab to Overview while retaining other context', async () => {
+    mockEligibleContexts()
+    renderRoute(
+      '/today?tab=progress&challenge=group-one&source=old#overview',
+      'today',
+    )
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/dashboard?tab=overview&challenge=group-one&source=old#overview',
+      ),
+    )
+  })
+
+  it('keeps an owner-only Group challenge on its management workspace', async () => {
+    mockEligibleContexts()
+    renderRoute('/challenges?challenge=owned-group&source=old', 'challenge')
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/group?challenge=owned-group&source=old',
+      ),
+    )
+  })
+
+  it('preserves the owner self-enrollment action for a private challenge', async () => {
+    mockEligibleContexts()
+    renderRoute('/challenges?challenge=owned-personal&source=old', 'challenge')
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/challenge/participants/enroll?challenge=owned-personal&source=old&self=owner',
+      ),
+    )
+  })
+
+  it('does not expose owner-only challenge context in personal Progress', async () => {
+    mockEligibleContexts()
+    renderRoute('/progress?challenge=owned-personal', 'progress')
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/dashboard?tab=progress&navigation=challenge-unavailable',
       ),
     )
   })
