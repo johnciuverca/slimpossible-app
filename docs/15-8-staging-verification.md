@@ -15,8 +15,16 @@
   not the Slimpossible app. This is specific to that browser/session, not a
   project-wide protection finding. The PM subsequently used their existing
   authenticated in-app browser (no credentials transferred) and confirmed the
-  staging app loaded. The exact deployed SHA was not independently confirmed
-  during that observation.
+  staging app loaded. In a follow-up read-only check, PM independently
+  confirmed the Vercel deployment UI for deployment
+  `E4nSwMkXrJ7NZPByKMESA6KdkziA` reports project `slimpossible-app`, Preview
+  environment, source branch `staging`, and exact source commit
+  `a2b524f33558f25744b5624580eac224943eaf24` (the merge of PR #267). The
+  assigned stable staging domain matches the hostname above. This maps the
+  reported owner browser observations to the candidate. It confirms Vercel
+  source/deployment metadata only; the Supabase project targeted by runtime
+  configuration was not independently verified, and no environment values
+  were inspected.
 
 ## Automated evidence on the exact staging tree
 
@@ -76,7 +84,7 @@ link was enabled; the error did not recur. No record was created or changed;
 no private values, identities, or notes are included here. The exact initial
 failing request/status was not captured, so the transient cause remains
 unknown. No code fix is justified by this observation. Member/outsider access,
-save/edit/refresh, and exact deployed-SHA mapping remain outstanding.
+save/edit/refresh and connected auth/privacy negatives remain outstanding.
 
 In a follow-up read-only owner-session check at 390×844, Dashboard Overview,
 personal chart, and authorized Invite people link loaded. Document width stayed
@@ -101,8 +109,10 @@ not close them from this local/CI/deployment result. Issue #247 remains paused.
 ## Remaining verification
 
 Continue in the already-authorized staging browser/session when available.
-Confirm the deployed SHA and dedicated non-production project, then complete
-the remaining desktop-size visual and direct hard-refresh/deep-link checks.
+The Vercel Preview source SHA and project/domain mapping are verified as above.
+The runtime Supabase project target is not verified; do not expose or inspect
+secret environment values. Complete the remaining desktop-size visual and
+direct hard-refresh/deep-link checks.
 Only if already-authorized member/outsider sessions are available, run those
 read-only routes; do not create accounts. Save/edit/refresh acceptance remains
 open and must use already-authorized disposable records under the existing
