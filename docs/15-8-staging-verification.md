@@ -12,10 +12,11 @@
 - The repository's documented stable staging hostname,
   `https://slimpossible-app-git-staging-cvc10.vercel.app`, was opened
   unauthenticated at 1280×900. It returned Vercel's login/protection page,
-  not the Slimpossible app. Preview-to-commit mapping and authenticated visual
-  inspection therefore remain **BLOCKED / NOT EXECUTED**. No 390px app view
-  could be inspected through that gate. No user session or credentials were
-  loaded, and the temporary screenshot is not included in the repository.
+  not the Slimpossible app. This is specific to that browser/session, not a
+  project-wide protection finding. The PM subsequently used their existing
+  authenticated in-app browser (no credentials transferred) and confirmed the
+  staging app loaded. The exact deployed SHA was not independently confirmed
+  during that observation.
 
 ## Automated evidence on the exact staging tree
 
@@ -56,15 +57,28 @@ notes, personal-only or unshared entries, raw IDs, or another group's data.
 The tests above exercise synthetic projections; no live payload was inspected
 for this candidate.
 
-## Connected acceptance — NOT EXECUTED
+## Connected acceptance — PARTIAL; owner journeys remain open
 
-| Journey                                                      | Automated evidence                                            | Connected result on `a2b524f`                         |
-| ------------------------------------------------------------ | ------------------------------------------------------------- | ----------------------------------------------------- |
-| Owner, joined member, outsider/no-challenge                  | Synthetic route, role, permission, and metric coverage passes | NOT EXECUTED — protected preview could not be entered |
-| Dashboard, Progress/Goals, selected Group; save/edit/refresh | Synthetic UI/repository/E2E coverage passes                   | NOT EXECUTED                                          |
-| Logout/login and account switching                           | Injected auth and synthetic account-switch coverage passes    | NOT EXECUTED                                          |
-| Desktop and 390px visual/keyboard/labels                     | Automated desktop/mobile/keyboard assertions pass             | BLOCKED — app UI remained behind Vercel protection    |
-| Actual staging permissions and returned data                 | Authorization contracts and mocked RPC privacy tests pass     | NOT EXECUTED — no connected request or SQL was made   |
+| Journey                                                      | Automated evidence                                            | Connected result on `a2b524f`                                                            |
+| ------------------------------------------------------------ | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Owner, joined member, outsider/no-challenge                  | Synthetic route, role, permission, and metric coverage passes | NOT EXECUTED — member and outsider journeys remain open                                  |
+| Dashboard, Progress/Goals, selected Group; save/edit/refresh | Synthetic UI/repository/E2E coverage passes                   | PARTIAL — Dashboard/Group viewed read-only; save/edit/refresh not run                    |
+| Logout/login and account switching                           | Injected auth and synthetic account-switch coverage passes    | NOT EXECUTED                                                                             |
+| Desktop and 390px visual/keyboard/labels                     | Automated desktop/mobile/keyboard assertions pass             | PARTIAL — PM saw Dashboard/Group at unspecified desktop size; 390px/keyboard not checked |
+| Actual staging permissions and returned data                 | Authorization contracts and mocked RPC privacy tests pass     | PARTIAL — selected Group summary loaded; payload/privacy negatives not inspected         |
+
+The PM's read-only authenticated observation found the primary Dashboard/Group
+navigation and personal Overview working, and the selected authorized Group
+summary loading with owner-management actions. On the first Dashboard load,
+invitation choices showed a load error and “Invite people” was disabled. No
+record was created or changed; no private values, identities, or notes are
+included here. The underlying Dashboard workspace loads challenge visibility
+and the signed-in user's participant rows together; either request can produce
+the invitation-choice error. Since the Group context later loaded, a failure
+of the participant-list request is a plausible explanation, but the exact
+failing request and error were not captured. This is a diagnosis to verify, not
+a confirmed root cause. Retry/recovery, member/outsider access, save/edit,
+responsive 390px, and keyboard checks remain outstanding.
 
 Prior evidence does not transfer automatically: #155's existing partial report
 is for the older `76312b6` candidate; #212/#211 evidence is for earlier
@@ -72,13 +86,16 @@ Chapter-16 candidates. #207 has no earlier evidence comments. Keep #207, #212,
 and #155 open until coordinated exact-candidate observations are recorded; do
 not close them from this local/CI/deployment result. Issue #247 remains paused.
 
-## Owner action to unblock
+## Remaining verification
 
-In the owner's authenticated Vercel browser, open the stable staging Preview,
-confirm it serves candidate `a2b524f` and the dedicated non-production project,
-then inspect Dashboard/Group at desktop and 390px and run the existing
-authorized disposable owner/member/outsider journeys. Return redacted
-PASS/FAIL/BLOCKED observations for the table above. Do not send credentials,
-identities, private notes, raw weights, screenshots containing personal data,
-or environment-variable values. No new accounts, hosted SQL, production
-changes, issue closure, or promotion to `main` were performed here.
+Continue in the already-authorized staging browser/session when available.
+Confirm the deployed SHA and dedicated non-production project, then repeat the
+Dashboard invitation-choice load once while observing only request outcome and
+status (no payload values); determine whether the challenge or participant
+request fails and whether refresh recovers. Complete desktop/390px, keyboard,
+member/outsider, and authorized save/edit/refresh checks with disposable
+non-sensitive records. Return redacted PASS/FAIL/BLOCKED observations. Do not
+transfer credentials, identities, private notes, raw weights, screenshots
+containing personal data, or environment-variable values. No new accounts,
+hosted SQL, production changes, issue closure, or promotion to `main` were
+performed here.
