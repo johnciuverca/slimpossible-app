@@ -8,6 +8,7 @@ const otherViewerId = '44444444-4444-4444-8444-444444444444'
 const memberKey = (group: string, viewer: string) =>
   createHash('md5').update(`${group}:${viewer}`).digest('hex')
 const supabaseRestUrl = 'https://group-preview.supabase.co/rest/v1'
+type TargetChangeControl = { hold?: boolean; release?: () => void }
 
 function shiftDate(dateOnly: string, days: number) {
   const date = new Date(`${dateOnly}T00:00:00.000Z`)
@@ -20,11 +21,16 @@ async function installGroupFixtures(
   multiple = false,
   ownEntries = false,
   differentWeights = false,
+  initialOwnWeight?: number,
+  priorOwnWeight?: number,
+  targetChangeControl?: TargetChangeControl,
 ) {
   const challengeId = ownEntries ? ownGroupId : 'e2e-challenge'
   const secondId = ownEntries ? secondGroupId : 'e2e-second-group'
   const requests: string[] = []
-  let ownWeight: number | null = differentWeights ? 95.1 : 88.5
+  let ownWeight: number | null =
+    initialOwnWeight ?? (differentWeights ? 95.1 : 88.5)
+  let ownTarget = 80
   page.on('request', (request) => requests.push(request.url()))
 
   await page.route(`${supabaseRestUrl}/**`, async (route) => {
@@ -40,7 +46,7 @@ async function installGroupFixtures(
             user_id: viewerId,
             display_name: 'Own viewer',
             starting_weight_kg: 100,
-            target_weight_kg: 80,
+            target_weight_kg: ownTarget,
             status: 'active',
             created_at: '2026-09-01T00:00:00Z',
             updated_at: '2026-09-01T00:00:00Z',
@@ -52,7 +58,7 @@ async function installGroupFixtures(
             user_id: viewerId,
             display_name: 'Own viewer',
             starting_weight_kg: 100,
-            target_weight_kg: 80,
+            target_weight_kg: ownTarget,
             status: 'active',
             created_at: '2026-09-01T00:00:00Z',
             updated_at: '2026-09-01T00:00:00Z',
@@ -80,6 +86,16 @@ async function installGroupFixtures(
             ? []
             : [
                 ownRow(),
+                ...(priorOwnWeight === undefined
+                  ? []
+                  : [
+                      {
+                        ...ownRow(),
+                        id: 'disposable-own-reached-target',
+                        recorded_date: '2026-09-21',
+                        weight_kg: priorOwnWeight,
+                      },
+                    ]),
                 ...(differentWeights
                   ? [
                       {
@@ -92,6 +108,32 @@ async function installGroupFixtures(
                   : []),
               ],
         ),
+      })
+      return
+    }
+    if (url.pathname === '/rest/v1/rpc/change_my_group_target') {
+      const body = request.postDataJSON() as {
+        target_challenge_id: string
+        target_target_weight_kg: number
+      }
+      expect(body.target_challenge_id).toBe(challengeId)
+      if (targetChangeControl?.hold) {
+        await new Promise<void>((resolve) => {
+          targetChangeControl.release = resolve
+        })
+      }
+      ownTarget = body.target_target_weight_kg
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            challenge_id: challengeId,
+            starting_weight_kg: 100,
+            target_weight_kg: ownTarget,
+            previous_target_weight_kg: null,
+            previous_target_achieved_on: null,
+          },
+        ]),
       })
       return
     }
@@ -298,9 +340,12 @@ async function installGroupFixtures(
         body: JSON.stringify([
           {
             member_key: ownKey,
-            display_name: 'Same display name',
+            display_name:
+              body.target_challenge_id === challengeId
+                ? 'Same display name'
+                : 'Second group member',
             starting_weight_kg: 100,
-            target_weight_kg: 80,
+            target_weight_kg: ownTarget,
             latest_recorded_date: '2026-09-22',
             completion_percentage: 50,
             progress_state: 'in_progress',
@@ -314,9 +359,12 @@ async function installGroupFixtures(
           },
           {
             member_key: otherKey,
-            display_name: 'Same display name',
+            display_name:
+              body.target_challenge_id === challengeId
+                ? 'Same display name'
+                : 'Second group member',
             starting_weight_kg: 100,
-            target_weight_kg: 80,
+            target_weight_kg: ownTarget,
             latest_recorded_date: '2026-09-22',
             completion_percentage: 50,
             progress_state: 'in_progress',
@@ -1199,7 +1247,7 @@ for (const viewport of [
     page,
   }) => {
     await page.setViewportSize({ height: 900, width: viewport.width })
-    const requests = await installGroupFixtures(page, false, true)
+    const requests = await installGroupFixtures(page, true, true, false, 90)
     await page.goto(
       `/e2e/fixtures/today-harness.html?scenario=group&user=${viewerId}`,
     )
@@ -1228,6 +1276,16 @@ for (const viewport of [
       requests.some((url) => url.includes('/rpc/get_group_member_progress')),
     ).toBe(true)
     expect(requests.some((url) => /\/weigh_ins(?:\?|$)/.test(url))).toBe(false)
+    await page.getByRole('button', { name: 'Change target' }).click()
+    const targetInput = page.getByLabel('New target (kg)')
+    await expect(targetInput).toHaveValue('80')
+    await targetInput.fill('85')
+    await page.getByRole('button', { name: 'Save target' }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(page.getByText(/Current target: 85 kg/).first()).toBeVisible()
+    expect(
+      requests.some((url) => url.includes('/rpc/change_my_group_target')),
+    ).toBe(true)
     await page.getByRole('button', { name: 'Overview' }).click()
     await expect(
       page.getByRole('button', { name: 'Overview' }),
@@ -1235,5 +1293,154 @@ for (const viewport of [
     await expect(
       page.getByRole('heading', { name: 'Member progress' }),
     ).toHaveCount(0)
+  })
+
+  test(`retains reached status from historical shared evidence on ${viewport.label}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ height: 900, width: viewport.width })
+    await installGroupFixtures(page, false, true, false, 90, 80)
+    await page.goto(
+      `/e2e/fixtures/today-harness.html?scenario=group&user=${viewerId}`,
+    )
+    await page
+      .getByRole('link', { name: 'Group · E2E authorized group' })
+      .click()
+    await page.getByRole('button', { name: 'Progress & history' }).click()
+    await expect(
+      page.getByRole('button', { name: 'Change target' }),
+    ).toBeVisible()
+    await page.getByRole('button', { name: 'Change target' }).click()
+    await page.getByLabel('New target (kg)').fill('85')
+    await page.getByRole('button', { name: 'Save target' }).click()
+    await expect(page.getByRole('alert')).toContainText(
+      'After reaching a target, choose a lower target.',
+    )
+    await expect(page.getByRole('dialog')).toBeVisible()
+  })
+
+  test(`hides previous challenge progress while the new projection is pending on ${viewport.label}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ height: 900, width: viewport.width })
+    await installGroupFixtures(page, true, true, false, 90)
+    let releaseProjection!: () => void
+    const projectionPending = new Promise<void>((resolve) => {
+      releaseProjection = resolve
+    })
+    await page.route(
+      `${supabaseRestUrl}/rpc/get_group_member_progress`,
+      async (route) => {
+        const body = route.request().postDataJSON() as {
+          target_challenge_id: string
+        }
+        if (body.target_challenge_id !== secondGroupId) {
+          await route.fallback()
+          return
+        }
+        await projectionPending
+        await route.fulfill({
+          status: 403,
+          contentType: 'application/json',
+          body: JSON.stringify({ message: 'Group membership required.' }),
+        })
+      },
+    )
+    await page.goto(
+      `/e2e/fixtures/today-harness.html?scenario=group&user=${viewerId}`,
+    )
+    await page
+      .getByRole('link', { name: 'Group · E2E authorized group' })
+      .click()
+    await page.getByRole('button', { name: 'Progress & history' }).click()
+    const oldMember = page.getByRole('heading', {
+      name: 'Same display name',
+    })
+    await expect(oldMember).toHaveCount(2)
+
+    await page
+      .getByRole('navigation', { name: 'Challenge contexts' })
+      .getByRole('link', { name: 'Group · Second authorized group' })
+      .click()
+    await expect(oldMember).toHaveCount(0)
+    await expect(page.getByText('Loading member progress…')).toBeVisible()
+    releaseProjection()
+    await expect(oldMember).toHaveCount(0)
+    await expect(
+      page.getByText('Member progress is unavailable for this session.'),
+    ).toBeVisible()
+  })
+
+  test(`invalidates target dialogs on clean, dirty and saving context changes on ${viewport.label}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ height: 900, width: viewport.width })
+    const saveControl: TargetChangeControl = { hold: true }
+    const requests = await installGroupFixtures(
+      page,
+      true,
+      true,
+      false,
+      90,
+      undefined,
+      saveControl,
+    )
+    await page.goto(
+      `/e2e/fixtures/today-harness.html?scenario=group&user=${viewerId}`,
+    )
+    await page
+      .getByRole('link', { name: 'Group · E2E authorized group' })
+      .click()
+    await page.getByRole('button', { name: 'Progress & history' }).click()
+    const contexts = page.getByRole('navigation', {
+      name: 'Challenge contexts',
+    })
+    const firstGroup = contexts.getByRole('link', {
+      name: 'Group · E2E authorized group',
+    })
+    const secondGroup = contexts.getByRole('link', {
+      name: 'Group · Second authorized group',
+    })
+
+    await page.getByRole('button', { name: 'Change target' }).click()
+    await secondGroup.evaluate((link: HTMLAnchorElement) => link.click())
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(secondGroup).toHaveAttribute('aria-current', 'page')
+    await firstGroup.click()
+
+    await page.getByRole('button', { name: 'Change target' }).click()
+    await page.getByLabel('New target (kg)').fill('85')
+    await secondGroup.evaluate((link: HTMLAnchorElement) => link.click())
+    const discardDialog = page.getByRole('dialog', {
+      name: 'Discard unsaved input?',
+    })
+    await expect(discardDialog).toBeVisible()
+    await discardDialog
+      .getByRole('button', { name: 'Discard and leave' })
+      .click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(secondGroup).toHaveAttribute('aria-current', 'page')
+    await firstGroup.click()
+
+    await page.getByRole('button', { name: 'Change target' }).click()
+    await page.getByLabel('New target (kg)').fill('85')
+    await page.getByRole('button', { name: 'Save target' }).click()
+    await expect(
+      page.getByRole('button', { name: 'Saving target…' }),
+    ).toBeVisible()
+    await expect.poll(() => Boolean(saveControl.release)).toBe(true)
+    await secondGroup.evaluate((link: HTMLAnchorElement) => link.click())
+    const savingDialog = page.getByRole('dialog', { name: 'Save in progress' })
+    await expect(savingDialog).toBeVisible()
+    await expect(
+      savingDialog.getByRole('button', { name: 'Discard and leave' }),
+    ).toHaveCount(0)
+    await savingDialog.getByRole('button', { name: 'Stay' }).click()
+    saveControl.release?.()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(firstGroup).toHaveAttribute('aria-current', 'page')
+    expect(
+      requests.filter((url) => url.includes('/rpc/change_my_group_target')),
+    ).toHaveLength(1)
   })
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 
 import {
@@ -21,9 +21,12 @@ import type { PersonalWorkspace } from '../data/usePersonalWorkspace'
 import { usePersonalWorkspace } from '../data/usePersonalWorkspace'
 import { ownGroupMemberKey } from '../models/ownGroupMemberKey'
 import {
+  groupMemberProgressForKey,
   progressBlocks,
   type GroupMemberProgress,
 } from '../models/groupMemberProgress'
+import { valueForContext } from '../models/groupMemberProgress'
+import { ownDashboardGoal } from '../models/ownDashboardGoal'
 import {
   notifyPersonalWeightChange,
   usePersonalWeightRevision,
@@ -1479,46 +1482,69 @@ export function GroupDashboardPage() {
           ownGroupMemberKey(data?.challenge.id ?? '', ownerId) !== null)),
     ),
   })
-  const [memberProgress, setMemberProgress] = useState<GroupMemberProgress[]>(
-    [],
+  const [memberProgressSnapshot, setMemberProgressSnapshot] = useState<{
+    key: string
+    rows: GroupMemberProgress[]
+    state: 'loading' | 'ready' | 'error'
+  }>({ key: '', rows: [], state: 'loading' })
+  const [targetDialogSnapshot, setTargetDialogSnapshot] = useState<{
+    contextKey: string
+    participant: Participant
+  } | null>(null)
+  const targetDialogContextRef = useRef('')
+  const memberProgressKey = data
+    ? JSON.stringify([requestKey, data.challenge.id, reloadKey])
+    : ''
+  const memberProgressKeyRef = useRef(memberProgressKey)
+  memberProgressKeyRef.current = memberProgressKey
+  const visibleMemberProgressSnapshot = groupMemberProgressForKey(
+    memberProgressSnapshot,
+    memberProgressKey,
   )
-  const [memberProgressState, setMemberProgressState] = useState<
-    'loading' | 'ready' | 'error'
-  >('loading')
-  const [targetDialogParticipant, setTargetDialogParticipant] =
-    useState<Participant | null>(null)
+  const memberProgress = visibleMemberProgressSnapshot.rows
+  const memberProgressState = visibleMemberProgressSnapshot.state
 
   useEffect(() => {
     let current = true
     const challengeId = data?.challenge.id
-    setMemberProgress([])
+    const resultKey = memberProgressKey
     if (!progressTab || !challengeId || persistence.mode !== 'remote') {
-      setMemberProgressState('loading')
-      if (!progressTab)
-        return () => {
-          current = false
-        }
-      setMemberProgressState('error')
+      setMemberProgressSnapshot({
+        key: resultKey,
+        rows: [],
+        state: progressTab && challengeId ? 'error' : 'loading',
+      })
       return () => {
         current = false
       }
     }
-    setMemberProgressState('loading')
+    setMemberProgressSnapshot({ key: resultKey, rows: [], state: 'loading' })
     void persistence.repositories.groupProgress
       .getMemberProgress(challengeId)
       .then((result) => {
-        if (!current) return
+        if (!current || memberProgressKeyRef.current !== resultKey) return
         if (result.state === 'success' || result.state === 'empty') {
-          setMemberProgress(result.data)
-          setMemberProgressState('ready')
+          setMemberProgressSnapshot({
+            key: resultKey,
+            rows: result.data,
+            state: 'ready',
+          })
         } else {
-          setMemberProgressState('error')
+          setMemberProgressSnapshot({
+            key: resultKey,
+            rows: [],
+            state: 'error',
+          })
         }
+      })
+      .catch(() => {
+        if (!current || memberProgressKeyRef.current !== resultKey) return
+        setMemberProgressSnapshot({ key: resultKey, rows: [], state: 'error' })
       })
     return () => {
       current = false
     }
-  }, [data?.challenge.id, persistence, progressTab, reloadKey, weightRevision])
+  }, [data?.challenge.id, memberProgressKey, persistence, progressTab])
 
   const ownMemberKey =
     data && ownerId ? ownGroupMemberKey(data.challenge.id, ownerId) : null
@@ -1531,6 +1557,59 @@ export function GroupDashboardPage() {
             participant.status === 'active',
         ) ?? null)
       : null
+  const ownProgressRow = memberProgress.find(
+    (member) => member.memberKey === ownMemberKey,
+  )
+  const ownParticipantMatchesProjection = Boolean(
+    ownParticipant &&
+    ownProgressRow &&
+    ownParticipant.challengeId === data?.challenge.id &&
+    ownParticipant.userId === ownerId &&
+    ownParticipant.status === 'active' &&
+    ownParticipant.startingWeightKg === ownProgressRow.startingWeightKg &&
+    ownParticipant.targetWeightKg === ownProgressRow.targetWeightKg,
+  )
+  const ownGoal =
+    data &&
+    ownerId &&
+    ownParticipant &&
+    personalWorkspace.personal.state === 'ready' &&
+    ownParticipantMatchesProjection
+      ? ownDashboardGoal(
+          data.challenge,
+          ownParticipant,
+          ownerId,
+          personalWorkspace.personal.data,
+          localDateOnly(),
+        )
+      : null
+  const targetDialogContextKey = JSON.stringify([
+    location.key,
+    ownerId ?? null,
+    personalWorkspace.ownerKey,
+    personalWorkspace.contexts.key,
+    personalWorkspace.contexts.state,
+    memberProgressKey,
+    ownParticipant?.id ?? null,
+    ownParticipant?.status ?? null,
+    ownParticipant?.startingWeightKg ?? null,
+    ownParticipant?.targetWeightKg ?? null,
+    ownParticipantMatchesProjection,
+  ])
+  targetDialogContextRef.current = targetDialogContextKey
+  useEffect(() => {
+    setTargetDialogSnapshot(null)
+  }, [targetDialogContextKey])
+  const targetDialogParticipant = valueForContext(
+    targetDialogSnapshot
+      ? {
+          contextKey: targetDialogSnapshot.contextKey,
+          value: targetDialogSnapshot.participant,
+        }
+      : null,
+    targetDialogContextKey,
+    ownParticipantMatchesProjection,
+  )
 
   useEffect(() => {
     let isCurrent = true
@@ -1824,7 +1903,9 @@ export function GroupDashboardPage() {
                 ? null
                 : Math.max(0, Math.min(100, member.completionPercentage))
             const canChangeTarget =
-              member.memberKey === ownMemberKey && ownParticipant !== null
+              member.memberKey === ownMemberKey &&
+              ownParticipantMatchesProjection &&
+              ownGoal !== null
             return (
               <article
                 className="rounded-xl border border-stone-200 p-4"
@@ -1871,7 +1952,12 @@ export function GroupDashboardPage() {
                 {canChangeTarget ? (
                   <button
                     className="mt-3 min-h-11 rounded-xl border border-stone-300 px-4 py-2 font-semibold"
-                    onClick={() => setTargetDialogParticipant(ownParticipant)}
+                    onClick={() =>
+                      setTargetDialogSnapshot({
+                        contextKey: targetDialogContextKey,
+                        participant: ownParticipant!,
+                      })
+                    }
                     type="button"
                   >
                     Change target
@@ -1882,19 +1968,20 @@ export function GroupDashboardPage() {
           })}
           {targetDialogParticipant ? (
             <ChangeTargetDialog
-              onClose={() => setTargetDialogParticipant(null)}
+              key={targetDialogContextKey}
+              onClose={() => {
+                if (targetDialogContextRef.current === targetDialogContextKey)
+                  setTargetDialogSnapshot(null)
+              }}
               onSaved={() => {
-                setTargetDialogParticipant(null)
+                if (targetDialogContextRef.current !== targetDialogContextKey)
+                  return
+                setTargetDialogSnapshot(null)
                 void personalWorkspace.refresh()
                 setReloadKey((value) => value + 1)
               }}
               participant={targetDialogParticipant}
-              reached={
-                targetDialogParticipant.targetWeightKg <=
-                (memberProgress.find(
-                  (member) => member.memberKey === ownMemberKey,
-                )?.targetWeightKg ?? Infinity)
-              }
+              reached={ownGoal?.reached ?? false}
               workspace={personalWorkspace}
             />
           ) : null}

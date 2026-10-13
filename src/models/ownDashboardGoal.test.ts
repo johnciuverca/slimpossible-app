@@ -36,6 +36,25 @@ describe('own Dashboard goal evidence', () => {
     expect(result.reached).toBe(true)
     expect(result.dashboard.completionPercentage).toBe(60)
   })
+  it('allows a target increase while latest shared weight is above target, but keeps historical reach sticky', () => {
+    const participant = { ...member, targetWeightKg: 80 }
+    const at90 = goal([entry('2026-10-02', 90)], participant)!
+    expect(at90.reached).toBe(false)
+    const increaseTo85Allowed =
+      85 < participant.startingWeightKg &&
+      (!at90.reached || 85 < participant.targetWeightKg)
+    expect(increaseTo85Allowed).toBe(true)
+
+    const reachedThenRebounded = goal(
+      [entry('2026-10-02', 80), entry('2026-10-03', 90)],
+      participant,
+    )!
+    expect(reachedThenRebounded.reached).toBe(true)
+    const increaseTo85AfterReachAllowed =
+      85 < participant.startingWeightKg &&
+      (!reachedThenRebounded.reached || 85 < participant.targetWeightKg)
+    expect(increaseTo85AfterReachAllowed).toBe(false)
+  })
   it('represents an equal-baseline target as reached without inventing an entry', () => {
     const result = goal([], { ...member, targetWeightKg: 100 })!
     expect(result.dashboard.completionPercentage).toBe(100)
