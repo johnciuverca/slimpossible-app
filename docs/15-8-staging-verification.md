@@ -70,11 +70,11 @@ for this candidate.
 
 | Journey                                                      | Automated evidence                                            | Connected result on `a2b524f`                                                                                                    |
 | ------------------------------------------------------------ | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Owner, joined member, outsider/no-challenge                  | Synthetic route, role, permission, and metric coverage passes | PARTIAL — owner personal-only and joined-member UI paths run; unrelated outsider/anonymous/withdrawn NOT EXECUTED                |
+| Owner, joined member, outsider/no-challenge                  | Synthetic route, role, permission, and metric coverage passes | PARTIAL — owner/member and signed-in unrelated-account UI paths run; anonymous/withdrawn and server negatives NOT EXECUTED       |
 | Dashboard, Progress/Goals, selected Group; save/edit/refresh | Synthetic UI/repository/E2E coverage passes                   | PARTIAL — owner synthetic save/edit/reload/cleanup passed; member selected-Group read-only passed; broader workflows remain open |
 | Logout/login and account switching                           | Injected auth and synthetic account-switch coverage passes    | NOT EXECUTED                                                                                                                     |
 | Desktop and 390px visual/keyboard/labels                     | Automated desktop/mobile/keyboard assertions pass             | PARTIAL — owner read-only 390×844/keyboard pass; desktop visual and full accessibility audit not recorded                        |
-| Actual staging permissions and returned data                 | Authorization contracts and mocked RPC privacy tests pass     | PARTIAL — member UI denied owner-private contexts; no unrelated outsider or direct server-negative test                          |
+| Actual staging permissions and returned data                 | Authorization contracts and mocked RPC privacy tests pass     | PARTIAL — member/private-context and cross-group UI denials observed; no direct server-negative test                             |
 
 The PM's read-only authenticated observation found the primary Dashboard/Group
 navigation and personal Overview working, and the selected authorized Group
@@ -143,8 +143,18 @@ This is a connected member-UI/read-only context-denial result, not a direct
 HTTP/RPC authorization test, payload inspection, or proof for unrelated
 outsiders. The account previously described by a UI/display label resembling
 “outsider” is actually an active member of the tested Group; it is not counted
-as an outsider. Unrelated, anonymous, and withdrawn-member server-side
-negatives remain unexecuted.
+as an outsider.
+
+## Signed-in unrelated-account read-only check
+
+Using a different already-existing staging account, PM confirmed its own
+authorized Group remained available, then opened a direct Group URL for the
+tested account's Group. The app displayed that the selected challenge was
+unavailable and showed no shared table. A hard refresh preserved the denial;
+PM then returned to the account's own authorized Group. No records were read
+out, changed, or copied into the report. This is a signed-in cross-group UI
+denial only; it does not prove direct HTTP/RPC authorization or cover
+anonymous/withdrawn accounts. The separate account's identity is not recorded.
 
 Prior evidence does not transfer automatically: #155's existing partial report
 is for the older `76312b6` candidate; #212/#211 evidence is for earlier
@@ -155,14 +165,14 @@ not close them from this local/CI/deployment result. Issue #247 remains paused.
 ## Remaining verification
 
 Vercel source SHA/project/domain and the staging Preview backend assignment
-were verified as described above. Owner and joined-member UI paths are now
-partially exercised. Remaining gates are a desktop-size connected visual and
-direct hard-refresh/deep-link pass; unrelated outsider, anonymous, and
-withdrawn-member checks only if already-authorized sessions exist; auth
-switch/signup/recovery; direct server-side privacy negatives; and Group-sharing
-write behavior. Do not create accounts. If the invitation-choice error
-returns, capture only request category/status/error code; do not inspect or
-share payload values. Full contrast/accessibility review also remains open.
+were verified as described above. Owner, joined-member, and signed-in
+cross-group UI paths are partially exercised. Remaining gates are a
+desktop-size connected visual and direct hard-refresh/deep-link pass; anonymous
+and withdrawn-member UI checks only if already-authorized sessions exist;
+auth switch/signup/recovery; direct server-side privacy negatives; and
+Group-sharing write behavior. Do not create accounts. If the invitation-choice
+error returns, capture only request category/status/error code; do not inspect
+or share payload values. Full contrast/accessibility review also remains open.
 Return redacted PASS/FAIL/BLOCKED observations. Do not transfer credentials,
 identities, private notes, raw weights, screenshots containing personal data,
 or environment-variable values. No new accounts, hosted SQL, production
