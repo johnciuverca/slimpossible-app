@@ -7,6 +7,7 @@ import { personalWeighInToday } from '../models/personalWeighIn'
 import { createParticipantMilestones } from '../models/participantMilestones'
 import { MilestoneProgress } from './MilestoneProgress'
 import { ChangeTargetDialog } from './ChangeTargetDialog'
+import { ChangeStartingWeightDialog } from './ChangeStartingWeightDialog'
 import { Button, Card, FeedbackPanel } from './ui'
 
 export function DashboardGoals({
@@ -16,7 +17,10 @@ export function DashboardGoals({
 }) {
   const section = useRef<HTMLElement>(null)
   const choicesNav = useRef<HTMLElement>(null)
-  const pendingFocus = useRef<string | null>(null)
+  const pendingFocus = useRef<{
+    challengeId: string
+    control: 'target' | 'starting-weight'
+  } | null>(null)
   const [notice, setNotice] = useState<{
     challengeId: string
     message: string
@@ -50,9 +54,13 @@ export function DashboardGoals({
       workspace.contexts.state === 'ready' &&
       workspace.personal.state === 'ready'
     ) {
-      if (selected?.id === pendingFocus.current)
+      if (selected?.id === pendingFocus.current.challengeId)
         section.current
-          ?.querySelector<HTMLButtonElement>('[data-change-target]')
+          ?.querySelector<HTMLButtonElement>(
+            pendingFocus.current.control === 'target'
+              ? '[data-change-target]'
+              : '[data-change-starting-weight]',
+          )
           ?.focus()
       pendingFocus.current = null
     }
@@ -115,16 +123,21 @@ export function DashboardGoals({
               key={`${workspace.ownerKey}:${selected.id}`}
               workspace={workspace}
               challengeId={selected.id}
-              onSaved={() => {
+              onSaved={(control) => {
                 setNotice({
                   challengeId: selected.id,
                   message:
-                    'Your target was saved. Your original starting weight and reached targets are retained; refreshing your goals and selected group progress.',
+                    control === 'target'
+                      ? 'Your target was saved. Your original starting weight and reached targets are retained; refreshing your goals and selected group progress.'
+                      : 'Your starting weight was corrected. Your target, weigh-ins, sharing choices, enrollment date and reached-target history are unchanged; refreshing your goals and selected group progress.',
                 })
                 section.current
                   ?.querySelector<HTMLElement>('#dashboard-goals-title')
                   ?.focus()
-                pendingFocus.current = selected.id
+                pendingFocus.current = {
+                  challengeId: selected.id,
+                  control,
+                }
                 workspace.refresh()
               }}
             />
@@ -142,9 +155,10 @@ function SelectedGoal({
 }: {
   workspace: PersonalWorkspace
   challengeId: string
-  onSaved: () => void
+  onSaved: (control: 'target' | 'starting-weight') => void
 }) {
   const [editing, setEditing] = useState(false)
+  const [editingStartingWeight, setEditingStartingWeight] = useState(false)
   const key = `${workspace.ownerKey}:${challengeId}:${workspace.contexts.key}`
   const [history, setHistory] = useState<{
     key: string
@@ -205,6 +219,10 @@ function SelectedGoal({
     participant.startingWeightKg > 0 &&
     challenge.kind === 'group' &&
     ['draft', 'active'].includes(challenge.status)
+  const canCorrectStartingWeight =
+    participant.status === 'active' &&
+    Number.isFinite(participant.startingWeightKg) &&
+    participant.startingWeightKg > 0
   const currentHistory = history?.key === key ? history : null
   return (
     <Card className="space-y-5 p-5 sm:p-7">
@@ -280,6 +298,16 @@ function SelectedGoal({
                 : 'Change target'}
             </Button>
           ) : null}
+          {canCorrectStartingWeight ? (
+            <Button
+              className="min-h-11"
+              data-change-starting-weight
+              variant="secondary"
+              onClick={() => setEditingStartingWeight(true)}
+            >
+              Edit starting weight
+            </Button>
+          ) : null}
         </>
       )}
       {challenge.kind === 'group' ? (
@@ -332,7 +360,18 @@ function SelectedGoal({
           onClose={() => setEditing(false)}
           onSaved={() => {
             setEditing(false)
-            onSaved()
+            onSaved('target')
+          }}
+        />
+      ) : null}
+      {editingStartingWeight && canCorrectStartingWeight ? (
+        <ChangeStartingWeightDialog
+          workspace={workspace}
+          participant={participant}
+          onClose={() => setEditingStartingWeight(false)}
+          onSaved={() => {
+            setEditingStartingWeight(false)
+            onSaved('starting-weight')
           }}
         />
       ) : null}

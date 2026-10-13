@@ -61,6 +61,36 @@ describe('own Dashboard goal evidence', () => {
     expect(result.dashboard.latestWeighIn).toBeNull()
     expect(result.reached).toBe(true)
   })
+  it('recalculates own progress from a corrected starting weight and the same current entry', () => {
+    const entries = [entry('2026-10-11', 94.8)]
+    const original = goal(entries)!
+    const corrected = goal(entries, { ...member, startingWeightKg: 110 })!
+    expect(original.dashboard.currentWeightKg).toBe(94.8)
+    expect(original.dashboard.completionPercentage).toBeCloseTo(52)
+    expect(corrected.dashboard.currentWeightKg).toBe(94.8)
+    expect(corrected.dashboard.targetWeightKg).toBe(90)
+    expect(corrected.dashboard.completionPercentage).toBeCloseTo(76)
+    expect(corrected.dashboard.remainingTargetWeightKg).toBe(
+      original.dashboard.remainingTargetWeightKg,
+    )
+  })
+  it('keeps personal challenge progress owner-private while using a corrected baseline', () => {
+    const personalChallenge = createChallengeFixture({ kind: 'personal' })
+    const personalParticipant = { ...member, challengeId: personalChallenge.id }
+    const currentEntry = {
+      ...entry('2026-10-11', 94.8, []),
+      sharedChallengeIds: [],
+    }
+    const corrected = ownDashboardGoal(
+      personalChallenge,
+      { ...personalParticipant, startingWeightKg: 110 },
+      member.userId,
+      [currentEntry],
+      '2026-10-12',
+    )!
+    expect(corrected.dashboard.currentWeightKg).toBe(94.8)
+    expect(corrected.dashboard.completionPercentage).toBeCloseTo(76)
+  })
   it('marks above-baseline targets unavailable', () => {
     const result = goal([entry('2026-10-02', 95)], {
       ...member,

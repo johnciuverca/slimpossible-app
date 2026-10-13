@@ -14,6 +14,7 @@ import { ChallengeTabs } from '../components/ChallengeContextTabs'
 import { WeightPageHeader } from '../components/WeightPageHeader'
 import { GroupChartHistory } from '../components/GroupChartHistory'
 import { ChangeTargetDialog } from '../components/ChangeTargetDialog'
+import { ChangeStartingWeightDialog } from '../components/ChangeStartingWeightDialog'
 import { DashboardChallengeActions } from '../components/DashboardChallengeActions'
 import { WeightEntryActions } from '../components/WeightEntryActions'
 import { WeightEntryCard } from '../components/WeightEntryCard'
@@ -1491,7 +1492,11 @@ export function GroupDashboardPage() {
     contextKey: string
     participant: Participant
   } | null>(null)
+  const [startingWeightDialogSnapshot, setStartingWeightDialogSnapshot] =
+    useState<{ contextKey: string; participant: Participant } | null>(null)
   const targetDialogContextRef = useRef('')
+  const startingWeightActionRef = useRef<HTMLButtonElement | null>(null)
+  const pendingStartingWeightFocus = useRef(false)
   const memberProgressKey = data
     ? JSON.stringify([requestKey, data.challenge.id, reloadKey])
     : ''
@@ -1569,6 +1574,18 @@ export function GroupDashboardPage() {
     ownParticipant.startingWeightKg === ownProgressRow.startingWeightKg &&
     ownParticipant.targetWeightKg === ownProgressRow.targetWeightKg,
   )
+  useEffect(() => {
+    if (
+      !pendingStartingWeightFocus.current ||
+      memberProgressState !== 'ready' ||
+      !ownParticipantMatchesProjection
+    )
+      return
+    if (startingWeightActionRef.current?.isConnected) {
+      startingWeightActionRef.current.focus()
+      pendingStartingWeightFocus.current = false
+    }
+  }, [memberProgressKey, memberProgressState, ownParticipantMatchesProjection])
   const ownGoal =
     data &&
     ownerId &&
@@ -1599,12 +1616,23 @@ export function GroupDashboardPage() {
   targetDialogContextRef.current = targetDialogContextKey
   useEffect(() => {
     setTargetDialogSnapshot(null)
+    setStartingWeightDialogSnapshot(null)
   }, [targetDialogContextKey])
   const targetDialogParticipant = valueForContext(
     targetDialogSnapshot
       ? {
           contextKey: targetDialogSnapshot.contextKey,
           value: targetDialogSnapshot.participant,
+        }
+      : null,
+    targetDialogContextKey,
+    ownParticipantMatchesProjection,
+  )
+  const startingWeightDialogParticipant = valueForContext(
+    startingWeightDialogSnapshot
+      ? {
+          contextKey: startingWeightDialogSnapshot.contextKey,
+          value: startingWeightDialogSnapshot.participant,
         }
       : null,
     targetDialogContextKey,
@@ -1906,6 +1934,10 @@ export function GroupDashboardPage() {
               member.memberKey === ownMemberKey &&
               ownParticipantMatchesProjection &&
               ownGoal !== null
+            const canCorrectStartingWeight =
+              member.memberKey === ownMemberKey &&
+              ownParticipantMatchesProjection &&
+              ownParticipant?.status === 'active'
             return (
               <article
                 className="rounded-xl border border-stone-200 p-4"
@@ -1963,6 +1995,22 @@ export function GroupDashboardPage() {
                     Change target
                   </button>
                 ) : null}
+                {canCorrectStartingWeight ? (
+                  <button
+                    ref={startingWeightActionRef}
+                    data-change-starting-weight
+                    className="mt-3 ml-2 min-h-11 rounded-xl border border-stone-300 px-4 py-2 font-semibold"
+                    onClick={() =>
+                      setStartingWeightDialogSnapshot({
+                        contextKey: targetDialogContextKey,
+                        participant: ownParticipant!,
+                      })
+                    }
+                    type="button"
+                  >
+                    Edit starting weight
+                  </button>
+                ) : null}
               </article>
             )
           })}
@@ -1982,6 +2030,25 @@ export function GroupDashboardPage() {
               }}
               participant={targetDialogParticipant}
               reached={ownGoal?.reached ?? false}
+              workspace={personalWorkspace}
+            />
+          ) : null}
+          {startingWeightDialogParticipant ? (
+            <ChangeStartingWeightDialog
+              key={`starting-weight:${targetDialogContextKey}`}
+              onClose={() => {
+                if (targetDialogContextRef.current === targetDialogContextKey)
+                  setStartingWeightDialogSnapshot(null)
+              }}
+              onSaved={() => {
+                if (targetDialogContextRef.current !== targetDialogContextKey)
+                  return
+                pendingStartingWeightFocus.current = true
+                setStartingWeightDialogSnapshot(null)
+                void personalWorkspace.refresh()
+                setReloadKey((value) => value + 1)
+              }}
+              participant={startingWeightDialogParticipant}
               workspace={personalWorkspace}
             />
           ) : null}

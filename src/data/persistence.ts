@@ -282,6 +282,16 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
         state: 'error',
       }
     },
+    async correctOwnEnrollmentStartingWeight() {
+      return {
+        error: {
+          kind: 'request',
+          message:
+            'Correcting an enrollment starting weight requires a signed-in server session.',
+        },
+        state: 'error',
+      }
+    },
     async listOwnGroupTargetMilestones() {
       return {
         error: {

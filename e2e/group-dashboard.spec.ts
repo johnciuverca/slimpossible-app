@@ -9,6 +9,7 @@ const memberKey = (group: string, viewer: string) =>
   createHash('md5').update(`${group}:${viewer}`).digest('hex')
 const supabaseRestUrl = 'https://group-preview.supabase.co/rest/v1'
 type TargetChangeControl = { hold?: boolean; release?: () => void }
+type StartingWeightCorrectionControl = { hold?: boolean; release?: () => void }
 
 function shiftDate(dateOnly: string, days: number) {
   const date = new Date(`${dateOnly}T00:00:00.000Z`)
@@ -24,6 +25,7 @@ async function installGroupFixtures(
   initialOwnWeight?: number,
   priorOwnWeight?: number,
   targetChangeControl?: TargetChangeControl,
+  startingWeightCorrectionControl?: StartingWeightCorrectionControl,
 ) {
   const challengeId = ownEntries ? ownGroupId : 'e2e-challenge'
   const secondId = ownEntries ? secondGroupId : 'e2e-second-group'
@@ -31,6 +33,7 @@ async function installGroupFixtures(
   let ownWeight: number | null =
     initialOwnWeight ?? (differentWeights ? 95.1 : 88.5)
   let ownTarget = 80
+  let ownStartingWeight = 100
   page.on('request', (request) => requests.push(request.url()))
 
   await page.route(`${supabaseRestUrl}/**`, async (route) => {
@@ -45,7 +48,7 @@ async function installGroupFixtures(
             challenge_id: challengeId,
             user_id: viewerId,
             display_name: 'Own viewer',
-            starting_weight_kg: 100,
+            starting_weight_kg: ownStartingWeight,
             target_weight_kg: ownTarget,
             status: 'active',
             created_at: '2026-09-01T00:00:00Z',
@@ -132,6 +135,33 @@ async function installGroupFixtures(
             target_weight_kg: ownTarget,
             previous_target_weight_kg: null,
             previous_target_achieved_on: null,
+          },
+        ]),
+      })
+      return
+    }
+    if (url.pathname === '/rest/v1/rpc/correct_my_enrollment_starting_weight') {
+      const body = request.postDataJSON() as {
+        target_challenge_id: string
+        target_starting_weight_kg: number
+      }
+      expect(body).toEqual({
+        target_challenge_id: challengeId,
+        target_starting_weight_kg: 110,
+      })
+      if (startingWeightCorrectionControl?.hold) {
+        await new Promise<void>((resolve) => {
+          startingWeightCorrectionControl.release = resolve
+        })
+      }
+      ownStartingWeight = body.target_starting_weight_kg
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            challenge_id: challengeId,
+            starting_weight_kg: ownStartingWeight,
+            target_weight_kg: ownTarget,
           },
         ]),
       })
@@ -344,10 +374,20 @@ async function installGroupFixtures(
               body.target_challenge_id === challengeId
                 ? 'Same display name'
                 : 'Second group member',
-            starting_weight_kg: 100,
+            starting_weight_kg:
+              body.target_challenge_id === challengeId
+                ? ownStartingWeight
+                : 100,
             target_weight_kg: ownTarget,
             latest_recorded_date: '2026-09-22',
-            completion_percentage: 50,
+            completion_percentage:
+              body.target_challenge_id === challengeId
+                ? Math.round(
+                    ((ownStartingWeight - (ownWeight ?? 90)) /
+                      (ownStartingWeight - ownTarget)) *
+                      1000,
+                  ) / 10
+                : 50,
             progress_state: 'in_progress',
             reached_target_milestones: [
               {
@@ -1293,6 +1333,106 @@ for (const viewport of [
     await expect(
       page.getByRole('heading', { name: 'Member progress' }),
     ).toHaveCount(0)
+  })
+
+  test(`corrects only own Group starting weight and refreshes on ${viewport.label}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ height: 900, width: viewport.width })
+    const correctionControl: StartingWeightCorrectionControl = { hold: true }
+    const requests = await installGroupFixtures(
+      page,
+      true,
+      true,
+      false,
+      90,
+      undefined,
+      undefined,
+      correctionControl,
+    )
+    await page.goto(
+      `/e2e/fixtures/today-harness.html?scenario=group&user=${viewerId}`,
+    )
+    await page
+      .getByRole('link', { name: 'Group · E2E authorized group' })
+      .click()
+    await page.getByRole('button', { name: 'Progress & history' }).click()
+
+    const editButton = page.getByRole('button', {
+      name: 'Edit starting weight',
+    })
+    await expect(editButton).toHaveCount(1)
+    await editButton.click()
+    const dialog = page.getByRole('dialog', {
+      name: 'Edit your starting weight',
+    })
+    const input = dialog.getByLabel('Correct starting weight (kg)')
+    await expect(input).toHaveValue('100')
+    await expect(input).toBeFocused()
+    await input.fill('79.99')
+    await dialog.getByRole('button', { name: 'Save starting weight' }).click()
+    await expect(dialog.getByRole('alert')).toContainText(
+      'at least your current target',
+    )
+    expect(
+      requests.filter((url) =>
+        url.includes('/rpc/correct_my_enrollment_starting_weight'),
+      ),
+    ).toHaveLength(0)
+    await input.fill('110.001')
+    await dialog.getByRole('button', { name: 'Save starting weight' }).click()
+    await expect(dialog.getByRole('alert')).toContainText(
+      'no more than two decimal places',
+    )
+
+    await page.keyboard.press('Escape')
+    const discardDialog = page.getByRole('dialog', {
+      name: 'Discard unsaved input?',
+    })
+    await expect(discardDialog).toBeVisible()
+    await discardDialog.getByRole('button', { name: 'Stay' }).click()
+    await expect(input).toHaveValue('110.001')
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+    await page
+      .getByRole('dialog', { name: 'Discard unsaved input?' })
+      .getByRole('button', { name: 'Discard and leave' })
+      .click()
+    await expect(editButton).toBeFocused()
+    await expect(dialog).toHaveCount(0)
+
+    await editButton.click()
+    const reopened = page.getByRole('dialog', {
+      name: 'Edit your starting weight',
+    })
+    await reopened.getByLabel('Correct starting weight (kg)').fill('110')
+    const form = reopened.locator('form')
+    await form.evaluate((element: HTMLFormElement) => element.requestSubmit())
+    await form.evaluate((element: HTMLFormElement) => element.requestSubmit())
+    await expect(
+      reopened.getByRole('button', { name: 'Saving starting weight…' }),
+    ).toBeVisible()
+    expect(
+      requests.filter((url) =>
+        url.includes('/rpc/correct_my_enrollment_starting_weight'),
+      ),
+    ).toHaveLength(1)
+    correctionControl.release?.()
+
+    await expect(reopened).toHaveCount(0)
+    await expect(
+      page.getByText('Start: 110 kg · Current target: 80 kg'),
+    ).toBeVisible()
+    await expect(
+      page.getByText('Start: 100 kg · Current target: 80 kg'),
+    ).toBeVisible()
+    await expect(page.getByText('66.7%', { exact: true })).toBeVisible()
+    await expect(page.getByText(/Reached 90 kg/)).toBeVisible()
+    await expect(editButton).toBeFocused()
+    expect(
+      requests.filter((url) =>
+        url.includes('/rpc/correct_my_enrollment_starting_weight'),
+      ),
+    ).toHaveLength(1)
   })
 
   test(`retains reached status from historical shared evidence on ${viewport.label}`, async ({

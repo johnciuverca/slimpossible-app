@@ -269,6 +269,35 @@ describe('Supabase repositories', () => {
     })
   })
 
+  it('maps the narrowly scoped own starting-weight correction RPC', async () => {
+    stubResponse([
+      {
+        challenge_id: 'challenge-1',
+        starting_weight_kg: 110,
+        target_weight_kg: 80,
+      },
+    ])
+    const result = await createRepositories(
+      client,
+    ).participants.correctOwnEnrollmentStartingWeight('challenge-1', 110)
+    expect(result).toEqual({
+      data: {
+        challengeId: 'challenge-1',
+        startingWeightKg: 110,
+        targetWeightKg: 80,
+      },
+      state: 'success',
+    })
+    const request = vi.mocked(fetch).mock.calls[0]
+    expect(String(request?.[0])).toContain(
+      '/rpc/correct_my_enrollment_starting_weight',
+    )
+    expect(JSON.parse(String(request?.[1]?.body))).toEqual({
+      target_challenge_id: 'challenge-1',
+      target_starting_weight_kg: 110,
+    })
+  })
+
   it('maps privately readable target milestones, including a null date without inventing one', async () => {
     stubResponse([
       { target_weight_kg: 90, achieved_on: null, state: 'reached' },
