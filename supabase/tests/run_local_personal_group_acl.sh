@@ -13,45 +13,56 @@ trap '"$task_pg_bin/pg_ctl" -D "$task_cluster/data" -m fast stop >/dev/null' EXI
 task_psql=("$task_pg_bin/psql" -X -v ON_ERROR_STOP=1 -h "$task_cluster/socket" -p 55432 -U postgres -d postgres)
 cd "$task_root"
 "${task_psql[@]}" -f supabase/tests/local_auth_compatibility_setup.sql
-for task_migration in supabase/migrations/*.sql; do
-  if [[ "$task_migration" != *20261005000001_converge_function_execute_grants.sql ]]; then
-    "${task_psql[@]}" -f "$task_migration"
-  fi
-done
-"${task_psql[@]}" -f supabase/tests/local_acl_fixture.sql
-"${task_psql[@]}" -f supabase/tests/group_weigh_in_history_authorization.sql
 run_history_harness() {
   sed -e 's/REPLACE_OWNER_UUID/00000000-0000-4000-8000-000000000001/g' \
       -e 's/REPLACE_MEMBER_UUID/00000000-0000-4000-8000-000000000002/g' \
       -e 's/REPLACE_OUTSIDER_UUID/00000000-0000-4000-8000-000000000003/g' \
     supabase/tests/group_weigh_in_history_staging_authorization.sql | "${task_psql[@]}"
 }
-run_history_harness
-if "${task_psql[@]}" -f supabase/tests/group_weigh_in_history_staging_authorization.sql; then
-  printf 'ERROR: unfilled group-history identity placeholders were accepted\n' >&2
-  exit 1
-fi
-if sed -e 's/REPLACE_OWNER_UUID/not-a-uuid/' \
-       -e 's/REPLACE_MEMBER_UUID/00000000-0000-4000-8000-000000000002/' \
-       -e 's/REPLACE_OUTSIDER_UUID/00000000-0000-4000-8000-000000000003/' \
-    supabase/tests/group_weigh_in_history_staging_authorization.sql | "${task_psql[@]}"; then
-  printf 'ERROR: malformed group-history identity was accepted\n' >&2
-  exit 1
-fi
-if sed -e 's/REPLACE_OWNER_UUID/00000000-0000-4000-8000-000000000001/g' \
-       -e 's/REPLACE_MEMBER_UUID/00000000-0000-4000-8000-000000000001/g' \
-       -e 's/REPLACE_OUTSIDER_UUID/00000000-0000-4000-8000-000000000003/g' \
-    supabase/tests/group_weigh_in_history_staging_authorization.sql | "${task_psql[@]}"; then
-  printf 'ERROR: duplicate group-history identities were accepted\n' >&2
-  exit 1
-fi
-if sed -e 's/REPLACE_OWNER_UUID/00000000-0000-4000-8000-000000000001/g' \
-       -e 's/REPLACE_MEMBER_UUID/00000000-0000-4000-8000-000000000002/g' \
-       -e 's/REPLACE_OUTSIDER_UUID/00000000-0000-4000-8000-000000000088/g' \
-    supabase/tests/group_weigh_in_history_staging_authorization.sql | "${task_psql[@]}"; then
-  printf 'ERROR: nonexistent group-history identity was accepted\n' >&2
-  exit 1
-fi
+run_staging_history_harness_guards() {
+  if "${task_psql[@]}" -f supabase/tests/group_weigh_in_history_staging_authorization.sql; then
+    printf 'ERROR: unfilled group-history identity placeholders were accepted\n' >&2
+    exit 1
+  fi
+  if sed -e 's/REPLACE_OWNER_UUID/not-a-uuid/' \
+         -e 's/REPLACE_MEMBER_UUID/00000000-0000-4000-8000-000000000002/' \
+         -e 's/REPLACE_OUTSIDER_UUID/00000000-0000-4000-8000-000000000003/' \
+      supabase/tests/group_weigh_in_history_staging_authorization.sql | "${task_psql[@]}"; then
+    printf 'ERROR: malformed group-history identity was accepted\n' >&2
+    exit 1
+  fi
+  if sed -e 's/REPLACE_OWNER_UUID/00000000-0000-4000-8000-000000000001/g' \
+         -e 's/REPLACE_MEMBER_UUID/00000000-0000-4000-8000-000000000001/g' \
+         -e 's/REPLACE_OUTSIDER_UUID/00000000-0000-4000-8000-000000000003/g' \
+      supabase/tests/group_weigh_in_history_staging_authorization.sql | "${task_psql[@]}"; then
+    printf 'ERROR: duplicate group-history identities were accepted\n' >&2
+    exit 1
+  fi
+  if sed -e 's/REPLACE_OWNER_UUID/00000000-0000-4000-8000-000000000001/g' \
+         -e 's/REPLACE_MEMBER_UUID/00000000-0000-4000-8000-000000000002/g' \
+         -e 's/REPLACE_OUTSIDER_UUID/00000000-0000-4000-8000-000000000088/g' \
+      supabase/tests/group_weigh_in_history_staging_authorization.sql | "${task_psql[@]}"; then
+    printf 'ERROR: nonexistent group-history identity was accepted\n' >&2
+    exit 1
+  fi
+}
+for task_migration in supabase/migrations/*.sql; do
+  if [[ "$task_migration" != *20261005000001_converge_function_execute_grants.sql ]]; then
+    if [[ "$task_migration" == *20261007000000_personal_weigh_ins.sql ]]; then
+      # Exercise the legacy opt-in RPC while it is installed. The following
+      # migration replaces it with the personal-weigh-in/share-table contract.
+      run_history_harness
+      run_staging_history_harness_guards
+    fi
+    "${task_psql[@]}" -f "$task_migration"
+  fi
+done
+# Migration 20261007000000 later revokes anon from this RPC. Restore its
+# pre-20261005000001 grant only in this disposable cluster so the older
+# convergence migration and its exact rollback can still be tested in isolation.
+"${task_psql[@]}" -c 'grant execute on function public.get_challenge_progress_summary(uuid) to anon'
+"${task_psql[@]}" -f supabase/tests/local_acl_fixture.sql
+"${task_psql[@]}" -f supabase/tests/group_weigh_in_history_authorization.sql
 "${task_psql[@]}" -f supabase/rollback/20261006000000_add_opt_in_group_weigh_in_history.sql
 "${task_psql[@]}" -c "do \$verify\$ begin
   if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'weigh_ins' and column_name = 'share_with_group')
@@ -136,4 +147,12 @@ fi
 "${task_psql[@]}" -f supabase/tests/function_execute_acl_audit.sql > "$task_cluster/recovery-acl.txt"
 run_harness
 "${task_psql[@]}" -v phase=recovery -f supabase/tests/local_acl_assertions.sql
+# Restore the later migration's current anon-denial contract after exercising
+# the historical convergence migration's rollback in isolation.
+"${task_psql[@]}" -c 'revoke execute on function public.get_challenge_progress_summary(uuid) from anon'
+"${task_psql[@]}" -c "do \$verify\$ begin
+  if has_function_privilege('anon', 'public.get_challenge_progress_summary(uuid)', 'EXECUTE') then
+    raise exception 'Current personal-weigh-in migration anon denial was not restored';
+  end if;
+end; \$verify\$"
 printf 'Local verification passed; stopped cluster and evidence retained at %s\n' "$task_cluster"
