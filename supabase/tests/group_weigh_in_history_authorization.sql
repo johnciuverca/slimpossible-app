@@ -9,7 +9,7 @@ create temp table slimpossible_group_weigh_in_checks (
   check_name text primary key,
   passed boolean not null
 );
-grant all on table slimpossible_group_weigh_in_checks to authenticated;
+grant all on table slimpossible_group_weigh_in_checks to authenticated, anon;
 
 do $$
 declare
@@ -67,19 +67,41 @@ begin
     (withdrawn_participant_id, test_challenge_id, withdrawn_id, 'Withdrawn Member', 'withdrawn', 90, 75, now()),
     (outsider_participant_id, other_challenge_id, outsider_id, 'Other Challenge', 'active', 90, 75, now());
 
-  -- The pre-existing row defaults private; two explicit opt-ins are visible;
-  -- the future-dated opt-in is excluded until its date arrives.
-  insert into public.weigh_ins (participant_id, recorded_date, weight_kg, note)
-  values (member_participant_id, current_date - 21, 102, 'historical private note');
-  insert into public.weigh_ins (
-    participant_id, recorded_date, weight_kg, note, share_with_group
-  ) values
-    (member_participant_id, current_date - 14, 100, 'private first note', true),
-    (member_participant_id, current_date - 7, 98.5, 'private correction note', true),
-    (member_participant_id, current_date + 1, 97, 'future private note', true),
-    (withdrawn_participant_id, current_date - 7, 75, 'withdrawn private note', true),
-    (outsider_participant_id, current_date - 7, 85, 'other challenge private note', true);
+  -- The older private entry must not become the shared-history delta baseline.
+  -- Only the next two entries are explicitly shared to this group; the future
+  -- entry is shared too, but is not yet visible. These are canonical personal
+  -- weigh-ins and challenge-specific share rows, matching the current RPC.
+  insert into public.personal_weigh_ins (user_id, recorded_date, weight_kg, note)
+  values
+    (member_id, current_date - 21, 102, 'historical private note'),
+    (member_id, current_date - 14, 100, 'private first note'),
+    (member_id, current_date - 7, 98.5, 'private correction note'),
+    (member_id, current_date + 1, 97, 'future private note'),
+    (withdrawn_id, current_date - 7, 75, 'withdrawn private note'),
+    (outsider_id, current_date - 7, 85, 'other challenge private note');
+  insert into public.personal_weigh_in_group_shares (
+    personal_weigh_in_id, challenge_id
+  )
+  select personal.id, selected.challenge_id
+  from public.personal_weigh_ins as personal
+  join (values
+    (member_id, current_date - 14, test_challenge_id),
+    (member_id, current_date - 7, test_challenge_id),
+    (member_id, current_date + 1, test_challenge_id),
+    (withdrawn_id, current_date - 7, test_challenge_id),
+    (outsider_id, current_date - 7, other_challenge_id)
+  ) as selected(user_id, recorded_date, challenge_id)
+    on selected.user_id = personal.user_id
+   and selected.recorded_date = personal.recorded_date;
 
+  execute 'set local role authenticated';
+  execute 'set local role anon';
+  begin
+    perform * from public.get_group_weigh_in_history(test_challenge_id);
+    insert into slimpossible_group_weigh_in_checks values ('anonymous_denied', false);
+  exception when insufficient_privilege then
+    insert into slimpossible_group_weigh_in_checks values ('anonymous_denied', true);
+  end;
   execute 'set local role authenticated';
   perform set_config('request.jwt.claim.sub', member_id::text, true);
   select count(*)::integer into entry_count
@@ -87,6 +109,9 @@ begin
   select to_jsonb(history) into summary
   from public.get_group_weigh_in_history(test_challenge_id) as history
   order by history.recorded_date desc limit 1;
+  if summary is null then
+    raise exception 'Fixture returned no shared history row; delta assertion cannot be evaluated.';
+  end if;
   insert into slimpossible_group_weigh_in_checks values
     ('active_member_sees_only_opted_in_past_records', entry_count = 2);
   insert into slimpossible_group_weigh_in_checks values
@@ -97,9 +122,15 @@ begin
       and not (summary ? 'participant_id')
       and not (summary ? 'user_id')
       and not (summary ? 'email'));
+  insert into slimpossible_group_weigh_in_checks values
+    ('private_prior_row_is_not_exposed_or_used_as_delta_baseline',
+      not exists (
+        select 1 from public.get_group_weigh_in_history(test_challenge_id)
+        where recorded_date = current_date - 21
+      ) and summary -> 'change_since_previous_kg' = '-1.5'::jsonb);
   select count(*)::integer into raw_count
-  from public.weigh_ins
-  where participant_id = withdrawn_participant_id;
+  from public.personal_weigh_ins
+  where user_id = withdrawn_id;
   insert into slimpossible_group_weigh_in_checks values
     ('raw_table_hides_other_members_rows', raw_count = 0);
 
@@ -109,9 +140,9 @@ begin
   insert into slimpossible_group_weigh_in_checks values
     ('challenge_owner_can_read_shared_history', entry_count = 2);
   select count(*)::integer into raw_count
-  from public.weigh_ins
-  where participant_id in (
-    select participant.id
+  from public.personal_weigh_ins
+  where user_id in (
+    select participant.user_id
     from public.participants as participant
     where participant.challenge_id = test_challenge_id
   );
@@ -149,22 +180,25 @@ begin
   end;
 
   execute 'reset role';
-  update public.weigh_ins
+  update public.personal_weigh_ins
   set weight_kg = 99
-  where participant_id = member_participant_id
+  where user_id = member_id
     and recorded_date = current_date - 14;
   execute 'set local role authenticated';
   perform set_config('request.jwt.claim.sub', member_id::text, true);
   select to_jsonb(history) into summary
   from public.get_group_weigh_in_history(test_challenge_id) as history
   order by history.recorded_date desc limit 1;
+  if summary is null then
+    raise exception 'Correction fixture returned no shared history row.';
+  end if;
   insert into slimpossible_group_weigh_in_checks values
     ('correction_recalculates_shared_delta',
       summary -> 'change_since_previous_kg' = '-0.5'::jsonb);
 
   execute 'reset role';
-  delete from public.weigh_ins
-  where participant_id = member_participant_id
+  delete from public.personal_weigh_ins
+  where user_id = member_id
     and recorded_date = current_date - 7;
   execute 'set local role authenticated';
   perform set_config('request.jwt.claim.sub', member_id::text, true);
