@@ -70,7 +70,7 @@ for this candidate.
 
 | Journey                                                      | Automated evidence                                            | Connected result on `a2b524f`                                                                             |
 | ------------------------------------------------------------ | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Owner, joined member, outsider/no-challenge                  | Synthetic route, role, permission, and metric coverage passes | NOT EXECUTED — member and outsider journeys remain open                                                   |
+| Owner, joined member, outsider/no-challenge                  | Synthetic route, role, permission, and metric coverage passes | PARTIAL — owner connected paths run; member and outsider remain NOT EXECUTED                              |
 | Dashboard, Progress/Goals, selected Group; save/edit/refresh | Synthetic UI/repository/E2E coverage passes                   | PARTIAL — owner synthetic personal-only save/edit/reload/cleanup passed; broader workflows remain open    |
 | Logout/login and account switching                           | Injected auth and synthetic account-switch coverage passes    | NOT EXECUTED                                                                                              |
 | Desktop and 390px visual/keyboard/labels                     | Automated desktop/mobile/keyboard assertions pass             | PARTIAL — owner read-only 390×844/keyboard pass; desktop visual and full accessibility audit not recorded |
@@ -107,8 +107,9 @@ not evidenced. No screenshot or private value was retained.
 
 On the same mapped Preview candidate, PM confirmed the staging runtime backend
 assignment before writing. Using the already-signed-in owner account and an
-unused date in an existing challenge, PM saved one fictional personal-only
-entry with a fictional note; every group-share option remained unchecked.
+unused date in the existing staging test account's personal log, PM saved one
+fictional personal-only entry with a fictional note and no challenge context;
+every group-share option remained unchecked.
 Saving succeeded. During edit, a paste appended to the prior numeric value and
 was blocked by finite-number validation without persisting; selecting all and
 replacing the field succeeded. Editing the same date saved successfully. A
