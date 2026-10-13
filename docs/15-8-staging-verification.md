@@ -68,13 +68,13 @@ for this candidate.
 
 ## Connected acceptance — PARTIAL; owner journeys remain open
 
-| Journey                                                      | Automated evidence                                            | Connected result on `a2b524f`                                                                             |
-| ------------------------------------------------------------ | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Owner, joined member, outsider/no-challenge                  | Synthetic route, role, permission, and metric coverage passes | PARTIAL — owner connected paths run; member and outsider remain NOT EXECUTED                              |
-| Dashboard, Progress/Goals, selected Group; save/edit/refresh | Synthetic UI/repository/E2E coverage passes                   | PARTIAL — owner synthetic personal-only save/edit/reload/cleanup passed; broader workflows remain open    |
-| Logout/login and account switching                           | Injected auth and synthetic account-switch coverage passes    | NOT EXECUTED                                                                                              |
-| Desktop and 390px visual/keyboard/labels                     | Automated desktop/mobile/keyboard assertions pass             | PARTIAL — owner read-only 390×844/keyboard pass; desktop visual and full accessibility audit not recorded |
-| Actual staging permissions and returned data                 | Authorization contracts and mocked RPC privacy tests pass     | PARTIAL — unshared fixture absent in owner Group view; no member/outsider or server-negative test         |
+| Journey                                                      | Automated evidence                                            | Connected result on `a2b524f`                                                                                                    |
+| ------------------------------------------------------------ | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Owner, joined member, outsider/no-challenge                  | Synthetic route, role, permission, and metric coverage passes | PARTIAL — owner personal-only and joined-member UI paths run; unrelated outsider/anonymous/withdrawn NOT EXECUTED                |
+| Dashboard, Progress/Goals, selected Group; save/edit/refresh | Synthetic UI/repository/E2E coverage passes                   | PARTIAL — owner synthetic save/edit/reload/cleanup passed; member selected-Group read-only passed; broader workflows remain open |
+| Logout/login and account switching                           | Injected auth and synthetic account-switch coverage passes    | NOT EXECUTED                                                                                                                     |
+| Desktop and 390px visual/keyboard/labels                     | Automated desktop/mobile/keyboard assertions pass             | PARTIAL — owner read-only 390×844/keyboard pass; desktop visual and full accessibility audit not recorded                        |
+| Actual staging permissions and returned data                 | Authorization contracts and mocked RPC privacy tests pass     | PARTIAL — member UI denied owner-private contexts; no unrelated outsider or direct server-negative test                          |
 
 The PM's read-only authenticated observation found the primary Dashboard/Group
 navigation and personal Overview working, and the selected authorized Group
@@ -84,9 +84,9 @@ subsequent reopen/retry, the personal Dashboard loaded and the Invite people
 link was enabled; the error did not recur. No record was created or changed;
 no private values, identities, or notes are included here. The exact initial
 failing request/status was not captured, so the transient cause remains
-unknown. No code fix is justified by this observation. Member/outsider access,
-auth switching, signup/recovery, and server-side privacy negatives remain
-outstanding.
+unknown. No code fix is justified by this observation. Unrelated outsider
+access, auth switching, signup/recovery, and server-side privacy negatives
+remain outstanding.
 
 In a follow-up read-only owner-session check at 390×844, Dashboard Overview,
 personal chart, and authorized Invite people link loaded. Document width stayed
@@ -124,6 +124,28 @@ remained, and returned to Dashboard Overview. No existing record, share,
 invitation, account, SQL, or production setting was changed. No raw values or
 private text are retained in this report.
 
+## Joined-member read-only acceptance
+
+After the owner signed into the existing staging member test account, PM
+reloaded the mapped candidate without changing records. Dashboard Overview and
+the member's own profile/history loaded, with no owner-management links. The
+selected authorized Group Progress/shared table loaded. Edit/delete actions
+were available only for the signed-in member's own shared rows; peer-owner rows
+had no edit/delete actions, and group-management links were absent. A known
+owner-private personal challenge was unavailable when opened through Dashboard
+Progress/Goals, while the member's own history remained available. A direct
+Group URL for that private challenge displayed an unavailable notice and no
+shared table. Known private-note markers from the two personal views were not
+present in the selected Group view. Refreshing the authorized Group view
+preserved the read-only result. No account logout or record write occurred.
+
+This is a connected member-UI/read-only context-denial result, not a direct
+HTTP/RPC authorization test, payload inspection, or proof for unrelated
+outsiders. The account previously described by a UI/display label resembling
+“outsider” is actually an active member of the tested Group; it is not counted
+as an outsider. Unrelated, anonymous, and withdrawn-member server-side
+negatives remain unexecuted.
+
 Prior evidence does not transfer automatically: #155's existing partial report
 is for the older `76312b6` candidate; #212/#211 evidence is for earlier
 Chapter-16 candidates. #207 has no earlier evidence comments. Keep #207, #212,
@@ -133,14 +155,15 @@ not close them from this local/CI/deployment result. Issue #247 remains paused.
 ## Remaining verification
 
 Vercel source SHA/project/domain and the staging Preview backend assignment
-were verified as described above. Remaining gates are a desktop-size connected
-visual and direct hard-refresh/deep-link pass; member/outsider and auth-switch
-checks only if authorized sessions already exist; and server-side privacy
-negatives. Do not create accounts. Group-sharing write behavior remains
-untested. If the invitation-choice error returns, capture only request
-category/status/error code; do not inspect or share payload values. Full
-contrast/accessibility review also remains open. Return redacted
-PASS/FAIL/BLOCKED observations. Do not transfer credentials, identities,
-private notes, raw weights, screenshots containing personal data, or
-environment-variable values. No new accounts, hosted SQL, production
+were verified as described above. Owner and joined-member UI paths are now
+partially exercised. Remaining gates are a desktop-size connected visual and
+direct hard-refresh/deep-link pass; unrelated outsider, anonymous, and
+withdrawn-member checks only if already-authorized sessions exist; auth
+switch/signup/recovery; direct server-side privacy negatives; and Group-sharing
+write behavior. Do not create accounts. If the invitation-choice error
+returns, capture only request category/status/error code; do not inspect or
+share payload values. Full contrast/accessibility review also remains open.
+Return redacted PASS/FAIL/BLOCKED observations. Do not transfer credentials,
+identities, private notes, raw weights, screenshots containing personal data,
+or environment-variable values. No new accounts, hosted SQL, production
 changes, issue closure, or promotion to `main` were performed here.
