@@ -289,6 +289,46 @@ async function installGroupFixtures(
       return
     }
 
+    if (url.pathname === '/rest/v1/rpc/get_group_member_progress') {
+      const body = request.postDataJSON() as { target_challenge_id: string }
+      const ownKey = memberKey(body.target_challenge_id, viewerId)
+      const otherKey = memberKey(body.target_challenge_id, otherViewerId)
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            member_key: ownKey,
+            display_name: 'Same display name',
+            starting_weight_kg: 100,
+            target_weight_kg: 80,
+            latest_recorded_date: '2026-09-22',
+            completion_percentage: 50,
+            progress_state: 'in_progress',
+            reached_target_milestones: [
+              {
+                target_weight_kg: 90,
+                achieved_on: '2026-09-10',
+                state: 'reached',
+              },
+            ],
+          },
+          {
+            member_key: otherKey,
+            display_name: 'Same display name',
+            starting_weight_kg: 100,
+            target_weight_kg: 80,
+            latest_recorded_date: '2026-09-22',
+            completion_percentage: 50,
+            progress_state: 'in_progress',
+            reached_target_milestones: [],
+            private_note: 'hidden projection sentinel',
+            raw_current_weight: 50,
+          },
+        ]),
+      })
+      return
+    }
+
     if (url.pathname === '/rest/v1/rpc/get_provisional_group_leader_summary') {
       const body = request.postDataJSON() as {
         target_challenge_id: string
@@ -356,6 +396,7 @@ for (const layout of [
       await page.goto(
         `http://127.0.0.1:4174/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
       )
+      await page.getByRole('button', { name: 'Progress & history' }).click()
       const matrix = page.getByRole('table', {
         name: 'Shared group weight history',
       })
@@ -637,6 +678,7 @@ for (const viewport of [
     await page.goto(
       `/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
     )
+    await page.getByRole('button', { name: 'Progress & history' }).click()
     const matrix = page.getByRole('table', {
       name: 'Shared group weight history',
     })
@@ -782,6 +824,7 @@ for (const viewport of [
     await page.setViewportSize({ height: 900, width: viewport.width })
     const requests = await installGroupFixtures(page, true)
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    await page.getByRole('button', { name: 'Progress & history' }).click()
     const table = page.getByRole('table', {
       name: 'Shared group weight history',
     })
@@ -960,6 +1003,7 @@ for (const viewport of [
       },
     )
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    await page.getByRole('button', { name: 'Progress & history' }).click()
     await expect(page.getByText('Loading shared group history…')).toBeVisible()
     phase = 'rows'
     release()
@@ -1003,6 +1047,7 @@ for (const viewport of [
     await page.setViewportSize({ height: 900, width: viewport.width })
     await installGroupFixtures(page, true)
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    await page.getByRole('button', { name: 'Progress & history' }).click()
     await expect(page.getByText('42.5%', { exact: true })).toBeVisible()
     await expect(
       page.getByRole('table', { name: 'Shared group weight history' }),
@@ -1058,6 +1103,7 @@ for (const viewport of [
     await page.setViewportSize({ height: 900, width: viewport.width })
     const requests = await installGroupFixtures(page)
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    await page.getByRole('button', { name: 'Progress & history' }).click()
 
     await expect(
       page.getByRole('heading', { name: 'Group', exact: true }),
@@ -1147,5 +1193,47 @@ for (const viewport of [
     await expect
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
       .toBe(viewport.width)
+  })
+
+  test(`shows challenge-scoped progress and only own target action on ${viewport.label}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ height: 900, width: viewport.width })
+    const requests = await installGroupFixtures(page, false, true)
+    await page.goto(
+      `/e2e/fixtures/today-harness.html?scenario=group&user=${viewerId}`,
+    )
+    await page
+      .getByRole('link', { name: 'Group · E2E authorized group' })
+      .click()
+    await page.getByRole('button', { name: 'Progress & history' }).click()
+
+    await expect(
+      page.getByRole('heading', { name: 'Member progress' }),
+    ).toBeVisible()
+    const memberCards = page
+      .locator('article')
+      .filter({ hasText: 'Same display name' })
+    await expect(memberCards).toHaveCount(2)
+    await expect(
+      page.getByRole('button', { name: 'Change target' }),
+    ).toHaveCount(1)
+    await expect(
+      page.getByText('Start: 100 kg · Current target: 80 kg').first(),
+    ).toBeVisible()
+    await expect(page.getByText(/Reached 90 kg/)).toBeVisible()
+    await expect(page.getByText('hidden projection sentinel')).toHaveCount(0)
+    await expect(page.getByText('raw_current_weight')).toHaveCount(0)
+    expect(
+      requests.some((url) => url.includes('/rpc/get_group_member_progress')),
+    ).toBe(true)
+    expect(requests.some((url) => /\/weigh_ins(?:\?|$)/.test(url))).toBe(false)
+    await page.getByRole('button', { name: 'Overview' }).click()
+    await expect(
+      page.getByRole('button', { name: 'Overview' }),
+    ).toHaveAttribute('aria-pressed', 'true')
+    await expect(
+      page.getByRole('heading', { name: 'Member progress' }),
+    ).toHaveCount(0)
   })
 }
