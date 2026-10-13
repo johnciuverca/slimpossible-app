@@ -162,7 +162,7 @@ for (const width of [1280, 390]) {
     ).toBeChecked()
     await page
       .getByRole('navigation', { name: 'Primary navigation' })
-      .getByRole('link', { name: 'Goals', exact: true })
+      .getByRole('link', { name: 'Dashboard', exact: true })
       .click()
     await expect(
       page.getByRole('dialog', { name: 'Discard unsaved input?' }),

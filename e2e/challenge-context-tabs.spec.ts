@@ -37,7 +37,7 @@ for (const width of [1280, 390]) {
     await last.focus()
     await page.keyboard.press('Enter')
     await expect(page.getByTestId('fixture-route')).toHaveText(
-      '/dashboard?tab=progress&challenge=extra-11',
+      '/dashboard?tab=progress&challenge=extra-11#goals',
     )
     await expect(last).toHaveAttribute('aria-current', 'page')
     await expect(
@@ -67,28 +67,24 @@ for (const width of [1280, 390]) {
       .getByRole('link', { name: /Open this group’s shared history/ })
       .click()
     await expect(page.getByTestId('fixture-route')).toHaveText(
-      '/group?challenge=dashboard-active',
+      '/group?challenge=dashboard-active#group-history',
     )
     await expect(contexts.getByRole('link', { name: /Personal/ })).toHaveCount(
       0,
     )
-    await primary
-      .getByRole('link', { name: 'My progress', exact: true })
-      .click()
-    await expect(page.getByTestId('fixture-route')).toHaveText(
-      '/progress?challenge=dashboard-active',
-    )
+    await primary.getByRole('link', { name: 'Dashboard', exact: true }).click()
+    await expect(page.getByTestId('fixture-route')).toHaveText('/dashboard')
+    await page.getByRole('tab', { name: 'Progress', exact: true }).click()
     await goals
       .getByRole('link', { name: 'Synthetic personal goal', exact: true })
       .click()
     await expect(page.getByTestId('fixture-route')).toHaveText(
-      '/dashboard?tab=progress&challenge=dashboard-personal',
+      '/dashboard?tab=progress&challenge=dashboard-personal#goals',
     )
-    await primary.getByRole('link', { name: 'Challenges', exact: true }).click()
-    await expect(page.getByTestId('fixture-route')).toHaveText(
-      '/challenges?challenge=dashboard-personal',
-    )
-    await expect(contexts).toBeVisible()
+    for (const retired of ['Challenges', 'My progress', 'Goals'])
+      await expect(
+        primary.getByRole('link', { name: retired, exact: true }),
+      ).toHaveCount(0)
     expect(
       await page.evaluate(() =>
         localStorage.getItem('slimpossible.local.personal-weigh-ins'),
@@ -149,7 +145,7 @@ for (const width of [1280, 390]) {
     await expect(draft).toBeChecked()
     await page
       .getByRole('navigation', { name: 'Primary navigation' })
-      .getByRole('link', { name: 'Goals', exact: true })
+      .getByRole('link', { name: 'Dashboard', exact: true })
       .click()
     const warning = page.getByRole('dialog', { name: 'Discard unsaved input?' })
     await expect(warning).toBeVisible()
@@ -160,12 +156,12 @@ for (const width of [1280, 390]) {
     await expect(weight).toHaveValue('83.2')
     await page
       .getByRole('navigation', { name: 'Primary navigation' })
-      .getByRole('link', { name: 'Goals', exact: true })
+      .getByRole('link', { name: 'Dashboard', exact: true })
       .click()
     await warning
       .getByRole('button', { name: 'Discard and leave', exact: true })
       .click()
-    await expect(page.getByTestId('fixture-route')).toHaveText('/goals')
+    await expect(page.getByTestId('fixture-route')).toHaveText('/dashboard')
     await page.goto(fixture('/weigh-ins'))
     await expect(weight).toHaveValue('')
     await expect(page.getByLabel('Private note (optional)')).toHaveValue('')

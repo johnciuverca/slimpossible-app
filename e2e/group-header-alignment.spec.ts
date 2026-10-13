@@ -69,7 +69,7 @@ for (const viewport of [
       const navBox = (await contexts.boundingBox())!
       const headerBox = (await header.boundingBox())!
       const actionBox = (await action.boundingBox())!
-      if (path !== '/group') {
+      if (path !== '/group' && !path.startsWith('/challenges')) {
         expect(headerBox.y - navBox.y - navBox.height).toBeCloseTo(24, 0)
       } else {
         expect(navBox.y - headerBox.y - headerBox.height).toBeCloseTo(24, 0)
@@ -90,7 +90,7 @@ for (const viewport of [
         })
         expect(actionBox.y - textBox.bottom).toBeCloseTo(16, 0)
       }
-      if (path === '/group') {
+      if (path === '/group' || path.startsWith('/challenges')) {
         await page.getByRole('button', { name: 'Progress & history' }).click()
         await expect(
           contexts.getByRole('link', { name: /Personal tracking/ }),
@@ -173,7 +173,7 @@ for (const viewport of [
       })
       .click()
     await expect(page.getByTestId('fixture-route')).toHaveText(
-      '/dashboard?tab=progress&challenge=dashboard-personal',
+      '/dashboard?tab=progress&challenge=dashboard-personal#goals',
     )
     await page.goto(fixture('/group?challenge=missing'))
     await expect(

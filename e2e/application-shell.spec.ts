@@ -17,8 +17,10 @@ test('keeps the application shell usable at 390px without page overflow', async 
     '/dashboard',
   )
   await expect(
-    page.getByRole('button', { name: 'Group history, coming soon' }),
-  ).toBeDisabled()
+    page
+      .getByRole('navigation', { name: 'Primary navigation' })
+      .getByRole('link'),
+  ).toHaveCount(2)
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
     .toBe(390)
@@ -30,21 +32,21 @@ test('keeps the application shell usable at 390px without page overflow', async 
   ).toBeVisible()
 })
 
-test('shows all live destinations without horizontal overflow on desktop', async ({
+test('shows only the actual workspaces without horizontal overflow on desktop', async ({
   page,
 }) => {
   await page.setViewportSize({ height: 900, width: 1440 })
   await page.goto('/')
 
-  for (const label of [
-    'Dashboard',
-    'Challenges',
-    'My progress',
-    'Group',
-    'Goals',
-  ]) {
+  for (const label of ['Dashboard', 'Group']) {
     await expect(page.getByRole('link', { name: label })).toBeVisible()
   }
+  for (const retired of ['Challenges', 'My progress', 'Goals'])
+    await expect(
+      page
+        .getByRole('navigation', { name: 'Primary navigation' })
+        .getByRole('link', { name: retired, exact: true }),
+    ).toHaveCount(0)
   await expect(
     page
       .getByRole('navigation', { name: 'Primary navigation' })

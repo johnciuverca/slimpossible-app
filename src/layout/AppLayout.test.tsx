@@ -8,10 +8,7 @@ import { AppLayout } from './AppLayout'
 
 const liveNavigation = [
   { label: 'Dashboard', path: '/dashboard' },
-  { label: 'Challenges', path: '/challenges' },
-  { label: 'My progress', path: '/progress' },
   { label: 'Group', path: '/group' },
-  { label: 'Goals', path: '/goals' },
 ]
 
 function renderLayout(path: string, state: AuthState) {
@@ -42,7 +39,7 @@ const signedOut: AuthState = { error: null, status: 'signed-out', user: null }
 afterEach(() => cleanup())
 
 describe('AppLayout', () => {
-  it('renders retained destinations without standalone Weigh-in navigation', () => {
+  it('renders only the actual Dashboard and Group workspaces in primary navigation', () => {
     renderLayout('/', signedOut)
 
     expect(screen.getByRole('banner')).toHaveTextContent('Slimpossible')
@@ -60,6 +57,11 @@ describe('AppLayout', () => {
         'href',
         path,
       )
+    }
+    for (const retired of ['Challenges', 'My progress', 'Goals']) {
+      expect(
+        screen.queryByRole('link', { name: retired }),
+      ).not.toBeInTheDocument()
     }
     expect(screen.getByRole('link', { name: 'Log in' })).toHaveAttribute(
       'href',
@@ -90,7 +92,7 @@ describe('AppLayout', () => {
     for (const { label, path } of liveNavigation) {
       expect(screen.getByRole('link', { name: label })).toHaveAttribute(
         'href',
-        ['/dashboard', '/progress', '/weigh-ins'].includes(path)
+        ['/dashboard', '/weigh-ins'].includes(path)
           ? path
           : `${path}?challenge=private%2Fplan`,
       )
@@ -113,14 +115,12 @@ describe('AppLayout', () => {
     },
   )
 
-  it('labels unavailable group history as disabled, without making it a link', () => {
+  it('does not add a duplicate or unavailable Group history destination', () => {
     renderLayout('/group', signedOut)
 
-    const unavailable = screen.getByRole('button', {
-      name: 'Group history, coming soon',
-    })
-    expect(unavailable).toBeDisabled()
-    expect(unavailable).toHaveTextContent('Coming soon')
+    expect(
+      screen.queryByRole('button', { name: /Group history/ }),
+    ).not.toBeInTheDocument()
     expect(
       screen.queryByRole('link', { name: /Group history/ }),
     ).not.toBeInTheDocument()

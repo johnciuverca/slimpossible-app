@@ -16,7 +16,6 @@ import {
 
 import { AuthSessionUI } from '../auth/AuthSessionUI'
 import { useOptionalAuth } from '../auth/useAuth'
-import { Button } from '../components/ui'
 import { ChallengeContextTabs } from '../components/ChallengeContextTabs'
 import { UnsavedChangesDialog } from '../components/UnsavedChangesDialog'
 import { RouterNavigationGuard } from '../components/RouterNavigationGuard'
@@ -31,10 +30,7 @@ type AppLayoutProps = {
 
 const navigationItems = [
   { label: 'Dashboard', to: '/dashboard' },
-  { label: 'Challenges', to: '/challenges' },
-  { label: 'My progress', to: '/progress' },
   { label: 'Group', to: '/group' },
-  { label: 'Goals', to: '/goals' },
 ]
 
 function withSelectedChallenge(to: string, search: string, from: string) {
@@ -96,7 +92,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     ['/challenges', '/weigh-ins'].includes(pathname) ||
     (pathname === '/' && new URLSearchParams(search).has('challenge'))
   const personalHome =
-    pathname === '/today' ||
+    ['/today', '/progress', '/goals', '/challenges'].includes(pathname) ||
     (pathname === '/' &&
       !new URLSearchParams(search).has('challenge') &&
       state.status === 'signed-in')
@@ -175,20 +171,6 @@ export function AppLayout({ children }: AppLayoutProps) {
                       </NavLink>
                     </li>
                   ))}
-                  <li className="shrink-0">
-                    <Button
-                      aria-label="Group history, coming soon"
-                      className="min-h-10 gap-2 rounded-xl border-dashed px-3 py-2 text-ink-muted sm:px-4"
-                      disabled
-                      type="button"
-                      variant="ghost"
-                    >
-                      <span>Group history</span>
-                      <span className="rounded-full border border-line bg-panel px-2 py-0.5 text-xs font-bold uppercase tracking-wide">
-                        Coming soon
-                      </span>
-                    </Button>
-                  </li>
                 </ul>
               </nav>
               <div className="shrink-0">

@@ -4,6 +4,79 @@ const fixture = (scenario: string, path = '/dashboard') =>
   `/e2e/fixtures/personal-dashboard-harness.html?${new URLSearchParams({ scenario, path })}`
 
 for (const width of [1280, 390]) {
+  test(`legacy workspace URLs resolve to safe Dashboard and Group workspaces at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto(
+      fixture(
+        'tabs',
+        '/progress?challenge=dashboard-active&source=legacy#goals',
+      ),
+    )
+    const route = page.getByTestId('fixture-route')
+    await expect(route).toHaveText(
+      '/dashboard?challenge=dashboard-active&source=legacy&tab=progress#goals',
+    )
+    await expect(
+      page.getByRole('tab', { name: 'Progress', exact: true }),
+    ).toHaveAttribute('aria-selected', 'true')
+    await expect(
+      page
+        .getByRole('navigation', { name: 'Primary navigation' })
+        .getByRole('link'),
+    ).toHaveCount(2)
+    await expect(
+      page.getByText('Synthetic first-account private note', { exact: true }),
+    ).toBeVisible()
+    await expect(
+      page.getByText('Synthetic second-account private note', { exact: true }),
+    ).toHaveCount(0)
+
+    await page.getByRole('tab', { name: 'Overview', exact: true }).click()
+    await expect(route).toContainText('/dashboard?challenge=dashboard-active')
+    await page.getByRole('button', { name: 'Fixture back' }).click()
+    await expect(
+      page.getByRole('tab', { name: 'Progress', exact: true }),
+    ).toHaveAttribute('aria-selected', 'true')
+    await page.getByRole('button', { name: 'Fixture forward' }).click()
+    await expect(
+      page.getByRole('tab', { name: 'Overview', exact: true }),
+    ).toHaveAttribute('aria-selected', 'true')
+
+    await page.goto(
+      fixture(
+        'tabs',
+        '/challenges?challenge=dashboard-active&source=legacy#group-history',
+      ),
+    )
+    await expect(route).toHaveText(
+      '/group?challenge=dashboard-active&source=legacy#group-history',
+    )
+    await expect(
+      page.getByRole('heading', { name: 'Group', exact: true }),
+    ).toBeVisible()
+    await expect(
+      page.getByText('Synthetic first-account private note', { exact: true }),
+    ).toHaveCount(0)
+
+    await page.goto(fixture('tabs', '/challenges?challenge=second-only'))
+    await expect(route).toHaveText(
+      '/dashboard?navigation=challenge-unavailable',
+    )
+    await expect(
+      page.getByText(/That challenge is not available to this account/),
+    ).toBeVisible()
+    await expect(
+      page
+        .getByRole('navigation', { name: 'Primary navigation' })
+        .getByRole('link'),
+    ).toHaveCount(2)
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(width)
+  })
+
   test(`personal Dashboard aliases have no challenge tabs/cards and keep profile/history/actions at ${width}px`, async ({
     page,
   }) => {
@@ -42,11 +115,13 @@ for (const width of [1280, 390]) {
       await expect(
         page.getByRole('link', { name: 'Create challenge', exact: true }),
       ).toHaveAttribute('href', '/challenge/setup')
+      const primary = page.getByRole('navigation', {
+        name: 'Primary navigation',
+      })
+      await expect(primary.getByRole('link', { name: 'Group' })).toBeVisible()
       await expect(
-        page
-          .getByRole('navigation', { name: 'Primary navigation' })
-          .getByRole('link', { name: 'Challenges', exact: true }),
-      ).toBeVisible()
+        primary.getByRole('link', { name: 'Challenges', exact: true }),
+      ).toHaveCount(0)
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth),
       ).toBe(width)
