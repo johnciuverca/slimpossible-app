@@ -59,13 +59,13 @@ for this candidate.
 
 ## Connected acceptance — PARTIAL; owner journeys remain open
 
-| Journey                                                      | Automated evidence                                            | Connected result on `a2b524f`                                                                     |
-| ------------------------------------------------------------ | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Owner, joined member, outsider/no-challenge                  | Synthetic route, role, permission, and metric coverage passes | NOT EXECUTED — member and outsider journeys remain open                                           |
-| Dashboard, Progress/Goals, selected Group; save/edit/refresh | Synthetic UI/repository/E2E coverage passes                   | PARTIAL — Dashboard/Group viewed read-only; one reopen/retry recovered; save/edit/refresh not run |
-| Logout/login and account switching                           | Injected auth and synthetic account-switch coverage passes    | NOT EXECUTED                                                                                      |
-| Desktop and 390px visual/keyboard/labels                     | Automated desktop/mobile/keyboard assertions pass             | PARTIAL — PM saw Dashboard/Group at unspecified desktop size; 390px/keyboard not checked          |
-| Actual staging permissions and returned data                 | Authorization contracts and mocked RPC privacy tests pass     | PARTIAL — selected Group summary loaded; payload/privacy negatives not inspected                  |
+| Journey                                                      | Automated evidence                                            | Connected result on `a2b524f`                                                                             |
+| ------------------------------------------------------------ | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Owner, joined member, outsider/no-challenge                  | Synthetic route, role, permission, and metric coverage passes | NOT EXECUTED — member and outsider journeys remain open                                                   |
+| Dashboard, Progress/Goals, selected Group; save/edit/refresh | Synthetic UI/repository/E2E coverage passes                   | PARTIAL — owner read-only Dashboard/Group; one reopen/retry recovered; no save/edit/refresh               |
+| Logout/login and account switching                           | Injected auth and synthetic account-switch coverage passes    | NOT EXECUTED                                                                                              |
+| Desktop and 390px visual/keyboard/labels                     | Automated desktop/mobile/keyboard assertions pass             | PARTIAL — owner read-only 390×844/keyboard pass; desktop visual and full accessibility audit not recorded |
+| Actual staging permissions and returned data                 | Authorization contracts and mocked RPC privacy tests pass     | PARTIAL — selected Group summary loaded; payload/privacy negatives not inspected                          |
 
 The PM's read-only authenticated observation found the primary Dashboard/Group
 navigation and personal Overview working, and the selected authorized Group
@@ -76,8 +76,21 @@ link was enabled; the error did not recur. No record was created or changed;
 no private values, identities, or notes are included here. The exact initial
 failing request/status was not captured, so the transient cause remains
 unknown. No code fix is justified by this observation. Member/outsider access,
-save/edit/refresh, responsive 390px, keyboard checks, and exact deployed-SHA
-mapping remain outstanding.
+save/edit/refresh, and exact deployed-SHA mapping remain outstanding.
+
+In a follow-up read-only owner-session check at 390×844, Dashboard Overview,
+personal chart, and authorized Invite people link loaded. Document width stayed
+390px. ArrowRight moved from Overview to Progress with selected tab and focus;
+personal history and Goals loaded. Enter on Group navigation opened the
+authorized selected Group Overview. Space activated “Progress & history” and
+retained focus; group progress, milestones, shared chart, and table loaded.
+Document width remained 390px; only the comparison chart and shared table had
+their contained horizontal overflow. Accessibility inspection found named
+record/management/edit controls and read-only peer controls in this owner
+view. The temporary viewport override was restored. No record was changed.
+This is not a complete contrast/visual polish or accessibility audit. A
+desktop-size connected visual pass and direct hard-refresh/deep-link checks are
+not evidenced. No screenshot or private value was retained.
 
 Prior evidence does not transfer automatically: #155's existing partial report
 is for the older `76312b6` candidate; #212/#211 evidence is for earlier
@@ -89,11 +102,13 @@ not close them from this local/CI/deployment result. Issue #247 remains paused.
 
 Continue in the already-authorized staging browser/session when available.
 Confirm the deployed SHA and dedicated non-production project, then complete
-the remaining desktop/390px and keyboard checks plus authorized disposable
-member/outsider and save/edit/refresh journeys. If the invitation-choice error
-returns, capture only which request category failed and its status/error code;
-do not inspect or share payload values. Return redacted PASS/FAIL/BLOCKED
-observations. Do not transfer credentials, identities, private notes, raw
-weights, screenshots containing personal data, or environment-variable
-values. No new accounts, hosted SQL, production changes, issue closure, or
-promotion to `main` were performed here.
+the remaining desktop-size visual and direct hard-refresh/deep-link checks.
+Only if already-authorized member/outsider sessions are available, run those
+read-only routes; do not create accounts. Save/edit/refresh acceptance remains
+open and must use already-authorized disposable records under the existing
+owner workflow. If the invitation-choice error returns, capture only which
+request category failed and its status/error code; do not inspect or share
+payload values. Return redacted PASS/FAIL/BLOCKED observations. Do not transfer
+credentials, identities, private notes, raw weights, screenshots containing
+personal data, or environment-variable values. No new accounts, hosted SQL,
+production changes, issue closure, or promotion to `main` were performed here.
