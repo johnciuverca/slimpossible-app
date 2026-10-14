@@ -140,7 +140,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-4 px-4 py-4 sm:px-8 xl:flex-row xl:items-center xl:justify-between">
             <Link
               className="w-fit shrink-0 rounded-md text-lg font-extrabold tracking-tight text-forest-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest-700"
-              to={withSelectedChallenge('/', search, pathname)}
+              to={state.status === 'signed-in' ? '/dashboard' : '/'}
             >
               Slimpossible
             </Link>
