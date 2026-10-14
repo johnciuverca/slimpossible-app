@@ -16,8 +16,12 @@ import {
 } from '../models/personalWeighIn'
 export function PersonalHistoryContent({
   workspace,
+  referenceWeightKg,
+  referenceLabel,
 }: {
   workspace: PersonalWorkspace
+  referenceWeightKg?: number
+  referenceLabel?: string
 }) {
   const [editor, setEditor] = useState<{
     key: string
@@ -66,6 +70,8 @@ export function PersonalHistoryContent({
             </p>
             {history.length ? (
               <PersonalProgressChart
+                referenceWeightKg={referenceWeightKg}
+                referenceLabel={referenceLabel}
                 weighIns={history.map((entry) => ({
                   date: entry.date,
                   weightKg: entry.weightKg,

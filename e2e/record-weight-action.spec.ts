@@ -72,7 +72,18 @@ for (const width of [1280, 390]) {
       const headerBox = (await header.boundingBox())!
       const actionBox = (await action.boundingBox())!
       const headingBox = (await heading.boundingBox())!
-      if (width > 600) {
+      if (await page.locator('.dashboard-workspace').count()) {
+        await expect(
+          page
+            .locator('.dashboard-action-grid')
+            .getByRole('button', { name: 'Record weight', exact: true }),
+        ).toBeVisible()
+        expect(actionBox.y).toBeGreaterThan(headingBox.y + headingBox.height)
+        expect(actionBox.x).toBeGreaterThanOrEqual(headerBox.x)
+        expect(actionBox.x + actionBox.width).toBeLessThanOrEqual(
+          headerBox.x + headerBox.width + 1,
+        )
+      } else if (width > 600) {
         expect(
           Math.abs(
             actionBox.x + actionBox.width - headerBox.x - headerBox.width,

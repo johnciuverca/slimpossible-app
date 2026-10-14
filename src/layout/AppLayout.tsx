@@ -100,7 +100,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   return (
     <NavigationSafetyContext.Provider value={safety}>
       <div
-        className="flex min-h-screen flex-col bg-page text-ink"
+        className={`app-shell flex min-h-screen flex-col bg-page text-ink ${pathname === '/dashboard' ? 'dashboard-shell' : ''}`}
         onClickCapture={(event) => {
           if (dataRouter) return
           const anchor =
@@ -136,7 +136,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           })
         }}
       >
-        <header className="border-b border-line bg-panel">
+        <header className="app-shell-header border-b border-line bg-panel">
           <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-4 px-4 py-4 sm:px-8 xl:flex-row xl:items-center xl:justify-between">
             <Link
               className="w-fit shrink-0 rounded-md text-lg font-extrabold tracking-tight text-forest-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest-700"
@@ -180,7 +180,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           </div>
         </header>
 
-        <main className="mx-auto flex w-full max-w-7xl min-w-0 flex-1 flex-col gap-6 px-4 py-7 sm:px-8 sm:py-10">
+        <main className="app-shell-main mx-auto flex w-full max-w-7xl min-w-0 flex-1 flex-col gap-6 px-4 py-7 sm:px-8 sm:py-10">
           {contextPage ? <ChallengeContextTabs /> : null}
           {children}
         </main>

@@ -99,13 +99,15 @@ for (const width of [1280, 390]) {
       await expect(
         page.getByRole('link', { name: /^Challenge progress:/ }),
       ).toHaveCount(0)
-      const profile = page.getByRole('region', { name: 'About you' })
-      await expect(
-        profile.getByText('Synthetic Alex', { exact: true }),
-      ).toBeVisible()
-      await expect(
-        profile.getByText('user-alex@example.invalid', { exact: true }),
-      ).toBeVisible()
+      await expect(page.getByRole('region', { name: 'About you' })).toHaveCount(
+        0,
+      )
+      await page.getByText('Synthetic Alex', { exact: true }).click()
+      await page.getByRole('button', { name: 'Profile', exact: true }).click()
+      await expect(page.getByRole('dialog')).toContainText(
+        'user-alex@example.invalid',
+      )
+      await page.getByRole('button', { name: 'Close Profile' }).click()
       await expect(
         page.getByRole('link', { name: 'My Progress and private history' }),
       ).toHaveAttribute('href', '/dashboard?tab=progress')
@@ -195,14 +197,10 @@ for (const width of [1280, 390]) {
           page.getByRole('link', { name: 'Continue to invitations' }),
         ).toHaveCount(0)
         await expect(
-          page
-            .getByRole('region', { name: 'About you' })
-            .getByText('Synthetic Second'),
+          page.getByText('Synthetic Second', { exact: true }),
         ).toBeVisible()
         await expect(
-          page
-            .getByRole('region', { name: 'About you' })
-            .getByText('Synthetic Alex'),
+          page.getByText('Synthetic Alex', { exact: true }),
         ).toHaveCount(0)
         await page
           .getByRole('button', { name: 'Switch synthetic account' })

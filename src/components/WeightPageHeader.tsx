@@ -6,6 +6,7 @@ import {
 import { personalWeighInToday } from '../models/personalWeighIn'
 import { RecordWeightDialog } from './RecordWeightDialog'
 import { Button } from './ui'
+import { DashboardActionIcon } from './DashboardActionIcon'
 
 /** One responsive action position for all personal and challenge pages. */
 export function WeightPageHeader({
@@ -42,9 +43,11 @@ function StandaloneRecordWeightAction({
 export function RecordWeightAction({
   workspace,
   onRecorded,
+  presentation = 'button',
 }: {
   workspace: PersonalWorkspace
   onRecorded?: () => void
+  presentation?: 'button' | 'card'
 }) {
   const [openOwner, setOpenOwner] = useState<string | null>(null)
   const [savedOwner, setSavedOwner] = useState<string | null>(null)
@@ -58,11 +61,32 @@ export function RecordWeightAction({
   return (
     <>
       <Button
+        aria-label={presentation === 'card' ? 'Record weight' : undefined}
+        className={
+          presentation === 'card'
+            ? 'dashboard-action dashboard-action-record'
+            : ''
+        }
         data-weight-owner={workspace.ownerKey}
         disabled={workspace.personal.state !== 'ready'}
         onClick={() => setOpenOwner(workspace.ownerKey)}
       >
-        Record weight
+        {presentation === 'card' ? (
+          <>
+            <DashboardActionIcon kind="record" />
+            <span>
+              <span className="block">Record weight</span>
+              <span className="dashboard-action-description">
+                Log your latest weight
+              </span>
+            </span>
+            <span className="dashboard-action-chevron" aria-hidden="true">
+              ›
+            </span>
+          </>
+        ) : (
+          'Record weight'
+        )}
       </Button>
       {workspace.personal.error ? (
         <p role="status" className="mt-2 max-w-xs text-sm text-ink-muted">
