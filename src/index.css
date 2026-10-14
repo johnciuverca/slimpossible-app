@@ -52,6 +52,103 @@ body {
   scroll-margin-top: 0;
 }
 
+/* Group keeps its spreadsheet layout while using the approved navy/teal palette. */
+.group-workspace {
+  color-scheme: dark;
+  --color-page: #0b121b;
+  --color-panel: #111c28;
+  --color-ink: #f1f6fa;
+  --color-ink-muted: #b5c1d0;
+  --color-line: #354353;
+  color: var(--color-ink);
+}
+.group-workspace .bg-white,
+.group-workspace .bg-stone-50,
+.group-workspace .bg-stone-100 {
+  background-color: #111c28;
+}
+.group-workspace .text-slate-950,
+.group-workspace .text-slate-900,
+.group-workspace .text-slate-800,
+.group-workspace .text-slate-700,
+.group-workspace .text-slate-600,
+.group-workspace .text-emerald-800,
+.group-workspace .text-emerald-700,
+.group-workspace .text-ink {
+  color: #e7eef6;
+}
+.group-workspace .text-ink-muted,
+.group-workspace .text-slate-500 {
+  color: #b5c1d0;
+}
+.group-workspace .border-stone-200,
+.group-workspace .border-stone-300,
+.group-workspace .divide-stone-200 > :not(:last-child) {
+  border-color: #354353;
+}
+.group-workspace .bg-emerald-50 {
+  background-color: #12352f;
+}
+.group-workspace .border-emerald-200 {
+  border-color: #286758;
+}
+.group-workspace .text-emerald-800 {
+  color: #8debd4;
+}
+.group-workspace .group-section-tab {
+  border-color: #46586b;
+  background: #111c28;
+  color: #d7e2ee;
+}
+.group-workspace .group-section-tab:hover,
+.group-workspace .group-member-tab:hover {
+  background: #1a2a39;
+}
+.group-workspace .group-section-tab-active,
+.group-workspace .group-member-tab-active {
+  border-color: #31dbb0;
+  background: #145447;
+  color: #f1fffb;
+  box-shadow: inset 0 0 0 1px #31dbb0;
+}
+.group-workspace :is(button, a, [tabindex]):focus-visible {
+  outline-color: #31dbb0;
+}
+.group-history-workspace > .sticky {
+  border-color: #354353;
+  background: #111c28;
+}
+.group-history-table {
+  color: #e7eef6;
+}
+.group-history-table caption {
+  color: #d7e2ee;
+}
+.group-history-table thead th {
+  background-color: #1a2937;
+  color: #f1f6fa;
+}
+.group-history-table tbody th {
+  background-color: #111c28;
+  color: #f1f6fa;
+}
+.group-history-table td {
+  background-color: #0e1822;
+}
+.group-history-table tbody tr:nth-child(even) td,
+.group-history-table tbody tr:nth-child(even) th {
+  background-color: #162330;
+}
+.group-workspace :is(button, a) {
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+.group-workspace :is(button, a):focus-visible {
+  outline: 3px solid #31dbb0;
+  outline-offset: 3px;
+}
+
 /* Dashboard's approved navy/teal design stays scoped to its personal workspace. */
 .dashboard-shell {
   color-scheme: dark;

@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { GroupChartHistory } from './GroupChartHistory'
 import type { Persistence } from '../data/persistence'
 import type { GroupChartEntry } from '../models/groupChartHistory'
+import type { GroupMemberProgress } from '../models/groupMemberProgress'
 import type { RepositoryListResult } from '../data/supabase/repositories'
 afterEach(cleanup)
 const rows: GroupChartEntry[] = [
@@ -24,6 +25,46 @@ const persistence = (
     repositories: { groupProgress: { getChartHistory: load } },
   }) as unknown as Persistence
 describe('Group chart history', () => {
+  it('separates same-group targets and trends from actual shared records', async () => {
+    const groupProgress: GroupMemberProgress[] = [
+      {
+        memberKey: 'a',
+        displayName: 'Ava',
+        targetWeightKg: 85,
+        startingWeightKg: 90,
+        completionPercentage: 50,
+        progressState: 'in_progress',
+        reachedTargetMilestones: [],
+      },
+    ]
+    render(
+      <GroupChartHistory
+        challengeId="group"
+        viewerId="viewer"
+        persistence={persistence(
+          vi.fn().mockResolvedValue({ state: 'success', data: rows }),
+        )}
+        refreshVersion={0}
+        memberProgress={groupProgress}
+      />,
+    )
+    const chart = await screen.findByRole('img', {
+      name: 'Weight (kg) — shared group history',
+    })
+    expect(
+      chart.querySelector('[data-series="target-reference"]'),
+    ).toHaveAttribute('stroke-dasharray', '8 5')
+    expect(
+      chart.querySelector('[data-series="derived-trend"]'),
+    ).toHaveAttribute('stroke-dasharray', '2 5')
+    expect(chart.querySelectorAll('circle')).toHaveLength(2)
+    const legend = screen.getByRole('list', { name: 'Group chart legend' })
+    expect(legend).toHaveTextContent('recorded weights')
+    expect(legend).toHaveTextContent('Target/reference weight')
+    expect(legend).toHaveTextContent('Derived trend from displayed points')
+    expect(legend).toHaveTextContent('first shared 2026-09-01')
+    expect(screen.getByRole('rowheader', { name: '2026-09-03' })).toBeVisible()
+  })
   it('plots four actual-kg member series with padded axes, preserves gaps and keeps individual change view', async () => {
     const records = [80, 100, 90, 110].map((weightKg, index) => ({
       memberKey: String(index),
@@ -75,7 +116,9 @@ describe('Group chart history', () => {
       expect(Number(circle.getAttribute('cy'))).toBeGreaterThan(25)
       expect(Number(circle.getAttribute('cy'))).toBeLessThan(215)
     }
-    expect(chart.querySelectorAll('g[stroke] line')).toHaveLength(1)
+    expect(
+      chart.querySelectorAll('[data-series="recorded-connection"]'),
+    ).toHaveLength(1)
     fireEvent.click(screen.getByRole('tab', { name: 'Member 0' }))
     const individual = screen.getByRole('img', {
       name: 'Change from first shared weight (kg)',
@@ -239,7 +282,9 @@ describe('Group chart history', () => {
     expect(load).toHaveBeenCalledWith('group-a')
     const chart = screen.getByRole('img')
     expect(chart.querySelectorAll('circle')).toHaveLength(2)
-    expect(chart.querySelectorAll('g[stroke] line')).toHaveLength(0)
+    expect(
+      chart.querySelectorAll('[data-series="recorded-connection"]'),
+    ).toHaveLength(0)
     expect(
       screen.getByRole('region', { name: 'Scrollable shared group weights' }),
     ).toHaveAttribute('tabindex', '0')
