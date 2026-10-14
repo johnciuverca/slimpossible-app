@@ -17,6 +17,7 @@ function renderLayout(path: string, state: AuthState) {
       <MemoryRouter initialEntries={[path]}>
         <AppLayout>
           <p>Live route content</p>
+          <CurrentRoute />
         </AppLayout>
       </MemoryRouter>
     </AuthProvider>,
@@ -39,6 +40,27 @@ const signedOut: AuthState = { error: null, status: 'signed-out', user: null }
 afterEach(() => cleanup())
 
 describe('AppLayout', () => {
+  it.each([
+    [
+      'signed-in',
+      {
+        error: null,
+        status: 'signed-in',
+        user: { id: 'owner-1', email: 'owner@example.invalid' },
+      } satisfies AuthState,
+      '/dashboard',
+    ],
+    ['signed-out', signedOut, '/'],
+  ])(
+    'the %s logo opens its canonical home without challenge parameters',
+    (_label, state, destination) => {
+      renderLayout('/group?challenge=private%2Fplan&tab=progress', state)
+      const logo = screen.getByRole('link', { name: 'Slimpossible' })
+      expect(logo).toHaveAttribute('href', destination)
+      fireEvent.click(logo)
+      expect(screen.getByTestId('current-route').textContent).toBe(destination)
+    },
+  )
   it('renders only the actual Dashboard and Group workspaces in primary navigation', () => {
     renderLayout('/', signedOut)
 
@@ -86,7 +108,7 @@ describe('AppLayout', () => {
 
     expect(screen.getByRole('link', { name: 'Slimpossible' })).toHaveAttribute(
       'href',
-      '/?challenge=private%2Fplan',
+      '/',
     )
 
     for (const { label, path } of liveNavigation) {

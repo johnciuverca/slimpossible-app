@@ -50,13 +50,18 @@ describe('AuthSessionUI', () => {
       {
         error: null,
         status: 'signed-in',
-        user: { email: 'person@example.com' },
+        user: { email: 'person@example.com', displayName: 'Alex' },
       },
       ['/today'],
     )
 
-    expect(screen.getByText('Signed in as')).toBeInTheDocument()
-    expect(screen.getByText('person@example.com')).toBeInTheDocument()
+    expect(screen.getByText('Alex')).toBeInTheDocument()
+    expect(screen.queryByText('person@example.com')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('Alex'))
+    fireEvent.click(screen.getByRole('button', { name: /^Profile$/ }))
+    expect(screen.getByRole('dialog')).toHaveTextContent('person@example.com')
+    fireEvent.click(screen.getByRole('button', { name: 'Close Profile' }))
+    fireEvent.click(screen.getByText('Alex'))
 
     fireEvent.click(screen.getByRole('button', { name: 'Log out' }))
 
@@ -91,6 +96,7 @@ describe('AuthSessionUI', () => {
     )
 
     expect(screen.getByText('Protected today')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Your account'))
     fireEvent.click(screen.getByRole('button', { name: 'Log out' }))
     expect(screen.getByText('Login screen')).toBeInTheDocument()
     expect(screen.queryByText('Protected today')).not.toBeInTheDocument()

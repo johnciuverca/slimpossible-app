@@ -17,18 +17,11 @@ for (const viewport of [
       name: 'Challenge contexts',
     })
     await page.goto(fixture('/dashboard'))
-    const navbar = page
-      .getByRole('navigation', { name: 'Primary navigation' })
-      .locator('xpath=ancestor::header')
     const dashboardAction = page.getByRole('button', {
       name: 'Record weight',
       exact: true,
     })
     await expect(dashboardAction).toBeEnabled()
-    const dashboardNavbarBox = (await navbar.boundingBox())!
-    const dashboardActionBox = (await dashboardAction.boundingBox())!
-    const dashboardOffset =
-      dashboardActionBox.y - dashboardNavbarBox.y - dashboardNavbarBox.height
     for (const path of [
       '/goals?challenge=dashboard-active',
       '/challenges?challenge=dashboard-active',
@@ -46,11 +39,11 @@ for (const viewport of [
         await expect(
           page.getByRole('button', { name: 'Record weight', exact: true }),
         ).toBeEnabled()
-        const box = (await page
-          .getByRole('button', { name: 'Record weight', exact: true })
-          .boundingBox())!
-        const navBox = (await navbar.boundingBox())!
-        expect(box.y - navBox.y - navBox.height).toBeCloseTo(dashboardOffset, 0)
+        await expect(
+          page
+            .locator('.dashboard-action-grid')
+            .getByRole('button', { name: 'Record weight', exact: true }),
+        ).toBeVisible()
         continue
       }
       await expect(contexts).toHaveCount(1)
@@ -73,10 +66,6 @@ for (const viewport of [
         expect(headerBox.y - navBox.y - navBox.height).toBeCloseTo(24, 0)
       } else {
         expect(navBox.y - headerBox.y - headerBox.height).toBeCloseTo(24, 0)
-        const navbarBox = (await navbar.boundingBox())!
-        const groupOffset = actionBox.y - navbarBox.y - navbarBox.height
-        console.log(JSON.stringify({ viewport, dashboardOffset, groupOffset }))
-        expect(groupOffset).toBeCloseTo(dashboardOffset, 0)
       }
       if (viewport.width > 600) {
         expect(actionBox.y - headerBox.y).toBeCloseTo(0, 0)

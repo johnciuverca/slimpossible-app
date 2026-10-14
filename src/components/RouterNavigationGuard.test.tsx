@@ -70,6 +70,51 @@ function Editor() {
     </>
   )
 }
+it('guards a signed-in logo departure before opening the canonical Dashboard', async () => {
+  const router = createMemoryRouter(
+    [
+      {
+        path: '*',
+        element: (
+          <AppLayout>
+            <Editor />
+          </AppLayout>
+        ),
+      },
+    ],
+    { initialEntries: ['/weigh-ins?challenge=private-plan'] },
+  )
+  render(
+    <AuthProvider
+      initialState={{
+        status: 'signed-in',
+        error: null,
+        user: { id: 'owner-1', email: 'owner@example.invalid' },
+      }}
+    >
+      <RouterProvider router={router} />
+    </AuthProvider>,
+  )
+  fireEvent.change(screen.getByLabelText('Unsaved weight'), {
+    target: { value: '83.2' },
+  })
+  const logo = screen.getByRole('link', { name: 'Slimpossible' })
+  fireEvent.click(logo)
+  expect(await screen.findByRole('dialog')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: /^Stay$/ }))
+  expect(screen.getByTestId('route')).toHaveTextContent(
+    '/weigh-ins?challenge=private-plan',
+  )
+  expect(screen.getByLabelText('Unsaved weight')).toHaveValue('83.2')
+  fireEvent.click(logo)
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'Discard and leave' }),
+  )
+  await waitFor(() =>
+    expect(screen.getByTestId('route').textContent).toBe('/dashboard'),
+  )
+  router.dispose()
+})
 it('retains the weigh-in draft across context-only navigation, while guarding departure with Stay/Discard', async () => {
   const router = createMemoryRouter(
     [

@@ -1,21 +1,36 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import type { PersonalWorkspace } from '../data/usePersonalWorkspace'
 import { Button, Card } from './ui'
+import { DashboardActionIcon } from './DashboardActionIcon'
 
 const actionClass =
   'inline-flex min-h-11 items-center justify-center rounded-full border border-line bg-panel px-4 py-2 text-sm font-semibold text-forest-800 hover:bg-forest-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700'
 
 export function DashboardChallengeActions({
   workspace,
+  recordAction,
 }: {
   workspace: PersonalWorkspace
+  recordAction?: ReactNode
 }) {
   // Remount owner-specific chooser state immediately when the account changes.
-  return <OwnedGroupActions key={workspace.ownerKey} workspace={workspace} />
+  return (
+    <OwnedGroupActions
+      key={workspace.ownerKey}
+      workspace={workspace}
+      recordAction={recordAction}
+    />
+  )
 }
 
-function OwnedGroupActions({ workspace }: { workspace: PersonalWorkspace }) {
+function OwnedGroupActions({
+  workspace,
+  recordAction,
+}: {
+  workspace: PersonalWorkspace
+  recordAction?: ReactNode
+}) {
   const navigate = useNavigate()
   const [joining, setJoining] = useState(false)
   const [invitation, setInvitation] = useState('')
@@ -37,44 +52,129 @@ function OwnedGroupActions({ workspace }: { workspace: PersonalWorkspace }) {
     `/challenge/invites?${new URLSearchParams({ challenge: id })}`
   return (
     <Card
-      className="space-y-4 p-6"
+      className={
+        recordAction ? 'dashboard-actions-region space-y-4' : 'space-y-4 p-6'
+      }
       role="region"
       aria-labelledby="dashboard-connect-title"
     >
-      <h2 id="dashboard-connect-title" className="text-lg font-bold">
+      <h2
+        id="dashboard-connect-title"
+        className={recordAction ? 'sr-only' : 'text-lg font-bold'}
+      >
         Create and connect
       </h2>
-      <p className="text-sm text-ink-muted">
+      <p className={recordAction ? 'sr-only' : 'text-sm text-ink-muted'}>
         Challenges are optional. Create one or invite people to a group you own.
       </p>
-      <div className="flex flex-wrap gap-3">
-        <Link className={actionClass} to="/challenge/setup">
-          Create challenge
-        </Link>
-        <Button
-          className="min-h-11"
-          variant="secondary"
-          aria-expanded={joining}
-          aria-controls="dashboard-join"
-          onClick={() => setJoining((value) => !value)}
+      <div
+        className={
+          recordAction ? 'dashboard-action-grid' : 'flex flex-wrap gap-3'
+        }
+      >
+        {recordAction}
+        <Link
+          aria-label="Create challenge"
+          className={
+            recordAction
+              ? 'dashboard-action dashboard-action-create'
+              : actionClass
+          }
+          to="/challenge/setup"
         >
-          Join with invitation
-        </Button>
+          {recordAction ? <DashboardActionIcon kind="create" /> : null}
+          <span>
+            Create challenge
+            {recordAction ? (
+              <span className="dashboard-action-description">
+                Start a new challenge
+              </span>
+            ) : null}
+          </span>
+          {recordAction ? (
+            <span className="dashboard-action-chevron" aria-hidden="true">
+              ›
+            </span>
+          ) : null}
+        </Link>
         {groups.length === 1 ? (
-          <Link className={actionClass} to={inviteDestination(groups[0].id)}>
-            Invite people
+          <Link
+            aria-label="Invite people"
+            className={
+              recordAction
+                ? 'dashboard-action dashboard-action-invite'
+                : actionClass
+            }
+            to={inviteDestination(groups[0].id)}
+          >
+            {recordAction ? <DashboardActionIcon kind="invite" /> : null}
+            <span>
+              Invite people
+              {recordAction ? (
+                <span className="dashboard-action-description">
+                  Bring your group together
+                </span>
+              ) : null}
+            </span>
+            {recordAction ? (
+              <span className="dashboard-action-chevron" aria-hidden="true">
+                ›
+              </span>
+            ) : null}
           </Link>
         ) : (
           <Button
+            aria-label="Invite people"
+            className={
+              recordAction ? 'dashboard-action dashboard-action-invite' : ''
+            }
             variant="secondary"
             disabled={contexts.state !== 'ready'}
             aria-expanded={choosing}
             aria-controls="dashboard-invite-chooser"
             onClick={() => setChoosing((value) => !value)}
           >
-            Invite people
+            {recordAction ? <DashboardActionIcon kind="invite" /> : null}
+            <span>
+              Invite people
+              {recordAction ? (
+                <span className="dashboard-action-description">
+                  Bring your group together
+                </span>
+              ) : null}
+            </span>
+            {recordAction ? (
+              <span className="dashboard-action-chevron" aria-hidden="true">
+                ›
+              </span>
+            ) : null}
           </Button>
         )}
+        <Button
+          aria-label="Join with invitation"
+          className={
+            recordAction ? 'dashboard-action dashboard-action-join' : 'min-h-11'
+          }
+          variant="secondary"
+          aria-expanded={joining}
+          aria-controls="dashboard-join"
+          onClick={() => setJoining((value) => !value)}
+        >
+          {recordAction ? <DashboardActionIcon kind="join" /> : null}
+          <span>
+            Join with invitation
+            {recordAction ? (
+              <span className="dashboard-action-description">
+                Use an invitation link
+              </span>
+            ) : null}
+          </span>
+          {recordAction ? (
+            <span className="dashboard-action-chevron" aria-hidden="true">
+              ›
+            </span>
+          ) : null}
+        </Button>
       </div>
       {joining ? (
         <form

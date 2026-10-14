@@ -279,9 +279,18 @@ describe('personal Dashboard and My Progress', () => {
         }
       }
       expect(createInvite).not.toHaveBeenCalled()
-      expect(screen.queryByText('Owned personal goal')).not.toBeInTheDocument()
-      expect(screen.queryByText('Archived owned group')).not.toBeInTheDocument()
-      expect(screen.queryByText('Joined group')).not.toBeInTheDocument()
+      const invitationChoices = within(
+        screen.getByRole('region', { name: 'Create and connect' }),
+      )
+      expect(
+        invitationChoices.queryByText('Owned personal goal'),
+      ).not.toBeInTheDocument()
+      expect(
+        invitationChoices.queryByText('Archived owned group'),
+      ).not.toBeInTheDocument()
+      expect(
+        invitationChoices.queryByText('Joined group'),
+      ).not.toBeInTheDocument()
     },
   )
 
@@ -317,10 +326,8 @@ describe('personal Dashboard and My Progress', () => {
       screen.queryByText('user-alex@example.invalid'),
     ).not.toBeInTheDocument()
     expect(
-      within(screen.getByRole('region', { name: 'About you' })).getByText(
-        'second-user@example.invalid',
-      ),
-    ).toBeInTheDocument()
+      screen.queryByRole('region', { name: 'About you' }),
+    ).not.toBeInTheDocument()
   })
 
   it.each([
