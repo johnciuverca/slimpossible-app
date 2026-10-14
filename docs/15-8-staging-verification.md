@@ -234,6 +234,8 @@ separate tracked fix only if PM approves the evidence-based diagnosis. No
 hosted policy/migration/grant change is proposed. Keep #207, #212, and #155
 open; #247 remains paused.
 
-No new accounts, hosted writes, migrations, production changes, issue closure,
-or promotion to main were performed. The only hosted SQL was the
-read-only BEGIN READ ONLY ... ROLLBACK verification above.
+No new accounts, hosted schema/grant/policy changes, persistent changes to
+pre-existing records, production changes, issue closure, or main promotion.
+Hosted data writes were limited to the authorized synthetic fixtures, all of
+which were cleaned up. The only hosted SQL was the read-only
+BEGIN READ ONLY ... ROLLBACK verification above.
