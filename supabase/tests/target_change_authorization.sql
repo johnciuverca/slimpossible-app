@@ -14,6 +14,7 @@ declare
   withdrawn_id uuid := '00000000-0000-4000-8000-000000000005';
   challenge_id uuid := gen_random_uuid();
   other_id uuid := gen_random_uuid();
+  invalid_challenge_id uuid := gen_random_uuid();
   share_scope_id uuid := gen_random_uuid();
   starting_target_id uuid := gen_random_uuid();
   personal_id uuid := gen_random_uuid();
@@ -30,6 +31,9 @@ declare
   milestone record;
   affected integer;
   visible integer;
+  history_before jsonb;
+  shares_before jsonb;
+  member_identity_before jsonb;
 begin
   insert into auth.users (id) values (group_viewer_id), (withdrawn_id)
   on conflict (id) do nothing;
@@ -58,12 +62,42 @@ begin
   insert into public.personal_weigh_in_group_shares (personal_weigh_in_id, challenge_id)
   values (shared_entry, challenge_id), (shared_entry, other_id);
 
+  select coalesce(jsonb_agg(to_jsonb(entry) order by entry.id), '[]'::jsonb)
+  into history_before
+  from public.personal_weigh_ins as entry
+  where entry.user_id = member_id;
+  select coalesce(jsonb_agg(to_jsonb(share) order by share.personal_weigh_in_id, share.challenge_id), '[]'::jsonb)
+  into shares_before
+  from public.personal_weigh_in_group_shares as share
+  where share.personal_weigh_in_id in (
+    select entry.id from public.personal_weigh_ins as entry where entry.user_id = member_id
+  );
+  select to_jsonb(member) - 'target_weight_kg' - 'updated_at'
+  into member_identity_before
+  from public.participants as member where member.id = member_row;
+
   execute 'set local role authenticated';
   perform set_config('request.jwt.claim.sub', member_id::text, true);
   select * into result_row from public.change_my_group_target(challenge_id, 75);
   insert into target_change_checks values ('pre_enrollment_shared_entry_does_not_create_milestone',
     result_row.starting_weight_kg = 100 and result_row.target_weight_kg = 75
     and result_row.previous_target_weight_kg is null and result_row.previous_target_achieved_on is null);
+  execute 'reset role';
+  insert into target_change_checks values ('self_change_does_not_change_peer_target',
+    (select target_weight_kg = 80 from public.participants where id = group_viewer_row));
+  insert into target_change_checks values ('self_change_preserves_baseline_identity_and_status',
+    (select to_jsonb(member) - 'target_weight_kg' - 'updated_at' = member_identity_before
+     from public.participants as member where member.id = member_row));
+  insert into target_change_checks values ('self_change_preserves_all_weigh_ins_and_notes',
+    history_before = (select coalesce(jsonb_agg(to_jsonb(entry) order by entry.id), '[]'::jsonb)
+      from public.personal_weigh_ins as entry where entry.user_id = member_id));
+  insert into target_change_checks values ('self_change_preserves_all_share_choices',
+    shares_before = (select coalesce(jsonb_agg(to_jsonb(share) order by share.personal_weigh_in_id, share.challenge_id), '[]'::jsonb)
+      from public.personal_weigh_in_group_shares as share
+      where share.personal_weigh_in_id in (
+        select entry.id from public.personal_weigh_ins as entry where entry.user_id = member_id
+      )));
+  execute 'set local role authenticated';
   select count(*)::integer into visible from public.list_my_group_target_milestones(challenge_id);
   insert into target_change_checks values ('pre_enrollment_shared_entry_does_not_persist_milestone', visible = 0);
   select count(*)::integer into visible from public.get_group_target_milestones(challenge_id);
@@ -194,6 +228,12 @@ begin
     insert into target_change_checks values ('cross_group_mutation_denied', true);
   end;
   begin
+    perform * from public.change_my_group_target(invalid_challenge_id, 70);
+    insert into target_change_checks values ('invalid_challenge_mutation_denied', false);
+  exception when insufficient_privilege then
+    insert into target_change_checks values ('invalid_challenge_mutation_denied', true);
+  end;
+  begin
     perform * from public.change_my_group_target(personal_id, 70);
     insert into target_change_checks values ('personal_challenge_mutation_denied', false);
   exception when insufficient_privilege then
@@ -253,7 +293,7 @@ $$;
 select name, passed from target_change_checks order by name;
 do $$ begin
   if exists (select 1 from target_change_checks where not passed)
-     or (select count(*) from target_change_checks) <> 35 then
+     or (select count(*) from target_change_checks) <> 40 then
     raise exception 'Target-change authorization regression failed.';
   end if;
 end $$;
