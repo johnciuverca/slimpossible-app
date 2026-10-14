@@ -162,18 +162,78 @@ Chapter-16 candidates. #207 has no earlier evidence comments. Keep #207, #212,
 and #155 open until coordinated exact-candidate observations are recorded; do
 not close them from this local/CI/deployment result. Issue #247 remains paused.
 
+## 2026-10-14 connected sharing and database verification
+
+The owner reports completing the four-step group-sharing walkthrough. PM
+independently repeated the relevant flow on the current staging application
+candidate, e181f8099611d4cf8e1b8ff91b43e072a7a6f5df, which is the test-only
+PR #270 merge; the application source is unchanged from the earlier
+a2b524f33558f25744b5624580eac224943eaf24 candidate. This follow-up must
+not be read as evidence that all #212 criteria are complete.
+
+Using an existing writer account, PM saved one fictional personal entry and
+explicitly selected one Group share. In that selected Group, the row appeared
+without its private note. In the existing member account, the shared row
+remained visible after reload; the private note and edit/delete controls were
+absent, and the member's own personal history remained separate. Back in the
+writer account, PM removed the Group share and confirmed the row disappeared
+from Group while remaining in Personal Progress. PM then deleted only this
+fictional fixture through the app; a hard reload confirmed it was gone and the
+three pre-existing personal records remained. No existing records, milestones,
+targets, shares, accounts, or production settings were changed. The member was
+not separately rechecked after the writer unshared the row. No fixture remains.
+The owner also reports their own four-step check passed.
+
+A reviewed read-only SQL role/claim probe also ran on staging. The database
+reported PostgreSQL 17.6, and its get_group_weigh_in_history(uuid)
+function-definition fingerprint matched the canonical PostgreSQL 16 local
+baseline. The exact reviewed script had SHA-256
+94323052fbdb1ba1cff6bbcb70a646bbc06b4e97f19e75ee2f356d088cb61bea.
+The catalog, function-security/ACL, cohort, and auth.uid() self-checks passed;
+sessionless and unrelated authenticated caller simulations were denied with
+SQLSTATE 42501. The batch used BEGIN READ ONLY and ROLLBACK; it returned no
+personal rows and made no persistent database changes. This is database
+role/GUC simulation, not signed PostgREST JWT/HTTP proof. It does not cover
+anonymous or withdrawn-account HTTP requests or the target-milestone RPC.
+
+### Reproducible Dashboard Goals observation
+
+PM reproduced the “Reached target history is unavailable right now” message on
+the selected Group Goal both before and after a hard reload; other personal
+history, goal context, and target controls loaded. No response payload or
+private values were inspected.
+
+Static path review found a plausible UI contract mismatch: DashboardGoals
+calls the participant repository's listOwnGroupTargetMilestones, which calls
+list_my_group_target_milestones. The shared mapList helper represents a valid
+zero-row result as state: 'empty', while this component currently treats only
+state: 'success' as ready and maps empty to the unavailable state. Thus a
+valid account with no reached-target history can see an error message. The
+live RPC result was not inspected, so this is a code-supported likely
+explanation, not a confirmed cause; hosted milestone-RPC schema/grants were
+not independently probed. No speculative app change was made. Track any fix
+as a focused issue/PR with explicit empty, non-empty, and denied-result tests.
+
 ## Remaining verification
 
-Vercel source SHA/project/domain and the staging Preview backend assignment
-were verified as described above. Owner, joined-member, and signed-in
-cross-group UI paths are partially exercised. Remaining gates are a
-desktop-size connected visual and direct hard-refresh/deep-link pass; anonymous
-and withdrawn-member UI checks only if already-authorized sessions exist;
-auth switch/signup/recovery; direct server-side privacy negatives; and
-Group-sharing write behavior. Do not create accounts. If the invitation-choice
-error returns, capture only request category/status/error code; do not inspect
-or share payload values. Full contrast/accessibility review also remains open.
-Return redacted PASS/FAIL/BLOCKED observations. Do not transfer credentials,
-identities, private notes, raw weights, screenshots containing personal data,
-or environment-variable values. No new accounts, hosted SQL, production
-changes, issue closure, or promotion to `main` were performed here.
+This follow-up adds connected evidence for one explicit Group share, member
+read-only visibility, unsharing, and cleanup; it does not complete #207, #212,
+or #155. Remaining #212 scope includes no-share and multiple-selected-group
+save/edit/refresh/account-switch paths, group chart/table and Sunday
+provisional/final recomputation after late/corrected data (including partial
+weeks and ties), remaining privacy/auth cases, and release configuration,
+migration/rollback, post-deploy smoke/disable, and accessibility checks. The
+member was not rechecked after unsharing. Anonymous and withdrawn-user HTTP
+negative tests remain unexecuted. The staging SQL probe described above is not
+signed-JWT/HTTP evidence.
+
+The Dashboard Goals unavailable message is reproducible; its exact live RPC
+outcome remains unknown. A bounded next step is one focused UI/repository test
+for valid empty versus non-empty versus denied milestone results, then a
+separate tracked fix only if PM approves the evidence-based diagnosis. No
+hosted policy/migration/grant change is proposed. Keep #207, #212, and #155
+open; #247 remains paused.
+
+No new accounts, hosted writes, migrations, production changes, issue closure,
+or promotion to main were performed. The only hosted SQL was the
+read-only BEGIN READ ONLY ... ROLLBACK verification above.
