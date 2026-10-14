@@ -78,16 +78,14 @@ supabase-activity.yml check only calls the Auth health endpoint; it is not a
 migration job. This PR adds no database credentials, GitHub Environments, or
 automated migration steps.
 
-The current six timestamp-ordered migration files in supabase/migrations/
-install the core schema and RLS policies, harden authorization, add
-challenge-invite RPCs/triggers, and add privacy-safe group summary RPCs.
-Review found no DROP TABLE, DROP COLUMN, or bulk table backfill in these
-files. Several migrations define SECURITY DEFINER functions and change
-grants/policies, so review those privileges and run the existing
-supabase/tests/ authorization checks on staging; do not treat these as
-routine unreviewed SQL.
+The checked-in timestamp-ordered migration set currently contains fifteen
+files. This inventory is a source-tree check, not evidence that a remote
+project has applied them. Several migrations define SECURITY DEFINER
+functions or change grants/policies; review their exact privileges and run
+the relevant `supabase/tests/` authorization checks on the dedicated staging
+project. Do not treat these as routine unreviewed SQL.
 
-The current reviewed set is:
+The current checked-in set is:
 
 - `20260917000000_create_core_schema.sql`
 - `20260917000001_add_rls_policies.sql`
@@ -95,6 +93,27 @@ The current reviewed set is:
 - `20260922000001_add_secure_challenge_invites.sql`
 - `20260924000000_add_privacy_safe_group_progress.sql`
 - `20260925000000_add_provisional_group_leader_summary.sql`
+- `20261005000000_add_personal_group_challenge_kinds.sql`
+- `20261005000001_converge_function_execute_grants.sql`
+- `20261006000000_add_opt_in_group_weigh_in_history.sql`
+- `20261007000000_personal_weigh_ins.sql`
+- `20261008000000_allow_draft_group_weigh_in_sharing.sql`
+- `20261009000000_add_group_chart_history.sql`
+- `20261012000000_add_group_target_change_milestones.sql`
+- `20261012100000_add_group_member_progress_projection.sql`
+- `20261013000000_correct_own_enrollment_starting_weight.sql`
+
+Guarded rollback scripts are checked in for selected Chapter 16 migrations:
+`20261005000000`, `20261005000001`, `20261006000000`,
+`20261007000000` (RPC compatibility restore), `20261009000000`,
+`20261012100000`, and `20261013000000`. There is no matching rollback file
+for `20261008000000` or `20261012000000`, and the original core migrations
+also have no automatic down scripts. A present rollback script is not an
+instruction to run it: inspect its preconditions and data effects, preserve
+the migration ledger, and prefer the reviewed forward-compatible recovery
+plan. Before any staging or production migration, verify a recoverable
+backup/restore path and the exact remote migration history. No remote
+migration state is asserted by this repository inventory.
 
 For each candidate, an owner uses the checked-out, reviewed migration set and
 explicitly targets each project. The following are operator-run examples;
