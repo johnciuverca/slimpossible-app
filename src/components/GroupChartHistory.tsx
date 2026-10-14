@@ -10,8 +10,12 @@ import {
 } from '../models/groupChartHistory'
 import { localDateOnly } from '../models/provisionalGroupLeader'
 import { WeightEntryCard } from './WeightEntryCard'
+import { deriveGroupChartTrend } from '../models/groupChartTrend'
+import type { GroupMemberProgress } from '../models/groupMemberProgress'
 
-const colors = ['#166534', '#1d4ed8', '#9f1239', '#6b21a8', '#92400e']
+const colors = ['#31dbb0', '#67a5ff', '#ff8ba7', '#c49cff', '#ffc164']
+const trendColor = '#ffbf69'
+const referenceColor = '#c49cff'
 const day = (date: string) => Date.parse(`${date}T00:00:00Z`) / 86400000
 const signed = (value: number) => `${value > 0 ? '+' : ''}${value} kg`
 
@@ -23,6 +27,7 @@ export function GroupChartHistory({
   children,
   enabled = true,
   showHistory = true,
+  memberProgress = [],
 }: {
   challengeId: string
   viewerId: string
@@ -31,6 +36,7 @@ export function GroupChartHistory({
   children?: ReactNode
   enabled?: boolean
   showHistory?: boolean
+  memberProgress?: GroupMemberProgress[]
 }) {
   const ownMemberKey = ownGroupMemberKey(challengeId, viewerId)
   const personalWorkspace = usePersonalWorkspace({
@@ -90,6 +96,10 @@ export function GroupChartHistory({
     (member) => member.memberKey === selectedKey,
   )
   const matrix = createGroupHistoryMatrix(series)
+  const trends = series.map((member) => ({
+    memberKey: member.memberKey,
+    trend: deriveGroupChartTrend(member.points),
+  }))
   useEffect(() => {
     if (selection.context !== context) {
       setSelection({ context, memberKey: '' })
@@ -125,13 +135,37 @@ export function GroupChartHistory({
   const changes = points.map((point) => point.changeKg)
   const absolute = !selectedKey
   const weights = points.map((point) => point.weightKg)
-  const weightMin = Math.min(...weights)
-  const weightMax = Math.max(...weights)
+  const chartValue = (memberKey: string, weightKg: number) => {
+    if (absolute) return weightKg
+    const baseline = series.find((member) => member.memberKey === memberKey)
+      ?.points[0]?.weightKg
+    return baseline === undefined ? weightKg : weightKg - baseline
+  }
+  const targetWeights = series.flatMap((member) => {
+    const target = memberProgress.find(
+      (candidate) => candidate.memberKey === member.memberKey,
+    )?.targetWeightKg
+    return target !== null && target !== undefined && Number.isFinite(target)
+      ? [chartValue(member.memberKey, target)]
+      : []
+  })
+  const trendWeights = trends.flatMap(({ memberKey, trend }) =>
+    trend
+      ? [
+          chartValue(memberKey, trend.startWeightKg),
+          chartValue(memberKey, trend.endWeightKg),
+        ]
+      : [],
+  )
+  const weightMin = Math.min(...weights, ...targetWeights, ...trendWeights)
+  const weightMax = Math.max(...weights, ...targetWeights, ...trendWeights)
   const padding = Math.max(0.5, (weightMax - weightMin) * 0.05)
   const min = absolute
     ? Math.max(0, weightMin - padding)
-    : Math.min(0, ...changes) - 0.5
-  const max = absolute ? weightMax + padding : Math.max(0, ...changes) + 0.5
+    : Math.min(0, ...changes, ...targetWeights, ...trendWeights) - 0.5
+  const max = absolute
+    ? weightMax + padding
+    : Math.max(0, ...changes, ...targetWeights, ...trendWeights) + 0.5
   const ticks = absolute ? [min, (min + max) / 2, max] : [min, 0, max]
   const pointValue = (point: (typeof points)[number]) =>
     absolute ? point.weightKg : point.changeKg
@@ -146,6 +180,7 @@ export function GroupChartHistory({
       ref={workspace}
       className="group-history-workspace min-w-0 space-y-6 scroll-mt-6"
     >
+      {children}
       {showHistory ? (
         <div
           ref={navigationRef}
@@ -167,7 +202,7 @@ export function GroupChartHistory({
                 disabled={!enabled}
                 tabIndex={selectedIndex === index ? 0 : -1}
                 type="button"
-                className={`min-h-11 shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 ${selectedIndex === index ? 'border-emerald-800 bg-emerald-800 text-white' : 'border-stone-300 bg-white text-emerald-800'}`}
+                className={`group-member-tab min-h-11 shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 ${selectedIndex === index ? 'group-member-tab-active border-emerald-800 bg-emerald-800 text-white' : 'border-stone-300 bg-white text-emerald-800'}`}
                 onClick={() =>
                   setSelection({ context, memberKey: member.memberKey })
                 }
@@ -198,7 +233,6 @@ export function GroupChartHistory({
           </div>
         </div>
       ) : null}
-      {children}
       {enabled && showHistory ? (
         <div
           id={`${id}-panel`}
@@ -315,12 +349,76 @@ export function GroupChartHistory({
                         </text>
                       </g>
                     ))}
+                    {series.map((member) => {
+                      const target = memberProgress.find(
+                        (candidate) => candidate.memberKey === member.memberKey,
+                      )?.targetWeightKg
+                      return target === null || target === undefined ? null : (
+                        <line
+                          key={`target:${member.memberKey}`}
+                          data-series="target-reference"
+                          x1={plotLeft}
+                          x2={675}
+                          y1={y(chartValue(member.memberKey, target))}
+                          y2={y(chartValue(member.memberKey, target))}
+                          stroke={referenceColor}
+                          strokeWidth={2}
+                          strokeDasharray="8 5"
+                        >
+                          <title>
+                            {member.label} target reference: {target} kg
+                          </title>
+                        </line>
+                      )
+                    })}
                     {series.map((member, index) => (
                       <g
                         key={member.memberKey}
                         stroke={colors[index % colors.length]}
                         fill={colors[index % colors.length]}
                       >
+                        {trends.find(
+                          (item) => item.memberKey === member.memberKey,
+                        )?.trend ? (
+                          <line
+                            data-series="derived-trend"
+                            x1={x(
+                              trends.find(
+                                (item) => item.memberKey === member.memberKey,
+                              )!.trend!.startDate,
+                            )}
+                            y1={y(
+                              chartValue(
+                                member.memberKey,
+                                trends.find(
+                                  (item) => item.memberKey === member.memberKey,
+                                )!.trend!.startWeightKg,
+                              ),
+                            )}
+                            x2={x(
+                              trends.find(
+                                (item) => item.memberKey === member.memberKey,
+                              )!.trend!.endDate,
+                            )}
+                            y2={y(
+                              chartValue(
+                                member.memberKey,
+                                trends.find(
+                                  (item) => item.memberKey === member.memberKey,
+                                )!.trend!.endWeightKg,
+                              ),
+                            )}
+                            stroke={trendColor}
+                            strokeWidth={2.5}
+                            strokeDasharray="2 5"
+                            strokeLinecap="round"
+                          >
+                            <title>
+                              {member.label} derived trend from displayed shared
+                              points
+                            </title>
+                          </line>
+                        ) : null}
                         {member.points.map((point, position) => {
                           const previous = member.points[position - 1]
                           return (
@@ -328,6 +426,7 @@ export function GroupChartHistory({
                               {previous &&
                               day(point.date) - day(previous.date) === 1 ? (
                                 <line
+                                  data-series="recorded-connection"
                                   x1={x(previous.date)}
                                   y1={y(pointValue(previous))}
                                   x2={x(point.date)}
@@ -365,16 +464,46 @@ export function GroupChartHistory({
                 </div>
                 <ul
                   aria-label="Group chart legend"
-                  className="mt-3 flex flex-wrap gap-3 text-sm"
+                  className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm"
                 >
                   {series.map((member, index) => (
-                    <li key={member.memberKey}>
+                    <li
+                      key={`recorded:${member.memberKey}`}
+                      className="flex items-center gap-2"
+                    >
                       <span
                         aria-hidden="true"
-                        style={{ color: colors[index % colors.length] }}
-                      >
-                        ●{' '}
-                      </span>
+                        className="inline-block w-6 border-t-2"
+                        style={{ borderColor: colors[index % colors.length] }}
+                      />
+                      {member.label} · recorded weights
+                    </li>
+                  ))}
+                  {targetWeights.length > 0 ? (
+                    <li className="flex items-center gap-2">
+                      <span
+                        aria-hidden="true"
+                        className="inline-block w-6 border-t-2 border-dashed"
+                        style={{ borderColor: referenceColor }}
+                      />
+                      Target/reference weight
+                    </li>
+                  ) : null}
+                  {trends.some(({ trend }) => trend !== null) ? (
+                    <li className="flex items-center gap-2">
+                      <span
+                        aria-hidden="true"
+                        className="inline-block w-6 border-t-2 border-dotted"
+                        style={{ borderColor: trendColor }}
+                      />
+                      Derived trend from displayed points
+                    </li>
+                  ) : null}
+                  {series.map((member) => (
+                    <li
+                      key={`baseline:${member.memberKey}`}
+                      className="text-ink-muted"
+                    >
                       {member.label} · {absolute ? 'first shared' : 'baseline'}{' '}
                       <time dateTime={member.baselineDate}>
                         {member.baselineDate}
@@ -390,11 +519,11 @@ export function GroupChartHistory({
                 >
                   <table
                     aria-label="Shared group weight history"
-                    className="table-fixed border-collapse text-left text-xs"
-                    style={{ width: 76 + series.length * 156 }}
+                    className="group-history-table table-fixed border-collapse text-left text-xs"
+                    style={{ width: 120 + series.length * 156 }}
                   >
                     <colgroup>
-                      <col style={{ width: 76 }} />
+                      <col style={{ width: 120 }} />
                       {series.map((member) => (
                         <col key={member.memberKey} style={{ width: 156 }} />
                       ))}
@@ -407,7 +536,7 @@ export function GroupChartHistory({
                         <th
                           scope="col"
                           aria-label="Recorded date"
-                          className="sticky left-0 top-0 z-30 bg-stone-50 px-1 py-2"
+                          className="sticky left-0 top-0 z-30 bg-stone-50 px-2 py-2"
                         >
                           Date
                         </th>
@@ -428,13 +557,10 @@ export function GroupChartHistory({
                           <th
                             scope="row"
                             aria-label={row.date}
-                            className="sticky left-0 z-10 whitespace-nowrap bg-white px-1 py-1 font-medium"
+                            className="sticky left-0 z-10 whitespace-nowrap bg-white px-2 py-1 font-medium"
                           >
                             <time dateTime={row.date} title={row.date}>
-                              {row.date.slice(8)}/{row.date.slice(5, 7)}
-                              <span className="sr-only">
-                                /{row.date.slice(0, 4)}
-                              </span>
+                              {row.date}
                             </time>
                           </th>
                           {row.cells.map((point, index) => (
