@@ -196,7 +196,7 @@ function SelectedGoal({
         if (current)
           setHistory({
             key,
-            state: result.state === 'success' ? 'ready' : 'error',
+            state: result.state === 'error' ? 'error' : 'ready',
             rows: result.state === 'success' ? result.data : [],
           })
       })

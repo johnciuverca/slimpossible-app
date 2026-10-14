@@ -57,7 +57,7 @@ function fixture(kind: 'group' | 'personal' = 'group') {
         { targetWeightKg: 95, achievedOn: '2026-10-02', state: 'reached' },
       ],
     })
-  const workspace: PersonalWorkspace = {
+  const workspace = {
     ownerKey: 'first',
     userId: participant.userId,
     persistence,
@@ -95,7 +95,7 @@ function fixture(kind: 'group' | 'personal' = 'group') {
     },
     groups: [challenge],
     refresh: vi.fn(),
-  }
+  } satisfies PersonalWorkspace
   return { workspace, change, correct }
 }
 function view(workspace: PersonalWorkspace) {
@@ -158,6 +158,80 @@ describe('integrated own Goals', () => {
     expect(
       screen.getByRole('link', { name: /shared history/ }),
     ).toHaveAttribute('href', '/group?challenge=challenge-1#group-history')
+  })
+  it('shows the existing empty state for a valid empty reached-history result', async () => {
+    const { workspace } = fixture()
+    workspace.persistence.repositories.participants.listOwnGroupTargetMilestones =
+      vi.fn().mockResolvedValue({ state: 'empty', data: [] })
+
+    render(view(workspace))
+
+    expect(
+      await screen.findByText('No previous reached targets saved yet.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText(/Reached target history is unavailable right now/),
+    ).not.toBeInTheDocument()
+  })
+  it('keeps repository errors distinct from valid empty history', async () => {
+    const { workspace } = fixture()
+    workspace.persistence.repositories.participants.listOwnGroupTargetMilestones =
+      vi.fn().mockResolvedValue({
+        error: { kind: 'request', message: 'Sign-in required.' },
+        state: 'error',
+      })
+
+    render(view(workspace))
+
+    expect(
+      await screen.findByText(
+        /Reached target history is unavailable right now/,
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText('No previous reached targets saved yet.'),
+    ).not.toBeInTheDocument()
+  })
+  it('ignores a late history result after the goal context changes', async () => {
+    const { workspace } = fixture()
+    type HistoryResult = Awaited<
+      ReturnType<
+        typeof workspace.persistence.repositories.participants.listOwnGroupTargetMilestones
+      >
+    >
+    let resolveFirst!: (result: HistoryResult) => void
+    const listHistory = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<HistoryResult>((resolve) => {
+            resolveFirst = resolve
+          }),
+      )
+      .mockResolvedValueOnce({ state: 'empty', data: [] })
+    workspace.persistence.repositories.participants.listOwnGroupTargetMilestones =
+      listHistory
+
+    const rendered = render(view(workspace))
+    const refreshedContext = {
+      ...workspace,
+      contexts: { ...workspace.contexts, key: 'refreshed-context' },
+    }
+    rendered.rerender(view(refreshedContext))
+
+    expect(
+      await screen.findByText('No previous reached targets saved yet.'),
+    ).toBeInTheDocument()
+    resolveFirst({
+      state: 'success',
+      data: [
+        { targetWeightKg: 95, achievedOn: '2026-10-02', state: 'reached' },
+      ],
+    })
+
+    await waitFor(() =>
+      expect(screen.queryByText('95 kg · 2026-10-02')).not.toBeInTheDocument(),
+    )
   })
   it('validates bounds and precision, saves through the own RPC and refreshes on confirmed success', async () => {
     const { workspace, change } = fixture()
