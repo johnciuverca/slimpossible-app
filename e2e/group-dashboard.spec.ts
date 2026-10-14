@@ -476,6 +476,7 @@ for (const layout of [
   }) => {
     const context = await browser.newContext({
       hasTouch: layout.hasTouch,
+      colorScheme: 'dark',
       viewport: { width: layout.width, height: 700 },
     })
     try {
@@ -688,6 +689,118 @@ for (const layout of [
     }
   })
 }
+
+test('Group Overview and history retain readable contrast in both color schemes', async ({
+  page,
+}) => {
+  await installGroupFixtures(page, true)
+  await page.emulateMedia({ colorScheme: 'light' })
+  await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+  await page.addStyleTag({
+    content: '* { animation: none !important; transition: none !important; }',
+  })
+  const workspace = page.locator('.group-workspace')
+  const overviewTab = page.getByRole('button', {
+    name: 'Overview',
+    exact: true,
+  })
+  const progressTab = page.getByRole('button', {
+    name: 'Progress & history',
+  })
+  await overviewTab.click()
+
+  function luminance(color: string) {
+    const channels = color
+      .match(/[\d.]+/g)!
+      .slice(0, 3)
+      .map(Number)
+    const linear = channels.map((channel) => {
+      const value = channel / 255
+      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+    })
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+  }
+  function contrast(foreground: string, background: string) {
+    const values = [luminance(foreground), luminance(background)].sort(
+      (a, b) => b - a,
+    )
+    return (values[0] + 0.05) / (values[1] + 0.05)
+  }
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme })
+    await expect(workspace).toHaveCSS('color-scheme', colorScheme)
+    const sample = await page.evaluate(() => {
+      const active = document.querySelector<HTMLElement>(
+        '[aria-label="Group sections"] .group-section-tab-active',
+      )!
+      const overview = document.querySelector<HTMLElement>(
+        '.group-overview-card',
+      )!
+      const metricCard = document.querySelector<HTMLElement>(
+        '.group-overview-metric',
+      )!
+      const metric = metricCard.querySelector<HTMLElement>('dd')!
+      const metricLabel = metricCard.querySelector<HTMLElement>('dt')!
+      const leaderRow = document.querySelector<HTMLElement>(
+        '.group-overview-leader li',
+      )!
+      const leaderName = leaderRow.querySelector<HTMLElement>('span')!
+      const style = (element: HTMLElement) => getComputedStyle(element)
+      return {
+        activeBackground: style(active).backgroundColor,
+        activeColor: style(active).color,
+        overviewBackground: style(overview).backgroundColor,
+        overviewColor: style(overview).color,
+        metricBackground: style(metricCard).backgroundColor,
+        metricColor: style(metric).color,
+        metricLabelColor: style(metricLabel).color,
+        leaderRowBackground: style(leaderRow).backgroundColor,
+        leaderNameColor: style(leaderName).color,
+      }
+    })
+    expect(
+      contrast(sample.activeColor, sample.activeBackground),
+      `${colorScheme} active-tab colors: ${JSON.stringify(sample)}`,
+    ).toBeGreaterThanOrEqual(4.5)
+    expect(
+      contrast(sample.overviewColor, sample.overviewBackground),
+    ).toBeGreaterThanOrEqual(4.5)
+    expect(
+      contrast(sample.metricColor, sample.metricBackground),
+    ).toBeGreaterThanOrEqual(4.5)
+    expect(
+      contrast(sample.metricLabelColor, sample.metricBackground),
+    ).toBeGreaterThanOrEqual(4.5)
+    expect(
+      contrast(sample.leaderNameColor, sample.leaderRowBackground),
+      `${colorScheme} provisional leader colors: ${JSON.stringify(sample)}`,
+    ).toBeGreaterThanOrEqual(4.5)
+    await expect(overviewTab).toBeVisible()
+    await page.screenshot({
+      path: test.info().outputPath(`group-overview-${colorScheme}.png`),
+      fullPage: true,
+    })
+  }
+  await progressTab.click()
+  const matrix = page.getByRole('table', {
+    name: 'Shared group weight history',
+  })
+  await expect(matrix).toBeVisible()
+  const dateCell = matrix.getByRole('rowheader').first()
+  for (const colorScheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme })
+    const dateColors = await dateCell.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return { color: style.color, background: style.backgroundColor }
+    })
+    expect(
+      contrast(dateColors.color, dateColors.background),
+      `${colorScheme} date-cell colors: ${JSON.stringify(dateColors)}`,
+    ).toBeGreaterThanOrEqual(4.5)
+  }
+  await expect(dateCell).toBeVisible()
+})
 
 for (const viewport of [
   { label: 'desktop', width: 1280 },
@@ -913,6 +1026,7 @@ for (const viewport of [
     page,
   }) => {
     await page.setViewportSize({ height: 900, width: viewport.width })
+    await page.emulateMedia({ colorScheme: 'dark' })
     const requests = await installGroupFixtures(page, true)
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
     const overviewTab = page.getByRole('button', {

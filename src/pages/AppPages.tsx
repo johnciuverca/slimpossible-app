@@ -2070,7 +2070,7 @@ export function GroupDashboardPage() {
         showHistory={progressTab}
         memberProgress={memberProgressState === 'ready' ? memberProgress : []}
       >
-        <Card className="p-5 sm:p-8 lg:p-10">
+        <Card className="group-overview-card p-5 sm:p-8 lg:p-10">
           <DashboardState
             isLoading={isLoading}
             message={message}
@@ -2081,7 +2081,7 @@ export function GroupDashboardPage() {
                 <div className="grid gap-5 lg:grid-cols-2">
                   <section
                     aria-labelledby="provisional-leader-heading"
-                    className="min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 sm:p-7"
+                    className="group-overview-leader min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 sm:p-7"
                   >
                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-800">
                       This week
@@ -2178,7 +2178,7 @@ export function GroupDashboardPage() {
 
                   <section
                     aria-labelledby="weekly-winners-heading"
-                    className="min-w-0 rounded-2xl border border-stone-200 bg-white p-5 sm:p-7"
+                    className="group-overview-result min-w-0 rounded-2xl border border-stone-200 bg-white p-5 sm:p-7"
                   >
                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-800">
                       Weekly highlights
@@ -2250,7 +2250,7 @@ export function GroupDashboardPage() {
                     weigh-in. Only permitted group totals are shown here.
                   </p>
                   <dl className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <div className="min-w-0 rounded-2xl border border-stone-200 bg-white p-5">
+                    <div className="group-overview-metric min-w-0 rounded-2xl border border-stone-200 bg-white p-5">
                       <dt className="text-sm font-semibold text-slate-600">
                         Active members
                       </dt>
@@ -2258,7 +2258,7 @@ export function GroupDashboardPage() {
                         {summary.activeParticipantCount}
                       </dd>
                     </div>
-                    <div className="min-w-0 rounded-2xl border border-stone-200 bg-white p-5">
+                    <div className="group-overview-metric min-w-0 rounded-2xl border border-stone-200 bg-white p-5">
                       <dt className="text-sm font-semibold text-slate-600">
                         Average goal progress
                       </dt>
@@ -2273,7 +2273,7 @@ export function GroupDashboardPage() {
                           : `Across ${summary.participantsWithProgressCount} members`}
                       </dd>
                     </div>
-                    <div className="min-w-0 rounded-2xl border border-stone-200 bg-white p-5">
+                    <div className="group-overview-metric min-w-0 rounded-2xl border border-stone-200 bg-white p-5">
                       <dt className="text-sm font-semibold text-slate-600">
                         Members with a saved weigh-in
                       </dt>
@@ -2281,7 +2281,7 @@ export function GroupDashboardPage() {
                         {summary.participantsWithRecordedWeightCount}
                       </dd>
                     </div>
-                    <div className="min-w-0 rounded-2xl border border-stone-200 bg-white p-5">
+                    <div className="group-overview-metric min-w-0 rounded-2xl border border-stone-200 bg-white p-5">
                       <dt className="text-sm font-semibold text-slate-600">
                         Goals reached
                       </dt>

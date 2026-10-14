@@ -100,7 +100,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   return (
     <NavigationSafetyContext.Provider value={safety}>
       <div
-        className={`app-shell flex min-h-screen flex-col bg-page text-ink ${pathname === '/dashboard' ? 'dashboard-shell' : ''}`}
+        className={`app-shell flex min-h-screen flex-col bg-page text-ink ${pathname === '/dashboard' ? 'dashboard-shell' : ''} ${pathname === '/group' ? 'group-shell' : ''}`}
         onClickCapture={(event) => {
           if (dataRouter) return
           const anchor =
