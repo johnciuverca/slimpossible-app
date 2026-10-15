@@ -70,7 +70,7 @@ export function LoginPage() {
   return (
     <section
       aria-labelledby="login-title"
-      className="mx-auto flex w-full max-w-md flex-1 items-center"
+      className="auth-page mx-auto flex w-full max-w-md flex-1 items-center"
     >
       <Card className="w-full p-8 sm:p-10">
         <PageHeader
@@ -107,18 +107,18 @@ export function LoginPage() {
           />
 
           {state.status === 'error' || submitError ? (
-            <p aria-live="polite" className="text-sm text-red-700">
+            <p aria-live="polite" className="text-sm text-danger-800">
               {state.status === 'error' ? state.error : submitError}
             </p>
           ) : null}
           {state.status === 'signed-in' ? (
-            <p aria-live="polite" className="text-sm text-emerald-700">
+            <p aria-live="polite" className="text-sm text-forest-700">
               Signed in successfully.
             </p>
           ) : null}
           {(location.state as { passwordReset?: boolean } | null)
             ?.passwordReset ? (
-            <p aria-live="polite" className="text-sm text-emerald-700">
+            <p aria-live="polite" className="text-sm text-forest-700">
               Your password was updated. Sign in with your new password.
             </p>
           ) : null}
@@ -128,9 +128,13 @@ export function LoginPage() {
           </Button>
         </form>
 
-        <p className="mt-6 text-sm leading-6 text-slate-600">
+        <p className="mt-6 text-sm leading-6 text-ink-muted">
           Need an account?{' '}
-          <Link className="text-emerald-700 underline" to="/register">
+          <Link
+            className="text-forest-700 underline"
+            state={location.state}
+            to="/register"
+          >
             Create one
           </Link>
         </p>
@@ -139,13 +143,13 @@ export function LoginPage() {
           className="mt-6 flex flex-col items-start gap-4"
         >
           <Link
-            className="inline-block text-sm text-emerald-700 underline"
+            className="inline-block text-sm text-forest-700 underline"
             to="/forgot-password"
           >
             Forgot your password?
           </Link>
           <Link
-            className="inline-block text-sm text-emerald-700 underline"
+            className="inline-block text-sm text-forest-700 underline"
             to="/"
           >
             Back to home

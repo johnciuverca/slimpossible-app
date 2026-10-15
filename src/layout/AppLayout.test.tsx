@@ -36,6 +36,11 @@ function CurrentRoute() {
 }
 
 const signedOut: AuthState = { error: null, status: 'signed-out', user: null }
+const signedIn: AuthState = {
+  error: null,
+  status: 'signed-in',
+  user: { id: 'owner-1', email: 'owner@example.invalid' },
+}
 
 afterEach(() => cleanup())
 
@@ -62,7 +67,7 @@ describe('AppLayout', () => {
     },
   )
   it('renders only the actual Dashboard and Group workspaces in primary navigation', () => {
-    renderLayout('/', signedOut)
+    renderLayout('/dashboard', signedIn)
 
     expect(screen.getByRole('banner')).toHaveTextContent('Slimpossible')
     expect(
@@ -85,15 +90,29 @@ describe('AppLayout', () => {
         screen.queryByRole('link', { name: retired }),
       ).not.toBeInTheDocument()
     }
-    expect(screen.getByRole('link', { name: 'Log in' })).toHaveAttribute(
-      'href',
-      '/login',
-    )
   })
+
+  it.each(['/login', '/register'])(
+    'shows public navigation without protected controls on %s',
+    (path) => {
+      renderLayout(path, signedOut)
+      for (const [name, href] of [
+        ['Home', '/'],
+        ['Log in', '/login'],
+        ['Register', '/register'],
+      ]) {
+        expect(screen.getByRole('link', { name })).toHaveAttribute('href', href)
+      }
+      for (const name of ['Dashboard', 'Group', 'Profile', 'Log out']) {
+        expect(screen.queryByRole('link', { name })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
+      }
+    },
+  )
 
   it('preserves the selected challenge across shared header navigation', () => {
     render(
-      <AuthProvider initialState={signedOut}>
+      <AuthProvider initialState={signedIn}>
         <MemoryRouter
           initialEntries={[
             '/challenge/participants/enroll?challenge=private%2Fplan',
@@ -108,7 +127,7 @@ describe('AppLayout', () => {
 
     expect(screen.getByRole('link', { name: 'Slimpossible' })).toHaveAttribute(
       'href',
-      '/',
+      '/dashboard',
     )
 
     for (const { label, path } of liveNavigation) {
@@ -128,7 +147,7 @@ describe('AppLayout', () => {
   it.each(liveNavigation)(
     'identifies $label as the current page without color-only state',
     ({ label, path }) => {
-      renderLayout(path, signedOut)
+      renderLayout(path, signedIn)
 
       const currentLink = screen.getByRole('link', { name: label })
       expect(currentLink).toHaveAttribute('aria-current', 'page')
@@ -149,7 +168,6 @@ describe('AppLayout', () => {
   })
 
   it.each([
-    ['signed-out', signedOut],
     [
       'challenge owner',
       {
