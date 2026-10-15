@@ -36,7 +36,9 @@ for (const width of [1280, 390]) {
               ? 'Your saved personal weigh-ins'
               : 'Personal weigh-in history'
           const date = await page
-            .getByRole('list', { name: historyName })
+            .getByRole(surface === 'dialog' ? 'table' : 'list', {
+              name: historyName,
+            })
             .locator('time')
             .first()
             .getAttribute('datetime')

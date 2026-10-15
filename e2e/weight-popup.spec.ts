@@ -8,7 +8,7 @@ for (const width of [1280, 390]) {
     await page.goto(
       '/e2e/fixtures/personal-dashboard-harness.html?scenario=accounts&path=/progress',
     )
-    const history = page.getByRole('list', {
+    const history = page.getByRole('table', {
       name: 'Your saved personal weigh-ins',
     })
     const edit = history.getByRole('button', { name: /Edit weight/ })

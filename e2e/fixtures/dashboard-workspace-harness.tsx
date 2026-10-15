@@ -240,6 +240,7 @@ export function CurrentRoute() {
     <output data-testid="fixture-route" className="sr-only">
       {location.pathname}
       {location.search}
+      {location.hash}
     </output>
   )
 }

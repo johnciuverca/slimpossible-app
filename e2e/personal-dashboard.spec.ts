@@ -69,18 +69,22 @@ for (const viewport of [
     await expect(
       page.getByRole('button', { name: 'Edit weight', exact: true }),
     ).toHaveCount(0)
-    await expect(page.getByText('82.4 kg', { exact: true })).toBeVisible()
+    await expect(
+      page.getByText('82.4 kg', { exact: true }).first(),
+    ).toBeVisible()
     await expect(
       page.getByText('Synthetic Dashboard private note', { exact: true }),
-    ).toHaveCount(0)
+    ).toBeVisible()
     await page.reload()
     await expect(page.getByText('Logged today', { exact: true })).toBeVisible()
-    await expect(page.getByText('82.4 kg', { exact: true })).toBeVisible()
-    await page.getByRole('tab', { name: 'Progress', exact: true }).click()
+    await expect(
+      page.getByText('82.4 kg', { exact: true }).first(),
+    ).toBeVisible()
+
     await expect(
       page.getByRole('heading', { name: 'Dashboard', exact: true }),
     ).toBeVisible()
-    const table = page.getByRole('list', {
+    const table = page.getByRole('table', {
       name: 'Your saved personal weigh-ins',
     })
     await expect(
@@ -131,7 +135,7 @@ for (const viewport of [
     await dialog
       .getByRole('button', { name: 'Save weight', exact: true })
       .click()
-    await expect(page.getByText('90 kg', { exact: true })).toBeVisible()
+    await expect(page.getByText('90 kg', { exact: true }).first()).toBeVisible()
     const goal = page.getByRole('progressbar', {
       name: 'Synthetic personal goal completion',
     })
@@ -145,7 +149,7 @@ for (const viewport of [
     await dialog
       .getByRole('button', { name: 'Update weight', exact: true })
       .click()
-    await expect(page.getByText('85 kg', { exact: true })).toBeVisible()
+    await expect(page.getByText('85 kg', { exact: true }).first()).toBeVisible()
     await expect(goal).toHaveCount(0)
     const rows = await page.evaluate(() =>
       JSON.parse(
@@ -158,8 +162,7 @@ for (const viewport of [
       'dashboard-active',
     ])
 
-    await page.getByRole('tab', { name: 'Progress', exact: true }).click()
-    const table = page.getByRole('list', {
+    const table = page.getByRole('table', {
       name: 'Your saved personal weigh-ins',
     })
     await expect(
@@ -209,7 +212,7 @@ for (const viewport of [
     await expect(
       page.getByRole('img', { name: /Personal weight history chart/ }),
     ).toHaveCount(0)
-    await page.getByRole('tab', { name: 'Overview', exact: true }).click()
+
     await expect(
       page.getByText('Not logged today', { exact: true }),
     ).toBeVisible()
@@ -222,12 +225,12 @@ for (const viewport of [
       .toBe(viewport.width)
   })
 
-  test(`My Progress isolates synthetic accounts and Dashboard does not show private notes on ${viewport.label}`, async ({
+  test(`Combined Dashboard shows only the active author's private history on ${viewport.label}`, async ({
     page,
   }) => {
     await page.setViewportSize({ width: viewport.width, height: 900 })
     await page.goto(fixture('accounts', '/progress'))
-    const table = page.getByRole('list', {
+    const table = page.getByRole('table', {
       name: 'Your saved personal weigh-ins',
     })
     await expect(
@@ -246,11 +249,11 @@ for (const viewport of [
       page.getByText('Synthetic first-account private note', { exact: true }),
     ).toHaveCount(0)
     await expect(table.getByText('75 kg', { exact: true })).toBeVisible()
-    await page.getByRole('tab', { name: 'Overview', exact: true }).click()
-    await expect(page.getByText('75 kg', { exact: true })).toBeVisible()
+
+    await expect(page.getByText('75 kg', { exact: true }).first()).toBeVisible()
     await expect(
       page.getByText('Synthetic second-account private note', { exact: true }),
-    ).toHaveCount(0)
+    ).toBeVisible()
     await expect(
       page.getByText('Not logged today', { exact: true }),
     ).toBeVisible()

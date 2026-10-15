@@ -2,17 +2,28 @@ import { expect, test } from '@playwright/test'
 const fixture = (path = '/dashboard', native = false) =>
   `/e2e/fixtures/dashboard-workspace-harness.html?${new URLSearchParams({ path, ...(native ? { native: '1' } : {}) })}`
 
-test('Dashboard tabs are addressable, keyboard operated and author-only at 390px', async ({
+test('Combined Dashboard has one chart/table and keyboard history access at 390px', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto(fixture())
   await expect(page.getByText('Latest personal weight')).toBeVisible()
-  await expect(page.getByText('60 kg', { exact: true })).toBeVisible()
-  await page.getByRole('tab', { name: 'Overview', exact: true }).focus()
-  await page.keyboard.press('ArrowRight')
+  await expect(page.getByText('60 kg', { exact: true }).first()).toBeVisible()
+  await expect(
+    page.getByRole('tablist', { name: 'Dashboard views' }),
+  ).toHaveCount(0)
+  await expect(
+    page.getByRole('img', { name: /^Personal weight history chart/ }),
+  ).toHaveCount(1)
+  await expect(
+    page.getByRole('table', { name: 'Your saved personal weigh-ins' }),
+  ).toHaveCount(1)
+  await page
+    .getByRole('link', { name: 'My Progress and private history' })
+    .focus()
+  await page.keyboard.press('Enter')
   await expect(page.getByTestId('fixture-route')).toHaveText(
-    '/dashboard?tab=progress',
+    '/dashboard#personal-history',
   )
   await expect(
     page.getByRole('heading', { name: 'Goals', exact: true }),
@@ -33,6 +44,29 @@ test('Dashboard tabs are addressable, keyboard operated and author-only at 390px
     path: test.info().outputPath('dashboard-progress-390.png'),
     fullPage: true,
   })
+})
+
+test('starting-weight control keeps keyboard focus and guards dirty input', async ({
+  page,
+}) => {
+  await page.goto(fixture('/dashboard?challenge=goal-one#goals'))
+  const action = page.getByRole('button', {
+    name: 'Edit starting weight',
+    exact: true,
+  })
+  await action.focus()
+  await page.keyboard.press('Enter')
+  const input = page.getByLabel('Correct starting weight (kg)')
+  await expect(input).toBeFocused()
+  await expect(input).toHaveValue('100')
+  await input.fill('110')
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'Stay', exact: true }).click()
+  await expect(input).toHaveValue('110')
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'Discard and leave' }).click()
+  await expect(action).toBeFocused()
+  await expect(page.getByText(/95 kg ·/)).toBeVisible()
 })
 
 test('a fake target save preserves the baseline, history and focus after refresh', async ({
@@ -92,25 +126,25 @@ test('changing a reached target refreshes its achievement history through the fa
   ).toBeFocused()
 })
 
-test('Progress direct loads and refreshes, and clean browser Back/Forward keeps the selected tab', async ({
+test('Legacy Progress direct-loads and refreshes; Back/Forward preserves history anchors', async ({
   page,
 }) => {
   await page.goto(fixture('/dashboard?tab=progress&challenge=goal-one'))
   await page.reload()
   await expect(
-    page.getByRole('tab', { name: 'Progress', exact: true }),
-  ).toHaveAttribute('aria-selected', 'true')
+    page.getByRole('table', { name: 'Your saved personal weigh-ins' }),
+  ).toBeVisible()
   await expect(page.getByText('4.8 kg', { exact: true })).toBeVisible()
   await page.goto(fixture('/dashboard', true))
-  await page.getByRole('tab', { name: 'Progress', exact: true }).click()
+  await page
+    .getByRole('link', { name: 'My Progress and private history' })
+    .click()
   await page.evaluate(() => history.back())
-  await expect(
-    page.getByRole('tab', { name: 'Overview', exact: true }),
-  ).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByTestId('fixture-route')).toHaveText('/dashboard')
   await page.evaluate(() => history.forward())
   await expect(
-    page.getByRole('tab', { name: 'Progress', exact: true }),
-  ).toHaveAttribute('aria-selected', 'true')
+    page.getByRole('table', { name: 'Your saved personal weigh-ins' }),
+  ).toBeVisible()
 })
 
 test('Escape protects dirty input and restores focus when discarded', async ({
@@ -138,7 +172,9 @@ test('browser Back keeps dirty target input until an explicit discard', async ({
   page,
 }) => {
   await page.goto(fixture('/dashboard', true))
-  await page.getByRole('tab', { name: 'Progress', exact: true }).click()
+  await page
+    .getByRole('link', { name: 'My Progress and private history' })
+    .click()
   await page.getByRole('button', { name: 'Change target', exact: true }).click()
   await page.getByLabel('New target (kg)').fill('85')
   await page.evaluate(() => window.history.back())
@@ -148,9 +184,9 @@ test('browser Back keeps dirty target input until an explicit discard', async ({
   await page.getByRole('button', { name: 'Stay', exact: true }).click()
   await expect(page.getByLabel('New target (kg)')).toHaveValue('85')
   await expect(page.getByTestId('fixture-route')).toHaveText(
-    '/dashboard?tab=progress',
+    '/dashboard#personal-history',
   )
-  await expect(page).toHaveURL(/\/dashboard\?tab=progress$/)
+  await expect(page).toHaveURL(/\/dashboard#personal-history$/)
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()
   await expect(
     page.getByRole('dialog', { name: 'Discard unsaved input?' }),
@@ -158,23 +194,21 @@ test('browser Back keeps dirty target input until an explicit discard', async ({
   await page.getByRole('button', { name: 'Discard and leave' }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await page.evaluate(() => window.history.back())
-  await expect(
-    page.getByRole('tab', { name: 'Overview', exact: true }),
-  ).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByTestId('fixture-route')).toHaveText('/dashboard')
 })
 
 test('discarding the browser Back warning completes the requested navigation', async ({
   page,
 }) => {
   await page.goto(fixture('/dashboard', true))
-  await page.getByRole('tab', { name: 'Progress', exact: true }).click()
+  await page
+    .getByRole('link', { name: 'My Progress and private history' })
+    .click()
   await page.getByRole('button', { name: 'Change target', exact: true }).click()
   await page.getByLabel('New target (kg)').fill('85')
   await page.evaluate(() => window.history.back())
   await page.getByRole('button', { name: 'Discard and leave' }).click()
-  await expect(
-    page.getByRole('tab', { name: 'Overview', exact: true }),
-  ).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByTestId('fixture-route')).toHaveText('/dashboard')
 })
 
 test('account and goal switching keep personal history separate and use the invitation route', async ({

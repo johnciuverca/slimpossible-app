@@ -820,7 +820,7 @@ for (const viewport of [
     await page.goto(
       `http://127.0.0.1:4174/e2e/fixtures/today-harness.html?scenario=progress&selected=${ownGroupId}&user=${viewerId}`,
     )
-    const personal = page.getByRole('list', {
+    const personal = page.getByRole('table', {
       name: 'Your saved personal weigh-ins',
     })
     const edit = personal.getByRole('button', {
@@ -832,7 +832,7 @@ for (const viewport of [
       exact: true,
     })
     await expect(edit).toBeVisible()
-    await expect(personal.getByRole('listitem')).toHaveCount(1)
+    await expect(personal.locator('tbody tr')).toHaveCount(1)
     await expect(
       page.getByRole('table', { name: 'Shared group weigh-ins' }),
     ).toHaveCount(0)
