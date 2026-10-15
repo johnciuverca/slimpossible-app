@@ -485,7 +485,6 @@ for (const layout of [
       await page.goto(
         `http://127.0.0.1:4174/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
       )
-      await page.getByRole('button', { name: 'Progress & history' }).click()
       const matrix = page.getByRole('table', {
         name: 'Shared group weight history',
       })
@@ -700,15 +699,6 @@ test('Group Overview and history retain readable contrast in both color schemes'
     content: '* { animation: none !important; transition: none !important; }',
   })
   const workspace = page.locator('.group-workspace')
-  const overviewTab = page.getByRole('button', {
-    name: 'Overview',
-    exact: true,
-  })
-  const progressTab = page.getByRole('button', {
-    name: 'Progress & history',
-  })
-  await overviewTab.click()
-
   function luminance(color: string) {
     const channels = color
       .match(/[\d.]+/g)!
@@ -732,7 +722,7 @@ test('Group Overview and history retain readable contrast in both color schemes'
     await expect(workspace).toHaveCSS('color-scheme', 'dark')
     const sample = await page.evaluate(() => {
       const active = document.querySelector<HTMLElement>(
-        '[aria-label="Group sections"] .group-section-tab-active',
+        '[aria-label="Shared group members"] .group-member-tab-active',
       )!
       const overview = document.querySelector<HTMLElement>(
         '.group-overview-card',
@@ -782,13 +772,14 @@ test('Group Overview and history retain readable contrast in both color schemes'
       contrast(sample.leaderNameColor, sample.leaderRowBackground),
       `${colorScheme} provisional leader colors: ${JSON.stringify(sample)}`,
     ).toBeGreaterThanOrEqual(4.5)
-    await expect(overviewTab).toBeVisible()
+    await expect(
+      page.getByRole('tab', { name: 'All members', exact: true }),
+    ).toBeVisible()
     await page.screenshot({
       path: test.info().outputPath(`group-overview-${colorScheme}.png`),
       fullPage: true,
     })
   }
-  await progressTab.click()
   const matrix = page.getByRole('table', {
     name: 'Shared group weight history',
   })
@@ -807,6 +798,73 @@ test('Group Overview and history retain readable contrast in both color schemes'
   }
   await expect(dateCell).toBeVisible()
 })
+
+for (const width of [1280, 390]) {
+  test(`combined Group retains legacy links without duplicate views at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await installGroupFixtures(page, true, true)
+    for (const suffix of [
+      '',
+      '&tab=overview',
+      '&tab=progress',
+      '#group-history',
+    ]) {
+      await page.goto(
+        `/e2e/fixtures/today-harness.html?${new URLSearchParams({ scenario: 'group', user: viewerId, route: `/group?challenge=${ownGroupId}${suffix}` })}`,
+      )
+      await expect(
+        page.getByRole('navigation', { name: 'Group sections' }),
+      ).toHaveCount(0)
+      await expect(
+        page.getByRole('button', { name: 'Overview', exact: true }),
+      ).toHaveCount(0)
+      await expect(
+        page.getByRole('button', { name: 'Progress & history', exact: true }),
+      ).toHaveCount(0)
+      await expect(
+        page.getByRole('heading', { name: 'Weekly result', exact: true }),
+      ).toHaveCount(1)
+      await expect(
+        page.getByRole('heading', { name: 'Member progress', exact: true }),
+      ).toHaveCount(1)
+      await expect(
+        page.getByRole('table', { name: 'Shared group weight history' }),
+      ).toHaveCount(1)
+      await expect(
+        page.getByRole('img', {
+          name: 'Weight (kg) — shared group history',
+          exact: true,
+        }),
+      ).toHaveCount(1)
+      await expect(
+        page.getByRole('button', { name: 'Record weight', exact: true }),
+      ).toHaveCount(1)
+      await expect(
+        page.getByRole('button', { name: 'Change target', exact: true }),
+      ).toHaveCount(1)
+      await expect(
+        page.getByRole('button', { name: 'Edit starting weight', exact: true }),
+      ).toHaveCount(1)
+      await expect(
+        page.getByRole('tab', { name: 'All members', exact: true }),
+      ).toHaveAttribute('aria-selected', 'true')
+      await expect(
+        page.getByText('Other member private note must never render'),
+      ).toHaveCount(0)
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      ).toBe(true)
+    }
+    await page.screenshot({
+      path: test.info().outputPath(`combined-group-${width}.png`),
+      fullPage: true,
+    })
+  })
+}
 
 for (const viewport of [
   { label: 'desktop', width: 1280 },
@@ -871,9 +929,6 @@ for (const viewport of [
       .getByRole('navigation', { name: 'Primary navigation' })
       .getByRole('link', { name: 'Group', exact: true })
       .click()
-    await page
-      .getByRole('button', { name: 'Progress & history', exact: true })
-      .click()
     await expect(
       page.getByRole('table', { name: 'Shared group weight history' }),
     ).toBeVisible()
@@ -889,7 +944,6 @@ for (const viewport of [
     await page.goto(
       `/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
     )
-    await page.getByRole('button', { name: 'Progress & history' }).click()
     const matrix = page.getByRole('table', {
       name: 'Shared group weight history',
     })
@@ -1036,21 +1090,15 @@ for (const viewport of [
     await page.emulateMedia({ colorScheme: 'dark' })
     const requests = await installGroupFixtures(page, true)
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
-    const overviewTab = page.getByRole('button', {
-      name: 'Overview',
-      exact: true,
-    })
-    const progressSectionTab = page.getByRole('button', {
-      name: 'Progress & history',
-    })
-    await expect(overviewTab).toHaveAttribute('aria-pressed', 'true')
-    await expect(overviewTab).toHaveCSS('border-top-color', 'rgb(49, 219, 176)')
-    await progressSectionTab.click()
-    await expect(progressSectionTab).toHaveAttribute('aria-pressed', 'true')
-    await expect(progressSectionTab).toHaveCSS(
-      'border-top-color',
-      'rgb(49, 219, 176)',
-    )
+    await expect(
+      page.getByRole('navigation', { name: 'Group sections' }),
+    ).toHaveCount(0)
+    await expect(
+      page.getByRole('heading', { name: 'Weekly result', exact: true }),
+    ).toHaveCount(1)
+    await expect(
+      page.getByRole('heading', { name: 'Member progress', exact: true }),
+    ).toHaveCount(1)
     const table = page.getByRole('table', {
       name: 'Shared group weight history',
     })
@@ -1234,7 +1282,6 @@ for (const viewport of [
       },
     )
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
-    await page.getByRole('button', { name: 'Progress & history' }).click()
     await expect(page.getByText('Loading shared group history…')).toBeVisible()
     phase = 'rows'
     release()
@@ -1278,7 +1325,6 @@ for (const viewport of [
     await page.setViewportSize({ height: 900, width: viewport.width })
     await installGroupFixtures(page, true)
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
-    await page.getByRole('button', { name: 'Progress & history' }).click()
     await expect(page.getByText('42.5%', { exact: true })).toBeVisible()
     await expect(
       page.getByRole('table', { name: 'Shared group weight history' }),
@@ -1334,7 +1380,6 @@ for (const viewport of [
     await page.setViewportSize({ height: 900, width: viewport.width })
     const requests = await installGroupFixtures(page)
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
-    await page.getByRole('button', { name: 'Progress & history' }).click()
 
     await expect(
       page.getByRole('heading', { name: 'Group', exact: true }),
@@ -1437,7 +1482,6 @@ for (const viewport of [
     await page
       .getByRole('link', { name: 'Group · E2E authorized group' })
       .click()
-    await page.getByRole('button', { name: 'Progress & history' }).click()
 
     await expect(
       page.getByRole('heading', { name: 'Member progress' }),
@@ -1469,13 +1513,12 @@ for (const viewport of [
     expect(
       requests.some((url) => url.includes('/rpc/change_my_group_target')),
     ).toBe(true)
-    await page.getByRole('button', { name: 'Overview' }).click()
     await expect(
-      page.getByRole('button', { name: 'Overview' }),
-    ).toHaveAttribute('aria-pressed', 'true')
+      page.getByRole('navigation', { name: 'Group sections' }),
+    ).toHaveCount(0)
     await expect(
       page.getByRole('heading', { name: 'Member progress' }),
-    ).toHaveCount(0)
+    ).toHaveCount(1)
   })
 
   test(`corrects only own Group starting weight and refreshes on ${viewport.label}`, async ({
@@ -1499,7 +1542,6 @@ for (const viewport of [
     await page
       .getByRole('link', { name: 'Group · E2E authorized group' })
       .click()
-    await page.getByRole('button', { name: 'Progress & history' }).click()
 
     const editButton = page.getByRole('button', {
       name: 'Edit starting weight',
@@ -1589,7 +1631,6 @@ for (const viewport of [
     await page
       .getByRole('link', { name: 'Group · E2E authorized group' })
       .click()
-    await page.getByRole('button', { name: 'Progress & history' }).click()
     await expect(
       page.getByRole('button', { name: 'Change target' }),
     ).toBeVisible()
@@ -1635,7 +1676,6 @@ for (const viewport of [
     await page
       .getByRole('link', { name: 'Group · E2E authorized group' })
       .click()
-    await page.getByRole('button', { name: 'Progress & history' }).click()
     const oldMember = page.getByRole('heading', {
       name: 'Same display name',
     })
@@ -1674,7 +1714,6 @@ for (const viewport of [
     await page
       .getByRole('link', { name: 'Group · E2E authorized group' })
       .click()
-    await page.getByRole('button', { name: 'Progress & history' }).click()
     const contexts = page.getByRole('navigation', {
       name: 'Challenge contexts',
     })
