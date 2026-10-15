@@ -27,13 +27,16 @@ vi.mock('../components/WeightPageHeader', () => ({
   WeightPageHeader: ({
     children,
     action,
+    additionalActions,
   }: {
     children: React.ReactNode
     action?: React.ReactNode
+    additionalActions?: React.ReactNode
   }) => (
     <header>
       {children}
       {action ?? <button>Record weight</button>}
+      {additionalActions}
     </header>
   ),
 }))

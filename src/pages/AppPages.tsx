@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 
 import {
+  Button,
   Card,
   FeedbackPanel,
   PageHeader,
@@ -1841,13 +1842,44 @@ export function GroupDashboardPage() {
       aria-labelledby="group-title"
     >
       <div className="space-y-6">
-        <WeightPageHeader onRecorded={() => setReloadKey((value) => value + 1)}>
+        <WeightPageHeader
+          onRecorded={() => setReloadKey((value) => value + 1)}
+          additionalActions={
+            <>
+              <Button
+                variant="secondary"
+                className="min-h-11"
+                aria-expanded={showCreateJoinActions}
+                aria-controls="group-create-join-actions"
+                onClick={() => setShowCreateJoinActions((value) => !value)}
+              >
+                Create or join a group
+              </Button>
+              <Button
+                variant="secondary"
+                className="min-h-11"
+                onClick={() => setReloadKey((value) => value + 1)}
+              >
+                Refresh shared progress
+              </Button>
+            </>
+          }
+        >
           <PageHeader
             description="Your shared home. Track weight and progress with other challenge members."
             title="Group"
             titleId="group-title"
           />
         </WeightPageHeader>
+        <section
+          id="group-create-join-actions"
+          aria-label="Create or join a group"
+          hidden={!showCreateJoinActions}
+        >
+          {showCreateJoinActions ? (
+            <DashboardChallengeActions workspace={personalWorkspace} />
+          ) : null}
+        </section>
         <ChallengeTabs
           challenges={challenges}
           selectedId={selectedChallengeId}
@@ -1887,26 +1919,6 @@ export function GroupDashboardPage() {
           </Link>
         </nav>
       ) : null}
-      <section aria-label="Create or join a group" className="space-y-3">
-        <button
-          aria-expanded={showCreateJoinActions}
-          className="min-h-11 rounded-xl border border-stone-300 px-4 py-3 font-semibold"
-          onClick={() => setShowCreateJoinActions((value) => !value)}
-          type="button"
-        >
-          Create or join a group
-        </button>
-        {showCreateJoinActions ? (
-          <DashboardChallengeActions workspace={personalWorkspace} />
-        ) : null}
-      </section>
-      <button
-        className="min-h-11 rounded-xl border border-stone-300 px-4 py-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
-        onClick={() => setReloadKey((value) => value + 1)}
-        type="button"
-      >
-        Refresh shared progress
-      </button>
       <Card
         id="group-summary"
         className="group-overview-card p-5 sm:p-8 lg:p-10"

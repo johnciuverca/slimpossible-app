@@ -67,10 +67,13 @@ for (const viewport of [
       } else {
         expect(navBox.y - headerBox.y - headerBox.height).toBeCloseTo(24, 0)
       }
-      if (viewport.width > 600) {
+      if (viewport.width >= 1280) {
+        const actionsBox = (await header
+          .getByRole('group', { name: 'Group actions' })
+          .boundingBox())!
         expect(actionBox.y - headerBox.y).toBeCloseTo(0, 0)
         expect(
-          actionBox.x + actionBox.width - headerBox.x - headerBox.width,
+          actionsBox.x + actionsBox.width - headerBox.x - headerBox.width,
         ).toBeCloseTo(0, 0)
       } else {
         const textBox = await header.evaluate((element) => {

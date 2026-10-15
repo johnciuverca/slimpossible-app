@@ -699,6 +699,12 @@ test('Group Overview and history retain readable contrast in both color schemes'
     content: '* { animation: none !important; transition: none !important; }',
   })
   const workspace = page.locator('.group-workspace')
+  await expect(
+    workspace.locator('.group-overview-metric').first(),
+  ).toBeVisible()
+  await expect(
+    workspace.locator('.group-overview-leader li').first(),
+  ).toBeVisible()
   function luminance(color: string) {
     const channels = color
       .match(/[\d.]+/g)!
@@ -800,6 +806,98 @@ test('Group Overview and history retain readable contrast in both color schemes'
 })
 
 for (const width of [1280, 390]) {
+  test(`Group top actions align and retain disclosure/refresh behavior at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 })
+    const requests = await installGroupFixtures(page, true, true)
+    await page.goto(
+      `/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
+    )
+    const actions = page.getByRole('group', {
+      name: 'Group actions',
+      exact: true,
+    })
+    const record = actions.getByRole('button', {
+      name: 'Record weight',
+      exact: true,
+    })
+    const create = actions.getByRole('button', {
+      name: 'Create or join a group',
+      exact: true,
+    })
+    const refresh = actions.getByRole('button', {
+      name: 'Refresh shared progress',
+      exact: true,
+    })
+    for (const name of [
+      'Record weight',
+      'Create or join a group',
+      'Refresh shared progress',
+    ]) {
+      await expect(page.getByRole('button', { name, exact: true })).toHaveCount(
+        1,
+      )
+    }
+    await expect(record).toBeEnabled()
+    const boxes = await Promise.all(
+      [record, create, refresh].map((button) => button.boundingBox()),
+    )
+    for (const box of boxes) {
+      expect(box!.height).toBeGreaterThanOrEqual(44)
+      expect(box!.x).toBeGreaterThanOrEqual(0)
+      expect(box!.x + box!.width).toBeLessThanOrEqual(width)
+    }
+    if (width === 1280) {
+      expect(Math.abs(boxes[0]!.y - boxes[1]!.y)).toBeLessThan(2)
+      expect(Math.abs(boxes[1]!.y - boxes[2]!.y)).toBeLessThan(2)
+    } else {
+      expect(boxes[1]!.y).toBeGreaterThanOrEqual(boxes[0]!.y)
+      expect(boxes[2]!.y).toBeGreaterThanOrEqual(boxes[1]!.y)
+    }
+    await create.focus()
+    await page.keyboard.press('Enter')
+    await expect(create).toHaveAttribute('aria-expanded', 'true')
+    const panel = page.getByRole('region', {
+      name: 'Create or join a group',
+      exact: true,
+    })
+    await expect(
+      panel.getByRole('link', { name: 'Create challenge', exact: true }),
+    ).toBeVisible()
+    await expect(
+      panel.getByRole('button', { name: 'Join with invitation', exact: true }),
+    ).toBeVisible()
+    await page.keyboard.press('Enter')
+    await expect(create).toHaveAttribute('aria-expanded', 'false')
+    await expect(panel).toHaveCount(0)
+    const before = requests.filter((url) =>
+      url.includes('/rpc/get_group_progress_summary'),
+    ).length
+    await refresh.click()
+    await expect
+      .poll(
+        () =>
+          requests.filter((url) =>
+            url.includes('/rpc/get_group_progress_summary'),
+          ).length,
+      )
+      .toBeGreaterThan(before)
+    await expect(
+      page.getByRole('table', { name: 'Shared group weight history' }),
+    ).toBeVisible()
+    await expect(refresh).toBeFocused()
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true)
+    await page.screenshot({
+      path: test.info().outputPath(`group-top-actions-${width}.png`),
+      fullPage: true,
+    })
+  })
+
   test(`combined Group retains legacy links without duplicate views at ${width}px`, async ({
     page,
   }) => {
