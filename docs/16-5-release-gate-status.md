@@ -7,6 +7,112 @@ configuration, migration, deployment, or issue closure.
 
 ## Current candidate and inherited evidence
 
+### 2026-10-15 reconciliation
+
+**Verdict: NOT READY.** The observations below are partial connected evidence.
+They do not close #212, #207, #208, or their parents.
+
+- A fresh `git ls-remote` resolved staging to
+  `cfb6c0217a5879d9020b4b4c349f90a625f67f9e` and the tested branch
+  `codex/17-6-group-readability` to
+  `17d22d8fce0c77654de5b3ff7ce429306bd79e5d`.
+- GitHub Preview deployment `7072125166` associates that branch commit with
+  successful immutable Preview `https://slimpossible-ly4mxgcqe-cvc10.vercel.app`.
+  PM identified the branch Preview as today's test surface. The agent did not
+  independently inspect the deployed JavaScript or backend assignment today.
+- The complete source diff from that Preview commit to staging contains only
+  `docs/17-2-group-member-progress-contract.md` and
+  `supabase/tests/target_change_authorization.sql`. Application source and
+  migration files are identical; this establishes source equivalence, not a
+  fresh hosted-schema or runtime-configuration attestation.
+- Quality run `38616319293` / #256 succeeded on PR #279 head
+  `647517a603967e96a97cb50ca952784bd2b96f94`, whose tree matches staging.
+  This is inherited automated evidence, not a suite rerun by this update.
+- On 2026-10-15 this agent ran
+  `bash supabase/tests/run_local_group_chart_history.sh` from the staging source.
+  All 12 chart-history and 32 canonical personal authorization assertions
+  passed, followed by the populated-date/injected-failure preservation guards,
+  exhausted-date guard and additive chart rollback/re-forward check. The runner
+  used synthetic identities in a fresh local PostgreSQL cluster over a Unix
+  socket, with no TCP listener; its exit trap stopped the server. This verifies
+  local SQL behavior only and does not reconcile the hosted staging catalog.
+
+PM reported directly observing these synthetic staging checks on 2026-10-15:
+
+| Step              | Observation                                                                                                                           |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Private entry     | A synthetic 90.05 kg entry dated 2026-10-15 appeared on the author's Dashboard and was absent from the selected group's shared table. |
+| Explicit share    | Sharing made that entry visible in the group; start 100 kg and target 90 kg produced 99.5% progress.                                  |
+| Member account    | Another active member saw the shared entry without Edit/Delete; that member could edit only their own entries.                        |
+| Author correction | Editing the original entry to 90.10 kg updated one shared row and showed 99% progress.                                                |
+
+PM relayed the owner's report that unsharing retained the personal entry while
+removing shared visibility, and that delete confirmation/deletion worked.
+Those two results are **owner-reported**, not PM-observed or independently
+repeated by this agent. No account identifiers, private notes, or screenshots
+are included here. These observations do not establish refresh persistence,
+multiple-group isolation, every negative authorization case, or Sunday results.
+
+Dependency audit: #208 remains open for evidence reconciliation; #209–#211 and
+#231 are closed. The latter issues' closure does not complete #212's connected
+acceptance criteria. The revised #210 contract supersedes the older
+group-only/both-destination wording: personal canonical entry, optional explicit
+shares to one or more groups, none selected by default.
+
+The earlier evidence record below names an older candidate. Subsequent
+Dashboard/personal-chart and Group-chart/history changes in PRs #276/#277 mean
+its unchanged-UI rationale cannot cover those changed surfaces. Preserve
+earlier evidence for genuinely unchanged authorization and sharing behavior.
+
+#### Next owner checklist
+
+1. With a disposable entry and two eligible groups, share to both, refresh,
+   switch accounts, then remove just one share. Confirm the personal entry and
+   remaining group share survive, and notes remain author-only.
+2. On approved disposable records, make a late/corrected entry and verify the
+   current Group chart/table and provisional/final Sunday outcomes, including
+   agreed partial-week and tie behavior. A weekday completion percentage does
+   not establish Sunday ranking correctness.
+3. Reconcile uncovered outsider, withdrawn, unauthenticated, cross-group and
+   inappropriate-owner RPC denials with existing SQL evidence. Arrange the
+   outstanding read-only staging schema/grant/migration-history audit, accounting
+   for manually applied migrations. No authenticated database connection was
+   available to this agent in this update; no ledger repair is proposed.
+
+The owner performs interactive account-switch/save/edit/delete tests personally.
+Record exact candidate, staging project, actor, expected/actual result and
+redacted evidence; do not request credentials. Production configuration,
+recovery and post-deploy smoke/disable planning remain separately gated.
+
+#### Proposed #248 follow-ups (planning only)
+
+No existing issue explicitly covers the newly approved combined views/public
+shell. #252/#254/#255 cover the previous tabbed workspaces; #274/#275 cover their
+visual refinement. Propose these scoped successors for PM tracking before code:
+
+- **17.7 — Share the visual shell across public and protected routes.** Keep a
+  persistent desktop left sidebar across Dashboard and Group, with accessible
+  mobile navigation. Match Login/Register dark styling, branding, typography,
+  controls and spacing. Signed-out navigation contains public destinations;
+  no signed-in account controls or protected actions. Preserve redirects,
+  authentication, focus and unsaved-navigation guards. Depends on the accepted
+  #274/#275 visual direction and #255 routing contracts.
+- **17.8 — Combine Dashboard into one personal view.** Remove its
+  Overview/Progress split and duplicate metric/chart/history sections; retain
+  one canonical recording flow, personal history/edit/delete, own goals and
+  reached milestones. Preserve old tab URLs/anchors through compatibility
+  routing. Depends on 17.7; references #252/#274.
+- **17.9 — Combine Group into one selected-group view.** Remove its
+  Overview/Progress split and duplicate metrics/chart/history, preserving member
+  tabs, exact shared-history meaning, Sunday results, self-only target actions
+  and selected-group privacy. Depends on 17.7 and accepted 17.8; references
+  #253/#254/#256/#257/#275. Re-run the affected #207/#212 checks on the resulting
+  final candidate before #247 resumes.
+
+These are proposals, not created tickets or implementation authorization.
+
+### Earlier candidate record (historical; superseded above)
+
 - Current staging merge commit: `ac6372183ffd121e1ac7832d382c2bfbf816289e`
   (PR #272), based on `32a28f9356168b70c512ec5236731d2225f6e895` (PR #268).
 - The prior connected sharing walkthrough and read-only database probe in
