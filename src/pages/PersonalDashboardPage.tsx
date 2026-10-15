@@ -14,6 +14,7 @@ import {
 import { personalWeighInToday } from '../models/personalWeighIn'
 import { PersonalHistoryContent } from './PersonalHistoryContent'
 import { DashboardGoals } from '../components/DashboardGoals'
+import { personalGoalChoices } from '../models/personalGoalChoices'
 
 type LegacyTab = 'overview' | 'progress'
 export function PersonalDashboardPage({
@@ -74,13 +75,10 @@ export function PersonalDashboardWorkspace({
   )
   const choices =
     workspace.contexts.state === 'ready'
-      ? workspace.contexts.data.challenges.filter((challenge) =>
-          workspace.contexts.data.participants.some(
-            (member) =>
-              member.challengeId === challenge.id &&
-              member.userId === workspace.userId &&
-              member.status === 'active',
-          ),
+      ? personalGoalChoices(
+          workspace.userId,
+          workspace.contexts.data.challenges,
+          workspace.contexts.data.participants,
         )
       : []
   const selected = params.get('challenge')

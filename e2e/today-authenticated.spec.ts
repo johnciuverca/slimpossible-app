@@ -114,7 +114,7 @@ test('renders private, saved Progress records accessibly at a mobile viewport', 
   await expect(groupHistory).toHaveCount(0)
   await expect(
     page.getByRole('link', { name: /Open this group’s shared history/ }),
-  ).toHaveAttribute('href', '/group?challenge=e2e-challenge#group-history')
+  ).toHaveCount(0)
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
     .toBe(390)

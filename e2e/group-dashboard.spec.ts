@@ -848,15 +848,12 @@ for (const viewport of [
     await editor.getByLabel('Weight in kg').fill('87')
     await editor.getByRole('button', { name: 'Update weight' }).click()
     await expect(personal).toContainText('87 kg')
-    await page
-      .getByRole('navigation', { name: 'Your goal challenges' })
-      .getByRole('link', { name: 'Second authorized group', exact: true })
-      .click()
-    await expect(edit).toBeVisible()
-    await expect(personal).toContainText('87 kg')
+    await expect(page.getByText(/No personal goal yet/)).toBeVisible()
     await expect(
       page.getByRole('link', { name: /Open this group’s shared history/ }),
-    ).toHaveAttribute('href', `/group?challenge=${secondGroupId}#group-history`)
+    ).toHaveCount(0)
+    await expect(edit).toBeVisible()
+    await expect(personal).toContainText('87 kg')
     await remove.click()
     const deletion = page.getByRole('dialog', { name: 'Delete weight?' })
     await expect(deletion).toContainText('ALL shared groups')
@@ -871,7 +868,11 @@ for (const viewport of [
       page.getByRole('list', { name: 'Your own personal entry actions' }),
     ).toHaveCount(0)
     await page
-      .getByRole('link', { name: /Open this group’s shared history/ })
+      .getByRole('navigation', { name: 'Primary navigation' })
+      .getByRole('link', { name: 'Group', exact: true })
+      .click()
+    await page
+      .getByRole('button', { name: 'Progress & history', exact: true })
       .click()
     await expect(
       page.getByRole('table', { name: 'Shared group weight history' }),

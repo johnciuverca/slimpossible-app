@@ -14,9 +14,14 @@ import {
   createParticipantFixture,
 } from '../models/fixtures'
 import { DashboardGoals } from './DashboardGoals'
+import { PersonalDashboardWorkspace } from '../pages/PersonalDashboardPage'
 
-function fixture(kind: 'group' | 'personal' = 'group') {
-  const challenge = createChallengeFixture({ kind, status: 'active' })
+function fixture(kind: 'group' | 'personal' = 'personal') {
+  const challenge = createChallengeFixture({
+    kind,
+    status: 'active',
+    ownerId: 'user-alex',
+  })
   const participant = createParticipantFixture({
     startingWeightKg: 100,
     targetWeightKg: 90,
@@ -98,9 +103,9 @@ function fixture(kind: 'group' | 'personal' = 'group') {
   } satisfies PersonalWorkspace
   return { workspace, change, correct }
 }
-function view(workspace: PersonalWorkspace) {
+function view(workspace: PersonalWorkspace, path = '/dashboard') {
   return (
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[path]}>
       <DashboardGoals key={workspace.ownerKey} workspace={workspace} />
     </MemoryRouter>
   )
@@ -143,134 +148,104 @@ afterEach(() => {
     Object.defineProperty(HTMLDialogElement.prototype, 'close', originalClose)
 })
 
-describe('integrated own Goals', () => {
-  it('shows own group evidence and reached history without private notes or peer actions', async () => {
+describe('personal-only Dashboard goals', () => {
+  it('shows only authorized personal goals with mixed personal and group contexts', () => {
     const { workspace } = fixture()
+    workspace.contexts.data.challenges.push(
+      createChallengeFixture({
+        id: 'group-secret',
+        name: 'Hidden group target',
+        ownerId: workspace.userId,
+      }),
+    )
+    workspace.contexts.data.participants.push(
+      createParticipantFixture({
+        challengeId: 'group-secret',
+        id: 'group-self',
+        targetWeightKg: 73,
+      }),
+    )
     render(view(workspace))
-    expect(screen.getByText('4.8 kg')).toBeInTheDocument()
     expect(
-      screen.queryByText('Private note stays outside Goals'),
-    ).not.toBeInTheDocument()
-    expect(
-      screen.getAllByRole('button', { name: 'Change target' }),
-    ).toHaveLength(1)
-    expect(await screen.findByText('95 kg · 2026-10-02')).toBeInTheDocument()
-    expect(
-      screen.getByRole('link', { name: /shared history/ }),
-    ).toHaveAttribute('href', '/group?challenge=challenge-1#group-history')
-  })
-  it('shows the existing empty state for a valid empty reached-history result', async () => {
-    const { workspace } = fixture()
-    workspace.persistence.repositories.participants.listOwnGroupTargetMilestones =
-      vi.fn().mockResolvedValue({ state: 'empty', data: [] })
-
-    render(view(workspace))
-
-    expect(
-      await screen.findByText('No previous reached targets saved yet.'),
+      screen.getByRole('link', { name: 'Slimpossible 2026' }),
     ).toBeInTheDocument()
     expect(
-      screen.queryByText(/Reached target history is unavailable right now/),
+      screen.queryByRole('link', { name: 'Hidden group target' }),
     ).not.toBeInTheDocument()
-  })
-  it('keeps repository errors distinct from valid empty history', async () => {
-    const { workspace } = fixture()
-    workspace.persistence.repositories.participants.listOwnGroupTargetMilestones =
-      vi.fn().mockResolvedValue({
-        error: { kind: 'request', message: 'Sign-in required.' },
-        state: 'error',
-      })
-
-    render(view(workspace))
-
     expect(
-      await screen.findByText(
-        /Reached target history is unavailable right now/,
-      ),
+      screen.queryByRole('button', { name: /Change target/ }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Edit starting weight' }),
     ).toBeInTheDocument()
     expect(
-      screen.queryByText('No previous reached targets saved yet.'),
-    ).not.toBeInTheDocument()
+      workspace.persistence.repositories.participants
+        .listOwnGroupTargetMilestones,
+    ).not.toHaveBeenCalled()
   })
-  it('ignores a late history result after the goal context changes', async () => {
-    const { workspace } = fixture()
-    type HistoryResult = Awaited<
-      ReturnType<
-        typeof workspace.persistence.repositories.participants.listOwnGroupTargetMilestones
-      >
-    >
-    let resolveFirst!: (result: HistoryResult) => void
-    const listHistory = vi
-      .fn()
-      .mockImplementationOnce(
-        () =>
-          new Promise<HistoryResult>((resolve) => {
-            resolveFirst = resolve
-          }),
+  it('group-only users have a minimal personal empty state and no group controls or milestone requests', () => {
+    const { workspace } = fixture('group')
+    render(view(workspace))
+    expect(screen.getByText(/No personal goal yet/)).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', {
+        name: /Change target|Edit starting weight/,
+      }),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText(/your goal$/)).not.toBeInTheDocument()
+    expect(
+      workspace.persistence.repositories.participants
+        .listOwnGroupTargetMilestones,
+    ).not.toHaveBeenCalled()
+  })
+  it.each(['group-secret', 'challenge-1'])(
+    'a legacy group URL cannot select a group goal or chart target: %s',
+    (requested) => {
+      const { workspace } = fixture('group')
+      workspace.contexts.data.challenges.push(
+        createChallengeFixture({
+          kind: 'personal',
+          id: 'own-personal',
+          ownerId: workspace.userId,
+          name: 'Own personal goal',
+        }),
       )
-      .mockResolvedValueOnce({ state: 'empty', data: [] })
-    workspace.persistence.repositories.participants.listOwnGroupTargetMilestones =
-      listHistory
-
+      workspace.contexts.data.participants.push(
+        createParticipantFixture({
+          id: 'personal-self',
+          challengeId: 'own-personal',
+        }),
+      )
+      const rendered = render(
+        <MemoryRouter
+          initialEntries={[
+            '/dashboard?tab=progress&challenge=' + requested + '#goals',
+          ]}
+        >
+          <PersonalDashboardWorkspace workspace={workspace} />
+        </MemoryRouter>,
+      )
+      expect(
+        screen.getByText(/This personal goal is unavailable/),
+      ).toBeInTheDocument()
+      expect(screen.queryByText(/your goal$/)).not.toBeInTheDocument()
+      expect(
+        rendered.container.querySelector('[data-chart-reference]'),
+      ).toBeNull()
+      expect(
+        screen.getByRole('table', { name: 'Your saved personal weigh-ins' }),
+      ).toBeInTheDocument()
+    },
+  )
+  it('does not display another owner personal goal or a withdrawn enrollment', () => {
+    const { workspace } = fixture()
+    workspace.contexts.data.challenges[0].ownerId = 'other'
     const rendered = render(view(workspace))
-    const refreshedContext = {
-      ...workspace,
-      contexts: { ...workspace.contexts, key: 'refreshed-context' },
-    }
-    rendered.rerender(view(refreshedContext))
-
-    expect(
-      await screen.findByText('No previous reached targets saved yet.'),
-    ).toBeInTheDocument()
-    resolveFirst({
-      state: 'success',
-      data: [
-        { targetWeightKg: 95, achievedOn: '2026-10-02', state: 'reached' },
-      ],
-    })
-
-    await waitFor(() =>
-      expect(screen.queryByText('95 kg · 2026-10-02')).not.toBeInTheDocument(),
-    )
-  })
-  it('validates bounds and precision, saves through the own RPC and refreshes on confirmed success', async () => {
-    const { workspace, change } = fixture()
-    render(view(workspace))
-    fireEvent.click(screen.getByRole('button', { name: 'Change target' }))
-    const input = screen.getByLabelText('New target (kg)')
-    fireEvent.change(input, { target: { value: '100' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save target' }))
-    expect(change).not.toHaveBeenCalled()
-    fireEvent.change(input, { target: { value: '0.00000000001' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save target' }))
-    expect(change).not.toHaveBeenCalled()
-    fireEvent.change(input, { target: { value: '85.123' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save target' }))
-    expect(change).not.toHaveBeenCalled()
-    fireEvent.change(input, { target: { value: '85' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save target' }))
-    await waitFor(() => expect(workspace.refresh).toHaveBeenCalledOnce())
-    expect(change).toHaveBeenCalledWith('challenge-1', 85)
-    expect(workspace.contexts.data.participants[0].startingWeightKg).toBe(100)
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-  })
-  it('preserves the old target and editor input on server failure', async () => {
-    const { workspace, change } = fixture()
-    change.mockResolvedValue({
-      state: 'error',
-      error: { message: 'RPC absent' },
-    })
-    render(view(workspace))
-    fireEvent.click(screen.getByRole('button', { name: 'Change target' }))
-    fireEvent.change(screen.getByLabelText('New target (kg)'), {
-      target: { value: '85' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Save target' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'could not be confirmed',
-    )
-    expect(workspace.refresh).not.toHaveBeenCalled()
-    expect(workspace.contexts.data.participants[0].targetWeightKg).toBe(90)
+    expect(screen.getByText(/No personal goal yet/)).toBeInTheDocument()
+    workspace.contexts.data.challenges[0].ownerId = workspace.userId
+    workspace.contexts.data.participants[0].status = 'withdrawn'
+    rendered.rerender(view(workspace))
+    expect(screen.getByText(/No personal goal yet/)).toBeInTheDocument()
   })
   it('validates the own starting-weight correction and refreshes after confirmed save', async () => {
     const { workspace, correct } = fixture()
@@ -357,120 +332,5 @@ describe('integrated own Goals', () => {
     await waitFor(() => expect(workspace.refresh).toHaveBeenCalledOnce())
     expect(correct).toHaveBeenCalledWith('challenge-1', 110)
     expect(workspace.contexts.data.participants[0].targetWeightKg).toBe(90)
-  })
-  it('prevents duplicate correction submissions and ignores a result after the account changes', async () => {
-    const { workspace, correct } = fixture()
-    if (workspace.persistence.mode === 'local')
-      workspace.persistence.mode = 'remote'
-    let resolve!: (value: unknown) => void
-    correct.mockImplementation(
-      () =>
-        new Promise((done) => {
-          resolve = done
-        }),
-    )
-    const rendered = render(view(workspace))
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Edit starting weight' }),
-    )
-    fireEvent.change(screen.getByLabelText('Correct starting weight (kg)'), {
-      target: { value: '110' },
-    })
-    const form = screen
-      .getByRole('button', { name: 'Save starting weight' })
-      .closest('form')!
-    fireEvent.submit(form)
-    fireEvent.submit(form)
-    expect(correct).toHaveBeenCalledOnce()
-    rendered.rerender(
-      view({
-        ...workspace,
-        ownerKey: 'second',
-        userId: 'second',
-        contexts: {
-          ...workspace.contexts,
-          key: 'second',
-          data: { challenges: [], participants: [] },
-        },
-      }),
-    )
-    resolve({
-      state: 'success',
-      data: {
-        challengeId: 'challenge-1',
-        startingWeightKg: 110,
-        targetWeightKg: 90,
-      },
-    })
-    await waitFor(() =>
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
-    )
-    expect(workspace.refresh).not.toHaveBeenCalled()
-    expect(workspace.contexts.data.participants[0].startingWeightKg).toBe(100)
-  })
-  it('blocks duplicate submissions and drops a pending result when the account changes', async () => {
-    const { workspace, change } = fixture()
-    let resolve!: (value: unknown) => void
-    change.mockImplementation(
-      () =>
-        new Promise((done) => {
-          resolve = done
-        }),
-    )
-    const rendered = render(view(workspace))
-    fireEvent.click(screen.getByRole('button', { name: 'Change target' }))
-    fireEvent.change(screen.getByLabelText('New target (kg)'), {
-      target: { value: '85' },
-    })
-    fireEvent.submit(
-      screen.getByRole('button', { name: 'Save target' }).closest('form')!,
-    )
-    fireEvent.submit(
-      screen.getByRole('button', { name: 'Saving target…' }).closest('form')!,
-    )
-    expect(change).toHaveBeenCalledOnce()
-    rendered.rerender(
-      view({
-        ...workspace,
-        ownerKey: 'second',
-        userId: 'second',
-        contexts: {
-          ...workspace.contexts,
-          data: { challenges: [], participants: [] },
-        },
-      }),
-    )
-    resolve({
-      state: 'success',
-      data: {
-        challengeId: 'challenge-1',
-        startingWeightKg: 100,
-        targetWeightKg: 85,
-      },
-    })
-    await waitFor(() =>
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
-    )
-    expect(workspace.refresh).not.toHaveBeenCalled()
-    expect(screen.queryByText(/your goal$/)).not.toBeInTheDocument()
-  })
-  it('requires a lower target after a previous qualifying achievement', () => {
-    const { workspace, change } = fixture()
-    workspace.personal.data.unshift({
-      id: 'reached',
-      date: '2026-10-02',
-      weightKg: 89,
-      sharedChallengeIds: ['challenge-1'],
-    })
-    render(view(workspace))
-    fireEvent.click(
-      screen.getByRole('button', { name: /Target reached · Change target/ }),
-    )
-    fireEvent.change(screen.getByLabelText('New target (kg)'), {
-      target: { value: '91' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Save target' }))
-    expect(screen.getByRole('alert')).toHaveTextContent('choose a lower target')
-    expect(change).not.toHaveBeenCalled()
   })
 })

@@ -56,9 +56,29 @@ function seed(key: string, value: unknown) {
   if (localStorage.getItem(key) === null)
     localStorage.setItem(key, JSON.stringify(value))
 }
-seed('slimpossible.local.challenges', groups)
+const personal = createChallengeFixture({
+  id: 'personal-goal',
+  name: 'Synthetic personal goal',
+  kind: 'personal',
+  ownerId: 'user-alex',
+  status: 'active',
+})
+seed(
+  'slimpossible.local.challenges',
+  params.get('groupOnly') === '1' ? groups : [...groups, personal],
+)
 seed('slimpossible.local.participants', [
   ...members,
+  ...(params.get('groupOnly') === '1'
+    ? []
+    : [
+        createParticipantFixture({
+          id: 'personal-self',
+          challengeId: personal.id,
+          startingWeightKg: 100,
+          targetWeightKg: 90,
+        }),
+      ]),
   createParticipantFixture({
     id: 'peer',
     challengeId: 'goal-one',

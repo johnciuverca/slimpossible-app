@@ -48,8 +48,7 @@ const hasChallenge =
   scenario !== 'no-challenge' &&
   scenario !== 'home-no-challenge' &&
   !isHomeSignedOut
-const personalGoalFixture =
-  scenario === 'goals-gain' || scenario === 'goals-maintenance'
+const personalGoalFixture = isGoals
 const challengeOwnerId =
   isHomeOwner || personalGoalFixture
     ? fixtureUserId
