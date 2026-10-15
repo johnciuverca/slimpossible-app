@@ -43,7 +43,7 @@ for (const width of [1280, 390]) {
     const chart = page.getByRole('img', {
       name: /^Personal weight history chart/,
     })
-    await expect(chart.locator('circle[data-date]')).toHaveCount(4)
+    await expect(chart.locator('circle[data-date]')).toHaveCount(5)
     await expect(chart.locator('[data-chart-trend]')).toHaveCount(1)
     await expect(chart.locator('[data-chart-reference]')).toHaveCount(1)
     await expect(
@@ -69,7 +69,7 @@ for (const width of [1280, 390]) {
     await page.keyboard.press('Escape')
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await expect(account.locator('..')).toBeFocused()
-    await page.getByRole('tab', { name: 'Progress', exact: true }).click()
+
     await expect(chart.locator('circle[data-date]')).toHaveCount(5)
   })
 }

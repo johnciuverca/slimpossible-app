@@ -9,7 +9,7 @@ for (const width of [1280, 390]) {
       await page.goto(
         `/e2e/fixtures/personal-dashboard-harness.html?${new URLSearchParams({ scenario: 'accounts', path })}`,
       )
-      const history = page.getByRole('list', {
+      const history = page.getByRole(path === '/progress' ? 'table' : 'list', {
         name:
           path === '/progress'
             ? 'Your saved personal weigh-ins'

@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import type { PersonalWorkspace } from '../data/usePersonalWorkspace'
 import type { ReachedTargetMilestone } from '../models/targetMilestone'
 import { ownDashboardGoal } from '../models/ownDashboardGoal'
+import { personalGoalChoices } from '../models/personalGoalChoices'
 import { personalWeighInToday } from '../models/personalWeighIn'
 import { createParticipantMilestones } from '../models/participantMilestones'
 import { MilestoneProgress } from './MilestoneProgress'
@@ -27,13 +28,10 @@ export function DashboardGoals({
   } | null>(null)
   const [params] = useSearchParams()
   const requested = params.get('challenge')
-  const choices = workspace.contexts.data.challenges.filter((challenge) =>
-    workspace.contexts.data.participants.some(
-      (member) =>
-        member.challengeId === challenge.id &&
-        member.userId === workspace.userId &&
-        member.status === 'active',
-    ),
+  const choices = personalGoalChoices(
+    workspace.userId,
+    workspace.contexts.data.challenges,
+    workspace.contexts.data.participants,
   )
   const selected = requested
     ? choices.find((challenge) => challenge.id === requested)
@@ -83,8 +81,8 @@ export function DashboardGoals({
         <p role="status">{notice.message}</p>
       ) : null}
       <p className="text-sm text-ink-muted">
-        Your own enrollment targets and milestones. Personal recording never
-        requires a challenge.
+        Your personal targets and milestones. Personal recording never requires
+        a challenge.
       </p>
       {workspace.contexts.state === 'loading' ? (
         <FeedbackPanel tone="loading">Loading your goals…</FeedbackPanel>
@@ -94,29 +92,31 @@ export function DashboardGoals({
         </FeedbackPanel>
       ) : (
         <>
-          <nav
-            ref={choicesNav}
-            aria-label="Your goal challenges"
-            className="app-nav-scroll flex max-w-full gap-2 overflow-x-auto pb-2"
-          >
-            {choices.map((challenge) => (
-              <Link
-                key={challenge.id}
-                aria-current={
-                  selected?.id === challenge.id ? 'page' : undefined
-                }
-                to={`/dashboard?${new URLSearchParams({ tab: 'progress', challenge: challenge.id })}#goals`}
-                className={`inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 py-2 text-sm font-semibold ${selected?.id === challenge.id ? 'border-forest-800 bg-forest-800 text-white' : 'border-line bg-panel text-forest-800'}`}
-              >
-                {challenge.name}
-              </Link>
-            ))}
-          </nav>
+          {choices.length ? (
+            <nav
+              ref={choicesNav}
+              aria-label="Your goal challenges"
+              className="app-nav-scroll flex max-w-full gap-2 overflow-x-auto pb-2"
+            >
+              {choices.map((challenge) => (
+                <Link
+                  key={challenge.id}
+                  aria-current={
+                    selected?.id === challenge.id ? 'page' : undefined
+                  }
+                  to={`/dashboard?${new URLSearchParams({ tab: 'progress', challenge: challenge.id })}#goals`}
+                  className={`inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 py-2 text-sm font-semibold ${selected?.id === challenge.id ? 'border-forest-800 bg-forest-800 text-white' : 'border-line bg-panel text-forest-800'}`}
+                >
+                  {challenge.name}
+                </Link>
+              ))}
+            </nav>
+          ) : null}
           {!selected ? (
             <FeedbackPanel tone="empty">
-              {requested
-                ? 'This goal is unavailable for this account. Choose one of your active challenge memberships above.'
-                : 'No enrolled goals yet. Create a challenge or join using an invitation below; your private history stays available.'}
+              {choices.length === 0
+                ? 'No personal goal yet. Your private history stays available without a goal.'
+                : 'This personal goal is unavailable for this account. Choose one of your personal goals above.'}
             </FeedbackPanel>
           ) : (
             <SelectedGoal
@@ -128,8 +128,8 @@ export function DashboardGoals({
                   challengeId: selected.id,
                   message:
                     control === 'target'
-                      ? 'Your target was saved. Your original starting weight and reached targets are retained; refreshing your goals and selected group progress.'
-                      : 'Your starting weight was corrected. Your target, weigh-ins, sharing choices, enrollment date and reached-target history are unchanged; refreshing your goals and selected group progress.',
+                      ? 'Your personal target was saved; refreshing your goal.'
+                      : 'Your personal starting weight was corrected. Your target, weigh-ins, sharing choices and enrollment date are unchanged; refreshing your goal.',
                 })
                 section.current
                   ?.querySelector<HTMLElement>('#dashboard-goals-title')

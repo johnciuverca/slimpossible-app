@@ -19,8 +19,8 @@ for (const width of [1280, 390]) {
       '/dashboard?challenge=dashboard-active&source=legacy&tab=progress#goals',
     )
     await expect(
-      page.getByRole('tab', { name: 'Progress', exact: true }),
-    ).toHaveAttribute('aria-selected', 'true')
+      page.getByRole('tablist', { name: 'Dashboard views' }),
+    ).toHaveCount(0)
     await expect(
       page
         .getByRole('navigation', { name: 'Primary navigation' })
@@ -33,16 +33,10 @@ for (const width of [1280, 390]) {
       page.getByText('Synthetic second-account private note', { exact: true }),
     ).toHaveCount(0)
 
-    await page.getByRole('tab', { name: 'Overview', exact: true }).click()
-    await expect(route).toContainText('/dashboard?challenge=dashboard-active')
-    await page.getByRole('button', { name: 'Fixture back' }).click()
+    await page.reload()
     await expect(
-      page.getByRole('tab', { name: 'Progress', exact: true }),
-    ).toHaveAttribute('aria-selected', 'true')
-    await page.getByRole('button', { name: 'Fixture forward' }).click()
-    await expect(
-      page.getByRole('tab', { name: 'Overview', exact: true }),
-    ).toHaveAttribute('aria-selected', 'true')
+      page.getByRole('heading', { name: 'Goals', exact: true }),
+    ).toBeVisible()
 
     await page.goto(
       fixture(
@@ -110,7 +104,7 @@ for (const width of [1280, 390]) {
       await page.getByRole('button', { name: 'Close Profile' }).click()
       await expect(
         page.getByRole('link', { name: 'My Progress and private history' }),
-      ).toHaveAttribute('href', '/dashboard?tab=progress')
+      ).toHaveAttribute('href', /#personal-history$/)
       await expect(
         page.getByRole('button', { name: 'Record weight', exact: true }),
       ).toBeEnabled()

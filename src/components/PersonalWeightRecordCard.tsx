@@ -30,43 +30,13 @@ export function PersonalWeightRecordCard({
             {entry.date}
           </time>
         </div>
-        <div className="flex shrink-0 gap-1">
-          {(['edit', 'delete'] as const).map((action) => (
-            <button
-              key={action}
-              type="button"
-              aria-label={`${action === 'edit' ? 'Edit weight' : 'Delete'} ${entry.date}`}
-              title={`${action === 'edit' ? 'Edit weight:' : 'Delete'} ${formatPersonalWeight(entry.weightKg)} recorded ${entry.date}`}
-              disabled={disabled || deleting}
-              onClick={action === 'edit' ? onEdit : onDelete}
-              className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-transparent transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700 disabled:cursor-not-allowed disabled:opacity-50 ${action === 'delete' ? 'text-danger-800 hover:border-line hover:bg-panel' : 'text-forest-800 hover:border-line hover:bg-panel'}`}
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-                focusable="false"
-              >
-                {action === 'edit' ? (
-                  <>
-                    <path d="m16 3 5 5-12 12-6 1 1-6Z" />
-                    <path d="m14 5 5 5" />
-                  </>
-                ) : (
-                  <>
-                    <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7" />
-                  </>
-                )}
-              </svg>
-            </button>
-          ))}
-        </div>
+        <PersonalWeightRecordActions
+          entry={entry}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          deleting={deleting}
+          disabled={disabled}
+        />
       </div>
       {entry.note ? (
         <p className="mt-4 whitespace-pre-wrap break-words text-sm text-ink-muted">
@@ -84,5 +54,59 @@ export function PersonalWeightRecordCard({
         </p>
       ) : null}
     </li>
+  )
+}
+
+export function PersonalWeightRecordActions({
+  entry,
+  onEdit,
+  onDelete,
+  deleting = false,
+  disabled = false,
+}: {
+  entry: PersonalWeighIn
+  onEdit: () => void
+  onDelete: () => void
+  deleting?: boolean
+  disabled?: boolean
+}) {
+  return (
+    <div className="flex shrink-0 gap-1">
+      {(['edit', 'delete'] as const).map((action) => (
+        <button
+          key={action}
+          type="button"
+          aria-label={`${action === 'edit' ? 'Edit weight' : 'Delete'} ${entry.date}`}
+          title={`${action === 'edit' ? 'Edit weight:' : 'Delete'} ${formatPersonalWeight(entry.weightKg)} recorded ${entry.date}`}
+          disabled={disabled || deleting}
+          onClick={action === 'edit' ? onEdit : onDelete}
+          className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-transparent transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700 disabled:cursor-not-allowed disabled:opacity-50 ${action === 'delete' ? 'text-danger-800 hover:border-line hover:bg-panel' : 'text-forest-800 hover:border-line hover:bg-panel'}`}
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            focusable="false"
+          >
+            {action === 'edit' ? (
+              <>
+                <path d="m16 3 5 5-12 12-6 1 1-6Z" />
+                <path d="m14 5 5 5" />
+              </>
+            ) : (
+              <>
+                <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7" />
+              </>
+            )}
+          </svg>
+        </button>
+      ))}
+    </div>
   )
 }

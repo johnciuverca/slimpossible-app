@@ -15,15 +15,15 @@ for (const width of [1280, 390]) {
     const goals = page.getByRole('navigation', { name: 'Your goal challenges' })
     const primary = page.getByRole('navigation', { name: 'Primary navigation' })
     await expect(contexts).toHaveCount(0)
-    await page.getByRole('tab', { name: 'Progress', exact: true }).click()
+
     await expect(
-      page.getByText('This goal is unavailable for this account.', {
+      page.getByText('This personal goal is unavailable for this account.', {
         exact: false,
       }),
     ).toBeVisible()
     await expect(
       goals.getByRole('link', { name: 'Synthetic active group', exact: true }),
-    ).toBeVisible()
+    ).toHaveCount(0)
     await expect(
       goals.getByRole('link', { name: /Second account/ }),
     ).toHaveCount(0)
@@ -60,21 +60,13 @@ for (const width of [1280, 390]) {
     })
     expect(bounds.activeLeft).toBeGreaterThanOrEqual(bounds.left - 1)
     expect(bounds.activeRight).toBeLessThanOrEqual(bounds.right + 1)
-    await goals
-      .getByRole('link', { name: 'Synthetic active group', exact: true })
-      .click()
-    await page
-      .getByRole('link', { name: /Open this group’s shared history/ })
-      .click()
-    await expect(page.getByTestId('fixture-route')).toHaveText(
-      '/group?challenge=dashboard-active#group-history',
-    )
-    await expect(contexts.getByRole('link', { name: /Personal/ })).toHaveCount(
-      0,
-    )
+    await primary.getByRole('link', { name: 'Group', exact: true }).click()
+    await expect(
+      page.getByRole('heading', { name: 'Group', exact: true }),
+    ).toBeVisible()
     await primary.getByRole('link', { name: 'Dashboard', exact: true }).click()
     await expect(page.getByTestId('fixture-route')).toHaveText('/dashboard')
-    await page.getByRole('tab', { name: 'Progress', exact: true }).click()
+
     await goals
       .getByRole('link', { name: 'Synthetic personal goal', exact: true })
       .click()

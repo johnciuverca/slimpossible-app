@@ -1,14 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import type { PersonalWorkspace } from '../data/usePersonalWorkspace'
 import { Button, Card, FeedbackPanel, StatusPill } from '../components/ui'
 import { PersonalProgressChart } from '../components/PersonalProgressChart'
 import { RecordWeightDialog } from '../components/RecordWeightDialog'
 import { DeleteWeightDialog } from '../components/DeleteWeightDialog'
-import { PersonalWeightRecordCard } from '../components/PersonalWeightRecordCard'
+import { PersonalWeightRecordActions } from '../components/PersonalWeightRecordCard'
 import {
   personalHistory,
   formatPersonalChange,
+  formatPersonalWeight,
 } from '../models/personalHistory'
 import {
   personalWeighInToday,
@@ -18,10 +19,12 @@ export function PersonalHistoryContent({
   workspace,
   referenceWeightKg,
   referenceLabel,
+  children,
 }: {
   workspace: PersonalWorkspace
   referenceWeightKg?: number
   referenceLabel?: string
+  children?: ReactNode
 }) {
   const [editor, setEditor] = useState<{
     key: string
@@ -91,7 +94,12 @@ export function PersonalHistoryContent({
               </p>
             ) : null}
           </Card>
-          <Card className="min-w-0 p-6">
+        </>
+      )}
+      {children}
+      {workspace.personal.state === 'ready' ? (
+        <>
+          <Card className="min-w-0 p-6" id="personal-history">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-xl font-bold">Personal history</h2>
               <StatusPill>Notes visible only to you</StatusPill>
@@ -101,32 +109,85 @@ export function PersonalHistoryContent({
                 No entries saved yet.
               </p>
             ) : (
-              <ul
-                className="mt-5 grid gap-4 md:grid-cols-2"
-                aria-label="Your saved personal weigh-ins"
-              >
-                {history.map((entry) => (
-                  <PersonalWeightRecordCard
-                    key={entry.id}
-                    entry={entry}
-                    groupName={(id) =>
-                      workspace.contexts.data.challenges.find(
-                        (row) => row.id === id,
-                      )?.name ?? 'an unavailable group'
-                    }
-                    onEdit={() => setEditor({ key: workspace.ownerKey, entry })}
-                    onDelete={() =>
-                      setDeleting({ key: workspace.ownerKey, entry })
-                    }
-                  />
-                ))}
-              </ul>
+              <>
+                <p
+                  id="personal-history-scroll-hint"
+                  className="mt-4 text-sm text-ink-muted sm:hidden"
+                >
+                  Scroll sideways for sharing details and Edit/Delete actions.
+                </p>
+                <div
+                  className="mt-5 overflow-x-auto rounded-xl focus-visible:outline-2 focus-visible:outline-forest-700"
+                  role="region"
+                  aria-label="Personal history table"
+                  aria-describedby="personal-history-scroll-hint"
+                  tabIndex={0}
+                >
+                  <table
+                    className="w-full text-left text-sm"
+                    aria-label="Your saved personal weigh-ins"
+                  >
+                    <thead>
+                      <tr className="border-b border-line text-ink-muted">
+                        {[
+                          'Date',
+                          'Weight',
+                          'Private note',
+                          'Sharing',
+                          'Actions',
+                        ].map((label) => (
+                          <th key={label} scope="col" className="px-3 py-3">
+                            {label}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {history.map((entry) => (
+                        <tr
+                          key={entry.id}
+                          className="border-b border-line align-top"
+                        >
+                          <th
+                            scope="row"
+                            className="px-3 py-4 whitespace-nowrap font-medium"
+                          >
+                            <time dateTime={entry.date}>{entry.date}</time>
+                          </th>
+                          <td className="px-3 py-4 whitespace-nowrap font-bold">
+                            {formatPersonalWeight(entry.weightKg)}
+                          </td>
+                          <td className="min-w-36 max-w-xs px-3 py-4 whitespace-pre-wrap break-words">
+                            {entry.note || '—'}
+                          </td>
+                          <td className="min-w-32 max-w-xs px-3 py-4 break-words">
+                            {entry.sharedChallengeIds.length
+                              ? `Shared with ${entry.sharedChallengeIds.map((id) => workspace.contexts.data.challenges.find((row) => row.id === id)?.name ?? 'an unavailable group').join(', ')}`
+                              : 'Private'}
+                          </td>
+                          <td className="px-3 py-2">
+                            <PersonalWeightRecordActions
+                              entry={entry}
+                              onEdit={() =>
+                                setEditor({ key: workspace.ownerKey, entry })
+                              }
+                              onDelete={() =>
+                                setDeleting({ key: workspace.ownerKey, entry })
+                              }
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </Card>
         </>
-      )}
+      ) : null}
       <Button variant="secondary" onClick={workspace.refresh}>
-        Refresh My Progress
+        Refresh Dashboard
       </Button>
       <div className="flex flex-wrap gap-5 text-sm font-semibold text-forest-800">
         <Link

@@ -820,7 +820,7 @@ for (const viewport of [
     await page.goto(
       `http://127.0.0.1:4174/e2e/fixtures/today-harness.html?scenario=progress&selected=${ownGroupId}&user=${viewerId}`,
     )
-    const personal = page.getByRole('list', {
+    const personal = page.getByRole('table', {
       name: 'Your saved personal weigh-ins',
     })
     const edit = personal.getByRole('button', {
@@ -832,7 +832,7 @@ for (const viewport of [
       exact: true,
     })
     await expect(edit).toBeVisible()
-    await expect(personal.getByRole('listitem')).toHaveCount(1)
+    await expect(personal.locator('tbody tr')).toHaveCount(1)
     await expect(
       page.getByRole('table', { name: 'Shared group weigh-ins' }),
     ).toHaveCount(0)
@@ -848,15 +848,12 @@ for (const viewport of [
     await editor.getByLabel('Weight in kg').fill('87')
     await editor.getByRole('button', { name: 'Update weight' }).click()
     await expect(personal).toContainText('87 kg')
-    await page
-      .getByRole('navigation', { name: 'Your goal challenges' })
-      .getByRole('link', { name: 'Second authorized group', exact: true })
-      .click()
-    await expect(edit).toBeVisible()
-    await expect(personal).toContainText('87 kg')
+    await expect(page.getByText(/No personal goal yet/)).toBeVisible()
     await expect(
       page.getByRole('link', { name: /Open this group’s shared history/ }),
-    ).toHaveAttribute('href', `/group?challenge=${secondGroupId}#group-history`)
+    ).toHaveCount(0)
+    await expect(edit).toBeVisible()
+    await expect(personal).toContainText('87 kg')
     await remove.click()
     const deletion = page.getByRole('dialog', { name: 'Delete weight?' })
     await expect(deletion).toContainText('ALL shared groups')
@@ -871,7 +868,11 @@ for (const viewport of [
       page.getByRole('list', { name: 'Your own personal entry actions' }),
     ).toHaveCount(0)
     await page
-      .getByRole('link', { name: /Open this group’s shared history/ })
+      .getByRole('navigation', { name: 'Primary navigation' })
+      .getByRole('link', { name: 'Group', exact: true })
+      .click()
+    await page
+      .getByRole('button', { name: 'Progress & history', exact: true })
       .click()
     await expect(
       page.getByRole('table', { name: 'Shared group weight history' }),

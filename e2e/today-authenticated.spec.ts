@@ -89,7 +89,11 @@ test('renders private, saved Progress records accessibly at a mobile viewport', 
   await page.goto(fixture('progress'))
 
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
-  await expect(page.getByText('88.4 kg', { exact: true })).toHaveCount(1)
+  await expect(
+    page
+      .getByRole('table', { name: 'Your saved personal weigh-ins' })
+      .getByText('88.4 kg', { exact: true }),
+  ).toHaveCount(1)
   await expect(page.getByText(/First-to-latest change: −1.6 kg/)).toBeVisible()
   await expect(
     page.getByText('E2E private note for the signed-in participant.'),
@@ -101,7 +105,7 @@ test('renders private, saved Progress records accessibly at a mobile viewport', 
     page.getByRole('img', { name: /2 saved weigh-ins/ }),
   ).toBeVisible()
   await expect(
-    page.getByRole('list', { name: 'Your saved personal weigh-ins' }),
+    page.getByRole('table', { name: 'Your saved personal weigh-ins' }),
   ).toBeVisible()
 
   const groupHistory = page.getByRole('region', {
@@ -110,7 +114,7 @@ test('renders private, saved Progress records accessibly at a mobile viewport', 
   await expect(groupHistory).toHaveCount(0)
   await expect(
     page.getByRole('link', { name: /Open this group’s shared history/ }),
-  ).toHaveAttribute('href', '/group?challenge=e2e-challenge#group-history')
+  ).toHaveCount(0)
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
     .toBe(390)

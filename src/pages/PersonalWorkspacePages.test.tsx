@@ -393,13 +393,13 @@ describe('personal Dashboard and My Progress', () => {
       target: { value: 'Only my note' },
     })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save weight' }))
-    await screen.findByText('82.1 kg')
+    await screen.findAllByText('82.1 kg')
     expect(screen.getByText('Logged today')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Record weight' })).toBeEnabled()
     expect(
       screen.queryByRole('button', { name: 'Edit weight' }),
     ).not.toBeInTheDocument()
-    expect(screen.queryByText('Only my note')).not.toBeInTheDocument()
+    expect(screen.getByText('Only my note')).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     const entries =
       await local().repositories.personalWeighIns.listForUser('user-alex')
@@ -450,7 +450,7 @@ describe('personal Dashboard and My Progress', () => {
       },
     })
     render(page(<PersonalDashboardPage />))
-    await screen.findByText('85 kg')
+    await screen.findAllByText('85 kg')
     expect(summary).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Record weight' }))
     const dialog = screen.getByRole('dialog', { name: 'Edit weight' })
@@ -463,7 +463,7 @@ describe('personal Dashboard and My Progress', () => {
     fireEvent.click(
       within(dialog).getByRole('button', { name: 'Update weight' }),
     )
-    await screen.findByText('84 kg')
+    await screen.findAllByText('84 kg')
     expect(summary).not.toHaveBeenCalled()
     expect(
       await storage.repositories.personalWeighIns.listForUser('user-alex'),
@@ -481,7 +481,7 @@ describe('personal Dashboard and My Progress', () => {
       sharedChallengeIds: [],
     })
     render(page(<MyProgressPage />, 'user-alex', '/progress'))
-    const table = await screen.findByRole('list', {
+    const table = await screen.findByRole('table', {
       name: 'Your saved personal weigh-ins',
     })
     expect(within(table).getByText('Private history')).toBeInTheDocument()
@@ -526,7 +526,7 @@ describe('personal Dashboard and My Progress', () => {
       target: { value: '82' },
     })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save weight' }))
-    await screen.findByText('82 kg')
+    await screen.findAllByText('82 kg')
   })
 
   it('distinguishes a personal load failure from an empty history', async () => {

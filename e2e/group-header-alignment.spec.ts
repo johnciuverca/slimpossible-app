@@ -34,8 +34,8 @@ for (const viewport of [
       if (personalWorkspace) {
         await expect(contexts).toHaveCount(0)
         await expect(
-          page.getByRole('tab', { name: 'Progress', exact: true }),
-        ).toHaveAttribute('aria-selected', 'true')
+          page.getByRole('table', { name: 'Your saved personal weigh-ins' }),
+        ).toBeVisible()
         await expect(
           page.getByRole('button', { name: 'Record weight', exact: true }),
         ).toBeEnabled()
