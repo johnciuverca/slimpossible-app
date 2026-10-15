@@ -67,10 +67,13 @@ for (const viewport of [
       } else {
         expect(navBox.y - headerBox.y - headerBox.height).toBeCloseTo(24, 0)
       }
-      if (viewport.width > 600) {
+      if (viewport.width >= 1280) {
+        const actionsBox = (await header
+          .getByRole('group', { name: 'Group actions' })
+          .boundingBox())!
         expect(actionBox.y - headerBox.y).toBeCloseTo(0, 0)
         expect(
-          actionBox.x + actionBox.width - headerBox.x - headerBox.width,
+          actionsBox.x + actionsBox.width - headerBox.x - headerBox.width,
         ).toBeCloseTo(0, 0)
       } else {
         const textBox = await header.evaluate((element) => {
@@ -80,7 +83,6 @@ for (const viewport of [
         expect(actionBox.y - textBox.bottom).toBeCloseTo(16, 0)
       }
       if (path === '/group' || path.startsWith('/challenges')) {
-        await page.getByRole('button', { name: 'Progress & history' }).click()
         await expect(
           contexts.getByRole('link', { name: /Personal tracking/ }),
         ).toHaveCount(0)
@@ -141,7 +143,7 @@ for (const viewport of [
     await expect(active).toBeFocused()
     await page.keyboard.press('Enter')
     await expect(page.getByTestId('fixture-route')).toHaveText(
-      '/group?challenge=dashboard-active&tab=progress',
+      '/group?challenge=dashboard-active',
     )
     await expect(active).toHaveAttribute('aria-current', 'page')
     await expect(draft).not.toHaveAttribute('aria-current', 'page')

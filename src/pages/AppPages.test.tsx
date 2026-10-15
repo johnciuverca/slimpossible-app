@@ -27,13 +27,16 @@ vi.mock('../components/WeightPageHeader', () => ({
   WeightPageHeader: ({
     children,
     action,
+    additionalActions,
   }: {
     children: React.ReactNode
     action?: React.ReactNode
+    additionalActions?: React.ReactNode
   }) => (
     <header>
       {children}
       {action ?? <button>Record weight</button>}
+      {additionalActions}
     </header>
   ),
 }))
@@ -1502,7 +1505,9 @@ describe('GroupDashboardPage', () => {
       name: 'Provisional leader',
     })
     expect(provisionalLeaderRegion).toHaveTextContent('Ties are shared')
-    fireEvent.click(screen.getByRole('button', { name: 'Progress & history' }))
+    expect(
+      screen.queryByRole('navigation', { name: 'Group sections' }),
+    ).not.toBeInTheDocument()
     await waitFor(() =>
       expect(
         screen.getByRole('region', {
@@ -1552,13 +1557,6 @@ describe('GroupDashboardPage', () => {
       target_current_date: localDateOnly(),
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Overview' }))
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Overview' })).toHaveAttribute(
-        'aria-pressed',
-        'true',
-      ),
-    )
     fireEvent.click(
       screen.getByRole('button', { name: 'Refresh shared progress' }),
     )

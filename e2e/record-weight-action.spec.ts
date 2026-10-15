@@ -83,6 +83,20 @@ for (const width of [1280, 390]) {
         expect(actionBox.x + actionBox.width).toBeLessThanOrEqual(
           headerBox.x + headerBox.width + 1,
         )
+      } else if (
+        await header.getByRole('group', { name: 'Group actions' }).count()
+      ) {
+        const actionsBox = (await header
+          .getByRole('group', { name: 'Group actions' })
+          .boundingBox())!
+        expect(actionBox.x).toBeGreaterThanOrEqual(actionsBox.x)
+        expect(actionBox.x + actionBox.width).toBeLessThanOrEqual(
+          actionsBox.x + actionsBox.width,
+        )
+        if (width >= 1280)
+          expect(Math.abs(actionBox.y - headerBox.y)).toBeLessThan(2)
+        else
+          expect(actionBox.y).toBeGreaterThan(headingBox.y + headingBox.height)
       } else if (width > 600) {
         expect(
           Math.abs(

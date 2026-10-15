@@ -13,19 +13,41 @@ export function WeightPageHeader({
   children,
   action,
   onRecorded,
+  additionalActions,
 }: {
   children: ReactNode
   action?: ReactNode
   onRecorded?: () => void
+  additionalActions?: ReactNode
 }) {
+  const recordAction = action ?? (
+    <StandaloneRecordWeightAction onRecorded={onRecorded} />
+  )
   return (
     <header
-      className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+      className={
+        additionalActions
+          ? 'flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between'
+          : 'flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between'
+      }
       data-weight-page-header
     >
       <div className="min-w-0 flex-1">{children}</div>
-      <div className="shrink-0 self-start">
-        {action ?? <StandaloneRecordWeightAction onRecorded={onRecorded} />}
+      <div
+        className={
+          additionalActions
+            ? 'flex max-w-full flex-wrap items-start gap-2 self-start'
+            : 'shrink-0 self-start'
+        }
+        role={additionalActions ? 'group' : undefined}
+        aria-label={additionalActions ? 'Group actions' : undefined}
+      >
+        {additionalActions ? (
+          <div className="min-w-0 [&>button]:min-h-11">{recordAction}</div>
+        ) : (
+          recordAction
+        )}
+        {additionalActions}
       </div>
     </header>
   )

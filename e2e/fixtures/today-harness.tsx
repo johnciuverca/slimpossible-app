@@ -231,7 +231,8 @@ createRoot(document.getElementById('root')!).render(
                 ]
               : isGroup
                 ? [
-                    `/group?challenge=${encodeURIComponent(initialHomeSelection ?? challengeId)}`,
+                    new URLSearchParams(window.location.search).get('route') ??
+                      `/group?challenge=${encodeURIComponent(initialHomeSelection ?? challengeId)}`,
                   ]
                 : [isMember ? `/today?challenge=${challengeId}` : '/today']
       }
