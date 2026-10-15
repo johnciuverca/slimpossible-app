@@ -1,13 +1,37 @@
 # 16.5 — Connected sharing release gate status
 
-Issue #212 remains **OPEN / NOT READY FOR RELEASE**. This record reconciles
-the prior staging evidence with the current staging source; it does not claim
-that an unexecuted live journey passed and does not authorize production
-configuration, migration, deployment, or issue closure.
+Issue #212 remains **OPEN / NOT READY FOR RELEASE**. The connected observations
+below are historical and partial. Current staging has since advanced; this
+document does not claim that the newer candidate passed connected acceptance
+and does not authorize production configuration, migration, deployment, or
+issue closure.
 
-## Current candidate and inherited evidence
+## Current staging candidate and later workspace changes
 
-### 2026-10-15 reconciliation
+The latest staging ref was rechecked on 2026-10-15 as
+`d8b984c62776dfac1162a11978b3d94b90b666de` (merge of PR #286). It includes
+these later workspace PRs:
+
+- [PR #284](https://github.com/johnciuverca/slimpossible-app/pull/284),
+  merged as `83404a9f9a28cf9637e99471492029f9abacba7f`: shared layout for
+  Dashboard, Group, Login and Register (issue #281 is closed).
+- [PR #285](https://github.com/johnciuverca/slimpossible-app/pull/285),
+  merged as `de57e9cfa0b25b30f5d028d30ad255cd5b094a66`: one personal-only
+  Dashboard view (issue #282 is closed).
+- [PR #286](https://github.com/johnciuverca/slimpossible-app/pull/286),
+  merged as `d8b984c62776dfac1162a11978b3d94b90b666de`: one selected-group
+  view (issue #283 remains open).
+
+These changes postdate the connected observations recorded below. Their
+automated checks and previews are not connected owner acceptance of `d8b984c`.
+In particular, the revised Dashboard/account shell and combined Group view,
+including the Create/Join popover and refresh behavior, have not been connected-
+tested as part of the observations below. Do not infer that #207, #212, #155,
+or issue #283 is accepted or complete from these merges.
+
+## Historical connected evidence and inherited automated checks
+
+### Historical connected observations (2026-10-15; earlier candidate)
 
 **Verdict: NOT READY.** The observations below are partial connected evidence.
 They do not close #212, #207, #208, or their parents.
@@ -59,10 +83,13 @@ acceptance criteria. The revised #210 contract supersedes the older
 group-only/both-destination wording: personal canonical entry, optional explicit
 shares to one or more groups, none selected by default.
 
-The earlier evidence record below names an older candidate. Subsequent
-Dashboard/personal-chart and Group-chart/history changes in PRs #276/#277 mean
-its unchanged-UI rationale cannot cover those changed surfaces. Preserve
-earlier evidence for genuinely unchanged authorization and sharing behavior.
+The observations in this section were made on the candidate identified below,
+not on current staging `d8b984c`. They remain historical evidence for the
+specific journeys and actor/data conditions recorded here. They do not cover
+the newer workspace surfaces in PRs #284–#286 described above. Existing
+authorization and sharing evidence may be retained only for the exact unchanged
+backend behavior it exercised; it does not certify the newer UI or current
+connected end-to-end flows.
 
 #### Next owner checklist
 
@@ -84,32 +111,22 @@ Record exact candidate, staging project, actor, expected/actual result and
 redacted evidence; do not request credentials. Production configuration,
 recovery and post-deploy smoke/disable planning remain separately gated.
 
-#### Proposed #248 follow-ups (planning only)
+#### #248 workspace sequence — current disposition
 
-No existing issue explicitly covers the newly approved combined views/public
-shell. #252/#254/#255 cover the previous tabbed workspaces; #274/#275 cover their
-visual refinement. Propose these scoped successors for PM tracking before code:
+The October 15 owner-approved follow-up sequence is no longer a proposal:
 
-- **17.7 — Share the visual shell across public and protected routes.** Keep a
-  persistent desktop left sidebar across Dashboard and Group, with accessible
-  mobile navigation. Match Login/Register dark styling, branding, typography,
-  controls and spacing. Signed-out navigation contains public destinations;
-  no signed-in account controls or protected actions. Preserve redirects,
-  authentication, focus and unsaved-navigation guards. Depends on the accepted
-  #274/#275 visual direction and #255 routing contracts.
-- **17.8 — Combine Dashboard into one personal view.** Remove its
-  Overview/Progress split and duplicate metric/chart/history sections; retain
-  one canonical recording flow, personal history/edit/delete, own goals and
-  reached milestones. Preserve old tab URLs/anchors through compatibility
-  routing. Depends on 17.7; references #252/#274.
-- **17.9 — Combine Group into one selected-group view.** Remove its
-  Overview/Progress split and duplicate metrics/chart/history, preserving member
-  tabs, exact shared-history meaning, Sunday results, self-only target actions
-  and selected-group privacy. Depends on 17.7 and accepted 17.8; references
-  #253/#254/#256/#257/#275. Re-run the affected #207/#212 checks on the resulting
-  final candidate before #247 resumes.
+| Issue          | Scope                             | Verified disposition                                             |
+| -------------- | --------------------------------- | ---------------------------------------------------------------- |
+| #281 / PR #284 | 17.7 shared workspace layout      | PR #284 merged to staging as `83404a9`; issue #281 closed.       |
+| #282 / PR #285 | 17.8 combined personal Dashboard  | PR #285 merged to staging as `de57e9c`; issue #282 closed.       |
+| #283 / PR #286 | 17.9 combined selected-group view | PR #286 merged to staging as `d8b984c`; issue #283 remains open. |
 
-These are proposals, not created tickets or implementation authorization.
+The merged PRs implement these workspace changes, but their merge and
+automated checks do not satisfy connected acceptance gates. Per #248, rerun
+the affected #207/#212 acceptance on the final candidate before #247 resumes.
+Keep #155 as a separate open Chapter 14 release gate; do not infer its
+completion from the Chapter 17 workspace PRs. #247 remains **BLOCKED / QUEUED**
+until the pre-sync roadmap and connected gates are accepted.
 
 ### Earlier candidate record (historical; superseded above)
 
@@ -160,10 +177,11 @@ Goals component changed.
 | Optional multiple-group sharing  | One explicitly selected group was connected-tested; local tests cover optional choices, edits, refresh, and account isolation. The owner accepted the targeted Goals preview.                                                                                                                                                                                             | Connected-test the still-missing multiple-eligible-group path and confirm only selected groups receive date/weight, never the note. Do not replay the accepted one-group path solely because the SHA changed.                                                                                                                                                                                                      |
 | No-share and membership/privacy  | Personal-only and one-group journeys were connected-tested. A member and unrelated signed-in reader were checked in the UI. Local authorization tests cover anonymous/withdrawn cases. The staging role/GUC probe checked the canonical RPC fingerprint, catalog/ACL/self-conditions, and denied sessionless and unrelated authenticated caller simulations with `42501`. | Reconcile the specific #212 direct server/RPC denial cases against the existing SQL and local tests; execute only any uncovered case, such as inappropriate owner access. Role/GUC evidence is database-side, not signed-JWT/HTTP evidence; JWT/HTTP is not a new requirement imposed here.                                                                                                                        |
 | Group charts and Sunday outcomes | Local chart/history tests cover corrections, late baselines, unsharing, deletion, partial participation, and ties; earlier connected read-only Group checks remain applicable because those paths did not change.                                                                                                                                                         | Connected evidence is still needed for a late/corrected entry updating the relevant chart/table and provisional/final Sunday results, including agreed partial-week and tie behavior.                                                                                                                                                                                                                              |
-| Accessibility and failure states | Existing connected 390px keyboard/navigation evidence and automated failure/empty/loading coverage remain relevant; #272 is limited to Goals empty-history presentation and its targeted preview was owner-accepted.                                                                                                                                                      | No blanket desktop/mobile replay is required for unrelated unchanged screens. Record only concrete unresolved accessibility or failure-state issues found during the remaining scoped checks.                                                                                                                                                                                                                      |
+| Accessibility and failure states | Earlier connected 390px keyboard/navigation observations and automated failure/empty/loading coverage apply only to the surfaces and candidate they exercised. PRs #284–#286 changed the workspace shell and layouts after those observations.                                                                                                                            | During connected acceptance on `d8b984c`, verify responsive layout, keyboard/focus, direct routes, and loading/empty/error behavior on affected Dashboard and Group surfaces. Record actual results; do not reuse prior screen evidence as a pass for these changes.                                                                                                                                               |
 | Migration/configuration/recovery | The source migration order and selected guarded rollback files are inventoried in [release workflow](release-workflow.md). The staging backend assignment and a read-only catalog/ACL probe are already in #268 evidence.                                                                                                                                                 | Reconcile the actual staging schema/grants with the approved migration set and available migration-history records, accounting for manually applied migrations. Use read-only evidence; do not repair the ledger or rerun SQL. Production configuration, recoverability, and post-deploy smoke/disable planning remain a separate owner-approved production gate. No backend URL reconfirmation is requested here. |
 
-No hosted writes, accounts, migrations, grants, policies, environment settings,
-production deployments, or issue closures were performed for this status
-review. #207, #212, and #155 remain open; #247 remains paused. Production
-release remains a separate owner-approved action after this gate is complete.
+The 2026-10-15 status review made no hosted writes, account changes, migrations,
+grant/policy changes, environment changes, production deployments, or issue
+closures. As of this update, #207, #212, and #155 remain open; #247 remains
+paused. Production release remains a separate owner-approved action after the
+gates are complete.
