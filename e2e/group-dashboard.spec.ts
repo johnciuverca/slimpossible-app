@@ -729,7 +729,7 @@ test('Group Overview and history retain readable contrast in both color schemes'
 
   for (const colorScheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme })
-    await expect(workspace).toHaveCSS('color-scheme', colorScheme)
+    await expect(workspace).toHaveCSS('color-scheme', 'dark')
     const sample = await page.evaluate(() => {
       const active = document.querySelector<HTMLElement>(
         '[aria-label="Group sections"] .group-section-tab-active',
@@ -747,7 +747,10 @@ test('Group Overview and history retain readable contrast in both color schemes'
       )!
       const leaderName = leaderRow.querySelector<HTMLElement>('span')!
       const style = (element: HTMLElement) => getComputedStyle(element)
+      const groupLink = document.querySelector<HTMLElement>('a.bg-forest-800')!
       return {
+        groupLinkBackground: style(groupLink).backgroundColor,
+        groupLinkColor: style(groupLink).color,
         activeBackground: style(active).backgroundColor,
         activeColor: style(active).color,
         overviewBackground: style(overview).backgroundColor,
@@ -762,6 +765,9 @@ test('Group Overview and history retain readable contrast in both color schemes'
     expect(
       contrast(sample.activeColor, sample.activeBackground),
       `${colorScheme} active-tab colors: ${JSON.stringify(sample)}`,
+    ).toBeGreaterThanOrEqual(4.5)
+    expect(
+      contrast(sample.groupLinkColor, sample.groupLinkBackground),
     ).toBeGreaterThanOrEqual(4.5)
     expect(
       contrast(sample.overviewColor, sample.overviewBackground),

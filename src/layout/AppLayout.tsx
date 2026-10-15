@@ -33,6 +33,12 @@ const navigationItems = [
   { label: 'Group', to: '/group' },
 ]
 
+const publicNavigationItems = [
+  { label: 'Home', to: '/' },
+  { label: 'Log in', to: '/login' },
+  { label: 'Register', to: '/register' },
+]
+
 function withSelectedChallenge(to: string, search: string, from: string) {
   // Personal destinations must never inherit a challenge selection.
   if (
@@ -51,8 +57,12 @@ function withSelectedChallenge(to: string, search: string, from: string) {
 
 /** Shared live shell; route guards and each page's real data remain unchanged. */
 export function AppLayout({ children }: AppLayoutProps) {
-  const { search, pathname } = useLocation()
+  const { search, pathname, state: locationState } = useLocation()
   const { state } = useOptionalAuth()
+  const signedIn = state.status === 'signed-in'
+  const sharedLayout = ['/dashboard', '/group', '/login', '/register'].includes(
+    pathname,
+  )
   const navigate = useNavigate()
   const blockers = useRef(new Map<symbol, NavigationBlock>())
   const safety = useMemo(
@@ -100,7 +110,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   return (
     <NavigationSafetyContext.Provider value={safety}>
       <div
-        className={`app-shell flex min-h-screen flex-col bg-page text-ink ${pathname === '/dashboard' ? 'dashboard-shell' : ''} ${pathname === '/group' ? 'group-shell' : ''}`}
+        className={`app-shell flex min-h-screen flex-col bg-page text-ink ${sharedLayout ? 'shared-layout' : ''} ${pathname === '/dashboard' ? 'dashboard-shell' : ''} ${pathname === '/group' ? 'group-shell' : ''}`}
         onClickCapture={(event) => {
           if (dataRouter) return
           const anchor =
@@ -151,31 +161,46 @@ export function AppLayout({ children }: AppLayoutProps) {
                 className="app-nav-scroll min-w-0 max-w-full overflow-x-auto"
               >
                 <ul className="flex w-max min-w-full items-center gap-1 py-1 text-sm font-semibold">
-                  {navigationItems.map(({ label, to }) => (
-                    <li className="shrink-0" key={to}>
-                      <NavLink
-                        aria-current={
-                          to === '/dashboard' && personalHome
-                            ? 'page'
-                            : undefined
-                        }
-                        className={({ isActive }) =>
-                          isActive || (to === '/dashboard' && personalHome)
-                            ? 'inline-flex min-h-10 items-center rounded-xl border border-forest-800 bg-forest-50 px-3 py-2 font-bold text-forest-900 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700 sm:px-4'
-                            : 'inline-flex min-h-10 items-center rounded-xl border border-transparent px-3 py-2 text-ink-muted transition-colors hover:border-line hover:bg-page hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700 sm:px-4'
-                        }
-                        end={to === '/'}
-                        to={withSelectedChallenge(to, search, pathname)}
-                      >
-                        {label}
-                      </NavLink>
-                    </li>
-                  ))}
+                  {(signedIn ? navigationItems : publicNavigationItems).map(
+                    ({ label, to }) => (
+                      <li className="shrink-0" key={to}>
+                        <NavLink
+                          aria-current={
+                            to === '/dashboard' && personalHome
+                              ? 'page'
+                              : undefined
+                          }
+                          className={({ isActive }) =>
+                            isActive || (to === '/dashboard' && personalHome)
+                              ? 'inline-flex min-h-10 items-center rounded-xl border border-forest-800 bg-forest-50 px-3 py-2 font-bold text-forest-900 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700 sm:px-4'
+                              : 'inline-flex min-h-10 items-center rounded-xl border border-transparent px-3 py-2 text-ink-muted transition-colors hover:border-line hover:bg-page hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700 sm:px-4'
+                          }
+                          end={to === '/'}
+                          state={
+                            to === '/login' || to === '/register'
+                              ? locationState
+                              : undefined
+                          }
+                          to={
+                            signedIn
+                              ? withSelectedChallenge(to, search, pathname)
+                              : to
+                          }
+                        >
+                          {label}
+                        </NavLink>
+                      </li>
+                    ),
+                  )}
                 </ul>
               </nav>
-              <div className="shrink-0">
-                <AuthSessionUI />
-              </div>
+              {signedIn ||
+              state.status === 'loading' ||
+              state.status === 'error' ? (
+                <div className="shrink-0">
+                  <AuthSessionUI />
+                </div>
+              ) : null}
             </div>
           </div>
         </header>
