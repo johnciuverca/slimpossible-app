@@ -856,9 +856,12 @@ for (const width of [1280, 390]) {
       expect(boxes[2]!.y).toBeGreaterThanOrEqual(boxes[1]!.y)
     }
     await create.focus()
+    const historyBefore = await page
+      .getByRole('table', { name: 'Shared group weight history' })
+      .boundingBox()
     await page.keyboard.press('Enter')
     await expect(create).toHaveAttribute('aria-expanded', 'true')
-    const panel = page.getByRole('region', {
+    const panel = page.getByRole('dialog', {
       name: 'Create or join a group',
       exact: true,
     })
@@ -868,9 +871,76 @@ for (const width of [1280, 390]) {
     await expect(
       panel.getByRole('button', { name: 'Join with invitation', exact: true }),
     ).toBeVisible()
-    await page.keyboard.press('Enter')
+    const panelBox = (await panel.boundingBox())!
+    expect(panelBox.x).toBeGreaterThanOrEqual(16)
+    expect(panelBox.x + panelBox.width).toBeLessThanOrEqual(width - 16)
+    expect(panelBox.y).toBeCloseTo(boxes[1]!.y + boxes[1]!.height + 8, 0)
+    expect(panelBox.y + panelBox.height).toBeLessThanOrEqual(900 - 16)
+    const historyAfter = await page
+      .getByRole('table', { name: 'Shared group weight history' })
+      .boundingBox()
+    expect(historyAfter!.y).toBeCloseTo(historyBefore!.y, 0)
+    await expect(
+      panel.getByRole('button', { name: 'Close create/join' }),
+    ).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(
+      panel.getByRole('link', { name: 'Create challenge', exact: true }),
+    ).toBeFocused()
+    await panel
+      .getByRole('button', { name: 'Join with invitation', exact: true })
+      .click()
+    await panel.getByLabel('Invitation link or token').fill('draft-invitation')
+    await page.screenshot({
+      path: test.info().outputPath(`group-popover-${width}.png`),
+      fullPage: false,
+    })
+    await page.setViewportSize({ width: 320, height: 568 })
+    await expect
+      .poll(async () => {
+        const box = await panel.boundingBox()
+        return Boolean(
+          box &&
+          box.x >= 16 &&
+          box.y >= 16 &&
+          box.x + box.width <= 304 &&
+          box.y + box.height <= 552,
+        )
+      })
+      .toBe(true)
+    await expect(panel.getByLabel('Invitation link or token')).toHaveValue(
+      'draft-invitation',
+    )
+    await page.setViewportSize({ width, height: 900 })
+    await page.keyboard.press('Escape')
     await expect(create).toHaveAttribute('aria-expanded', 'false')
     await expect(panel).toHaveCount(0)
+    await expect(create).toBeFocused()
+    await create.click()
+    await expect(panel.getByLabel('Invitation link or token')).toHaveValue(
+      'draft-invitation',
+    )
+    await page.getByRole('heading', { name: 'Group', exact: true }).click()
+    await expect(panel).toHaveCount(0)
+    await create.click()
+    await expect(panel.getByLabel('Invitation link or token')).toHaveValue(
+      'draft-invitation',
+    )
+    await panel
+      .getByRole('link', { name: 'Create challenge', exact: true })
+      .click()
+    const discard = page.getByRole('dialog', { name: 'Discard unsaved input?' })
+    await expect(discard).toBeVisible()
+    await discard.getByRole('button', { name: 'Stay', exact: true }).click()
+    await expect(
+      page.getByRole('heading', { name: 'Group', exact: true }),
+    ).toBeVisible()
+    if (!(await panel.isVisible())) await create.click()
+    await expect(panel.getByLabel('Invitation link or token')).toHaveValue(
+      'draft-invitation',
+    )
+    await panel.getByRole('button', { name: 'Close create/join' }).click()
+    await expect(create).toBeFocused()
     const before = requests.filter((url) =>
       url.includes('/rpc/get_group_progress_summary'),
     ).length

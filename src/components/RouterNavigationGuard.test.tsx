@@ -10,12 +10,15 @@ import { afterEach, beforeEach, expect, it } from 'vitest'
 import {
   createMemoryRouter,
   Link,
+  Outlet,
   RouterProvider,
   useLocation,
 } from 'react-router-dom'
 import { AppLayout } from '../layout/AppLayout'
 import { AuthProvider } from '../auth/AuthContext'
 import { useUnsavedNavigation } from './navigationSafety'
+import { DashboardChallengeActions } from './DashboardChallengeActions'
+import type { PersonalWorkspace } from '../data/usePersonalWorkspace'
 
 const originalShow = Object.getOwnPropertyDescriptor(
   HTMLDialogElement.prototype,
@@ -70,6 +73,86 @@ function Editor() {
     </>
   )
 }
+
+function groupActionsRouter() {
+  const workspace = {
+    ownerKey: 'signed-in:owner-1',
+    userId: 'owner-1',
+    contexts: { state: 'ready', data: { challenges: [], participants: [] } },
+  } as unknown as PersonalWorkspace
+  const router = createMemoryRouter(
+    [
+      {
+        element: (
+          <AppLayout>
+            <Outlet />
+          </AppLayout>
+        ),
+        children: [
+          {
+            path: '/group',
+            element: (
+              <DashboardChallengeActions workspace={workspace} protectDraft />
+            ),
+          },
+          { path: '/challenge/setup', element: <h1>Create destination</h1> },
+          { path: '/invite/:token', element: <h1>Review destination</h1> },
+        ],
+      },
+    ],
+    { initialEntries: ['/group'] },
+  )
+  render(
+    <AuthProvider
+      initialState={{
+        status: 'signed-in',
+        error: null,
+        user: { id: 'owner-1', email: 'owner@example.invalid' },
+      }}
+    >
+      <RouterProvider router={router} />
+    </AuthProvider>,
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'Join with invitation' }))
+  fireEvent.change(screen.getByLabelText('Invitation link or token'), {
+    target: { value: 'saved-draft' },
+  })
+  return router
+}
+
+it('guards a Group join draft across navigation with Stay and explicit Discard', async () => {
+  const router = groupActionsRouter()
+  const unload = new Event('beforeunload', { cancelable: true })
+  window.dispatchEvent(unload)
+  expect(unload.defaultPrevented).toBe(true)
+  fireEvent.click(screen.getByRole('link', { name: 'Create challenge' }))
+  expect(
+    await screen.findByRole('dialog', { name: 'Discard unsaved input?' }),
+  ).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Stay' }))
+  expect(screen.getByLabelText('Invitation link or token')).toHaveValue(
+    'saved-draft',
+  )
+  fireEvent.click(screen.getByRole('link', { name: 'Create challenge' }))
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'Discard and leave' }),
+  )
+  expect(
+    await screen.findByRole('heading', { name: 'Create destination' }),
+  ).toBeInTheDocument()
+  router.dispose()
+})
+
+it('allows intentional invitation review without a discard prompt', async () => {
+  const router = groupActionsRouter()
+  fireEvent.click(screen.getByRole('button', { name: 'Review invitation' }))
+  expect(
+    await screen.findByRole('heading', { name: 'Review destination' }),
+  ).toBeInTheDocument()
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(router.state.location.pathname).toBe('/invite/saved-draft')
+  router.dispose()
+})
 it('guards a signed-in logo departure before opening the canonical Dashboard', async () => {
   const router = createMemoryRouter(
     [

@@ -1,8 +1,10 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { flushSync } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
 import type { PersonalWorkspace } from '../data/usePersonalWorkspace'
 import { Button, Card } from './ui'
 import { DashboardActionIcon } from './DashboardActionIcon'
+import { useUnsavedNavigation } from './navigationSafety'
 
 const actionClass =
   'inline-flex min-h-11 items-center justify-center rounded-full border border-line bg-panel px-4 py-2 text-sm font-semibold text-forest-800 hover:bg-forest-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700'
@@ -10,9 +12,11 @@ const actionClass =
 export function DashboardChallengeActions({
   workspace,
   recordAction,
+  protectDraft = false,
 }: {
   workspace: PersonalWorkspace
   recordAction?: ReactNode
+  protectDraft?: boolean
 }) {
   // Remount owner-specific chooser state immediately when the account changes.
   return (
@@ -20,6 +24,7 @@ export function DashboardChallengeActions({
       key={workspace.ownerKey}
       workspace={workspace}
       recordAction={recordAction}
+      protectDraft={protectDraft}
     />
   )
 }
@@ -27,9 +32,11 @@ export function DashboardChallengeActions({
 function OwnedGroupActions({
   workspace,
   recordAction,
+  protectDraft,
 }: {
   workspace: PersonalWorkspace
   recordAction?: ReactNode
+  protectDraft: boolean
 }) {
   const navigate = useNavigate()
   const [joining, setJoining] = useState(false)
@@ -37,6 +44,18 @@ function OwnedGroupActions({
   const [joinError, setJoinError] = useState('')
   const [choosing, setChoosing] = useState(false)
   const [selectedId, setSelectedId] = useState('')
+  const [reviewing, setReviewing] = useState(false)
+  const dirty = protectDraft && !reviewing && Boolean(invitation || selectedId)
+  useUnsavedNavigation(dirty ? 'dirty' : null)
+  useEffect(() => {
+    if (!dirty) return
+    const guard = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', guard)
+    return () => window.removeEventListener('beforeunload', guard)
+  }, [dirty])
   const { contexts } = workspace
   const groups =
     contexts.state === 'ready'
@@ -190,6 +209,8 @@ function OwnedGroupActions({
               setJoinError('Paste the invitation link or token you received.')
               return
             }
+            // Reviewing the submitted token is intentional, not a discarded draft.
+            flushSync(() => setReviewing(true))
             navigate(`/invite/${encodeURIComponent(token)}`)
           }}
         >

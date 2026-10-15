@@ -17,6 +17,7 @@ import { GroupChartHistory } from '../components/GroupChartHistory'
 import { ChangeTargetDialog } from '../components/ChangeTargetDialog'
 import { ChangeStartingWeightDialog } from '../components/ChangeStartingWeightDialog'
 import { DashboardChallengeActions } from '../components/DashboardChallengeActions'
+import { GroupActionsPopover } from '../components/GroupActionsPopover'
 import { WeightEntryActions } from '../components/WeightEntryActions'
 import { WeightEntryCard } from '../components/WeightEntryCard'
 import type { PersonalWorkspace } from '../data/usePersonalWorkspace'
@@ -1473,11 +1474,12 @@ export function GroupDashboardPage() {
   const [messageTone, setMessageTone] = useState<FeedbackTone>('info')
   const [reloadKey, setReloadKey] = useState(0)
   const [weeklyAnnouncement, setWeeklyAnnouncement] = useState('')
-  const [showCreateJoinActions, setShowCreateJoinActions] = useState(false)
+  const [hasOpenedCreateJoinActions, setHasOpenedCreateJoinActions] =
+    useState(false)
   const personalWorkspace = usePersonalWorkspace({
     enabled: Boolean(
       ownerId &&
-      (showCreateJoinActions ||
+      (hasOpenedCreateJoinActions ||
         ownGroupMemberKey(data?.challenge.id ?? '', ownerId) !== null),
     ),
   })
@@ -1846,15 +1848,15 @@ export function GroupDashboardPage() {
           onRecorded={() => setReloadKey((value) => value + 1)}
           additionalActions={
             <>
-              <Button
-                variant="secondary"
-                className="min-h-11"
-                aria-expanded={showCreateJoinActions}
-                aria-controls="group-create-join-actions"
-                onClick={() => setShowCreateJoinActions((value) => !value)}
+              <GroupActionsPopover
+                key={personalWorkspace.ownerKey}
+                onOpen={() => setHasOpenedCreateJoinActions(true)}
               >
-                Create or join a group
-              </Button>
+                <DashboardChallengeActions
+                  workspace={personalWorkspace}
+                  protectDraft
+                />
+              </GroupActionsPopover>
               <Button
                 variant="secondary"
                 className="min-h-11"
@@ -1871,15 +1873,6 @@ export function GroupDashboardPage() {
             titleId="group-title"
           />
         </WeightPageHeader>
-        <section
-          id="group-create-join-actions"
-          aria-label="Create or join a group"
-          hidden={!showCreateJoinActions}
-        >
-          {showCreateJoinActions ? (
-            <DashboardChallengeActions workspace={personalWorkspace} />
-          ) : null}
-        </section>
         <ChallengeTabs
           challenges={challenges}
           selectedId={selectedChallengeId}
