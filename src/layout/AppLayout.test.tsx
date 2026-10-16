@@ -92,6 +92,36 @@ describe('AppLayout', () => {
     }
   })
 
+  it('uses the Dashboard shell for signed-in root without changing public or challenge routes', () => {
+    const { unmount } = renderLayout('/', signedIn)
+
+    const dashboardShell = document.querySelector('.app-shell')
+    expect(dashboardShell).toHaveClass('shared-layout', 'dashboard-shell')
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    expect(screen.getByRole('button', { name: 'Profile' })).toBeInTheDocument()
+
+    unmount()
+    renderLayout('/', signedOut)
+    expect(document.querySelector('.app-shell')).not.toHaveClass(
+      'shared-layout',
+      'dashboard-shell',
+    )
+    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute(
+      'href',
+      '/',
+    )
+
+    cleanup()
+    renderLayout('/?challenge=private%2Fplan', signedIn)
+    expect(document.querySelector('.app-shell')).not.toHaveClass(
+      'shared-layout',
+      'dashboard-shell',
+    )
+  })
+
   it.each(['/login', '/register'])(
     'shows public navigation without protected controls on %s',
     (path) => {

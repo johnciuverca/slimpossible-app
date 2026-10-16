@@ -8,7 +8,6 @@ import {
 } from 'react'
 import {
   Link,
-  NavLink,
   useLocation,
   useNavigate,
   UNSAFE_DataRouterContext,
@@ -60,9 +59,16 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { search, pathname, state: locationState } = useLocation()
   const { state } = useOptionalAuth()
   const signedIn = state.status === 'signed-in'
-  const sharedLayout = ['/dashboard', '/group', '/login', '/register'].includes(
-    pathname,
-  )
+  const personalHome =
+    ['/today', '/progress', '/goals', '/challenges'].includes(pathname) ||
+    (pathname === '/' &&
+      !new URLSearchParams(search).has('challenge') &&
+      signedIn)
+  const sharedLayout =
+    ['/dashboard', '/group', '/login', '/register'].includes(pathname) ||
+    (pathname === '/' && personalHome)
+  const dashboardShell =
+    pathname === '/dashboard' || (pathname === '/' && personalHome)
   const navigate = useNavigate()
   const blockers = useRef(new Map<symbol, NavigationBlock>())
   const safety = useMemo(
@@ -101,16 +107,11 @@ export function AppLayout({ children }: AppLayoutProps) {
   const contextPage =
     ['/challenges', '/weigh-ins'].includes(pathname) ||
     (pathname === '/' && new URLSearchParams(search).has('challenge'))
-  const personalHome =
-    ['/today', '/progress', '/goals', '/challenges'].includes(pathname) ||
-    (pathname === '/' &&
-      !new URLSearchParams(search).has('challenge') &&
-      state.status === 'signed-in')
 
   return (
     <NavigationSafetyContext.Provider value={safety}>
       <div
-        className={`app-shell flex min-h-screen flex-col bg-page text-ink ${sharedLayout ? 'shared-layout' : ''} ${pathname === '/dashboard' ? 'dashboard-shell' : ''} ${pathname === '/group' ? 'group-shell' : ''}`}
+        className={`app-shell flex min-h-screen flex-col bg-page text-ink ${sharedLayout ? 'shared-layout' : ''} ${dashboardShell ? 'dashboard-shell' : ''} ${pathname === '/group' ? 'group-shell' : ''}`}
         onClickCapture={(event) => {
           if (dataRouter) return
           const anchor =
@@ -149,7 +150,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         <header className="app-shell-header border-b border-line bg-panel">
           <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-4 px-4 py-4 sm:px-8 xl:flex-row xl:items-center xl:justify-between">
             <Link
-              className="w-fit shrink-0 rounded-md text-lg font-extrabold tracking-tight text-forest-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest-700"
+              className="app-shell-brand inline-flex min-h-11 w-fit shrink-0 items-center rounded-md border border-transparent px-2 text-lg font-extrabold tracking-tight text-forest-800 transition-colors hover:border-line hover:bg-page hover:text-ink focus-visible:border-line focus-visible:bg-page focus-visible:text-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest-700"
               to={state.status === 'signed-in' ? '/dashboard' : '/'}
             >
               Slimpossible
@@ -162,35 +163,36 @@ export function AppLayout({ children }: AppLayoutProps) {
               >
                 <ul className="flex w-max min-w-full items-center gap-1 py-1 text-sm font-semibold">
                   {(signedIn ? navigationItems : publicNavigationItems).map(
-                    ({ label, to }) => (
-                      <li className="shrink-0" key={to}>
-                        <NavLink
-                          aria-current={
-                            to === '/dashboard' && personalHome
-                              ? 'page'
-                              : undefined
-                          }
-                          className={({ isActive }) =>
-                            isActive || (to === '/dashboard' && personalHome)
-                              ? 'inline-flex min-h-10 items-center rounded-xl border border-forest-800 bg-forest-50 px-3 py-2 font-bold text-forest-900 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700 sm:px-4'
-                              : 'inline-flex min-h-10 items-center rounded-xl border border-transparent px-3 py-2 text-ink-muted transition-colors hover:border-line hover:bg-page hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700 sm:px-4'
-                          }
-                          end={to === '/'}
-                          state={
-                            to === '/login' || to === '/register'
-                              ? locationState
-                              : undefined
-                          }
-                          to={
-                            signedIn
-                              ? withSelectedChallenge(to, search, pathname)
-                              : to
-                          }
-                        >
-                          {label}
-                        </NavLink>
-                      </li>
-                    ),
+                    ({ label, to }) => {
+                      const active =
+                        pathname === to ||
+                        (to !== '/' && pathname.startsWith(`${to}/`)) ||
+                        (to === '/dashboard' && personalHome)
+                      return (
+                        <li className="shrink-0" key={to}>
+                          <Link
+                            aria-current={active ? 'page' : undefined}
+                            className={
+                              active
+                                ? 'inline-flex min-h-10 items-center rounded-xl border border-forest-800 bg-forest-50 px-3 py-2 font-bold text-forest-900 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700 sm:px-4'
+                                : 'inline-flex min-h-10 items-center rounded-xl border border-transparent px-3 py-2 text-ink-muted transition-colors hover:border-line hover:bg-page hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700 sm:px-4'
+                            }
+                            state={
+                              to === '/login' || to === '/register'
+                                ? locationState
+                                : undefined
+                            }
+                            to={
+                              signedIn
+                                ? withSelectedChallenge(to, search, pathname)
+                                : to
+                            }
+                          >
+                            {label}
+                          </Link>
+                        </li>
+                      )
+                    },
                   )}
                 </ul>
               </nav>

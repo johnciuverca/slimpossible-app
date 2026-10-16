@@ -215,7 +215,9 @@ body {
   background: #145447;
   color: #f1fffb;
 }
-.app-shell.group-shell .app-shell-header a:not([aria-current='page']):hover {
+.app-shell.group-shell
+  .app-shell-header
+  a:not([aria-current='page']):not(.app-shell-brand):hover {
   border-color: #46586b;
   background: #1a2a39;
   color: #f1f6fa;
