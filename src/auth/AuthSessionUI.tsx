@@ -99,11 +99,15 @@ function AccountControl({
           }
         }}
       >
-        <summary className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-line px-3 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-forest-700">
+        <summary
+          aria-label={`Profile and account for ${name}`}
+          title="Profile and account"
+          className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-line px-3 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-forest-700"
+        >
           <span className="account-avatar" aria-hidden="true">
             {name.charAt(0).toUpperCase()}
           </span>
-          <span className="min-w-0 truncate">{name}</span>
+          <span className="account-name min-w-0 truncate">{name}</span>
           <span aria-hidden="true">⌄</span>
         </summary>
         <div className="account-options absolute right-0 z-30 mt-2 w-44 rounded-xl border border-line bg-panel p-2 shadow-panel">
