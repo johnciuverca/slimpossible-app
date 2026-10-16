@@ -6,9 +6,9 @@ insert into public.profiles (id, display_name) values
 insert into public.challenges (id, owner_id, created_by, name, start_date, end_date) values
   ('10000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001',
    '00000000-0000-4000-8000-000000000001', 'Existing sentinel', current_date, current_date + 30);
-insert into public.participants (id, challenge_id, user_id, display_name, starting_weight_kg, target_weight_kg) values
+insert into public.participants (id, challenge_id, user_id, display_name, status, starting_weight_kg, target_weight_kg, joined_at) values
   ('20000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001',
-   '00000000-0000-4000-8000-000000000001', 'Existing owner', 90, 80);
+   '00000000-0000-4000-8000-000000000001', 'Existing owner', 'active', 90, 80, now());
 insert into public.weigh_ins (participant_id, recorded_date, weight_kg, note) values
   ('20000000-0000-4000-8000-000000000001', current_date, 89, 'Preserve existing note');
 create table local_test.acl_before as
