@@ -124,7 +124,15 @@ function AccountControl({
           </span>
           <span className="account-name min-w-0 truncate">{name}</span>
           <span className="account-chevron" aria-hidden="true">
-            ⌄
+            <svg viewBox="0 0 12 10" width="12" height="10" fill="none">
+              <path
+                d="m2 3 4 4 4-4"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.6"
+              />
+            </svg>
           </span>
         </summary>
         <div className="account-options absolute right-0 z-30 mt-2 w-44 rounded-xl border border-line bg-panel p-2 shadow-panel">

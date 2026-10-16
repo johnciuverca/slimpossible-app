@@ -30,16 +30,39 @@ for (const width of [320, 390, 768, 1280, 1920]) {
     await expect(dashboard).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
     await expect(account).toBeVisible()
     if (width > 640) {
-      const accountName = await page.locator('.account-name').boundingBox()
-      const chevron = await page.locator('.account-chevron').boundingBox()
-      expect(accountName).not.toBeNull()
-      expect(chevron).not.toBeNull()
+      const visibleInkCenters = await page.evaluate(() => {
+        const name = document.querySelector<HTMLElement>('.account-name')!
+        const path = document.querySelector<SVGGraphicsElement>(
+          '.account-chevron path',
+        )!
+        const nameStyle = getComputedStyle(name)
+        const lineHeight = Number.parseFloat(nameStyle.lineHeight)
+        const context = document.createElement('canvas').getContext('2d')!
+        context.font = nameStyle.font
+        const metrics = context.measureText(name.textContent ?? '')
+        const baselineOffset =
+          (lineHeight -
+            metrics.fontBoundingBoxAscent -
+            metrics.fontBoundingBoxDescent) /
+            2 +
+          metrics.fontBoundingBoxAscent
+        const nameInkCenter =
+          name.getBoundingClientRect().y +
+          baselineOffset +
+          (metrics.actualBoundingBoxDescent - metrics.actualBoundingBoxAscent) /
+            2
+        const bounds = path.getBBox()
+        const pathCenter = new DOMPoint(
+          bounds.x + bounds.width / 2,
+          bounds.y + bounds.height / 2,
+        ).matrixTransform(path.getScreenCTM()!)
+        return { nameInkCenter, chevronInkCenter: pathCenter.y }
+      })
       expect(
         Math.abs(
-          accountName!.y +
-            accountName!.height / 2 -
-            (chevron!.y + chevron!.height / 2),
+          visibleInkCenters.nameInkCenter - visibleInkCenters.chevronInkCenter,
         ),
+        JSON.stringify(visibleInkCenters),
       ).toBeLessThanOrEqual(2)
     }
     const header = await page.getByRole('banner').boundingBox()
