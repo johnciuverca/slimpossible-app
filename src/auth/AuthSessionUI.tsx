@@ -76,6 +76,20 @@ function AccountControl({
   const menu = useRef<HTMLDetailsElement>(null)
   const dialog = useRef<HTMLDialogElement>(null)
   useEffect(() => {
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (
+        menu.current?.open &&
+        event.target instanceof Node &&
+        !menu.current.contains(event.target)
+      ) {
+        menu.current.open = false
+      }
+    }
+    document.addEventListener('pointerdown', closeOnOutsidePointer)
+    return () =>
+      document.removeEventListener('pointerdown', closeOnOutsidePointer)
+  }, [])
+  useEffect(() => {
     if (!profile) return
     const element = dialog.current
     element?.showModal()
@@ -94,17 +108,32 @@ function AccountControl({
         className="account-control relative"
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
-            menu.current?.removeAttribute('open')
+            event.preventDefault()
+            if (menu.current) menu.current.open = false
             menu.current?.querySelector('summary')?.focus()
           }
         }}
       >
-        <summary className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-line px-3 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-forest-700">
+        <summary
+          aria-label={`Profile and account for ${name}`}
+          title="Profile and account"
+          className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-line px-3 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-forest-700"
+        >
           <span className="account-avatar" aria-hidden="true">
             {name.charAt(0).toUpperCase()}
           </span>
-          <span className="min-w-0 truncate">{name}</span>
-          <span aria-hidden="true">⌄</span>
+          <span className="account-name min-w-0 truncate">{name}</span>
+          <span className="account-chevron" aria-hidden="true">
+            <svg viewBox="0 0 12 10" width="12" height="10" fill="none">
+              <path
+                d="m2 3 4 4 4-4"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.6"
+              />
+            </svg>
+          </span>
         </summary>
         <div className="account-options absolute right-0 z-30 mt-2 w-44 rounded-xl border border-line bg-panel p-2 shadow-panel">
           <Button

@@ -67,6 +67,8 @@ export function AppLayout({ children }: AppLayoutProps) {
   const sharedLayout =
     ['/dashboard', '/group', '/login', '/register'].includes(pathname) ||
     (pathname === '/' && personalHome)
+  const publicAuthShell =
+    !signedIn && ['/login', '/register'].includes(pathname)
   const dashboardShell =
     pathname === '/dashboard' || (pathname === '/' && personalHome)
   const navigate = useNavigate()
@@ -111,7 +113,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   return (
     <NavigationSafetyContext.Provider value={safety}>
       <div
-        className={`app-shell flex min-h-screen flex-col bg-page text-ink ${sharedLayout ? 'shared-layout' : ''} ${dashboardShell ? 'dashboard-shell' : ''} ${pathname === '/group' ? 'group-shell' : ''}`}
+        className={`app-shell flex min-h-screen flex-col bg-page text-ink ${signedIn ? 'signed-in-shell' : ''} ${publicAuthShell ? 'public-auth-shell' : ''} ${sharedLayout ? 'shared-layout' : ''} ${dashboardShell ? 'dashboard-shell' : ''} ${pathname === '/group' ? 'group-shell' : ''}`}
         onClickCapture={(event) => {
           if (dataRouter) return
           const anchor =
@@ -148,7 +150,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         }}
       >
         <header className="app-shell-header border-b border-line bg-panel">
-          <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-4 px-4 py-4 sm:px-8 xl:flex-row xl:items-center xl:justify-between">
+          <div className="app-shell-header-inner mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-4 px-4 py-4 sm:px-8 xl:flex-row xl:items-center xl:justify-between">
             <Link
               className="app-shell-brand inline-flex min-h-11 w-fit shrink-0 items-center rounded-md border border-transparent px-2 text-lg font-extrabold tracking-tight text-forest-800 transition-colors hover:border-line hover:bg-page hover:text-ink focus-visible:border-line focus-visible:bg-page focus-visible:text-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest-700"
               to={state.status === 'signed-in' ? '/dashboard' : '/'}
@@ -156,7 +158,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               Slimpossible
             </Link>
 
-            <div className="flex min-w-0 flex-col gap-3 xl:flex-1 xl:flex-row xl:items-center xl:justify-end xl:gap-5">
+            <div className="app-shell-header-actions flex min-w-0 flex-col gap-3 xl:flex-1 xl:flex-row xl:items-center xl:justify-end xl:gap-5">
               <nav
                 aria-label="Primary navigation"
                 className="app-nav-scroll min-w-0 max-w-full overflow-x-auto"
