@@ -79,6 +79,8 @@ begin
     starting_weight_kg, target_weight_kg, joined_at
   ) values (
     group_challenge_id, member_id, 'Group test member', 'active', 90, 80, now()
+  ), (
+    group_challenge_id, unrelated_id, 'Withdrawn test member', 'withdrawn', 90, 80, now()
   );
 
   execute 'set local role authenticated';
@@ -183,6 +185,12 @@ begin
 
   perform set_config('request.jwt.claim.sub', unrelated_id::text, true);
   select count(*)::integer into visible_count
+  from public.challenges where id = group_challenge_id;
+  insert into slimpossible_personal_group_results
+  values ('withdrawn_member_cannot_read_group_challenge', visible_count = 0,
+    'withdrawn membership is not active access');
+
+  select count(*)::integer into visible_count
   from public.challenges where id in (personal_challenge_id, group_challenge_id);
   insert into slimpossible_personal_group_results
   values ('outsider_cannot_read_either_context', visible_count = 0, 'rows hidden');
@@ -198,7 +206,7 @@ order by check_name;
 
 do $$
 begin
-  if (select count(*) from slimpossible_personal_group_results) <> 11
+  if (select count(*) from slimpossible_personal_group_results) <> 12
      or exists (select 1 from slimpossible_personal_group_results where not passed) then
     raise exception 'Personal/group authorization checks failed; roll back this batch.';
   end if;
