@@ -96,7 +96,9 @@ for (const width of [1280, 390]) {
       await expect(page.getByRole('region', { name: 'About you' })).toHaveCount(
         0,
       )
-      await page.getByText('Synthetic Alex', { exact: true }).click()
+      await page
+        .getByLabel('Profile and account for Synthetic Alex', { exact: true })
+        .click()
       await page.getByRole('button', { name: 'Profile', exact: true }).click()
       await expect(page.getByRole('dialog')).toContainText(
         'user-alex@example.invalid',
@@ -191,10 +193,14 @@ for (const width of [1280, 390]) {
           page.getByRole('link', { name: 'Continue to invitations' }),
         ).toHaveCount(0)
         await expect(
-          page.getByText('Synthetic Second', { exact: true }),
+          page.getByLabel('Profile and account for Synthetic Second', {
+            exact: true,
+          }),
         ).toBeVisible()
         await expect(
-          page.getByText('Synthetic Alex', { exact: true }),
+          page.getByLabel('Profile and account for Synthetic Alex', {
+            exact: true,
+          }),
         ).toHaveCount(0)
         await page
           .getByRole('button', { name: 'Switch synthetic account' })

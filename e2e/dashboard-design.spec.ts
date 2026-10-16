@@ -59,7 +59,12 @@ for (const width of [1280, 390]) {
       path: test.info().outputPath(`dashboard-overview-${width}.png`),
       fullPage: true,
     })
-    const account = page.getByText('Synthetic account', { exact: true })
+    const account = page.getByLabel(
+      'Profile and account for Synthetic account',
+      {
+        exact: true,
+      },
+    )
     await account.click()
     await page.getByRole('button', { name: 'Profile', exact: true }).click()
     await expect(page.getByRole('dialog', { name: 'Profile' })).toBeVisible()
@@ -68,7 +73,7 @@ for (const width of [1280, 390]) {
     ).toBeFocused()
     await page.keyboard.press('Escape')
     await expect(page.getByRole('dialog')).toHaveCount(0)
-    await expect(account.locator('..')).toBeFocused()
+    await expect(account).toBeFocused()
 
     await expect(chart.locator('circle[data-date]')).toHaveCount(5)
   })
