@@ -67,6 +67,8 @@ export function AppLayout({ children }: AppLayoutProps) {
   const sharedLayout =
     ['/dashboard', '/group', '/login', '/register'].includes(pathname) ||
     (pathname === '/' && personalHome)
+  const publicAuthShell =
+    !signedIn && ['/login', '/register'].includes(pathname)
   const dashboardShell =
     pathname === '/dashboard' || (pathname === '/' && personalHome)
   const navigate = useNavigate()
@@ -111,7 +113,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   return (
     <NavigationSafetyContext.Provider value={safety}>
       <div
-        className={`app-shell flex min-h-screen flex-col bg-page text-ink ${signedIn ? 'signed-in-shell' : ''} ${sharedLayout ? 'shared-layout' : ''} ${dashboardShell ? 'dashboard-shell' : ''} ${pathname === '/group' ? 'group-shell' : ''}`}
+        className={`app-shell flex min-h-screen flex-col bg-page text-ink ${signedIn ? 'signed-in-shell' : ''} ${publicAuthShell ? 'public-auth-shell' : ''} ${sharedLayout ? 'shared-layout' : ''} ${dashboardShell ? 'dashboard-shell' : ''} ${pathname === '/group' ? 'group-shell' : ''}`}
         onClickCapture={(event) => {
           if (dataRouter) return
           const anchor =

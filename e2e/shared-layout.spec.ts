@@ -29,6 +29,19 @@ for (const width of [320, 390, 768, 1280, 1920]) {
     await expect(group).toHaveCSS('background-color', 'rgb(37, 59, 45)')
     await expect(dashboard).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
     await expect(account).toBeVisible()
+    if (width > 640) {
+      const accountName = await page.locator('.account-name').boundingBox()
+      const chevron = await page.locator('.account-chevron').boundingBox()
+      expect(accountName).not.toBeNull()
+      expect(chevron).not.toBeNull()
+      expect(
+        Math.abs(
+          accountName!.y +
+            accountName!.height / 2 -
+            (chevron!.y + chevron!.height / 2),
+        ),
+      ).toBeLessThanOrEqual(2)
+    }
     const header = await page.getByRole('banner').boundingBox()
     const main = await page.getByRole('main').boundingBox()
     expect(header!.y + header!.height).toBeLessThanOrEqual(main!.y + 1)
@@ -63,6 +76,14 @@ for (const width of [320, 390, 768, 1280, 1920]) {
     await expect(account).toBeFocused()
     await page.keyboard.press('Enter')
     await page.keyboard.press('Escape')
+    await expect(
+      page.getByRole('button', { name: 'Log out', exact: true }),
+    ).toBeHidden()
+    await account.click()
+    await expect(
+      page.getByRole('button', { name: 'Log out', exact: true }),
+    ).toBeVisible()
+    await page.getByRole('main').click({ position: { x: 12, y: 12 } })
     await expect(
       page.getByRole('button', { name: 'Log out', exact: true }),
     ).toBeHidden()
@@ -197,9 +218,20 @@ for (const width of [1280, 390]) {
       const main = await page.getByRole('main').boundingBox()
       expect(header).not.toBeNull()
       expect(main).not.toBeNull()
-      if (width > 1100)
-        expect(header!.x + header!.width).toBeLessThanOrEqual(main!.x + 1)
-      else expect(header!.y + header!.height).toBeLessThanOrEqual(main!.y + 1)
+      expect(header!.y + header!.height).toBeLessThanOrEqual(main!.y + 1)
+      await expect(shell).toHaveClass(/public-auth-shell/)
+      const brandBox = await page
+        .getByRole('link', { name: 'Slimpossible', exact: true })
+        .boundingBox()
+      const navBox = await nav.boundingBox()
+      expect(brandBox).not.toBeNull()
+      expect(navBox).not.toBeNull()
+      expect(brandBox!.x + brandBox!.width).toBeLessThanOrEqual(navBox!.x + 1)
+      expect(
+        await page
+          .locator('.app-shell-header-inner')
+          .evaluate((element) => getComputedStyle(element).flexDirection),
+      ).toBe('row')
       await page
         .getByRole('link', { name: 'Slimpossible', exact: true })
         .focus()

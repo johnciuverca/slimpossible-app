@@ -76,6 +76,20 @@ function AccountControl({
   const menu = useRef<HTMLDetailsElement>(null)
   const dialog = useRef<HTMLDialogElement>(null)
   useEffect(() => {
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (
+        menu.current?.open &&
+        event.target instanceof Node &&
+        !menu.current.contains(event.target)
+      ) {
+        menu.current.open = false
+      }
+    }
+    document.addEventListener('pointerdown', closeOnOutsidePointer)
+    return () =>
+      document.removeEventListener('pointerdown', closeOnOutsidePointer)
+  }, [])
+  useEffect(() => {
     if (!profile) return
     const element = dialog.current
     element?.showModal()
@@ -94,7 +108,8 @@ function AccountControl({
         className="account-control relative"
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
-            menu.current?.removeAttribute('open')
+            event.preventDefault()
+            if (menu.current) menu.current.open = false
             menu.current?.querySelector('summary')?.focus()
           }
         }}
@@ -108,7 +123,9 @@ function AccountControl({
             {name.charAt(0).toUpperCase()}
           </span>
           <span className="account-name min-w-0 truncate">{name}</span>
-          <span aria-hidden="true">⌄</span>
+          <span className="account-chevron" aria-hidden="true">
+            ⌄
+          </span>
         </summary>
         <div className="account-options absolute right-0 z-30 mt-2 w-44 rounded-xl border border-line bg-panel p-2 shadow-panel">
           <Button

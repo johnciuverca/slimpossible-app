@@ -500,6 +500,13 @@ body {
 .account-control summary::-webkit-details-marker {
   display: none;
 }
+.account-chevron {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
 .chart-axis {
   fill: var(--color-ink-muted);
 }
@@ -529,6 +536,80 @@ body {
 }
 .personal-weight-chart circle:focus-visible {
   outline: 3px solid var(--chart-trend, #a86312);
+}
+/* Public authentication pages use the approved horizontal dark header. */
+.public-auth-shell .app-shell-header {
+  --color-panel: #1a1c1a;
+  --color-page: #292e2a;
+  --color-line: #373d38;
+  --color-ink: #e1e8e2;
+  --color-ink-muted: #a9b6ac;
+  --color-forest-50: #253b2d;
+  --color-forest-700: #9ac9aa;
+  --color-forest-800: #9ac9aa;
+  --color-forest-900: #c6e2ce;
+  color: var(--color-ink);
+  color-scheme: dark;
+}
+.public-auth-shell .app-shell-header-inner {
+  min-height: 72px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding-block: 12px;
+}
+.public-auth-shell .app-shell-header-actions {
+  flex: 0 1 auto;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+}
+.public-auth-shell .app-shell-header .app-nav-scroll {
+  overflow: visible;
+}
+.public-auth-shell .app-shell-header nav ul {
+  width: auto;
+  min-width: 0;
+  gap: 8px;
+}
+.app-shell.public-auth-shell .app-shell-header nav a {
+  min-height: 44px;
+  border-radius: 9px;
+  border-color: transparent;
+  color: var(--color-ink-muted);
+  font-weight: 650;
+}
+.app-shell.public-auth-shell .app-shell-header nav a[aria-current='page'] {
+  border-color: #5f8068;
+  background: #253b2d;
+  color: #c6e2ce;
+  font-weight: 700;
+}
+.app-shell.public-auth-shell
+  .app-shell-header
+  nav
+  a:not([aria-current='page']):hover {
+  border-color: #5f8068;
+  background: #292e2a;
+  color: #e1e8e2;
+}
+@media (max-width: 640px) {
+  .public-auth-shell .app-shell-header-inner {
+    gap: 4px;
+    padding-inline: 10px;
+  }
+  .public-auth-shell .app-shell-brand {
+    padding-inline: 2px;
+    font-size: 15px;
+  }
+  .public-auth-shell .app-shell-header nav ul {
+    gap: 0;
+  }
+  .app-shell.public-auth-shell .app-shell-header nav a {
+    padding-inline: 5px;
+    font-size: 11px;
+  }
 }
 /* Workspace switcher colors stay in the header, leaving page surfaces intact. */
 .signed-in-shell .app-shell-header {
@@ -655,18 +736,21 @@ body {
   }
 }
 @media (min-width: 1100px) {
-  .shared-layout:not(.signed-in-shell) {
+  .shared-layout:not(.signed-in-shell):not(.public-auth-shell) {
     display: grid;
     grid-template-columns: 220px minmax(0, 1fr);
     grid-template-rows: 1fr auto;
   }
-  .shared-layout:not(.signed-in-shell) .app-shell-header {
+  .shared-layout:not(.signed-in-shell):not(.public-auth-shell)
+    .app-shell-header {
     grid-column: 1;
     grid-row: 1 / span 2;
     border-right: 1px solid var(--color-line);
     border-bottom: 0;
   }
-  .shared-layout:not(.signed-in-shell) .app-shell-header > div {
+  .shared-layout:not(.signed-in-shell):not(.public-auth-shell)
+    .app-shell-header
+    > div {
     position: sticky;
     top: 0;
     min-height: 100vh;
@@ -677,31 +761,42 @@ body {
     justify-content: flex-start;
     padding: 2rem 1rem;
   }
-  .shared-layout:not(.signed-in-shell) .app-shell-header > div > div {
+  .shared-layout:not(.signed-in-shell):not(.public-auth-shell)
+    .app-shell-header
+    > div
+    > div {
     flex-direction: column;
     align-items: stretch;
     justify-content: flex-start;
     margin-top: 2rem;
   }
-  .shared-layout:not(.signed-in-shell) .app-shell-header nav ul {
+  .shared-layout:not(.signed-in-shell):not(.public-auth-shell)
+    .app-shell-header
+    nav
+    ul {
     flex-direction: column;
     align-items: stretch;
     gap: 0.75rem;
     width: 100%;
   }
-  .shared-layout:not(.signed-in-shell) .app-shell-header nav a {
+  .shared-layout:not(.signed-in-shell):not(.public-auth-shell)
+    .app-shell-header
+    nav
+    a {
     width: 100%;
     min-height: 48px;
   }
-  .shared-layout:not(.signed-in-shell) .app-shell-header .account-control {
+  .shared-layout:not(.signed-in-shell):not(.public-auth-shell)
+    .app-shell-header
+    .account-control {
     margin-top: 2rem;
   }
-  .shared-layout .app-shell-main {
+  .shared-layout:not(.public-auth-shell) .app-shell-main {
     grid-column: 2;
     grid-row: 1;
     padding: 2rem;
   }
-  .shared-layout > footer {
+  .shared-layout:not(.public-auth-shell) > footer {
     grid-column: 2;
     grid-row: 2;
   }
