@@ -150,7 +150,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         <header className="app-shell-header border-b border-line bg-panel">
           <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-4 px-4 py-4 sm:px-8 xl:flex-row xl:items-center xl:justify-between">
             <Link
-              className="w-fit shrink-0 rounded-md text-lg font-extrabold tracking-tight text-forest-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest-700"
+              className="app-shell-brand inline-flex min-h-11 w-fit shrink-0 items-center rounded-md border border-transparent px-2 text-lg font-extrabold tracking-tight text-forest-800 transition-colors hover:border-line hover:bg-page hover:text-ink focus-visible:border-line focus-visible:bg-page focus-visible:text-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest-700"
               to={state.status === 'signed-in' ? '/dashboard' : '/'}
             >
               Slimpossible

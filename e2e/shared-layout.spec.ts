@@ -1,6 +1,46 @@
 import { expect, test } from '@playwright/test'
 
 for (const width of [1280, 390]) {
+  test(`brand hover and keyboard-focus affordances work in Dashboard and Group shells at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 })
+
+    for (const path of ['/', '/dashboard', '/group']) {
+      await page.goto(
+        `/e2e/fixtures/personal-dashboard-harness.html?${new URLSearchParams({ scenario: 'tabs', path })}`,
+      )
+      const brand = page.getByRole('link', {
+        name: 'Slimpossible',
+        exact: true,
+      })
+      await expect(brand).toHaveAttribute('href', '/dashboard')
+      const initialBackground = await brand.evaluate(
+        (element) => getComputedStyle(element).backgroundColor,
+      )
+      await brand.hover()
+      await expect
+        .poll(() =>
+          brand.evaluate(
+            (element) => getComputedStyle(element).backgroundColor,
+          ),
+        )
+        .not.toBe(initialBackground)
+
+      await page.keyboard.press('Tab')
+      await page.keyboard.press('Tab')
+      await expect(brand).toBeFocused()
+      await expect(brand).toHaveCSS('outline-style', 'solid')
+      await expect
+        .poll(() =>
+          brand.evaluate(
+            (element) => getComputedStyle(element).backgroundColor,
+          ),
+        )
+        .not.toBe(initialBackground)
+    }
+  })
+
   test(`signed-in root Dashboard alias matches /dashboard shell at ${width}px`, async ({
     page,
   }) => {
