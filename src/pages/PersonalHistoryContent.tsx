@@ -26,6 +26,20 @@ export function PersonalHistoryContent({
   referenceLabel?: string
   children?: ReactNode
 }) {
+  const sharingLabel = (entry: PersonalWeighIn) => {
+    const ids = entry.sharedChallengeIds
+    if (workspace.contexts.state === 'loading')
+      return `Shared with ${ids.length} ${ids.length === 1 ? 'group' : 'groups'} (loading names)`
+    if (workspace.contexts.state === 'error')
+      return `Shared with ${ids.length} ${ids.length === 1 ? 'group' : 'groups'} (names could not be loaded)`
+    return `Shared with ${ids
+      .map(
+        (id) =>
+          workspace.contexts.data.challenges.find((row) => row.id === id)
+            ?.name ?? 'an unavailable group',
+      )
+      .join(', ')}`
+  }
   const [editor, setEditor] = useState<{
     key: string
     entry?: PersonalWeighIn
@@ -162,7 +176,7 @@ export function PersonalHistoryContent({
                           </td>
                           <td className="min-w-32 max-w-xs px-3 py-4 break-words">
                             {entry.sharedChallengeIds.length
-                              ? `Shared with ${entry.sharedChallengeIds.map((id) => workspace.contexts.data.challenges.find((row) => row.id === id)?.name ?? 'an unavailable group').join(', ')}`
+                              ? sharingLabel(entry)
                               : 'Private'}
                           </td>
                           <td className="px-3 py-2">

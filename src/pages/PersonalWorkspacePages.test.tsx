@@ -330,6 +330,94 @@ describe('personal Dashboard and My Progress', () => {
     ).not.toBeInTheDocument()
   })
 
+  it('recovers challenge names and invitation choices after a context-load failure', async () => {
+    const storage = local()
+    const listChallenges = storage.repositories.challenges.listVisibleToUser
+    const listSpy = vi
+      .spyOn(storage.repositories.challenges, 'listVisibleToUser')
+      .mockImplementationOnce(listChallenges)
+      .mockRejectedValueOnce(new Error('Temporary context failure'))
+      .mockImplementation(listChallenges)
+    window.localStorage.setItem(
+      'slimpossible.local.challenges',
+      JSON.stringify([
+        createChallengeFixture({
+          id: 'group-one',
+          name: 'Group One',
+          ownerId: 'user-alex',
+          createdBy: 'user-alex',
+          kind: 'group',
+        }),
+        createChallengeFixture({
+          id: 'group-two',
+          name: 'Group Two',
+          ownerId: 'user-alex',
+          createdBy: 'user-alex',
+          kind: 'group',
+        }),
+        createChallengeFixture({
+          id: 'personal-goal',
+          name: 'Personal Goal',
+          ownerId: 'user-alex',
+          kind: 'personal',
+        }),
+      ]),
+    )
+    window.localStorage.setItem(
+      'slimpossible.local.participants',
+      JSON.stringify([
+        createParticipantFixture({ challengeId: 'personal-goal' }),
+      ]),
+    )
+    window.localStorage.setItem(
+      'slimpossible.local.personal-weigh-ins',
+      JSON.stringify([
+        {
+          id: 'shared-entry',
+          userId: 'user-alex',
+          date: '2026-01-01',
+          weightKg: 90,
+          note: 'Private note',
+          sharedChallengeIds: ['group-one', 'removed-group'],
+        },
+      ]),
+    )
+    vi.spyOn(persistenceModule, 'createPersistence').mockReturnValue(storage)
+    render(page(<PersonalDashboardPage />))
+    const invite = await screen.findByRole('button', { name: 'Invite people' })
+    await waitFor(() => expect(invite).toBeEnabled())
+    fireEvent.click(invite)
+    await screen.findByRole('combobox', { name: 'Choose a group you own' })
+    expect(
+      screen.getByText('Shared with Group One, an unavailable group'),
+    ).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh Dashboard' }))
+    expect(
+      await screen.findByText(
+        'Shared with 2 groups (names could not be loaded)',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/an unavailable group/)).not.toBeInTheDocument()
+    expect(
+      await screen.findByText(/Invitation choices could not be loaded/),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Your goal choices could not be loaded. Refresh to try again.',
+      ),
+    ).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh Dashboard' }))
+    expect(
+      await screen.findByText('Shared with Group One, an unavailable group'),
+    ).toBeInTheDocument()
+    expect(
+      await screen.findByRole('combobox', { name: 'Choose a group you own' }),
+    ).toBeInTheDocument()
+    expect(listSpy).toHaveBeenCalledTimes(3)
+  })
+
   it.each([
     ['Group', GroupDashboardPage, '/group?challenge=missing'],
     ['Goals', GoalsPage, '/goals?challenge=missing'],
