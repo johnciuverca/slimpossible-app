@@ -103,6 +103,13 @@ begin
     insert into slimpossible_group_weigh_in_checks values ('anonymous_denied', true);
   end;
   execute 'set local role authenticated';
+  perform set_config('request.jwt.claim.sub', '', true);
+  begin
+    perform * from public.get_group_weigh_in_history(test_challenge_id);
+    insert into slimpossible_group_weigh_in_checks values ('authenticated_without_identity_denied', false);
+  exception when insufficient_privilege then
+    insert into slimpossible_group_weigh_in_checks values ('authenticated_without_identity_denied', true);
+  end;
   perform set_config('request.jwt.claim.sub', member_id::text, true);
   select count(*)::integer into entry_count
   from public.get_group_weigh_in_history(test_challenge_id);
@@ -139,6 +146,18 @@ begin
   from public.get_group_weigh_in_history(test_challenge_id);
   insert into slimpossible_group_weigh_in_checks values
     ('challenge_owner_can_read_shared_history', entry_count = 2);
+  select to_jsonb(history) into summary
+  from public.get_group_weigh_in_history(test_challenge_id) as history
+  where history.recorded_date = current_date - 14;
+  insert into slimpossible_group_weigh_in_checks values
+    ('challenge_owner_gets_only_shared_projection_without_notes',
+      summary is not null
+      and not (summary ? 'note')
+      and not (summary ? 'user_id')
+      and not exists (
+        select 1 from public.get_group_weigh_in_history(test_challenge_id)
+        where recorded_date = current_date - 21
+      ));
   select count(*)::integer into raw_count
   from public.personal_weigh_ins
   where user_id in (
