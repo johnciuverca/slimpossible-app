@@ -42,6 +42,7 @@ declare
   numeric_summary numeric;
   date_summary date;
   projection jsonb;
+  provisional_projection jsonb;
 begin
   if owner_id = member_id or owner_id = outsider_id or member_id = outsider_id then
     raise exception 'Approved owner/member/outsider identities must be distinct.';
@@ -216,6 +217,67 @@ begin
     ('weekday_share_updates_completion_without_changing_sunday_winners',
       numeric_summary = 100 and reached_count = 1 and recorded_count = 1
       and eligible_count = 1 and winner_count = 1);
+
+  -- The challenge owner is intentionally not enrolled in group_one. The owner
+  -- may still read only the group's share-scoped summaries.
+  perform set_config('request.jwt.claim.sub', owner_id::text, true);
+  select to_jsonb(summary) into projection
+  from public.get_group_progress_summary(group_one, comparison_sunday) summary;
+  insert into slimpossible_personal_weigh_in_results values
+    ('non_enrolled_owner_receives_safe_group_summary',
+      not exists (
+        select 1 from public.participants
+        where challenge_id = group_one and user_id = owner_id and status = 'active'
+      )
+      and projection ->> 'challenge_id' = group_one::text
+      and projection ->> 'active_participant_count' = '1'
+      and projection ->> 'eligible_participant_count' = '1'
+      and not (projection ? 'note')
+      and not (projection ? 'weight_kg')
+      and not (projection ? 'user_id')
+      and not (projection ? 'participant_id'));
+  select to_jsonb(summary) into provisional_projection
+  from public.get_provisional_group_leader_summary(group_one, comparison_sunday) summary;
+  insert into slimpossible_personal_weigh_in_results values
+    ('non_enrolled_owner_receives_safe_provisional_summary',
+      provisional_projection ->> 'challenge_id' = group_one::text
+      and provisional_projection ->> 'active_participant_count' = '1'
+      and provisional_projection ->> 'eligible_participant_count' = '1'
+      and provisional_projection ->> 'state' = 'solo-challenge'
+      and not (provisional_projection ? 'note')
+      and not (provisional_projection ? 'weight_kg')
+      and not (provisional_projection ? 'user_id')
+      and not (provisional_projection ? 'participant_id'));
+
+  perform set_config('request.jwt.claim.sub', member_id::text, true);
+  select to_jsonb(summary) into provisional_projection
+  from public.get_provisional_group_leader_summary(group_one, comparison_sunday) summary;
+  insert into slimpossible_personal_weigh_in_results values
+    ('active_member_receives_provisional_summary',
+      provisional_projection ->> 'challenge_id' = group_one::text
+      and provisional_projection ->> 'active_participant_count' = '1'
+      and provisional_projection ->> 'eligible_participant_count' = '1'
+      and provisional_projection ->> 'state' = 'solo-challenge');
+
+  perform set_config('request.jwt.claim.sub', outsider_id::text, true);
+  begin
+    perform * from public.get_group_progress_summary(group_one, comparison_sunday);
+    insert into slimpossible_personal_weigh_in_results values
+      ('outsider_cannot_read_group_summary', false);
+  exception when insufficient_privilege then
+    insert into slimpossible_personal_weigh_in_results values
+      ('outsider_cannot_read_group_summary', true);
+  end;
+  begin
+    perform * from public.get_provisional_group_leader_summary(group_one, comparison_sunday);
+    insert into slimpossible_personal_weigh_in_results values
+      ('outsider_cannot_read_provisional_summary', false);
+  exception when insufficient_privilege then
+    insert into slimpossible_personal_weigh_in_results values
+      ('outsider_cannot_read_provisional_summary', true);
+  end;
+
+  perform set_config('request.jwt.claim.sub', member_id::text, true);
   begin
     perform * from public.get_group_progress_summary(group_one, current_sunday + 7);
     insert into slimpossible_personal_weigh_in_results values
@@ -377,7 +439,7 @@ select check_name, passed from slimpossible_personal_weigh_in_results order by c
 
 do $$
 begin
-  if (select count(*) from slimpossible_personal_weigh_in_results) <> 32
+  if (select count(*) from slimpossible_personal_weigh_in_results) <> 37
      or exists (select 1 from slimpossible_personal_weigh_in_results where not passed) then
     raise exception 'Personal weigh-in authorization checks failed; roll back this batch.';
   end if;

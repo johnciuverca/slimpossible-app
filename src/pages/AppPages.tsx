@@ -1717,7 +1717,7 @@ export function GroupDashboardPage() {
         setData(null)
         setWeeklyAnnouncement('')
         setMessage(
-          'Shared progress is available to active members only, or could not be loaded. Try refreshing.',
+          'Shared progress is unavailable for this challenge right now. Try refreshing.',
         )
         setMessageTone('error')
       } else {
