@@ -1581,11 +1581,11 @@ describe('GroupDashboardPage', () => {
     )
   })
 
-  it('denies an owner who does not have active membership', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        response([
+  it('loads selected-group summaries for an owner who is not enrolled', async () => {
+    const fetchMock = vi.fn((...args: Parameters<typeof fetch>) => {
+      const url = String(args[0])
+      if (url.includes('/challenges?')) {
+        return response([
           {
             created_at: '2026-09-17T10:00:00.000Z',
             created_by: 'owner-1',
@@ -1599,19 +1599,16 @@ describe('GroupDashboardPage', () => {
             target_weight_kg: null,
             updated_at: '2026-09-17T10:00:00.000Z',
           },
-        ]),
-      )
-      .mockResolvedValueOnce(
-        response(
-          {
-            code: '42501',
-            details: 'internal row detail',
-            hint: null,
-            message: 'Group membership required.',
-          },
-          403,
-        ),
-      )
+        ])
+      }
+      if (url.includes('/rpc/get_group_progress_summary')) {
+        return groupProgressResponse()
+      }
+      if (url.includes('/rpc/get_provisional_group_leader_summary')) {
+        return provisionalLeaderResponse()
+      }
+      return response([])
+    })
 
     renderDashboard(
       <GroupDashboardPage />,
@@ -1620,16 +1617,15 @@ describe('GroupDashboardPage', () => {
       'owner-1',
     )
 
+    expect(await screen.findByText('40%')).toBeInTheDocument()
     expect(
-      await screen.findByText(/available to active members only/),
+      screen.getByRole('region', { name: 'Weekly result' }),
     ).toBeInTheDocument()
-    expect(screen.queryByText('Weekly winners')).not.toBeInTheDocument()
-    expect(screen.queryByText('internal row detail')).not.toBeInTheDocument()
     expect(
       fetchMock.mock.calls.some(([url]) =>
         String(url).includes('/rpc/get_provisional_group_leader_summary'),
       ),
-    ).toBe(false)
+    ).toBe(true)
   })
 
   it('allows an owner who is an active challenge member', async () => {
@@ -1690,7 +1686,7 @@ describe('GroupDashboardPage', () => {
     expect(await screen.findByText('35%')).toBeInTheDocument()
     expect(screen.getAllByText('Owner')).toHaveLength(2)
     expect(
-      screen.queryByText(/available to active members only/),
+      screen.queryByText(/Shared progress is unavailable for this challenge/),
     ).not.toBeInTheDocument()
   })
 
@@ -1764,7 +1760,9 @@ describe('GroupDashboardPage', () => {
     )
 
     expect(
-      await screen.findByText(/available to active members only/),
+      await screen.findByText(
+        /Shared progress is unavailable for this challenge/,
+      ),
     ).toBeInTheDocument()
     expect(
       screen.queryByRole('region', { name: 'Weekly result' }),
