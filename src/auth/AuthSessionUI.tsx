@@ -137,6 +137,7 @@ function AccountControl({
         </summary>
         <div className="account-options absolute right-0 z-30 mt-2 w-44 rounded-xl border border-line bg-panel p-2 shadow-panel">
           <Button
+            aria-label="Profile"
             className="w-full justify-start"
             variant="ghost"
             onClick={() => {
@@ -147,6 +148,7 @@ function AccountControl({
             Profile
           </Button>
           <Button
+            aria-label="Log out"
             className="w-full justify-start"
             onClick={onLogout}
             variant="ghost"
