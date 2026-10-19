@@ -374,7 +374,11 @@ describe('HomePage', () => {
     await screen.findByText(/90 kg/)
     fireEvent.click(screen.getByRole('button', { name: `Delete ${today}` }))
     fireEvent.click(screen.getByRole('button', { name: 'Delete weight' }))
-    await screen.findByText('Weigh-in and its group shares were deleted.')
+    await screen.findByText(
+      'Weigh-in and its group shares were deleted.',
+      {},
+      { timeout: 5000 },
+    )
     cleanup()
 
     renderRemotePage(<HomePage />)

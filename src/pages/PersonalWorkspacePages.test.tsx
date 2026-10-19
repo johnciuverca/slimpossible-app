@@ -200,6 +200,72 @@ describe('personal Dashboard and My Progress', () => {
       screen.queryByRole('button', { name: 'Edit weight 2026-01-01' }),
     ).not.toBeInTheDocument()
   })
+  it.each(['personal', 'group'] as const)(
+    'prefills exact hundredth precision and preserves a no-op edit in the %s path',
+    async (path) => {
+      seedGroups()
+      const storage = local()
+      const privateNote = 'synthetic private note fixture'
+      const sharedChallengeIds = ['challenge-1']
+      window.localStorage.setItem(
+        'slimpossible.local.personal-weigh-ins',
+        JSON.stringify([
+          {
+            id: 'precision-entry',
+            userId: 'user-alex',
+            date: '2026-01-01',
+            weightKg: 88.85,
+            note: privateNote,
+            sharedChallengeIds,
+          },
+        ]),
+      )
+      vi.spyOn(persistenceModule, 'createPersistence').mockReturnValue(storage)
+
+      render(
+        path === 'group'
+          ? page(<PersonalEntryActions challengeId="challenge-1" />)
+          : page(<MyProgressPage />, 'user-alex', '/progress'),
+      )
+      fireEvent.click(
+        await screen.findByRole('button', {
+          name: 'Edit weight 2026-01-01',
+        }),
+      )
+
+      const editor = within(
+        await screen.findByRole('dialog', { name: 'Edit weight' }),
+      )
+      const weight = editor.getByLabelText('Weight in kg')
+      expect(weight).toHaveValue(88.85)
+      expect(weight).toHaveAttribute('step', '0.01')
+      const noteInput = editor.getByLabelText(/Private note/)
+      expect((noteInput as HTMLTextAreaElement).value === privateNote).toBe(
+        true,
+      )
+      expect(
+        editor.getByRole('checkbox', { name: 'Slimpossible 2026' }),
+      ).toBeChecked()
+
+      fireEvent.click(editor.getByRole('button', { name: 'Update weight' }))
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+      )
+
+      const saved =
+        await storage.repositories.personalWeighIns.listForUser('user-alex')
+      expect(saved.state).toBe('success')
+      if (saved.state !== 'success') throw new Error('Expected saved history')
+      expect(saved.data).toHaveLength(1)
+      expect(saved.data[0]).toMatchObject({
+        id: 'precision-entry',
+        date: '2026-01-01',
+        weightKg: 88.85,
+        sharedChallengeIds,
+      })
+      expect(saved.data[0].note === privateNote).toBe(true)
+    },
+  )
   it.each([0, 1, 2])(
     'offers invite destinations for %s owned eligible groups only, without creating invitations',
     async (count) => {
