@@ -58,12 +58,16 @@ describe('AuthSessionUI', () => {
     expect(screen.getByText('Alex')).toBeInTheDocument()
     expect(screen.queryByText('person@example.com')).not.toBeInTheDocument()
     fireEvent.click(screen.getByText('Alex'))
-    fireEvent.click(screen.getByRole('button', { name: /^Profile$/ }))
+    const profileButton = screen.getByRole('button', { name: 'Profile' })
+    expect(profileButton).toHaveAttribute('aria-label', 'Profile')
+    fireEvent.click(profileButton)
     expect(screen.getByRole('dialog')).toHaveTextContent('person@example.com')
     fireEvent.click(screen.getByRole('button', { name: 'Close Profile' }))
     fireEvent.click(screen.getByText('Alex'))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Log out' }))
+    const logoutButton = screen.getByRole('button', { name: 'Log out' })
+    expect(logoutButton).toHaveAttribute('aria-label', 'Log out')
+    fireEvent.click(logoutButton)
 
     await waitFor(() => {
       expect(screen.getByRole('link', { name: 'Log in' })).toBeInTheDocument()
