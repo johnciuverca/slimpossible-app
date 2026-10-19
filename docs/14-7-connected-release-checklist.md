@@ -6,24 +6,29 @@ checklist. Do not treat local tests or mock responses as staging evidence.
 
 ## Current evidence and blockers
 
-- Starting source: current `main` at `29082d3` on 2026-09-28, including the
-  merged #154 and #194 implementation PRs.
-- Local automated checks are recorded separately in the PR and refer to its
-  exact tested head SHA.
-- Live staging journeys: **NOT EXECUTED**. No approved preview URL or open
-  staging browser tab was available to this task. The repository's prior live
-  evidence records full application persistence as unverified.
-- Staging migrations/configuration: **NOT INDEPENDENTLY VERIFIED**. Earlier
-  setup and migration evidence is historical and does not establish current
-  Preview-to-project targeting.
+- Release-gate evidence was reconciled on 2026-10-19 against staging candidate
+  `00fcf280bd3be0d54ea3497679d23e80633207d4` (PR #295 merge).
+- A disposable local PostgreSQL harness run from that exact candidate applied
+  the timestamp-ordered migration set and passed 17 permission cases and 15
+  group-history projection cases. This is local SQL evidence only; it does not
+  attest to the hosted staging migration ledger or schema.
+- On the same staging candidate, the connected #212 disposable-record flow
+  passed for group-only sharing, then sharing to both selected groups, editing,
+  and deletion. The private note was absent from group views, and the deleted
+  row remained absent after refreshing both groups. No existing user row or
+  production data was changed.
+- In Incognito, opening `/dashboard` directly redirected to the app's `/login`
+  route. This verifies that route only; it does not complete the wider direct
+  link/reload, account, or protected-data matrix.
 - Production activation, production migrations, and merge: **NOT PERFORMED**.
 
-The release remains blocked until an owner supplies the exact approved
-non-production preview URL and confirms that it targets a dedicated staging
-Supabase project with disposable test identities and the current migration
-set applied. The owner must enter any credentials directly in the existing
-private browser/session; never send credentials, populated environment files,
-or real personal data in chat or this repository.
+The release remains blocked. Registration, saved solo progress, invitation
+acceptance, Sunday ranking and late-correction outcomes, recovery through a
+real mailbox, induced live failures, and the mobile/keyboard matrix remain
+**NOT EXECUTED**. The candidate migration inventory is recorded in the
+[release workflow](release-workflow.md); no hosted migration-ledger
+reconciliation is claimed. Never send credentials, populated environment
+files, or real personal data in chat or this repository.
 
 ## Staging preflight — owner action
 
@@ -53,16 +58,16 @@ Run with synthetic values only. Record each item as `PASS`, `FAIL`, or
 exists. Do not paste emails, invite tokens, raw weights, or private notes into
 screenshots, logs, PRs, or this file.
 
-| Journey                 | Required observation                                                                                                                                                                                                                                              | Result       |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
-| Solo registration       | A registers with the dedicated mailbox, confirms if required, signs in, and reaches the authenticated app. Verification returns safely to `/login`.                                                                                                               | NOT EXECUTED |
-| Solo saved progress     | A creates a challenge, explicitly enrolls, saves a synthetic weigh-in, refreshes, and sees saved progress after a fresh sign-in. Correcting the same date leaves one record.                                                                                      | NOT EXECUTED |
-| Recovery and errors     | Recovery confirmation does not reveal account existence; a valid dedicated recovery link resets the test password; expired/used links and simulated network failures show safe retry guidance.                                                                    | NOT EXECUTED |
-| Group invitation        | A creates a group challenge and invite; B opens the invite, authenticates, accepts, and appears as an active member only after acceptance.                                                                                                                        | NOT EXECUTED |
-| Group ranking and edits | A and B add synthetic Sunday records; the selected group's final Sunday ranking is correct. Late/corrected same-date records update the result after refresh, without duplicates.                                                                                 | NOT EXECUTED |
-| Membership and privacy  | Active members can see only the allowed group aggregate/display names. Invited-before-acceptance, signed-out/anonymous, and unrelated identities cannot read protected group data. No other member's raw weight/history/note appears in UI or group RPC response. | NOT EXECUTED |
-| Direct links and reload | Direct `/progress?challenge=<selected-id>`, `/group?challenge=<selected-id>`, and invite links load the exact selected challenge; refresh preserves valid route context and signed-out protected navigation returns through login safely.                         | NOT EXECUTED |
-| Keyboard and mobile     | At a narrow mobile viewport, no clipped controls or horizontal page overflow; Tab order/focus is visible and primary links/forms/buttons work with Enter/Space. Repeat critical check on desktop.                                                                 | NOT EXECUTED |
+| Journey                 | Required observation                                                                                                                                                                                                                                              | Result                                                                           |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Solo registration       | A registers with the dedicated mailbox, confirms if required, signs in, and reaches the authenticated app. Verification returns safely to `/login`.                                                                                                               | NOT EXECUTED                                                                     |
+| Solo saved progress     | A creates a challenge, explicitly enrolls, saves a synthetic weigh-in, refreshes, and sees saved progress after a fresh sign-in. Correcting the same date leaves one record.                                                                                      | NOT EXECUTED                                                                     |
+| Recovery and errors     | Recovery confirmation does not reveal account existence; a valid dedicated recovery link resets the test password; expired/used links and simulated network failures show safe retry guidance.                                                                    | NOT EXECUTED                                                                     |
+| Group invitation        | A creates a group challenge and invite; B opens the invite, authenticates, accepts, and appears as an active member only after acceptance.                                                                                                                        | NOT EXECUTED                                                                     |
+| Group ranking and edits | A and B add synthetic Sunday records; the selected group's final Sunday ranking is correct. Late/corrected same-date records update the result after refresh, without duplicates.                                                                                 | NOT EXECUTED                                                                     |
+| Membership and privacy  | Active members can see only the allowed group aggregate/display names. Invited-before-acceptance, signed-out/anonymous, and unrelated identities cannot read protected group data. No other member's raw weight/history/note appears in UI or group RPC response. | NOT EXECUTED — the #212 share/privacy path below is partial evidence only        |
+| Direct links and reload | Direct `/progress?challenge=<selected-id>`, `/group?challenge=<selected-id>`, and invite links load the exact selected challenge; refresh preserves valid route context and signed-out protected navigation returns through login safely.                         | NOT EXECUTED — only the signed-out `/dashboard` → `/login` redirect was observed |
+| Keyboard and mobile     | At a narrow mobile viewport, no clipped controls or horizontal page overflow; Tab order/focus is visible and primary links/forms/buttons work with Enter/Space. Repeat critical check on desktop.                                                                 | NOT EXECUTED                                                                     |
 
 Existing automated tests exercise mocked auth/repository boundaries and local
 browser behavior, including protected direct routes, mobile shell/enrollment
@@ -70,6 +75,11 @@ layout, keyboard activation, form errors, password recovery states, group
 summary privacy, and selected challenge behavior. They are not live staging
 verification. The browser acceptance results above must be recorded
 independently.
+
+The 2026-10-19 staging observations above are limited to the exact routes and
+synthetic #212 record flow described. They do not establish signup, invite
+acceptance, password recovery, Sunday ranking, mobile/keyboard, or induced
+network-failure behavior.
 
 Relevant suites include `src/pages/ChallengeSetupPage.test.tsx`,
 `src/pages/ChallengeInvitesPage.test.tsx`,
@@ -127,6 +137,7 @@ production release:
 
 ## Redacted run record
 
-| Date/time and timezone | Exact reviewed app SHA | Environment label (no URL/project ref) | Staging result                                             | Owner / blocker    |
-| ---------------------- | ---------------------- | -------------------------------------- | ---------------------------------------------------------- | ------------------ |
-| NOT EXECUTED           | NOT RECORDED           | NOT PROVIDED                           | BLOCKED — preview URL and owner staging readiness required | Owner action above |
+| Date/time and timezone             | Exact reviewed app SHA                     | Environment label (no URL/project ref) | Result                                                                                                                                                                       | Remaining blocker                                      |
+| ---------------------------------- | ------------------------------------------ | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| 2026-10-19 (timezone not recorded) | `00fcf280bd3be0d54ea3497679d23e80633207d4` | Staging Preview                        | #212 group-only → both selected groups, edit/delete, private-note privacy, and absence after refresh: PASS. Incognito `/dashboard` → app `/login`: PASS for this route only. | #155 journeys and broader #207/#212 matrix above       |
+| 2026-10-19 (timezone not recorded) | `00fcf280bd3be0d54ea3497679d23e80633207d4` | Disposable local PostgreSQL            | 17 permission cases and 15 group-history projection cases: PASS. Local harness only; hosted migration state not verified.                                                    | Owner read-only hosted migration-ledger reconciliation |

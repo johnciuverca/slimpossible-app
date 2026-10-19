@@ -15,6 +15,41 @@ const deployment = readFileSync(
   'utf8',
 )
 const normalizedGuide = guide.replace(/\s+/g, ' ')
+const candidateMigrations = [
+  '20260917000000_create_core_schema.sql',
+  '20260917000001_add_rls_policies.sql',
+  '20260922000000_harden_rls_authorization.sql',
+  '20260922000001_add_secure_challenge_invites.sql',
+  '20260924000000_add_privacy_safe_group_progress.sql',
+  '20260925000000_add_provisional_group_leader_summary.sql',
+  '20261005000000_add_personal_group_challenge_kinds.sql',
+  '20261005000001_converge_function_execute_grants.sql',
+  '20261006000000_add_opt_in_group_weigh_in_history.sql',
+  '20261007000000_personal_weigh_ins.sql',
+  '20261008000000_allow_draft_group_weigh_in_sharing.sql',
+  '20261009000000_add_group_chart_history.sql',
+  '20261012000000_add_group_target_change_milestones.sql',
+  '20261012100000_add_group_member_progress_projection.sql',
+  '20261013000000_correct_own_enrollment_starting_weight.sql',
+  '20261016000000_require_active_challenge_membership.sql',
+  '20261018000000_allow_group_owners_to_view_summaries.sql',
+]
+const rollbackTimestamps = [
+  '20261005000000',
+  '20261005000001',
+  '20261006000000',
+  '20261007000000',
+  '20261009000000',
+  '20261012100000',
+  '20261013000000',
+  '20261018000000',
+]
+
+function listedMigrations(document: string) {
+  return [...document.matchAll(/^\s*- `([^`]+\.sql)`$/gm)].map(
+    (match) => match[1],
+  )
+}
 
 describe('persistent release workflow contract', () => {
   it('runs quality checks for PRs and pushes to main and staging', () => {
@@ -49,16 +84,14 @@ describe('persistent release workflow contract', () => {
   })
 
   it('lists reviewed migrations and keeps production approval manual', () => {
-    for (const migration of [
-      '20260917000000_create_core_schema.sql',
-      '20260917000001_add_rls_policies.sql',
-      '20260922000000_harden_rls_authorization.sql',
-      '20260922000001_add_secure_challenge_invites.sql',
-      '20260924000000_add_privacy_safe_group_progress.sql',
-      '20260925000000_add_provisional_group_leader_summary.sql',
-    ]) {
-      expect(guide).toContain(migration)
+    expect(listedMigrations(guide)).toEqual(candidateMigrations)
+    expect(guide).toContain('17\ntimestamp-ordered migration files')
+    expect(guide).toContain('8 of 17')
+    for (const timestamp of rollbackTimestamps) {
+      expect(guide).toContain(`\`${timestamp}\``)
     }
+    expect(guide).toContain('No remote migration')
+    expect(guide).toContain('ledger has been reconciled')
 
     expect(guide).toContain('$STAGING_DB_URL')
     expect(guide).toContain('$PRODUCTION_DB_URL')
