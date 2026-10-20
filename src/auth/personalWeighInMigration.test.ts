@@ -154,7 +154,7 @@ describe('personal weigh-in migration contract', () => {
     expect(authorizationHarness).toContain(
       'unauthorized_delete_leaves_live_entry_intact',
     )
-    expect(authorizationHarness).toContain('<> 37')
+    expect(authorizationHarness).toContain('<> 41')
     expect(authorizationHarness).toContain(
       'non_enrolled_owner_receives_safe_group_summary',
     )

@@ -55,8 +55,12 @@ describe('Group summary owner authorization migration', () => {
       'non_enrolled_owner_receives_safe_group_summary',
       'non_enrolled_owner_receives_safe_provisional_summary',
       'active_member_receives_provisional_summary',
-      'outsider_cannot_read_group_summary',
-      'outsider_cannot_read_provisional_summary',
+      'different_group_member_and_non_owner_cannot_read_group_summary',
+      'different_group_member_and_non_owner_cannot_read_provisional_summary',
+      'sessionless_cannot_read_group_summary',
+      'sessionless_cannot_read_provisional_summary',
+      'withdrawn_member_cannot_read_group_summary',
+      'withdrawn_member_cannot_read_provisional_summary',
     ]) {
       expect(authorizationHarness).toContain(check)
     }
