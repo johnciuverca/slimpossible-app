@@ -18,6 +18,7 @@ declare
   group_id uuid := gen_random_uuid();
   draft_id uuid := gen_random_uuid();
   personal_id uuid := gen_random_uuid();
+  other_group_id uuid := gen_random_uuid();
   early_id uuid := gen_random_uuid();
   late_id uuid := gen_random_uuid();
   future_id uuid := gen_random_uuid();
@@ -62,16 +63,19 @@ begin
     join public.personal_weigh_ins entry on entry.id=share.personal_weigh_in_id
     where entry.user_id in (owner_id, member_id);
   insert into public.profiles (id, display_name) values
-    (owner_id, 'Chart disposable owner'), (member_id, 'Chart disposable member')
+    (owner_id, 'Chart disposable owner'), (member_id, 'Chart disposable member'),
+    (outsider_id, 'Chart other challenge owner')
     on conflict (id) do nothing;
   insert into public.challenges (id,owner_id,created_by,name,start_date,end_date,status,challenge_kind) values
     (group_id,owner_id,owner_id,'Chart disposable active',fixture_day-30,future_day+30,'active','group'),
     (draft_id,owner_id,owner_id,'Chart disposable draft',fixture_day-30,future_day+30,'draft','group'),
-    (personal_id,owner_id,owner_id,'Chart disposable personal',fixture_day-30,future_day+30,'active','personal');
+    (personal_id,owner_id,owner_id,'Chart disposable personal',fixture_day-30,future_day+30,'active','personal'),
+    (other_group_id,outsider_id,outsider_id,'Other owner group',fixture_day-30,future_day+30,'active','group');
   insert into public.participants (challenge_id,user_id,display_name,status,starting_weight_kg,target_weight_kg,joined_at) values
     (group_id,owner_id,'Same name','active',100,90,now()),
     (group_id,member_id,'Same name','active',90,80,now()),
-    (draft_id,member_id,'Same name','active',90,80,now());
+    (draft_id,member_id,'Same name','active',90,80,now()),
+    (other_group_id,outsider_id,'Other group member','active',90,80,now());
   -- Direct fixture insertion also probes future filtering; UI save forbids it.
   insert into public.personal_weigh_ins (id,user_id,recorded_date,weight_kg,note) values
     (early_id,member_id,fixture_day-3,90,'private shared-row note'),
@@ -124,9 +128,16 @@ begin
   perform set_config('request.jwt.claim.sub', outsider_id::text, true);
   begin
     perform * from public.get_group_chart_history(group_id);
-    raise exception 'Outsider chart access was allowed.';
+    raise exception 'A member and owner of a different challenge read this group chart.';
   exception when insufficient_privilege then null;
   end;
+  insert into chart_checks values ('different_group_member_and_non_owner_denied',
+    exists (select 1 from public.challenges challenge_row
+      where challenge_row.id=other_group_id and challenge_row.owner_id=outsider_id)
+    and exists (select 1 from public.participants
+      where challenge_id=other_group_id and user_id=outsider_id and status='active')
+    and not exists (select 1 from public.participants
+      where challenge_id=group_id and user_id=outsider_id and status='active'));
   perform set_config('request.jwt.claim.sub', owner_id::text, true);
   select count(*) into count_rows from public.get_group_chart_history(group_id);
   insert into chart_checks values ('owner_authorized_without_raw_row_access',count_rows=1);
