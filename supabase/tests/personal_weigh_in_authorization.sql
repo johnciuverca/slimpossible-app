@@ -259,22 +259,43 @@ begin
       and provisional_projection ->> 'eligible_participant_count' = '1'
       and provisional_projection ->> 'state' = 'solo-challenge');
 
-  perform set_config('request.jwt.claim.sub', outsider_id::text, true);
+  -- No JWT subject must be denied by both summary RPCs.
+  perform set_config('request.jwt.claim.sub', '', true);
   begin
     perform * from public.get_group_progress_summary(group_one, comparison_sunday);
     insert into slimpossible_personal_weigh_in_results values
-      ('outsider_cannot_read_group_summary', false);
+      ('sessionless_cannot_read_group_summary', false);
   exception when insufficient_privilege then
     insert into slimpossible_personal_weigh_in_results values
-      ('outsider_cannot_read_group_summary', true);
+      ('sessionless_cannot_read_group_summary', true);
   end;
   begin
     perform * from public.get_provisional_group_leader_summary(group_one, comparison_sunday);
     insert into slimpossible_personal_weigh_in_results values
-      ('outsider_cannot_read_provisional_summary', false);
+      ('sessionless_cannot_read_provisional_summary', false);
   exception when insufficient_privilege then
     insert into slimpossible_personal_weigh_in_results values
-      ('outsider_cannot_read_provisional_summary', true);
+      ('sessionless_cannot_read_provisional_summary', true);
+  end;
+
+  -- outsider_id is an active member and owner of outsider_group, not group_one.
+  -- These denials therefore cover both cross-group membership and a non-target owner.
+  perform set_config('request.jwt.claim.sub', outsider_id::text, true);
+  begin
+    perform * from public.get_group_progress_summary(group_one, comparison_sunday);
+    insert into slimpossible_personal_weigh_in_results values
+      ('different_group_member_and_non_owner_cannot_read_group_summary', false);
+  exception when insufficient_privilege then
+    insert into slimpossible_personal_weigh_in_results values
+      ('different_group_member_and_non_owner_cannot_read_group_summary', true);
+  end;
+  begin
+    perform * from public.get_provisional_group_leader_summary(group_one, comparison_sunday);
+    insert into slimpossible_personal_weigh_in_results values
+      ('different_group_member_and_non_owner_cannot_read_provisional_summary', false);
+  exception when insufficient_privilege then
+    insert into slimpossible_personal_weigh_in_results values
+      ('different_group_member_and_non_owner_cannot_read_provisional_summary', true);
   end;
 
   perform set_config('request.jwt.claim.sub', member_id::text, true);
@@ -325,6 +346,32 @@ begin
   execute 'reset role';
   update public.participants set status = 'withdrawn'
   where id = member_two_participant;
+  execute 'set local role authenticated';
+  perform set_config('request.jwt.claim.sub', member_id::text, true);
+  execute 'reset role';
+  update public.participants set status = 'withdrawn'
+  where id = member_one_participant;
+  execute 'set local role authenticated';
+  perform set_config('request.jwt.claim.sub', member_id::text, true);
+  begin
+    perform * from public.get_group_progress_summary(group_one, comparison_sunday);
+    insert into slimpossible_personal_weigh_in_results values
+      ('withdrawn_member_cannot_read_group_summary', false);
+  exception when insufficient_privilege then
+    insert into slimpossible_personal_weigh_in_results values
+      ('withdrawn_member_cannot_read_group_summary', true);
+  end;
+  begin
+    perform * from public.get_provisional_group_leader_summary(group_one, comparison_sunday);
+    insert into slimpossible_personal_weigh_in_results values
+      ('withdrawn_member_cannot_read_provisional_summary', false);
+  exception when insufficient_privilege then
+    insert into slimpossible_personal_weigh_in_results values
+      ('withdrawn_member_cannot_read_provisional_summary', true);
+  end;
+  execute 'reset role';
+  update public.participants set status = 'active'
+  where id = member_one_participant;
   execute 'set local role authenticated';
   perform set_config('request.jwt.claim.sub', member_id::text, true);
   begin
@@ -439,7 +486,7 @@ select check_name, passed from slimpossible_personal_weigh_in_results order by c
 
 do $$
 begin
-  if (select count(*) from slimpossible_personal_weigh_in_results) <> 37
+  if (select count(*) from slimpossible_personal_weigh_in_results) <> 41
      or exists (select 1 from slimpossible_personal_weigh_in_results where not passed) then
     raise exception 'Personal weigh-in authorization checks failed; roll back this batch.';
   end if;
