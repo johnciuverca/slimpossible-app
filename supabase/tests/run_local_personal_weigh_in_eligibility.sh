@@ -27,6 +27,10 @@ for task_mode in clean upgrade defaults; do
   fi
   if [[ "$task_mode" == defaults ]]; then
     "${task_psql[@]}" -c "set slimpossible.disposable_acl_fixture='true'" -f supabase/tests/personal_weigh_in_default_privileges.sql
+    # The defaults fixture reapplies the earlier personal-weigh-in migrations,
+    # which replaces the later owner-summary RPC. Restore the final migration
+    # state before checking authorization against the complete schema.
+    "${task_psql[@]}" -f supabase/migrations/20261018000000_allow_group_owners_to_view_summaries.sql
   fi
   for task_harness in personal_weigh_in_authorization personal_weigh_in_group_eligibility; do
     sed -e 's/REPLACE_OWNER_UUID/00000000-0000-4000-8000-000000000001/g' \
