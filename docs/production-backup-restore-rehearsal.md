@@ -7,7 +7,7 @@ notes, and authentication records. Keep every artifact and detailed result in
 owner-controlled private storage, never in this repository, GitHub, chat, CI,
 or a shared/unreviewed drive.
 
-## Pilot backup waiver and remaining owner decisions
+## Pilot backup waiver and cutover gates
 
 ### Backup/restore waiver — limited pilot only
 
@@ -29,46 +29,30 @@ authorize any hosted SQL, migration, settings change, or deployment. Revisit
 backup/recovery before a broader release or any later operation outside this
 pilot.
 
-### Legacy-write cutover — owner decision still required
+### Owner-selected legacy-write cutover path
 
 Migration `20261007000000_personal_weigh_ins.sql` copies legacy
 `public.weigh_ins` into canonical `public.personal_weigh_ins` once. A legacy
 client write after that copy will not automatically appear in canonical
-history. PR #306 recorded a freeze-before-backfill plan, but the current owner
-decision for this pilot is unresolved; do not treat that earlier plan as
-selected or authorized.
+history. The owner has selected **option A: a short announced write pause** as
+the preparation path for this pilot. This records the chosen approach; it is
+not approval to execute the fence, migration, or deployment. The choice does
+not replace fresh schema/migration-history preflight or separate approval for
+each exact hosted operation.
 
-The owner must choose one of these approaches before the fence, migration, or
-deployment is scheduled:
+The pause is notice-based, not a technical all-write lock. The existing SQL
+fence blocks stale legacy-table INSERT/UPDATE only; it does not block canonical
+RPC saves. Old clients may show a generic failure and do not queue or retry
+rejected entries. Tell users that any save they cannot confirm may need to be
+re-entered after canonical behavior is verified.
 
-1. **Short announced write pause:** ask users not to submit weigh-ins during
-   the cutover window, then fence legacy writes before the one-time copy and
-   keep the notice through canonical-save smoke checks. The existing SQL fence
-   blocks stale legacy-table INSERT/UPDATE only; it does not technically block
-   canonical RPC writes. Old clients may show a generic failure and do not
-   queue or retry rejected entries.
-2. **Catch-up without a pause:** first define and rehearse how writes arriving
-   after the one-time copy are reconciled into canonical history without
-   losing, duplicating, or changing existing rows or sharing. No such
-   catch-up procedure is currently verified; do not assume rerunning the
-   migration is safe.
+### Selected short-pause preparation sequence (not execution approval)
 
-The smallest remaining owner decision is: **may weigh-in submissions pause
-for the cutover window, or must the release support a rehearsed catch-up path
-without a pause?** Until the owner chooses, the cutover sequence is not
-selected. The choice does not replace the separate migration-history and
-schema preflight below.
-
-### Freeze-option procedure — conditional, not selected
-
-Use this sequence only if the owner chooses the short-pause option above and
-separately approves the exact hosted operation. It is not the selected
-cutover path today. Refresh the schema/migration-history preflight and confirm
-the exact reviewed migration set before scheduling; confirm the Production
-project identity and stop on ambiguity. Announce the pause and tell users not
-to submit weigh-ins until the owner ends the notice. Rejected old-client saves
-are not queued and may need to be re-entered after canonical behavior is
-verified.
+Use this sequence only after the fresh schema/migration-history preflight,
+confirmation of the Production project identity, and separate owner approval
+of the exact hosted operation. Announce the pause and tell users not to submit
+weigh-ins until the owner ends the notice. Rejected old-client saves are not
+queued and may need to be re-entered after canonical behavior is verified.
 
 In the confirmed Production project, execute
 `supabase/manual-cutovers/freeze_legacy_weigh_in_writes.sql` in one
@@ -273,19 +257,18 @@ dry-run differs, any migration errors, or privacy/ACL/data-preservation checks
 fail. The rehearsal is not production approval.
 
 The legacy write fence is **separate from** the twelve migrations and
-`supabase db push`. In an isolated rehearsal, test only the cutover path the
-owner selected: the fence-before-copy sequence for a pause, or the approved
-catch-up behavior for a no-pause cutover. Verify that canonical RPC saves
-still work and that rejected legacy INSERT/UPDATE leave source rows unchanged
-when the fence path is selected. Test older-client UX separately from the
+`supabase db push`. In an isolated rehearsal, test the owner-selected
+fence-before-copy sequence for the short pause. Verify that canonical RPC
+saves still work and that rejected legacy INSERT/UPDATE leave source rows
+unchanged. Test older-client UX separately from the
 updated PR #305 component; do not assume all cached bundles show refresh text.
 The SQL intentionally leaves legacy DELETE unchanged; that remains a separate
 risk.
 
-The cutover choice remains open as recorded above. Before any production
-execution, reconcile the schema/migration history, settle the cutover choice,
-and obtain separate owner approval for the exact operations. The pilot backup
-waiver does not alter these gates. If any migration, fence, catch-up,
+The owner-selected short pause is a preparation decision, not execution
+approval. Before any production execution, reconcile the schema/migration
+history and obtain separate owner approval for the exact operations. The pilot
+backup waiver does not alter these gates. If any migration, fence,
 deployment, or smoke step fails, stop, preserve any private evidence or
 artifacts that exist, and wait for an owner-approved recovery decision. Never
 automatically re-grant legacy writes, restore a database, delete data, or roll
@@ -310,7 +293,7 @@ could affect Production. Preserve any private backup and failed-run evidence
 for owner review.
 
 **Current result:** backup and restore rehearsal **NOT EXECUTED** and waived
-only for the limited pilot by owner direction. The current gates remain the
-owner's freeze-versus-catch-up choice and a fresh schema/migration-history
-preflight. No production data or backup has been accessed or changed by this
-PR.
+only for the limited pilot by owner direction. The owner-selected short pause
+is a preparation path only. A fresh schema/migration-history preflight and
+separate owner approval for each exact hosted operation remain required. No
+production data or backup has been accessed or changed by this PR.
