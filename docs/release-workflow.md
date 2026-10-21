@@ -186,9 +186,12 @@ Production is a separate, deliberate owner gate, not a CI action:
        supabase migration list --db-url "$PRODUCTION_DB_URL"
        supabase db push --db-url "$PRODUCTION_DB_URL" --dry-run
 
-2. Confirm a recoverable production backup/restore path, identify the exact
-   pending migration filenames, and get explicit owner approval for this
-   production change. A normal push, PR, CI run, or Vercel deployment is not
+2. Complete the owner-only backup and isolated restore gates in
+   [production-backup-restore-rehearsal.md](production-backup-restore-rehearsal.md).
+   A CLI database dump alone is not complete proof unless Auth references and
+   any Storage dependencies are also covered. Identify the exact pending
+   migration filenames and get explicit owner approval for each production
+   database operation. A normal push, PR, CI run, or Vercel deployment is not
    approval.
 3. For reviewed backward-compatible schema expansion that the new app needs,
    the owner applies only the approved migrations to production before merging
@@ -198,37 +201,43 @@ Production is a separate, deliberate owner gate, not a CI action:
 4. Only after the owner gate succeeds should the release PR merge and trigger
    the main production deployment. If a migration or check fails, stop the
    release; do not auto-repair migration history or roll forward blindly.
+5. **The owner-chosen freeze-before-backfill sequence is mandatory.** Complete
+   the backup/restore rehearsal and preflight, announce the write-freeze,
+   execute and verify the manual legacy INSERT/UPDATE fence before the
+   one-time backfill, then apply the approved migrations, deploy the canonical
+   app, and run the owner-approved smoke. Keep the notice active until
+   canonical save/reload is verified; then tell users to refresh and re-enter
+   any unconfirmed value. Follow the exact gates and recovery rules in
+   [production-backup-restore-rehearsal.md](production-backup-restore-rehearsal.md).
 
 ## Legacy weigh-in write cutover (#247)
 
 The canonical client writes through `save_personal_weigh_in`; the legacy
-`DailyWeighInFormPage` writes directly to `public.weigh_ins`. Do not revoke
-legacy writes in a normal migration: migrations may run before the canonical
-client is deployed, which would strand users on the old app. Once the
-canonical app is live on the target environment and its owner-approved smoke
-checks pass, the owner may separately run
-`supabase/post-deploy/disable_legacy_weigh_in_writes.sql` as a manual,
-transactional post-deploy step. It is outside `supabase/migrations`, so
-`supabase db push` does not apply it. Review the target project and current app
-deployment first. For a CLI run, use:
+`DailyWeighInFormPage` writes directly to `public.weigh_ins`. The owner chose
+freeze-before-backfill for preparation. The reviewed manual fence is
+`supabase/manual-cutovers/freeze_legacy_weigh_in_writes.sql`, outside
+`supabase/migrations`, so `supabase db push` never applies it. In an
+owner-approved window, run and verify it before starting the one-time-copy
+migration. Then apply the approved migrations, deploy the canonical app, and
+run the approved smoke while the user notice remains active. Do not execute
+any production step without its separate owner gate. See the
+[backup/recovery runbook](production-backup-restore-rehearsal.md) for the
+exact command, verification, stop conditions, and recovery procedure.
 
 ```sh
 psql "$TARGET_DB_URL" --single-transaction -v ON_ERROR_STOP=1 \
-  -f supabase/post-deploy/disable_legacy_weigh_in_writes.sql
+  -f supabase/manual-cutovers/freeze_legacy_weigh_in_writes.sql
 ```
 
-In a SQL editor, run the file contents between `BEGIN` and `COMMIT`, committing
-only if its ACL assertion succeeds. Stop if the assertion detects another
-grant path.
-
-This cutover removes only authenticated INSERT/UPDATE on the legacy table.
-Legacy SELECT and DELETE are deliberately unchanged; the current stale page
-has no delete control or delete repository operation. A stale page's rejected
-save returns permission denied and presents a refresh instruction. Verify the
-canonical save flow after the cutover. The matching rollback-only local test is
-`supabase/tests/legacy_weigh_in_write_cutover.sql`, run by
-`supabase/tests/run_local_data_api_grants.sh`; it does not connect to a hosted
-project and does not authorize or perform this post-deploy step.
+The file is one atomic `DO` statement; use the documented single-transaction
+invocation. It is idempotent and preserves legacy SELECT/DELETE while
+revoking authenticated INSERT/UPDATE only. Stop if assertions fail or the
+commit result is uncertain, and use a read-only ACL check before proceeding.
+It does not technically lock canonical RPC writes; a hard all-write lock
+would require a separately reviewed and approved app/hosting gate. Keep the
+freeze notice until canonical save/reload is verified. Old cached bundles may
+show only a generic failure, and rejected values are not automatically
+retried; users must refresh and re-enter unconfirmed values.
 
 For all migration executions, record only the project/environment label,
 tested commit, migration filenames, timestamp, and outcome. Do not put
