@@ -31,7 +31,7 @@ history. PR #305's former post-deploy-only timing did not close that window.
 2. Schedule and announce the write-freeze window before changing the database.
    Tell users not to submit weigh-ins during the window; rejected old-client
    saves are not queued and will need to be entered again after the new app is
-   verified. Keep the freeze notice active through step 7.
+   verified. Keep the freeze notice active through step 6.
 3. In the confirmed Production project, execute
    `supabase/manual-cutovers/freeze_legacy_weigh_in_writes.sql` in one
    transaction **before starting any file in the pending migration set**:
@@ -48,6 +48,7 @@ history. PR #305's former post-deploy-only timing did not close that window.
    migration starts. If the command fails or its commit result is uncertain,
    use only a read-only ACL check to establish the state; stop until the
    fence is verified. Do not start migrations on an unverified fence.
+
 4. Apply only the separately approved, reviewed migration set in its verified
    order. Do not repair or rewrite migration history as a shortcut. If any
    migration fails, keep the legacy fence and user notice in place; do not
