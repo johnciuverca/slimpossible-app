@@ -78,7 +78,7 @@ supabase-activity.yml check only calls the Auth health endpoint; it is not a
 migration job. This PR adds no database credentials, GitHub Environments, or
 automated migration steps.
 
-The checked-in timestamp-ordered migration set currently contains fifteen
+The checked-in timestamp-ordered migration set currently contains seventeen
 files. This inventory is a source-tree check, not evidence that a remote
 project has applied them. Several migrations define SECURITY DEFINER
 functions or change grants/policies; review their exact privileges and run
@@ -102,6 +102,51 @@ The current checked-in set is:
 - `20261012000000_add_group_target_change_milestones.sql`
 - `20261012100000_add_group_member_progress_projection.sql`
 - `20261013000000_correct_own_enrollment_starting_weight.sql`
+- `20261016000000_require_active_challenge_membership.sql`
+- `20261018000000_allow_group_owners_to_view_summaries.sql`
+
+### Public-table Data API grants
+
+Supabase's [Data API grant rollout](https://supabase.com/changelog/45329-breaking-change-tables-not-exposed-to-data-and-graphql-api-automatically)
+will stop automatically granting new `public` tables access on existing
+projects on October 30, 2026. Existing tables keep their stored privileges;
+RLS behavior does not change. Review table ACLs separately from RLS and do not
+copy broad sample grants or grant `anon` without a documented product need.
+
+The current #247 production plan has these twelve migrations pending after the
+five catalog-reconciled baseline migrations. Only four of those twelve create
+public tables:
+
+| Migration/table                                     | Application path and intended direct Data API access                                                                                                                                                                                                                                      |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `20261007000000` — `personal_weigh_ins`             | The current client lists/saves/deletes through authenticated RPCs. The existing database contract also deliberately permits authenticated `SELECT`, constrained by the owner-only RLS policy. Preserve this explicit grant unless that contract is separately reviewed. No `anon` access. |
+| `20261007000000` — `personal_weigh_in_group_shares` | Internal share relation read and written by reviewed RPCs; no direct client-table grant.                                                                                                                                                                                                  |
+| `20261007000000` — `personal_weigh_in_legacy_map`   | Internal migration provenance; no direct client-table grant.                                                                                                                                                                                                                              |
+| `20261012000000` — `participant_target_milestones`  | Private milestone snapshots read/written through authenticated RPCs; no direct client-table grant.                                                                                                                                                                                        |
+
+These four tables use UUID keys and create no owned sequences. The five
+catalog-reconciled tables (`profiles`, `challenges`, `participants`,
+`weigh_ins`, and `challenge_invites`) predate the pending set; current app
+repositories use direct Data API access for profiles/challenges/participants
+and legacy `weigh_ins`, and RPCs for invitation operations. The October 30
+default change does not rewrite their existing grants.
+
+For each future public table, record its direct-table versus RPC access path,
+the exact roles and operations required, its sequence needs, and its RLS
+policy. Put only necessary explicit `GRANT` statements beside table creation;
+for RPC-only/internal tables, do not grant direct table access. Keep the
+default-grant simulation and this inventory current when the pending migration
+set changes. Run the local, socket-only, disposable rehearsal:
+
+    bash supabase/tests/run_local_data_api_grants.sh
+
+The runner creates the five baseline tables with their existing grants,
+disables future table/sequence defaults, applies the exact twelve pending
+migrations, verifies existing-table ACL/RLS preservation and the four-table
+privilege matrix, then runs personal-weigh-in, target-milestone, and member
+projection authorization harnesses. It uses a lightweight local Auth shim;
+this is not connected staging acceptance. Do not apply SQL or change grants in
+staging or production as part of this check.
 
 Guarded rollback scripts are checked in for selected Chapter 16 migrations:
 `20261005000000`, `20261005000001`, `20261006000000`,
