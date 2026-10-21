@@ -201,41 +201,43 @@ Production is a separate, deliberate owner gate, not a CI action:
 4. Only after the owner gate succeeds should the release PR merge and trigger
    the main production deployment. If a migration or check fails, stop the
    release; do not auto-repair migration history or roll forward blindly.
-5. **Release remains blocked until the write-cutover sequence is resolved.**
-   The personal-weigh-in migration copies legacy rows once, while PR #305's
-   current manual revoke is post-deploy; legacy writes in between can be
-   missing from canonical history. Follow the blocking owner decision in
-   [production-backup-restore-rehearsal.md](production-backup-restore-rehearsal.md)
-   and complete the selected isolated rehearsal before any production
-   backfill/deploy. Do not treat a post-deploy revoke alone as closing this
-   gap.
+5. **The owner-chosen freeze-before-backfill sequence is mandatory.** Complete
+   the backup/restore rehearsal and preflight, announce the write-freeze,
+   execute and verify the manual legacy INSERT/UPDATE fence before the
+   one-time backfill, then apply the approved migrations, deploy the canonical
+   app, and run the owner-approved smoke. Keep the notice active until
+   canonical save/reload is verified; then tell users to refresh and re-enter
+   any unconfirmed value. Follow the exact gates and recovery rules in
+   [production-backup-restore-rehearsal.md](production-backup-restore-rehearsal.md).
 
 ## Legacy weigh-in write cutover (#247)
 
 The canonical client writes through `save_personal_weigh_in`; the legacy
-`DailyWeighInFormPage` writes directly to `public.weigh_ins`. PR #305 supplies
-a separately run, transactional revoke outside `supabase/migrations`, so
-`supabase db push` does not apply it. Its current instructions place the
-revoke after canonical deploy and smoke. **That sequence alone is not yet
-safe:** the one-time migration copy precedes deployment, leaving a window for
-legacy rows to change. Do not run the SQL file until the owner chooses the
-freeze-before-copy or catch-up plan in the [backup/recovery runbook](production-backup-restore-rehearsal.md)
-and the selected sequence has a reviewed implementation and isolated
-rehearsal. For reference, the CLI invocation is:
+`DailyWeighInFormPage` writes directly to `public.weigh_ins`. The owner chose
+freeze-before-backfill for preparation. The reviewed manual fence is
+`supabase/manual-cutovers/freeze_legacy_weigh_in_writes.sql`, outside
+`supabase/migrations`, so `supabase db push` never applies it. In an
+owner-approved window, run and verify it before starting the one-time-copy
+migration. Then apply the approved migrations, deploy the canonical app, and
+run the approved smoke while the user notice remains active. Do not execute
+any production step without its separate owner gate. See the
+[backup/recovery runbook](production-backup-restore-rehearsal.md) for the
+exact command, verification, stop conditions, and recovery procedure.
 
 ```sh
 psql "$TARGET_DB_URL" --single-transaction -v ON_ERROR_STOP=1 \
-  -f supabase/post-deploy/disable_legacy_weigh_in_writes.sql
+  -f supabase/manual-cutovers/freeze_legacy_weigh_in_writes.sql
 ```
 
-In a SQL editor, the file contents must run between `BEGIN` and `COMMIT`,
-committing only if its ACL assertion succeeds. Stop if the assertion detects
-another grant path. This SQL preserves legacy SELECT and DELETE; the current
-stale page has no delete control or delete repository operation. The updated
-PR #305 component displays a refresh instruction on SQLSTATE `42501`, but an
-already-cached older bundle may display only its generic failure. Failed saves
-are not automatically retried; the owner must approve user notice and retry
-expectations for the selected maintenance/cutover plan.
+The file is one atomic `DO` statement; use the documented single-transaction
+invocation. It is idempotent and preserves legacy SELECT/DELETE while
+revoking authenticated INSERT/UPDATE only. Stop if assertions fail or the
+commit result is uncertain, and use a read-only ACL check before proceeding.
+It does not technically lock canonical RPC writes; a hard all-write lock
+would require a separately reviewed and approved app/hosting gate. Keep the
+freeze notice until canonical save/reload is verified. Old cached bundles may
+show only a generic failure, and rejected values are not automatically
+retried; users must refresh and re-enter unconfirmed values.
 
 For all migration executions, record only the project/environment label,
 tested commit, migration filenames, timestamp, and outcome. Do not put

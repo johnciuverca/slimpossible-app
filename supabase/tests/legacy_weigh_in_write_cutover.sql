@@ -36,8 +36,10 @@ insert into public.weigh_ins (
   current_date - 2, 90, 'preserve this legacy source row'
 );
 
--- Exercise the exact manually gated SQL, then roll its ACL change back below.
-\i supabase/post-deploy/disable_legacy_weigh_in_writes.sql
+-- Exercise the exact manual SQL twice to prove idempotence, then roll its ACL
+-- change back below with the surrounding test transaction.
+\i supabase/manual-cutovers/freeze_legacy_weigh_in_writes.sql
+\i supabase/manual-cutovers/freeze_legacy_weigh_in_writes.sql
 
 set local role authenticated;
 select set_config(
@@ -51,6 +53,7 @@ declare
   legacy_count integer;
   legacy_weight numeric;
   canonical_id uuid;
+  deleted_rows integer;
 begin
   begin
     insert into public.weigh_ins (
@@ -73,6 +76,18 @@ begin
 
   if not rejected_insert or not rejected_update then
     raise exception 'Expected legacy INSERT and UPDATE to fail with SQLSTATE 42501';
+  end if;
+
+  if not has_table_privilege('authenticated', 'public.weigh_ins', 'SELECT')
+     or not has_table_privilege('authenticated', 'public.weigh_ins', 'DELETE') then
+    raise exception 'Legacy SELECT/DELETE privileges were not preserved';
+  end if;
+
+  delete from public.weigh_ins
+  where id = '24700000-0000-4000-8000-000000000003' and false;
+  get diagnostics deleted_rows = row_count;
+  if deleted_rows <> 0 then
+    raise exception 'DELETE preservation probe unexpectedly changed a source row';
   end if;
 
   select count(*)::integer, min(weight_kg)

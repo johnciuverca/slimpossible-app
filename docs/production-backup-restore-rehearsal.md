@@ -7,56 +7,91 @@ notes, and authentication records. Keep every artifact and detailed result in
 owner-controlled private storage, never in this repository, GitHub, chat, CI,
 or a shared/unreviewed drive.
 
-## Blocking cutover-sequence decision
+## Owner-chosen freeze-before-backfill sequence
 
-Do **not** use the existing production order as a release instruction yet.
-Migration `20261007000000_personal_weigh_ins.sql` copies legacy
-`public.weigh_ins` into canonical `public.personal_weigh_ins` once. PR #305's
-manual legacy-write revoke is currently documented after canonical app deploy
-and smoke checks. An old client can write to `weigh_ins` after that copy but
-before the later revoke; that row is not automatically copied to canonical
-history. The revoke by itself does not close this interval.
+The owner chose this preparation path on 2026-10-21: schedule a short
+weigh-in write freeze, block legacy writes before the one-time copy, deploy the
+canonical app, verify canonical saves, then tell users to refresh and retry
+any unconfirmed entry. This authorizes documentation and local tests only; it
+does not authorize production access, SQL, migrations, settings changes, or
+deployment.
 
-The owner must choose and approve one safe contract before any production
-backfill or release. Neither option below is yet authorized or implemented:
+The ordering matters. Migration `20261007000000_personal_weigh_ins.sql` copies
+legacy `public.weigh_ins` into canonical `public.personal_weigh_ins` once. If
+the fence waits until after app deployment, an old client can write to
+`weigh_ins` after the copy; that row is not automatically copied to canonical
+history. PR #305's former post-deploy-only timing did not close that window.
 
-1. **Freeze before the copy (simpler, but changes the approved timing).**
-   Schedule and announce a weigh-in write freeze covering the migration and
-   app deployment window. In a separately reviewed cutover change, apply and
-   verify the legacy INSERT/UPDATE fence **before starting the pending
-   migration set**, then run the approved migrations, deploy the canonical
-   app, and complete its smoke checks before ending the freeze. This requires
-   explicit owner approval to move PR #305's revoke from post-deploy to
-   pre-migration, and a focused change to the current post-deploy-only
-   instructions/artifact. Do not improvise by running the existing file
-   earlier than its reviewed instructions allow. Legacy saves will fail
-   during the freeze; tell users beforehand that the old bundle may show only
-   a generic failure and that rejected entries are not queued. After the new
-   app is live, users must refresh and re-enter any unconfirmed value.
-2. **Keep writes enabled through deploy (preserves current timing, but needs
-   more implementation).** Keep the post-deploy revoke, but design and review
-   a deterministic post-revoke catch-up from legacy rows into canonical data
-   before enabling canonical writes or treating canonical history as
-   complete. Define conflict handling for canonical edits, same-user/date
-   rows, notes, timestamps, and explicit group shares. Keep the deployed
-   canonical UI in an approved maintenance/write-pause state until catch-up
-   succeeds. This needs a separately scoped and approved migration/code
-   change plus isolated rehearsal; do not assume the one-time copy is
-   repeatable or overwrite canonical edits.
+### Exact owner-run sequence
 
-The intended stale-save behavior remains server-side rejection and a refresh
-instruction where the running client supports it. PR #305's message is
-frontend code, not part of the SQL response contract for every already-cached
-bundle. A client still running JavaScript from before that change may show a
-generic failure instead. No client-side retry or queued save is established;
-users may need to refresh and re-enter an unconfirmed value. The owner must
-approve the maintenance notice/retry expectations and whether an intermediate
-compatibility release is required. Do not claim zero stale-client or data-loss
-risk until the chosen sequence is rehearsed and verified.
+1. Complete the verified private backup and isolated restore/rehearsal gates
+   below. Refresh the migration/catalog preflight and confirm the exact
+   reviewed migration set. Confirm the Production project identity; stop on
+   any ambiguity.
+2. Schedule and announce the write-freeze window before changing the database.
+   Tell users not to submit weigh-ins during the window; rejected old-client
+   saves are not queued and will need to be entered again after the new app is
+   verified. Keep the freeze notice active through step 7.
+3. In the confirmed Production project, execute
+   `supabase/manual-cutovers/freeze_legacy_weigh_in_writes.sql` in one
+   transaction **before starting any file in the pending migration set**:
 
-**Release stop:** until the owner chooses one option and the corresponding
-focused change/rehearsal is complete, do not apply the production backfill,
-deploy the release, or run PR #305's revoke as a supposed complete cutover.
+   ```sh
+   psql "$PRODUCTION_DB_URL" --single-transaction -v ON_ERROR_STOP=1 \
+     -f supabase/manual-cutovers/freeze_legacy_weigh_in_writes.sql
+   ```
+
+   The one-statement fence is outside `supabase/migrations`. It idempotently
+   revokes only authenticated legacy INSERT/UPDATE and asserts those effective
+   privileges are gone while legacy SELECT/DELETE remain. The script's
+   assertions must succeed and the transaction must commit before any
+   migration starts. If the command fails or its commit result is uncertain,
+   use only a read-only ACL check to establish the state; stop until the
+   fence is verified. Do not start migrations on an unverified fence.
+4. Apply only the separately approved, reviewed migration set in its verified
+   order. Do not repair or rewrite migration history as a shortcut. If any
+   migration fails, keep the legacy fence and user notice in place; do not
+   automatically re-grant writes or roll back.
+5. Deploy the reviewed canonical app only after migration success. Keep the
+   announced freeze in place while the owner runs the approved production
+   smoke checks, including a canonical save and reload/visibility check with
+   the approved test account and cleanup plan.
+6. End the freeze notice only after canonical save and reload behavior is
+   verified and production health checks pass. Tell users to refresh to load
+   the canonical app and manually re-enter any value whose save was not
+   confirmed. Do not imply failed entries were queued or automatically
+   recovered. Keep the legacy INSERT/UPDATE fence permanently in place unless
+   a separately reviewed recovery decision explicitly changes that policy.
+
+The existing repository has no technical maintenance gate for canonical RPC
+writes. The database fence blocks stale legacy-table writes, but the newly
+deployed canonical app can accept canonical saves as soon as it is live. The
+scheduled freeze therefore depends on the owner-notified window; do not claim
+it is a technical block on all app writes. If a hard all-write lock through
+smoke is required, stop and obtain separate approval for a reviewed app or
+hosting gate before proceeding.
+
+### Old-client experience and failure recovery
+
+PR #305's refresh message is frontend code, not part of the SQL response
+contract for every cached bundle. A client still running JavaScript from
+before that change may show only a generic failure. No client-side retry or
+queued save is established; rejected values must be re-entered after refresh
+once canonical saves are verified. The freeze announcement must say so in
+advance. Do not claim zero stale-client or data-loss risk.
+
+The SQL fence is one atomic `DO` statement: if its revoke or any assertion
+fails, that statement rolls back. It is idempotent, but run it with
+`--single-transaction` as documented. If it fails before commit, do not
+migrate; inspect the effective ACL read-only and request owner review. If a
+migration, deploy, or smoke fails after the fence committed, leave the fence
+in place, preserve the verified backup and evidence, and keep the freeze
+notice active. The owner must choose an exact forward recovery or restore plan
+after reconciling which migrations committed. Never automatically grant
+legacy writes, restore a database, delete rows, or roll back migrations. Any
+decision to resume legacy writes requires a separate owner approval and
+verified restoration of the pre-freeze ACL only after confirming the
+canonical copy/client cannot diverge.
 
 ## Current gate
 
@@ -196,19 +231,18 @@ approved twelve-migration set from the current release candidate. Stop if the
 dry-run differs, any migration errors, or privacy/ACL/data-preservation checks
 fail. The rehearsal is not production approval.
 
-PR #305's stale-client write control is **separate from** the twelve
-migrations and `supabase db push`; however, its current post-deploy timing
-alone does not protect the one-time copy. In the isolated rehearsal, model the
-owner-selected freeze-before-copy or catch-up contract from the preceding
-section. Verify that no legacy write can fall between the copy and fence,
-canonical RPC saves still work, and rejected legacy INSERT/UPDATE leave source
-rows unchanged. Test the actual older-client UX separately from the updated
-PR #305 component; do not assume all cached bundles show the refresh text. The
-SQL intentionally leaves legacy DELETE unchanged; that remains a separate
-risk.
+The legacy write fence is **separate from** the twelve migrations and
+`supabase db push`. In the isolated rehearsal, execute the manual fence
+before the migration that copies rows. Verify the fence before proceeding,
+that canonical RPC saves still work, and that rejected legacy INSERT/UPDATE
+leave source rows unchanged. Test the actual older-client UX separately from
+the updated PR #305 component; do not assume all cached bundles show the
+refresh text. The SQL intentionally leaves legacy DELETE unchanged; that
+remains a separate risk.
 
-After the owner chooses, record the exact production sequence and rehearsed
-failure recovery here before authorizing the release. If any migration,
+The owner-chosen sequence and failure recovery are recorded above. Before any
+production execution, complete the isolated rehearsal and obtain the separate
+owner approvals described there. If any migration,
 fence, catch-up, deployment, or smoke step fails, stop, preserve the verified
 backup and evidence, and wait for an owner-approved recovery decision. Never
 automatically re-grant legacy writes, restore a database, delete data, or roll
