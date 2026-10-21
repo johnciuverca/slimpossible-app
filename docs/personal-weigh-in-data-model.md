@@ -73,12 +73,15 @@ For unambiguous single-row dates, copy the exact date, weight, note, and timesta
 2. Run the read-only duplicate/conflict inventory and stop if any duplicate `(user_id, recorded_date)` needs a decision.
 3. After owner resolution, copy only unambiguous rows and exact prior opt-ins in one transaction, retaining source rows and a reconciliation map.
 4. Switch reads/writes to canonical entries while keeping explicit compatibility reads for the old challenge-specific scoring until those consumers are migrated and tested.
-5. In an owner-approved write-freeze window, run and verify
+5. The owner selected a short announced pause as the preparation path for the
+   hosted cutover. This choice is not authorization to execute. After fresh
+   schema/migration-history preflight and separate owner approval for each
+   exact operation, run and verify
    `supabase/manual-cutovers/freeze_legacy_weigh_in_writes.sql` before the
-   one-time backfill migration. Then apply the approved migration set, deploy
-   the canonical app, and keep the notice active until canonical save/reload
-   is verified. This manual fence stays outside automatic migrations. Follow
-   the exact owner-only sequence and recovery gates in
+   one-time backfill migration, then apply only the approved migration set and
+   deploy the canonical app. The manual fence stays outside automatic
+   migrations and blocks legacy-table INSERT/UPDATE only, not canonical RPC
+   saves. Follow the owner-only gates in
    `docs/production-backup-restore-rehearsal.md`.
 6. Retire legacy tables only in a separately reviewed migration after all
    consumers, retained source data, and hosted acceptance are proven.
