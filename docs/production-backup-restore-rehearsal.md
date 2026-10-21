@@ -7,78 +7,112 @@ notes, and authentication records. Keep every artifact and detailed result in
 owner-controlled private storage, never in this repository, GitHub, chat, CI,
 or a shared/unreviewed drive.
 
-## Owner-chosen freeze-before-backfill sequence
+## Pilot backup waiver and remaining owner decisions
 
-The owner chose this preparation path on 2026-10-21: schedule a short
-weigh-in write freeze, block legacy writes before the one-time copy, deploy the
-canonical app, verify canonical saves, then tell users to refresh and retry
-any unconfirmed entry. This authorizes documentation and local tests only; it
-does not authorize production access, SQL, migrations, settings changes, or
-deployment.
+### Backup/restore waiver — limited pilot only
 
-The ordering matters. Migration `20261007000000_personal_weigh_ins.sql` copies
-legacy `public.weigh_ins` into canonical `public.personal_weigh_ins` once. If
-the fence waits until after app deployment, an old client can write to
-`weigh_ins` after the copy; that row is not automatically copied to canonical
-history. PR #305's former post-deploy-only timing did not close that window.
+Owner direction relayed on 2026-10-21: the owner reports that all current live
+and staging records are test data and chooses to proceed with the limited
+family pilot without making a manual backup first. For this pilot only, the
+owner waives the backup and isolated-restore rehearsal gate. This is a waiver,
+not evidence: backup and restore remain **NOT EXECUTED**, and there is no
+verified recovery point. A failed migration, mistaken write, or deployment
+problem could leave records changed or unrecoverable. The waiver does not
+authorize resetting or recreating a project, dropping/truncating tables,
+deleting users or weigh-ins, copying staging data to live, or accepting data
+loss. Preserve existing users and all nine reported legacy weigh-ins; keep
+legacy entries private unless prior explicit sharing says otherwise.
 
-### Exact owner-run sequence
+This exception is limited to the named pilot. It does not establish a safe
+backup/restore process, waive schema or migration-history reconciliation, or
+authorize any hosted SQL, migration, settings change, or deployment. Revisit
+backup/recovery before a broader release or any later operation outside this
+pilot.
 
-1. Complete the verified private backup and isolated restore/rehearsal gates
-   below. Refresh the migration/catalog preflight and confirm the exact
-   reviewed migration set. Confirm the Production project identity; stop on
-   any ambiguity.
-2. Schedule and announce the write-freeze window before changing the database.
-   Tell users not to submit weigh-ins during the window; rejected old-client
-   saves are not queued and will need to be entered again after the new app is
-   verified. Keep the freeze notice active through step 6.
-3. In the confirmed Production project, execute
-   `supabase/manual-cutovers/freeze_legacy_weigh_in_writes.sql` in one
-   transaction **before starting any file in the pending migration set**:
+### Legacy-write cutover — owner decision still required
 
-   ```sh
-   psql "$PRODUCTION_DB_URL" --single-transaction -v ON_ERROR_STOP=1 \
-     -f supabase/manual-cutovers/freeze_legacy_weigh_in_writes.sql
-   ```
+Migration `20261007000000_personal_weigh_ins.sql` copies legacy
+`public.weigh_ins` into canonical `public.personal_weigh_ins` once. A legacy
+client write after that copy will not automatically appear in canonical
+history. PR #306 recorded a freeze-before-backfill plan, but the current owner
+decision for this pilot is unresolved; do not treat that earlier plan as
+selected or authorized.
 
-   The one-statement fence is outside `supabase/migrations`. It idempotently
-   revokes only authenticated legacy INSERT/UPDATE and asserts those effective
-   privileges are gone while legacy SELECT/DELETE remain. The script's
-   assertions must succeed and the transaction must commit before any
-   migration starts. If the command fails or its commit result is uncertain,
-   use only a read-only ACL check to establish the state; stop until the
-   fence is verified. Do not start migrations on an unverified fence.
+The owner must choose one of these approaches before the fence, migration, or
+deployment is scheduled:
 
-4. Apply only the separately approved, reviewed migration set in its verified
-   order. Do not repair or rewrite migration history as a shortcut. If any
-   migration fails, keep the legacy fence and user notice in place; do not
-   automatically re-grant writes or roll back.
-5. Deploy the reviewed canonical app only after migration success. Keep the
-   announced freeze in place while the owner runs the approved production
-   smoke checks, including a canonical save and reload/visibility check with
-   the approved test account and cleanup plan.
-6. End the freeze notice only after canonical save and reload behavior is
-   verified and production health checks pass. Tell users to refresh to load
-   the canonical app and manually re-enter any value whose save was not
-   confirmed. Do not imply failed entries were queued or automatically
-   recovered. Keep the legacy INSERT/UPDATE fence permanently in place unless
-   a separately reviewed recovery decision explicitly changes that policy.
+1. **Short announced write pause:** ask users not to submit weigh-ins during
+   the cutover window, then fence legacy writes before the one-time copy and
+   keep the notice through canonical-save smoke checks. The existing SQL fence
+   blocks stale legacy-table INSERT/UPDATE only; it does not technically block
+   canonical RPC writes. Old clients may show a generic failure and do not
+   queue or retry rejected entries.
+2. **Catch-up without a pause:** first define and rehearse how writes arriving
+   after the one-time copy are reconciled into canonical history without
+   losing, duplicating, or changing existing rows or sharing. No such
+   catch-up procedure is currently verified; do not assume rerunning the
+   migration is safe.
+
+The smallest remaining owner decision is: **may weigh-in submissions pause
+for the cutover window, or must the release support a rehearsed catch-up path
+without a pause?** Until the owner chooses, the cutover sequence is not
+selected. The choice does not replace the separate migration-history and
+schema preflight below.
+
+### Freeze-option procedure — conditional, not selected
+
+Use this sequence only if the owner chooses the short-pause option above and
+separately approves the exact hosted operation. It is not the selected
+cutover path today. Refresh the schema/migration-history preflight and confirm
+the exact reviewed migration set before scheduling; confirm the Production
+project identity and stop on ambiguity. Announce the pause and tell users not
+to submit weigh-ins until the owner ends the notice. Rejected old-client saves
+are not queued and may need to be re-entered after canonical behavior is
+verified.
+
+In the confirmed Production project, execute
+`supabase/manual-cutovers/freeze_legacy_weigh_in_writes.sql` in one
+transaction **before starting any file in the pending migration set**:
+
+```sh
+psql "$PRODUCTION_DB_URL" --single-transaction -v ON_ERROR_STOP=1 \
+  -f supabase/manual-cutovers/freeze_legacy_weigh_in_writes.sql
+```
+
+The one-statement fence is outside `supabase/migrations`. It idempotently
+revokes only authenticated legacy INSERT/UPDATE and asserts those effective
+privileges are gone while legacy SELECT/DELETE remain. The script's
+assertions must succeed and the transaction must commit before any
+migration starts. If the command fails or its commit result is uncertain,
+use only a read-only ACL check to establish the state; stop until the
+fence is verified. Do not start migrations on an unverified fence.
+
+After the fence is verified, apply only the separately approved migration set
+in its verified order. Do not repair or rewrite migration history as a
+shortcut. If any migration fails, keep the fence and user notice in place; do
+not automatically re-grant writes or roll back. Deploy the reviewed canonical
+app only after migration success. Keep the pause through owner-run smoke
+checks, including canonical save/reload and visibility. End the notice only
+after those checks and production health checks pass. Tell users to refresh
+and manually re-enter any value whose save was not confirmed. Do not imply
+failed entries were queued or automatically recovered. Keep the legacy
+INSERT/UPDATE fence in place unless a separately reviewed owner decision
+changes that policy.
 
 The existing repository has no technical maintenance gate for canonical RPC
 writes. The database fence blocks stale legacy-table writes, but the newly
 deployed canonical app can accept canonical saves as soon as it is live. The
-scheduled freeze therefore depends on the owner-notified window; do not claim
-it is a technical block on all app writes. If a hard all-write lock through
-smoke is required, stop and obtain separate approval for a reviewed app or
-hosting gate before proceeding.
+scheduled pause therefore depends on the owner-notified window; it is not a
+technical block on all app writes. If a hard all-write lock through smoke is
+required, stop and obtain separate approval for a reviewed app or hosting gate.
 
-### Old-client experience and failure recovery
+### Old-client experience and failure recovery (if the fence option is chosen)
 
 PR #305's refresh message is frontend code, not part of the SQL response
 contract for every cached bundle. A client still running JavaScript from
 before that change may show only a generic failure. No client-side retry or
-queued save is established; rejected values must be re-entered after refresh
-once canonical saves are verified. The freeze announcement must say so in
+queued save is established; rejected values may need to be re-entered after
+refresh once canonical saves are verified. The pause notice must say so in
 advance. Do not claim zero stale-client or data-loss risk.
 
 The SQL fence is one atomic `DO` statement: if its revoke or any assertion
@@ -86,9 +120,9 @@ fails, that statement rolls back. It is idempotent, but run it with
 `--single-transaction` as documented. If it fails before commit, do not
 migrate; inspect the effective ACL read-only and request owner review. If a
 migration, deploy, or smoke fails after the fence committed, leave the fence
-in place, preserve the verified backup and evidence, and keep the freeze
-notice active. The owner must choose an exact forward recovery or restore plan
-after reconciling which migrations committed. Never automatically grant
+in place, preserve any private evidence or artifacts that exist, and keep the
+user notice active. The owner must choose an exact forward recovery or restore
+plan after reconciling which migrations committed. Never automatically grant
 legacy writes, restore a database, delete rows, or roll back migrations. Any
 decision to resume legacy writes requires a separate owner approval and
 verified restoration of the pre-freeze ACL only after confirming the
@@ -97,22 +131,20 @@ canonical copy/client cannot diverge.
 ## Current gate
 
 Issue #247 reports that Production is on the Free plan without managed
-database backups; a manual logical export is possible, but no production
-backup or isolated restore has been verified. Reconfirm the plan and available
-restore methods in the owner dashboard when the gate is scheduled. This guide
-does not upgrade a plan or claim a backup exists.
+database backups. No manual backup or isolated restore has been verified. The
+owner's waiver above applies only to the limited pilot; it does not change
+this evidence status or imply that a backup exists.
 
-The official [Supabase CLI backup/restore guide](https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore)
-exports roles, database schema, and data as separate files. The CLI excludes
-Supabase-managed `auth` and `storage` schemas by default; customizations there
-need separate treatment. A database export does not copy Storage object bytes.
-The [backup documentation](https://supabase.com/docs/guides/platform/backups)
-also states that database backups do not include Storage API objects. The
-[Restore to a new project feature](https://supabase.com/docs/guides/platform/clone-project)
-includes Auth user data, but requires a paid plan with physical backups and
-does not copy Storage objects/settings or Auth settings/API keys. It also
-copies database extensions that may immediately perform external operations.
-Do not assume any one of these paths is a complete application recovery.
+The standard [Supabase CLI backup/restore guide](https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore)
+exports roles, schema, and data separately and excludes platform-managed
+`auth`/`storage` tables from its normal dump. Supabase separately documents a
+direct [`pg_dump` path that can include `auth` and `storage`](https://supabase.com/docs/guides/troubleshooting/pg_dump-fails-with-query-would-be-affected-by-row-level-security-policy-1d5783);
+that path has not been rehearsed for this project and is not part of the pilot
+waiver. Its example backup role requires explicit role/grant setup and is not
+strictly read-only. Neither database dump includes Storage object bytes; see
+the [Storage migration guidance](https://supabase.com/docs/guides/storage/management/download-objects).
+Do not treat documentation of an export method as proof of a successful
+restore or complete application recovery.
 
 Before capture, the owner must select and record privately a supported method
 that covers all required resources:
@@ -128,13 +160,13 @@ that covers all required resources:
   production API keys, secrets, redirect settings, or production endpoints to
   the disposable target.
 
-If the selected method cannot safely capture and restore a required resource,
-stop. A `roles.sql`/`schema.sql`/`data.sql` set alone is not complete proof for
-this app unless Auth references and any Storage dependencies are separately
-covered. If the only viable method requires paid features or new services,
-obtain the owner's explicit plan/cost approval before provisioning anything.
+For any future backup/recovery rehearsal, if the selected method cannot safely
+capture and restore a required resource, stop. A
+`roles.sql`/`schema.sql`/`data.sql` set alone is not complete proof for this
+app unless Auth references and any Storage dependencies are separately
+covered. A pilot waiver does not make an incomplete export complete.
 
-## Owner-run capture
+## Future owner-run capture (not part of the waived pilot)
 
 1. Obtain explicit owner approval for the production snapshot and isolated
    rehearsal. Confirm the live app's configured Supabase project and the
@@ -178,7 +210,7 @@ obtain the owner's explicit plan/cost approval before provisioning anything.
    passes its checksum. Do not put dump excerpts, SQL output, UUIDs, emails,
    notes, or record-level data in the shared run record.
 
-## Isolated restore and acceptance
+## Future isolated restore and acceptance (not part of the waived pilot)
 
 1. Select a **new, disposable, separately identified** restore target. Confirm
    its project identity in the owner dashboard immediately before restore and
@@ -221,6 +253,14 @@ obtain the owner's explicit plan/cost approval before provisioning anything.
 
 ## Separate migration rehearsal and #305 cutover order
 
+The pilot waiver covers only the backup and restore rehearsal. It does not
+waive fresh schema/migration-history reconciliation or the separate review of
+the exact migration set. No verified production-baseline restore exists, so
+do not claim the production migration rehearsal has been completed or apply
+migrations based only on the historical five-effect/twelve-pending inventory.
+Reconcile the source state and rehearse the reviewed set in an owner-approved
+isolated environment before any production migration.
+
 Do not rehearse migrations on the only verified restore. Once that untouched
 baseline restore passes, the owner may create another isolated disposable copy
 for the approved rehearsal. First reconcile the catalog to the five baseline
@@ -233,26 +273,29 @@ dry-run differs, any migration errors, or privacy/ACL/data-preservation checks
 fail. The rehearsal is not production approval.
 
 The legacy write fence is **separate from** the twelve migrations and
-`supabase db push`. In the isolated rehearsal, execute the manual fence
-before the migration that copies rows. Verify the fence before proceeding,
-that canonical RPC saves still work, and that rejected legacy INSERT/UPDATE
-leave source rows unchanged. Test the actual older-client UX separately from
-the updated PR #305 component; do not assume all cached bundles show the
-refresh text. The SQL intentionally leaves legacy DELETE unchanged; that
-remains a separate risk.
+`supabase db push`. In an isolated rehearsal, test only the cutover path the
+owner selected: the fence-before-copy sequence for a pause, or the approved
+catch-up behavior for a no-pause cutover. Verify that canonical RPC saves
+still work and that rejected legacy INSERT/UPDATE leave source rows unchanged
+when the fence path is selected. Test older-client UX separately from the
+updated PR #305 component; do not assume all cached bundles show refresh text.
+The SQL intentionally leaves legacy DELETE unchanged; that remains a separate
+risk.
 
-The owner-chosen sequence and failure recovery are recorded above. Before any
-production execution, complete the isolated rehearsal and obtain the separate
-owner approvals described there. If any migration,
-fence, catch-up, deployment, or smoke step fails, stop, preserve the verified
-backup and evidence, and wait for an owner-approved recovery decision. Never
+The cutover choice remains open as recorded above. Before any production
+execution, reconcile the schema/migration history, settle the cutover choice,
+and obtain separate owner approval for the exact operations. The pilot backup
+waiver does not alter these gates. If any migration, fence, catch-up,
+deployment, or smoke step fails, stop, preserve any private evidence or
+artifacts that exist, and wait for an owner-approved recovery decision. Never
 automatically re-grant legacy writes, restore a database, delete data, or roll
 back migrations.
 
 ## Cleanup and stop conditions
 
-Keep the verified backup encrypted and private for the owner-approved
-retention period; never delete it as part of rehearsal cleanup. After the
+If a backup is later created, keep it encrypted and private for the
+owner-approved retention period; never delete it as part of rehearsal cleanup.
+After the
 owner accepts the evidence and confirms the exact disposable target, the owner
 may remove only that disposable restore and its temporary credentials. Verify
 the target identity again before deletion. Securely remove temporary local
@@ -262,11 +305,12 @@ without recording secrets or user data.
 Stop before any next action if project identity is uncertain; a required
 resource is missing; target isolation or external-job suppression is
 uncertain; checksums, restore, constraints, counts, catalog, migration
-preflight, privacy, or ACL checks fail; a supposedly disposable target could
-affect Production; or the selected method requires unapproved costs or
-settings. Preserve the private backup and failed-run evidence for owner review.
+preflight, privacy, or ACL checks fail; or a supposedly disposable target
+could affect Production. Preserve any private backup and failed-run evidence
+for owner review.
 
-**Current result: backup and restore rehearsal NOT EXECUTED.** The next action
-is an owner decision, made privately, on a supported complete backup/restore
-method for the current Production plan and the required Auth/Storage coverage.
-No production data or backup has been accessed or changed by this PR.
+**Current result:** backup and restore rehearsal **NOT EXECUTED** and waived
+only for the limited pilot by owner direction. The current gates remain the
+owner's freeze-versus-catch-up choice and a fresh schema/migration-history
+preflight. No production data or backup has been accessed or changed by this
+PR.

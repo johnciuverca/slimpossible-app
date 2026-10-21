@@ -187,12 +187,14 @@ Production is a separate, deliberate owner gate, not a CI action:
        supabase db push --db-url "$PRODUCTION_DB_URL" --dry-run
 
 2. Complete the owner-only backup and isolated restore gates in
-   [production-backup-restore-rehearsal.md](production-backup-restore-rehearsal.md).
-   A CLI database dump alone is not complete proof unless Auth references and
-   any Storage dependencies are also covered. Identify the exact pending
-   migration filenames and get explicit owner approval for each production
-   database operation. A normal push, PR, CI run, or Vercel deployment is not
-   approval.
+   [production-backup-restore-rehearsal.md](production-backup-restore-rehearsal.md),
+   unless the owner has explicitly recorded a limited pilot-only waiver there.
+   A waiver is not backup evidence, recovery proof, or blanket release
+   approval. A CLI database dump alone is not complete proof unless Auth
+   references and any Storage dependencies are also covered. Identify the exact
+   pending migration filenames and get explicit owner approval for each
+   production database operation. A normal push, PR, CI run, or Vercel
+   deployment is not approval.
 3. For reviewed backward-compatible schema expansion that the new app needs,
    the owner applies only the approved migrations to production before merging
    the release PR, then verifies success before allowing the Vercel release.
@@ -201,28 +203,32 @@ Production is a separate, deliberate owner gate, not a CI action:
 4. Only after the owner gate succeeds should the release PR merge and trigger
    the main production deployment. If a migration or check fails, stop the
    release; do not auto-repair migration history or roll forward blindly.
-5. **The owner-chosen freeze-before-backfill sequence is mandatory.** Complete
-   the backup/restore rehearsal and preflight, announce the write-freeze,
-   execute and verify the manual legacy INSERT/UPDATE fence before the
-   one-time backfill, then apply the approved migrations, deploy the canonical
-   app, and run the owner-approved smoke. Keep the notice active until
-   canonical save/reload is verified; then tell users to refresh and re-enter
-   any unconfirmed value. Follow the exact gates and recovery rules in
+5. **The owner must choose the legacy-write cutover path.** A short announced
+   pause can use the manual legacy INSERT/UPDATE fence before the one-time
+   backfill, followed by approved migrations, canonical deployment, and smoke
+   checks before ending the notice. The fence does not block canonical RPC
+   writes. A no-pause cutover needs a separately defined and rehearsed
+   catch-up path for legacy writes that arrive after the one-time copy. Do not
+   treat PR #306's earlier freeze-first plan as the current choice; do not
+   execute either path until the owner selects and separately approves the
+   exact operations. Follow the gates and recovery rules in
    [production-backup-restore-rehearsal.md](production-backup-restore-rehearsal.md).
 
 ## Legacy weigh-in write cutover (#247)
 
 The canonical client writes through `save_personal_weigh_in`; the legacy
-`DailyWeighInFormPage` writes directly to `public.weigh_ins`. The owner chose
-freeze-before-backfill for preparation. The reviewed manual fence is
-`supabase/manual-cutovers/freeze_legacy_weigh_in_writes.sql`, outside
-`supabase/migrations`, so `supabase db push` never applies it. In an
-owner-approved window, run and verify it before starting the one-time-copy
-migration. Then apply the approved migrations, deploy the canonical app, and
-run the approved smoke while the user notice remains active. Do not execute
-any production step without its separate owner gate. See the
+`DailyWeighInFormPage` writes directly to `public.weigh_ins`. The owner has not
+selected freeze-versus-catch-up for the current pilot. The reviewed manual
+fence is `supabase/manual-cutovers/freeze_legacy_weigh_in_writes.sql`, outside
+`supabase/migrations`, so `supabase db push` never applies it. Use it before
+the one-time-copy migration only if the owner selects the pause path and
+separately approves the operation. A no-pause path requires a tested catch-up
+plan; the one-time migration does not automatically copy later writes. Do not
+execute any production step without its separate owner gate. See the
 [backup/recovery runbook](production-backup-restore-rehearsal.md) for the
-exact command, verification, stop conditions, and recovery procedure.
+decision, verification, stop conditions, and recovery procedure.
+
+Only for the pause option, and only after separate owner approval:
 
 ```sh
 psql "$TARGET_DB_URL" --single-transaction -v ON_ERROR_STOP=1 \
