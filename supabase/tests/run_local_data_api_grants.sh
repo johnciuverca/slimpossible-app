@@ -100,6 +100,8 @@ for task_harness in \
   fi
 done
 
+"${task_psql[@]}" -f supabase/tests/legacy_weigh_in_write_cutover.sql
+
 "$task_pg_bin/pg_ctl" -D "$task_cluster/data" -m fast stop >/dev/null
 printf 'PASS no-auto-grants migration/access audit; disposable cluster retained at %s\n' "$task_cluster"
 task_cluster=''
