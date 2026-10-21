@@ -3,13 +3,31 @@
 -- never reads application rows, executes an RPC, or changes database objects.
 -- The migration ledger is inspected through catalogs only, so an absent ledger
 -- is reported safely. This does not reconcile migration history or authorize
--- hosted operations. Keep detailed output private.
+-- hosted operations. ACL output is direct/default grants only: role-membership-
+-- derived effective access is not assessed. Schema USAGE ACLs are included.
+-- Keep detailed output private.
 
 begin transaction read only;
 
 select current_database() as database_name,
        current_user as session_role,
        current_setting('transaction_read_only') as transaction_read_only;
+
+-- Schema ACL entries/defaults, including USAGE. Membership-derived access is
+-- intentionally out of scope.
+select n.nspname as schema_name,
+       pg_catalog.pg_get_userbyid(n.nspowner) as owner,
+       case when acl.grantee = 0 then 'PUBLIC'
+            else grantee.rolname end as grantee,
+       acl.privilege_type,
+       acl.is_grantable
+from pg_catalog.pg_namespace n
+cross join lateral pg_catalog.aclexplode(
+  coalesce(n.nspacl, pg_catalog.acldefault('n', n.nspowner))
+) as acl
+left join pg_catalog.pg_roles grantee on grantee.oid = acl.grantee
+where n.nspname in ('public', 'supabase_migrations')
+order by n.nspname, grantee, acl.privilege_type;
 
 -- Relations in public, including views and sequences; absence is represented
 -- by an empty result rather than a missing-relation error.
@@ -68,8 +86,8 @@ from pg_catalog.pg_indexes
 where schemaname = 'public'
 order by tablename, indexname;
 
--- Explicit and effective relation ACL entries, including built-in defaults
--- when relacl is NULL. This reports grants, not table data.
+-- Direct/default relation ACL entries, including built-in defaults when
+-- relacl is NULL. Role-membership-derived effective access is not assessed.
 select n.nspname as schema_name,
        c.relname as relation_name,
        case when acl.grantee = 0 then 'PUBLIC'
@@ -112,7 +130,8 @@ where n.nspname = 'public'
   and not t.tgisinternal
 order by c.relname, t.tgname;
 
--- Routine signatures, ownership, security mode, settings, and effective ACL.
+-- Routine signatures, ownership, security mode, settings, and direct/default
+-- ACL entries. Role-membership-derived access is not assessed.
 -- Function bodies are intentionally omitted.
 select n.nspname as schema_name,
        p.proname as routine_name,
