@@ -1,14 +1,65 @@
 # 16.5 — Connected sharing release gate status
 
-Issue #212 remains **OPEN / NOT READY FOR RELEASE**. The connected observations
-below are historical and partial. Current staging has since advanced; this
-document does not claim that the newer candidate passed connected acceptance
-and does not authorize production configuration, migration, deployment, or
-issue closure.
+As of 2026-10-21, issue #212 remains **OPEN / NOT READY FOR RELEASE**. The
+latest staging branch was verified at
+`ed9b9a9155f072824bdfd3f96f95e50113a78582` (merge of PR #303). PR #303 adds
+release documentation and local grant-audit tests; it does not change
+application or migration behavior. The connected application evidence below
+therefore remains tied to the application tree accepted at `d24a593`, not a
+newly repeated walkthrough on the documentation/test merge.
 
-## Current staging candidate and later workspace changes
+Issue #207 is **CLOSED / COMPLETED**. Its authoritative completion record says
+all six acceptance criteria were satisfied on the same application tree at
+`d24a593`, including responsive/mobile, keyboard/accessibility, and
+loading/empty/error-state evidence. The accessible-name concern was separately
+corrected as a false alarm: Profile and Log out have accessible names, keyboard
+focus reaches both, and Escape closes the menu. Reuse the evidence recorded in
+[#207](https://github.com/johnciuverca/slimpossible-app/issues/207) and its
+linked comments; do not repeat those checks solely for PR #303.
 
-The latest staging ref was rechecked on 2026-10-15 as
+The five core sharing, privacy, history, and Sunday-result criteria in #212
+are recorded complete. This does not constitute final owner sign-off. Keep
+#212 open until the release-review record is reconciled and the owner records
+the required sign-off. Production promotion remains separately gated by #247.
+No production configuration, database, backup, migration, merge, or deployment
+was changed or authorized by this status update.
+
+## Current remaining gates
+
+- Reconcile #212's stale checklist/status text with #207's completed record and
+  the already-recorded #212 evidence. Preserve evidence provenance and exact
+  tested candidates; do not replay completed UI or authorization suites.
+- Obtain and record explicit owner sign-off for #212. It has not been inferred
+  from #207's closure or from passing tests.
+- For any later production promotion under #247, first obtain a private backup
+  and successful isolated restore proof; rehearse the migration baseline and
+  exact pending set; resolve and test the stale-client legacy-write control;
+  and repeat the privacy-safe production catalog/data preflight immediately
+  before an approved window. Production currently has no migration ledger;
+  catalog equivalence is not proof of applied migration history. The proposed
+  sequence is five catalog-reconciled baseline versions followed by twelve
+  timestamp-ordered migrations, and has not been executed on production.
+- Keep production configuration, migration execution, main merge, and deploy
+  as separate owner approvals. The existing records say environment and Auth
+  redirect separation were checked read-only; no production setting change is
+  authorized here.
+- #247 lists post-deploy smoke coverage, but the records do not establish a
+  tested feature-disable procedure or production database rollback. Several
+  migrations have no safe inverse, and some inverses can lose sharing state.
+  Before production release, document owner-reviewed disable triggers and a
+  forward-compatible recovery/compatibility path; do not automatically run an
+  inverse migration after failure.
+
+## Historical status snapshot — 2026-10-15 (superseded)
+
+The sections below preserve earlier evidence and planning notes. Their
+candidate SHAs, open/closed issue descriptions, and proposed next steps are
+historical unless explicitly carried forward by the current status above or
+the live issue records.
+
+### Historical staging snapshot
+
+The staging ref was then recorded as
 `d8b984c62776dfac1162a11978b3d94b90b666de` (merge of PR #286). It includes
 these later workspace PRs:
 
@@ -29,7 +80,7 @@ including the Create/Join popover and refresh behavior, have not been connected-
 tested as part of the observations below. Do not infer that #207, #212, #155,
 or issue #283 is accepted or complete from these merges.
 
-## Historical connected evidence and inherited automated checks
+### Historical connected evidence and inherited automated checks
 
 ### Historical connected observations (2026-10-15; earlier candidate)
 
@@ -151,7 +202,7 @@ until the pre-sync roadmap and connected gates are accepted.
   These checks are automated evidence, not a substitute for the connected
   acceptance items still listed below.
 
-## Evidence already recorded
+### Evidence recorded in the historical snapshot
 
 The #268 evidence record reports one explicit group share, a member's
 read-only view without the author's note or edit/delete controls, writer
@@ -170,7 +221,7 @@ multiple-selected-group journey and late/corrected Sunday outcomes; the
 accepted one-group path does not need replay solely because the unrelated
 Goals component changed.
 
-## Remaining acceptance and release blockers
+### Historical remaining-acceptance snapshot (superseded)
 
 | Area                             | Existing evidence                                                                                                                                                                                                                                                                                                                                                         | Remaining action                                                                                                                                                                                                                                                                                                                                                                                                   |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -182,6 +233,7 @@ Goals component changed.
 
 The 2026-10-15 status review made no hosted writes, account changes, migrations,
 grant/policy changes, environment changes, production deployments, or issue
-closures. As of this update, #207, #212, and #155 remain open; #247 remains
-paused. Production release remains a separate owner-approved action after the
-gates are complete.
+closures. Its issue dispositions and blocker table above are historical and
+superseded by the current status at the top of this document and the linked
+live issue records. Production release remains a separate owner-approved action
+after its gates are complete.
