@@ -7,6 +7,57 @@ notes, and authentication records. Keep every artifact and detailed result in
 owner-controlled private storage, never in this repository, GitHub, chat, CI,
 or a shared/unreviewed drive.
 
+## Blocking cutover-sequence decision
+
+Do **not** use the existing production order as a release instruction yet.
+Migration `20261007000000_personal_weigh_ins.sql` copies legacy
+`public.weigh_ins` into canonical `public.personal_weigh_ins` once. PR #305's
+manual legacy-write revoke is currently documented after canonical app deploy
+and smoke checks. An old client can write to `weigh_ins` after that copy but
+before the later revoke; that row is not automatically copied to canonical
+history. The revoke by itself does not close this interval.
+
+The owner must choose and approve one safe contract before any production
+backfill or release. Neither option below is yet authorized or implemented:
+
+1. **Freeze before the copy (simpler, but changes the approved timing).**
+   Schedule and announce a weigh-in write freeze covering the migration and
+   app deployment window. In a separately reviewed cutover change, apply and
+   verify the legacy INSERT/UPDATE fence **before starting the pending
+   migration set**, then run the approved migrations, deploy the canonical
+   app, and complete its smoke checks before ending the freeze. This requires
+   explicit owner approval to move PR #305's revoke from post-deploy to
+   pre-migration, and a focused change to the current post-deploy-only
+   instructions/artifact. Do not improvise by running the existing file
+   earlier than its reviewed instructions allow. Legacy saves will fail
+   during the freeze; tell users beforehand that the old bundle may show only
+   a generic failure and that rejected entries are not queued. After the new
+   app is live, users must refresh and re-enter any unconfirmed value.
+2. **Keep writes enabled through deploy (preserves current timing, but needs
+   more implementation).** Keep the post-deploy revoke, but design and review
+   a deterministic post-revoke catch-up from legacy rows into canonical data
+   before enabling canonical writes or treating canonical history as
+   complete. Define conflict handling for canonical edits, same-user/date
+   rows, notes, timestamps, and explicit group shares. Keep the deployed
+   canonical UI in an approved maintenance/write-pause state until catch-up
+   succeeds. This needs a separately scoped and approved migration/code
+   change plus isolated rehearsal; do not assume the one-time copy is
+   repeatable or overwrite canonical edits.
+
+The intended stale-save behavior remains server-side rejection and a refresh
+instruction where the running client supports it. PR #305's message is
+frontend code, not part of the SQL response contract for every already-cached
+bundle. A client still running JavaScript from before that change may show a
+generic failure instead. No client-side retry or queued save is established;
+users may need to refresh and re-enter an unconfirmed value. The owner must
+approve the maintenance notice/retry expectations and whether an intermediate
+compatibility release is required. Do not claim zero stale-client or data-loss
+risk until the chosen sequence is rehearsed and verified.
+
+**Release stop:** until the owner chooses one option and the corresponding
+focused change/rehearsal is complete, do not apply the production backfill,
+deploy the release, or run PR #305's revoke as a supposed complete cutover.
+
 ## Current gate
 
 Issue #247 reports that Production is on the Free plan without managed
@@ -145,25 +196,23 @@ approved twelve-migration set from the current release candidate. Stop if the
 dry-run differs, any migration errors, or privacy/ACL/data-preservation checks
 fail. The rehearsal is not production approval.
 
-PR #305's stale-client write control is a **separate post-deploy step**, not
-one of the twelve migrations and not part of `supabase db push`. In the
-isolated rehearsal, first apply the reviewed schema set, deploy/test the
-canonical app against that isolated target, and confirm its owner-approved
-smoke checks. Only then rehearse
-`supabase/post-deploy/disable_legacy_weigh_in_writes.sql` as its own
-transaction. Verify canonical RPC saves still work and authenticated legacy
-INSERT/UPDATE are denied without changing existing rows. Do not revoke legacy
-writes before the canonical app is live and healthy. The SQL intentionally
-leaves legacy DELETE unchanged; that remains a separately reviewed risk.
+PR #305's stale-client write control is **separate from** the twelve
+migrations and `supabase db push`; however, its current post-deploy timing
+alone does not protect the one-time copy. In the isolated rehearsal, model the
+owner-selected freeze-before-copy or catch-up contract from the preceding
+section. Verify that no legacy write can fall between the copy and fence,
+canonical RPC saves still work, and rejected legacy INSERT/UPDATE leave source
+rows unchanged. Test the actual older-client UX separately from the updated
+PR #305 component; do not assume all cached bundles show the refresh text. The
+SQL intentionally leaves legacy DELETE unchanged; that remains a separate
+risk.
 
-The eventual production order is: backup and isolated recovery proof; exact
-isolated migration/cutover rehearsal; fresh production catalog preflight;
-separate owner approval of database operations and release; approved
-backward-compatible migrations; canonical app deploy and production smoke;
-then a separately owner-authorized #305 post-deploy write revocation. If the
-production deployment or smoke fails, stop before the revocation and follow a
-separately reviewed recovery decision. Never automatically re-grant legacy
-writes, restore a database, delete data, or roll back migrations.
+After the owner chooses, record the exact production sequence and rehearsed
+failure recovery here before authorizing the release. If any migration,
+fence, catch-up, deployment, or smoke step fails, stop, preserve the verified
+backup and evidence, and wait for an owner-approved recovery decision. Never
+automatically re-grant legacy writes, restore a database, delete data, or roll
+back migrations.
 
 ## Cleanup and stop conditions
 
