@@ -186,9 +186,12 @@ Production is a separate, deliberate owner gate, not a CI action:
        supabase migration list --db-url "$PRODUCTION_DB_URL"
        supabase db push --db-url "$PRODUCTION_DB_URL" --dry-run
 
-2. Confirm a recoverable production backup/restore path, identify the exact
-   pending migration filenames, and get explicit owner approval for this
-   production change. A normal push, PR, CI run, or Vercel deployment is not
+2. Complete the owner-only backup and isolated restore gates in
+   [production-backup-restore-rehearsal.md](production-backup-restore-rehearsal.md).
+   A CLI database dump alone is not complete proof unless Auth references and
+   any Storage dependencies are also covered. Identify the exact pending
+   migration filenames and get explicit owner approval for each production
+   database operation. A normal push, PR, CI run, or Vercel deployment is not
    approval.
 3. For reviewed backward-compatible schema expansion that the new app needs,
    the owner applies only the approved migrations to production before merging
@@ -198,6 +201,11 @@ Production is a separate, deliberate owner gate, not a CI action:
 4. Only after the owner gate succeeds should the release PR merge and trigger
    the main production deployment. If a migration or check fails, stop the
    release; do not auto-repair migration history or roll forward blindly.
+5. After the canonical app is live on main and the owner-approved production
+   smoke checks pass, the owner separately authorizes and runs the manual
+   post-deploy stale-client write revocation described below (PR #305). Do not
+   include it in the migration push or run it before the canonical app is live.
+   If deployment or smoke checks fail, stop before revoking legacy writes.
 
 ## Legacy weigh-in write cutover (#247)
 
