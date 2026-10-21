@@ -1,0 +1,273 @@
+# 16.4 — Authorized Group charts and exact weight history
+
+Issue #211, parent #199. Branch starts at staging `ee212008`; #242's pending
+layout work is deliberately excluded and remains separate/unmerged.
+
+## Product and read contract
+
+The Group placeholder is replaced with a comparison chart and dated exact-kg
+table for the selected authorized group. Production uses only
+`get_group_chart_history(uuid)`, an additive security-definer RPC. It projects
+`member_key`, `display_name`, `recorded_date`, and `weight_kg` from canonical
+personal entries joined to explicit shares for that group. No notes, emails,
+raw user/participant IDs, private-only entries or unrelated groups are returned.
+Owners and active members may read; outsiders, anonymous/sessionless callers,
+withdrawn viewers and personal-challenge requests are denied. Withdrawn authors'
+entries and future dates are excluded. Draft and active groups follow the same
+existing read authorization contract. The previous history RPC is unchanged.
+
+A member key is needed because display names are not unique. It is an opaque
+digest of group ID plus author UUID, not an authorization credential. It is
+stable within the group and differs between groups; raw identifiers are not
+projected. Duplicate display names remain separate chart series and receive
+visible member ordinals. Authorization continues to happen on the server.
+
+The chart shows **kg change from each person's first shared entry**, not their
+private enrollment weight, absolute lowest weight, or a winner score. First
+shared dates are labeled in the legend; negative means loss, positive gain,
+zero maintenance. Only consecutive calendar dates connect; missing dates are
+gaps, never interpolated check-ins. Single-entry series have one zero marker.
+The table provides all exact weights, dates and baseline changes as the
+accessible chart equivalent. It and the chart have keyboard-focusable horizontal
+scroll regions on mobile. Coincident points/ties can overlap visually; the table
+retains every member's value.
+
+Late entries can move the first-shared baseline. Corrections, unsharing and
+deletion recalculate the next authorized read. Group's existing Refresh shared
+progress reloads chart, summary and both ranking views; successful recording
+from Group now triggers that same reload. Returning from other recording pages
+loads fresh reads. No realtime subscription is claimed. Sunday-to-Sunday and
+provisional ranking formulas are unchanged and independent of the chart.
+
+Snapshots are keyed by account/challenge/refresh, stale responses ignored,
+and old rows hidden synchronously. Missing RPC/migration or denied access shows
+an unavailable state; there is no fallback to private rows or synthetic data.
+No chart data is persisted in the browser.
+
+## Hosted staging migration — APPLIED 2026-10-08; browser acceptance pending
+
+Forward: `supabase/migrations/20261009000000_add_group_chart_history.sql`.
+Inverse: `supabase/rollback/20261009000000_add_group_chart_history.sql`.
+The forward migration adds only the read RPC and restricted execute ACL; it
+does not modify tables, backfill data, widen raw-row policies or change rankings.
+The inverse removes only the new RPC and preserves all entries, shares and the
+old history contract. Applying it leaves this UI honestly unavailable.
+
+PM reported applying the owner-approved additive RPC through Supabase SQL Editor
+on `slimpossible-staging` (project `erylzsdmsohvssgqwfor`) on 2026-10-08,
+after fresh backup recovery verification. The applied SQL matched the migration
+at implementation head `03e94ea87abf8a4125c7f23ff8a7275c2f446bfd`; only comments
+and whitespace were compacted. The transaction reported Success. This was SQL
+Editor execution, not a Supabase migration-ledger entry or repair. A did not
+execute hosted SQL.
+
+PM-reported preflight: `connection_ok=1`, chart RPC absent, canonical/shares
+tables ready, 16 canonical entries and 5 shares. Completed postchecks:
+sessionless calls denied by the DO guard; security definer enabled; fixed
+`pg_catalog, public, auth` search path; only member key, display name, recorded
+date and kg projected; anonymous EXECUTE false; authenticated EXECUTE true;
+entry/share counts unchanged at 16/5. The retained local SQL Editor proof
+`slimpossible-211-staging-verification.jpg` was inspected by A and visibly
+confirms anonymous false, authenticated true and 16 entries. The 5-share result
+is PM-reported; its screenshot column is obscured by an editor overlay.
+
+These are migration/catalog/access/count checks, not executed owner/member
+browser acceptance or the full connected privacy matrix. No hosted Auth
+identities, private row values or credentials are included in this evidence.
+No PR merge or production change is authorized by the staging approval.
+Vercel/CI green is still separate from connected acceptance.
+
+`supabase/tests/group_chart_history_authorization.sql` is rollback-only and
+requires three distinct owner-approved existing disposable Auth UUIDs supplied
+privately. It fails before fixtures for missing/duplicate identities. It creates
+only temporary challenge/member/weight fixtures and rolls them back; it never
+creates Auth users. Never use real personal accounts or Production. Credentials
+and populated identities must not be committed.
+
+## Harness safety fix and regression — 2026-10-09
+
+Review found that fixed fixture dates could collide with existing disposable
+entries, and a null-ID save could upsert an existing account/date. The harness
+now chooses bounded unused past/future dates before DML, uses generated fixture
+IDs for every correction/unshare/delete, and fails closed when no dates exist.
+Existing entry/share snapshots are compared privately inside SQL; only named
+boolean assertions are returned, never identity values or snapshot contents.
+All fixture DML remains one atomic statement inside BEGIN/ROLLBACK. If SQL Editor
+reports an error, issue ROLLBACK before reusing the session.
+
+The local socket-only runner passed 12 chart assertions and five denial guards
+on both empty and populated synthetic accounts, plus the 32 existing canonical
+checks and additive inverse/reapply. Populated fixtures occupy every formerly
+fixed date and retain existing shares. Exact profile/challenge/participant/entry/
+share fingerprints stayed unchanged after successful rollback and after an
+injected failure following correction, deletion and withdrawal. An exhausted
+future-date test also aborted before DML with the exact state unchanged.
+Format/lint/typecheck/build and all 442 unit tests passed again; shell syntax and
+diff checks passed. Existing 75-browser-test evidence above is reused because
+application code is unchanged; these are not new connected browser results.
+
+## Connected hosted and mobile evidence — 2026-10-09
+
+After the owner's exact-scope approval, PM reviewed and executed the hardened
+harness at `954caebb63d5c6084a18535c06e38a4950f22722` in staging SQL Editor.
+The three existing disposable identities were resolved privately. PM reported
+all 12 named assertions true and all five denial guards completing without an
+execution error, including actual authenticated/anonymous role switches. This
+covers owner/member authorization, selected draft/active group scope, nonfuture
+shared rows, private projection, group-specific keys, late baseline, correction,
+unshare, deletion of generated fixtures, duplicate-name keys, withdrawn viewer
+denial/author exclusion, and original entry/share equality. A separate ROLLBACK
+and cleanup query found zero remaining fixture challenges and the original
+outsider membership still active. No production or persistent fixture changes
+occurred. This is PM-executed hosted evidence, not A's independent execution;
+private identity lookup and proof are not published.
+
+The owner then signed into the existing member account on immutable preview
+`https://slimpossible-c27au014n-cvc10.vercel.app` (application `03e94ea`, unchanged
+by the harness/docs commits). A completed read-only connected checks at 390x844:
+both labeled chart/table regions were focusable; Tab moved from chart to table;
+Right scrolled each region by 40px; neither caused horizontal page overflow.
+Keyboard group selection cleared the previous chart/table during the observed
+load, showed the other group's honest empty state, and restored five shared
+entries when switching back. Direct refresh retained the selected context and
+restored chart/table. This observes natural connected loading, not a controlled
+delayed response or account switch. No entry/share/membership mutation or sign-out
+occurred. The viewport was reset and the authorized Group tab left open. Private
+names, identities, dates, weights, notes and screenshots are not published.
+
+## Explicit staging acceptance adjustment — 2026-10-09
+
+The owner approved PM's recommendation with “do it like that, its approved”:
+accept the combined automated, hosted database and executed real-browser evidence
+for staging instead of the remaining exhaustive manual rendered matrix and an
+actual withdrawn-browser run. Those unexecuted manual variants remain NOT
+EXECUTED; hosted withdrawal denial and automated browser denial are distinct
+evidence, not claims of a real withdrawn-browser test. This explicitly supersedes
+those staging-only test gates. Production release #212 remains separately gated.
+PM reviewed the hardened harness before executing it; final independent PR
+sign-off and explicit merge approval are still required. Quality, Vercel and
+Preview Comments passed on `954caebb`; this acceptance is not merge authority.
+
+## Local validation — 2026-10-08
+
+- Format/lint/typecheck/build/diff checks pass; existing bundle warning remains.
+- 442 unit tests pass across 74 files. Coverage includes baseline/gain/maintenance, duplicate names, late rows,
+  corrections/removals, stale account/challenge responses, missing RPC, privacy
+  projection, and successful-save refresh wiring.
+- 75 browser tests pass (69 application + 6 Group). Group tests at 1280/390px
+  cover exact weights, duplicate names, chart/table accessibility and contrast,
+  truthful selected-group refresh, gains/maintenance, correction, empty/loading/
+  denied history, future suppression and keyboard scrolling without page overflow.
+  Network requests use intercepted synthetic services, not connected acceptance.
+- Local socket-only native PostgreSQL rehearsal passed: 11 named chart checks
+  plus five denial guards, 32 existing canonical/privacy/ranking assertions,
+  additive rollback, legacy RPC preservation, and forward reapply. It uses the
+  existing local Auth compatibility shim, not actual hosted Supabase Auth.
+- Read-only in-app visual inspection of the labeled synthetic fixture confirmed
+  kg/date labels, separate gain/loss series, missing-date gaps, legend and exact
+  weight table. `e2e/fixtures/group-chart-harness.html` is test-only and never used
+  as a production data fallback.
+- Fresh database-archive recovery passed in a new internal-only, no-published-port
+  Docker database. The original backup checksum remained unchanged. Aggregate
+  orphan/index/constraint checks passed; RLS and checked privacy ACLs remained
+  intact. Exact #211 forward/inverse/reapply preserved all 46 snapshotted tables,
+  existing public function definitions/ACLs, managed-role flags/memberships and
+  selected-group history/ranking outputs. The new local resources were stopped
+  and retained; owner containers/backups remained untouched. This proves archive
+  recoverability relative to that backup, not source completeness without a
+  source manifest, live Auth configuration/sign-in, or Storage object bytes.
+
+## Connected member visual observation — PARTIAL 2026-10-08
+
+PM reported a read-only staging member-session observation on immutable preview
+`https://slimpossible-c27au014n-cvc10.vercel.app` (implementation `03e94ea`).
+The selected authorized group loaded a real chart and dated exact-weight table;
+own-baseline arithmetic and missing-date gaps appeared correct. Existing empty
+rankings accurately reflected the absence of eligible Sunday pairs. PM observed
+no private notes or other members' emails in the visible Group output; the
+current viewer's session email in global navigation is expected.
+
+This is PM-reported partial member visual evidence, not A's independent browser
+verification or complete authorization/privacy acceptance. The screenshot and
+all actual member names, dates, weights and other private values remain private
+and are not included here. No data mutation or new implementation was performed.
+
+## Connected owner-reported private save/member exclusion — PARTIAL 2026-10-08
+
+On the same immutable preview, the owner reported completing the save step with
+group sharing unchecked. PM reported seeing the owner session's "Personal weight
+saved" confirmation and only the existing member's shared series in Group.
+After the owner switched accounts, PM confirmed the member session and observed
+the same existing member-only chart/history, with no owner entry or private notes
+displayed for the selected group.
+
+The unchecked-share save is owner-reported; PM's observed confirmation does not
+independently establish the stored sharing state. Member exclusion is a partial
+connected visual observation relayed by PM, not A's independent test. This initial
+observation did not inspect stored shares or execute correction, unsharing of a
+previously shared entry, deletion or the full authorization harness. Subsequent
+owner reports below are separate evidence, not retroactive independent checks. Names,
+emails, weights, actual recorded dates and screenshots are not published.
+No implementation change or merge was performed by A.
+
+## Consolidated additional connected results — PARTIAL 2026-10-08
+
+- Owner-reported behavior passed: sharing caused the disposable entry to appear
+  in Group; unsharing made it disappear; correcting a shared weight was reflected
+  after Group refresh; deletion removed the disposable shared entry from chart
+  and table. These are owner reports, not A's direct inspection of saved shares,
+  network responses or database rows, and not full connected acceptance.
+- PM reported a connected nonmember direct-link browser denial on the same
+  immutable preview. The existing session was authorized for a different group;
+  requesting the tested group's link produced "The selected challenge is
+  unavailable for this account" with no requested-group chart/table/summary
+  rows. Header/context retained the other authorized group's label while the
+  body denied the requested group: a cosmetic mismatch, not observed forbidden
+  data. This observation neither implements a fix nor approves pending #242.
+- PM reported completing the owner-approved hosted staging withdrawn-membership
+  RPC check in SQL Editor. Read-only preflight resolved exactly one existing
+  active, nonowner disposable membership. Within BEGIN/DO, only that membership
+  was set to withdrawn with a one-row guard; transaction-local JWT subject
+  simulated that existing user's `auth.uid()`. The chart RPC raised the expected
+  insufficient-privilege result; unexpected access would have raised an error.
+  ROLLBACK restored the membership, and the final check confirmed active status.
+  PM reported no execution errors or persistent membership/data change. This is
+  a connected RPC guard assertion with a simulated JWT subject, not a withdrawn
+  browser-session observation or full authenticated-role authorization harness.
+
+All observations are source-qualified PM/owner reports. A did not execute the
+hosted check. Private screenshots, target identities and actual dates/weights/
+notes/emails are retained privately and are not published. No account, entry or
+share deletion occurred in the rollback-only withdrawn RPC check; the separate
+disposable entry deletion above is owner-reported. No production change or merge
+was performed.
+
+## Remaining hard merge gates — PENDING
+
+Staging test acceptance is complete under the explicit owner-approved adjustment
+above. Before merge:
+
+- Obtain independent PM review sign-off and explicit owner merge approval. None
+  is inferred from hosted migration approval or partial acceptance. PR #243 stays
+  unmerged. Separately, #242's owner visual acceptance is still pending; its
+  layout work and queued #244/#245 remain separate with no new implementation.
+
+The original manual checklist is retained for traceability and possible future
+supplemental checks, not as unmet staging gates after the approved adjustment.
+Its unexecuted variants are not recorded as passed; production #212 has its own
+release gates:
+
+1. Use approved disposable owner/member accounts. In Group, verify only selected
+   group's explicitly shared dates/weights appear; private notes/emails and other
+   groups do not appear in UI or RPC projection. Test draft and active groups.
+2. Verify duplicate names stay separate, gains/maintenance/single entries render
+   honestly, table kg is exact, missing dates are gaps, and mobile/keyboard scroll
+   regions remain usable. Compare each member with their own first shared weight.
+3. Add a late shared entry, correct it, unshare and delete. Refresh and verify chart,
+   table and summaries follow current shares, while Sunday/provisional formulas
+   are unchanged. Record from Group should refresh automatically after success.
+4. Switch challenge/account during loading: no old rows flash or reappear.
+   Outsider/withdrawn direct links must fail safely. Confirm personal Dashboard,
+   home and Today remain personal and canonical recording/privacy are intact.
+5. Record dated, redacted results against the exact PR head/environment. Leave
+   the PR unmerged until PM review and owner acceptance; production is separate.

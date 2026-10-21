@@ -1,25 +1,64 @@
 import { expect, test } from '@playwright/test'
 
-test('opens the public challenge setup flow from the home screen', async ({
+test('direct-loads and refreshes the signed-out Home welcome journey', async ({
   page,
 }) => {
-  await page.goto('/')
+  await page.goto('/?challenge=not-visible-while-signed-out')
 
   await expect(page.getByRole('banner')).toContainText('Slimpossible')
   await expect(
     page.getByRole('navigation', { name: 'Primary navigation' }),
   ).toBeVisible()
   await expect(
-    page.getByRole('heading', { name: 'Your challenge starts here.' }),
+    page.getByRole('heading', { name: 'Keep showing up. It adds up.' }),
   ).toBeVisible()
-  await expect(page.getByRole('status')).toHaveText('Public preview')
+  await expect(
+    page.getByRole('link', { name: 'Create your account' }),
+  ).toHaveAttribute('href', '/register')
+  await expect(page.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+    'href',
+    '/login',
+  )
+  await expect(
+    page.getByRole('link', { name: 'Set up a challenge' }),
+  ).toHaveCount(0)
 
-  await page.getByRole('link', { name: 'Set up a challenge' }).click()
-  await expect(page).toHaveURL(/\/challenge\/setup$/)
+  await page.reload()
   await expect(
-    page.getByRole('heading', { name: 'Set up your challenge.' }),
+    page.getByRole('heading', { name: 'Keep showing up. It adds up.' }),
   ).toBeVisible()
+  await expect(page).toHaveURL(/\/?\?challenge=not-visible-while-signed-out$/)
+})
+
+test('activates sign-in from Home with the keyboard', async ({ page }) => {
+  await page.goto('/')
+  const signIn = page.getByRole('link', { name: 'Sign in' })
+  await signIn.focus()
+  await page.keyboard.press('Enter')
+
+  await expect(page).toHaveURL(/\/login$/)
   await expect(
-    page.getByRole('form', { name: 'Challenge setup form' }),
+    page.getByRole('heading', { name: 'Welcome back.' }),
+  ).toBeVisible()
+})
+
+test('direct-loads and refreshes the protected Today route while signed out', async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 800, width: 390 })
+  await page.goto('/today?challenge=direct-link-check')
+
+  await expect(page).toHaveURL(/\/login$/)
+  await expect(
+    page.getByRole('heading', { name: 'Welcome back.' }),
+  ).toBeVisible()
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+    .toBe(390)
+
+  await page.reload()
+  await expect(page).toHaveURL(/\/login$/)
+  await expect(
+    page.getByRole('heading', { name: 'Welcome back.' }),
   ).toBeVisible()
 })

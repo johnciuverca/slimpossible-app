@@ -78,17 +78,14 @@ supabase-activity.yml check only calls the Auth health endpoint; it is not a
 migration job. This PR adds no database credentials, GitHub Environments, or
 automated migration steps.
 
-The release-gate inventory below is for the exact staging candidate checked on
-2026-10-19, `00fcf280bd3be0d54ea3497679d23e80633207d4`. It contains 17
-timestamp-ordered migration files. This snapshot is not a claim that the
-main-based documentation branch contains those SQL files, that a hosted
-project has applied them, or that its migration ledger has been reconciled.
+The release candidate based on staging `1cf5f0d` contains 17
+timestamp-ordered migration files. This source inventory does not establish that
+a hosted project has applied them or that its migration ledger has been reconciled.
 Several migrations define SECURITY DEFINER functions or change grants/policies;
-review their exact privileges and run the relevant `supabase/tests/`
-authorization checks on the dedicated staging project. Do not treat these as
-routine unreviewed SQL.
+review their exact privileges and the relevant `supabase/tests/` authorization
+checks before any separately approved hosted operation.
 
-The candidate migration set is:
+The current checked-in set is:
 
 - `20260917000000_create_core_schema.sql`
 - `20260917000001_add_rls_policies.sql`
@@ -116,9 +113,54 @@ file is checked in for `20261008000000`, `20261012000000`,
 `20261016000000`, or the initial core migrations. A present rollback script
 is not an instruction to run it: inspect its preconditions and data effects,
 preserve the migration ledger, and prefer the reviewed forward-compatible
-recovery plan. Before any staging or production migration, verify a recoverable
-backup/restore path and the exact remote migration history. No remote migration
+recovery plan. For the limited pilot, the owner backup waiver in
+[the recovery runbook](production-backup-restore-rehearsal.md) applies;
+backup/restore remains unexecuted. Exact remote schema/history review and
+separate operation approval remain required. No remote migration
 state is asserted by this inventory.
+
+### Public-table Data API grants
+
+Supabase's [Data API grant rollout](https://supabase.com/changelog/45329-breaking-change-tables-not-exposed-to-data-and-graphql-api-automatically)
+will stop automatically granting new `public` tables access on existing
+projects on October 30, 2026. Existing tables keep their stored privileges;
+RLS behavior does not change. Review table ACLs separately from RLS and do not
+copy broad sample grants or grant `anon` without a documented product need.
+
+The current #247 production plan has these twelve migrations pending after the
+five catalog-reconciled baseline migrations. Only four of those twelve create
+public tables:
+
+| Migration/table                                     | Application path and intended direct Data API access                                                                                                                                                                                                                                      |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `20261007000000` — `personal_weigh_ins`             | The current client lists/saves/deletes through authenticated RPCs. The existing database contract also deliberately permits authenticated `SELECT`, constrained by the owner-only RLS policy. Preserve this explicit grant unless that contract is separately reviewed. No `anon` access. |
+| `20261007000000` — `personal_weigh_in_group_shares` | Internal share relation read and written by reviewed RPCs; no direct client-table grant.                                                                                                                                                                                                  |
+| `20261007000000` — `personal_weigh_in_legacy_map`   | Internal migration provenance; no direct client-table grant.                                                                                                                                                                                                                              |
+| `20261012000000` — `participant_target_milestones`  | Private milestone snapshots read/written through authenticated RPCs; no direct client-table grant.                                                                                                                                                                                        |
+
+These four tables use UUID keys and create no owned sequences. The five
+catalog-reconciled tables (`profiles`, `challenges`, `participants`,
+`weigh_ins`, and `challenge_invites`) predate the pending set; current app
+repositories use direct Data API access for profiles/challenges/participants
+and legacy `weigh_ins`, and RPCs for invitation operations. The October 30
+default change does not rewrite their existing grants.
+
+For each future public table, record its direct-table versus RPC access path,
+the exact roles and operations required, its sequence needs, and its RLS
+policy. Put only necessary explicit `GRANT` statements beside table creation;
+for RPC-only/internal tables, do not grant direct table access. Keep the
+default-grant simulation and this inventory current when the pending migration
+set changes. Run the local, socket-only, disposable rehearsal:
+
+    bash supabase/tests/run_local_data_api_grants.sh
+
+The runner creates the five baseline tables with their existing grants,
+disables future table/sequence defaults, applies the exact twelve pending
+migrations, verifies existing-table ACL/RLS preservation and the four-table
+privilege matrix, then runs personal-weigh-in, target-milestone, and member
+projection authorization harnesses. It uses a lightweight local Auth shim;
+this is not connected staging acceptance. Do not apply SQL or change grants in
+staging or production as part of this check.
 
 For each candidate, an owner uses the checked-out, reviewed migration set and
 explicitly targets each project. The following are operator-run examples;
@@ -146,10 +188,15 @@ Production is a separate, deliberate owner gate, not a CI action:
        supabase migration list --db-url "$PRODUCTION_DB_URL"
        supabase db push --db-url "$PRODUCTION_DB_URL" --dry-run
 
-2. Confirm a recoverable production backup/restore path, identify the exact
-   pending migration filenames, and get explicit owner approval for this
-   production change. A normal push, PR, CI run, or Vercel deployment is not
-   approval.
+2. Complete the owner-only backup and isolated restore gates in
+   [production-backup-restore-rehearsal.md](production-backup-restore-rehearsal.md),
+   unless the owner has explicitly recorded a limited pilot-only waiver there.
+   A waiver is not backup evidence, recovery proof, or blanket release
+   approval. A CLI database dump alone is not complete proof unless Auth
+   references and any Storage dependencies are also covered. Identify the exact
+   pending migration filenames and get explicit owner approval for each
+   production database operation. A normal push, PR, CI run, or Vercel
+   deployment is not approval.
 3. For reviewed backward-compatible schema expansion that the new app needs,
    the owner applies only the approved migrations to production before merging
    the release PR, then verifies success before allowing the Vercel release.
@@ -158,6 +205,47 @@ Production is a separate, deliberate owner gate, not a CI action:
 4. Only after the owner gate succeeds should the release PR merge and trigger
    the main production deployment. If a migration or check fails, stop the
    release; do not auto-repair migration history or roll forward blindly.
+5. **The owner selected a short announced pause as the preparation path.** It
+   can use the manual legacy INSERT/UPDATE fence before the one-time backfill,
+   followed by approved migrations, canonical deployment, and smoke checks
+   before ending the notice. The fence does not block canonical RPC writes.
+   This choice is not approval to execute; refresh schema/migration-history
+   preflight and obtain separate owner approval for each exact hosted
+   operation. Follow the gates and recovery rules in
+   [production-backup-restore-rehearsal.md](production-backup-restore-rehearsal.md).
+
+## Legacy weigh-in write cutover (#247)
+
+The canonical client writes through `save_personal_weigh_in`; the legacy
+`DailyWeighInFormPage` writes directly to `public.weigh_ins`. The owner selected
+a short announced pause as the preparation path for this pilot. The reviewed
+manual fence is `supabase/manual-cutovers/freeze_legacy_weigh_in_writes.sql`,
+outside `supabase/migrations`, so `supabase db push` never applies it. Use it
+before the one-time-copy migration only after fresh schema/migration-history
+preflight and separate owner approval for that exact operation. This choice is
+not execution approval. The fence blocks legacy-table INSERT/UPDATE only; it
+does not block canonical RPC writes. Do not execute any production step without
+its separate owner gate. See the
+[backup/recovery runbook](production-backup-restore-rehearsal.md) for the
+decision, verification, stop conditions, and recovery procedure.
+
+Only after fresh preflight and separate owner approval for this selected pause
+path:
+
+```sh
+psql "$TARGET_DB_URL" --single-transaction -v ON_ERROR_STOP=1 \
+  -f supabase/manual-cutovers/freeze_legacy_weigh_in_writes.sql
+```
+
+The file is one atomic `DO` statement; use the documented single-transaction
+invocation. It is idempotent and preserves legacy SELECT/DELETE while
+revoking authenticated INSERT/UPDATE only. Stop if assertions fail or the
+commit result is uncertain, and use a read-only ACL check before proceeding.
+It does not technically lock canonical RPC writes; a hard all-write lock
+would require a separately reviewed and approved app/hosting gate. Keep the
+freeze notice until canonical save/reload is verified. Old cached bundles may
+show only a generic failure, and rejected values are not automatically
+retried; users must refresh and re-enter unconfirmed values.
 
 For all migration executions, record only the project/environment label,
 tested commit, migration filenames, timestamp, and outcome. Do not put

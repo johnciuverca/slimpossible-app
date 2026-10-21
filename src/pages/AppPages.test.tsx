@@ -4,11 +4,13 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { AuthProvider } from '../auth/AuthContext'
+import { AuthContext, type AuthContextValue } from '../auth/context'
 import {
   GoalsPage,
   GroupDashboardPage,
@@ -17,7 +19,31 @@ import {
   TodayPage,
 } from './AppPages'
 import { mostRecentSunday } from '../models/groupProgress'
-import { localDateOnly } from '../models/provisionalGroupLeader'
+import { PersonalWeighInsPage } from './PersonalWeighInsPage'
+// These legacy challenge-view tests use ordered HTTP responses. Exercise the
+// independent personal action with real repositories in PersonalWorkspacePages
+// and the cross-page browser suite, rather than mixing its requests into these.
+vi.mock('../components/WeightPageHeader', () => ({
+  WeightPageHeader: ({
+    children,
+    action,
+    additionalActions,
+  }: {
+    children: React.ReactNode
+    action?: React.ReactNode
+    additionalActions?: React.ReactNode
+  }) => (
+    <header>
+      {children}
+      {action ?? <button>Record weight</button>}
+      {additionalActions}
+    </header>
+  ),
+}))
+import {
+  localDateOnly,
+  provisionalWeekDates,
+} from '../models/provisionalGroupLeader'
 
 function response(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -26,7 +52,11 @@ function response(body: unknown, status = 200) {
   })
 }
 
-function renderSignedIn(fetchMock: ReturnType<typeof vi.fn>) {
+function renderSignedIn(
+  fetchMock: ReturnType<typeof vi.fn>,
+  initialEntry = '/',
+  userId = 'member-1',
+) {
   vi.stubEnv('VITE_SUPABASE_URL', 'https://home-project.supabase.co')
   vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-anon-key')
   vi.stubGlobal('fetch', fetchMock)
@@ -36,17 +66,20 @@ function renderSignedIn(fetchMock: ReturnType<typeof vi.fn>) {
       initialState={{
         error: null,
         status: 'signed-in',
-        user: { email: 'member@example.com', id: 'member-1' },
+        user: { email: 'member@example.com', id: userId },
       }}
     >
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <HomePage />
       </MemoryRouter>
     </AuthProvider>,
   )
 }
 
-function dashboardResponses(challengeOwnerId = 'member-1') {
+function dashboardResponses(
+  challengeOwnerId = 'member-1',
+  latestNote: string | null = null,
+) {
   return [
     response([
       {
@@ -79,31 +112,94 @@ function dashboardResponses(challengeOwnerId = 'member-1') {
     ]),
     response([
       {
-        created_at: '2026-09-17T10:00:00.000Z',
         id: 'weigh-in-1',
+        user_id: 'member-1',
         note: null,
-        participant_id: 'participant-1',
         recorded_date: '2026-09-17',
+        shared_challenge_ids: [],
         updated_at: '2026-09-17T10:00:00.000Z',
         weight_kg: 95,
       },
       {
-        created_at: '2026-09-18T10:00:00.000Z',
         id: 'weigh-in-2',
-        note: null,
-        participant_id: 'participant-1',
+        user_id: 'member-1',
+        note: latestNote,
         recorded_date: '2026-09-18',
+        shared_challenge_ids: [],
         updated_at: '2026-09-18T10:00:00.000Z',
         weight_kg: 90,
       },
+      {
+        id: 'future-weigh-in',
+        user_id: 'member-1',
+        note: 'future row from legacy migration',
+        recorded_date: '2099-01-01',
+        shared_challenge_ids: [],
+        updated_at: '2099-01-01T10:00:00.000Z',
+        weight_kg: 1,
+      },
     ]),
   ]
+}
+
+function groupProgressResponse(challengeId = 'challenge-1') {
+  const currentSunday = mostRecentSunday()
+  const previousSundayDate = new Date(`${currentSunday}T00:00:00.000Z`)
+  previousSundayDate.setUTCDate(previousSundayDate.getUTCDate() - 7)
+  return response([
+    {
+      active_participant_count: 3,
+      average_completion_percentage: 40,
+      challenge_id: challengeId,
+      current_sunday: currentSunday,
+      eligible_participant_count: 2,
+      participants_with_progress_count: 3,
+      participants_with_recorded_weight_count: 3,
+      previous_sunday: previousSundayDate.toISOString().slice(0, 10),
+      reached_target_count: 1,
+      weekly_winner_count: 1,
+      weekly_winner_names: ['Private sample winner'],
+    },
+  ])
+}
+
+function provisionalLeaderResponse({
+  activeParticipantCount = 3,
+  challengeId = 'challenge-1',
+  eligibleParticipantCount = 2,
+  leaderNames = ['Ava', 'Ben'],
+  state = 'leaders',
+}: {
+  activeParticipantCount?: number
+  challengeId?: string
+  eligibleParticipantCount?: number
+  leaderNames?: string[]
+  state?: 'leaders' | 'no-eligible-candidates' | 'solo-challenge'
+} = {}) {
+  const week = provisionalWeekDates(localDateOnly())
+  return response([
+    {
+      active_participant_count: activeParticipantCount,
+      challenge_id: challengeId,
+      current_week_end: week.currentWeekEnd,
+      current_week_start: week.currentWeekStart,
+      eligible_participant_count: eligibleParticipantCount,
+      leader_count: leaderNames.length,
+      leader_latest_dates: leaderNames.map(() => localDateOnly()),
+      leader_names: leaderNames,
+      previous_sunday: week.previousSunday,
+      state,
+      private_note: 'do not expose provisional notes',
+      raw_history: [{ weight_kg: 91.5 }],
+    },
+  ])
 }
 
 function renderDashboard(
   page: React.ReactNode,
   fetchMock: ReturnType<typeof vi.fn>,
   initialEntry = '/today?challenge=challenge-1',
+  userId = 'member-1',
 ) {
   vi.stubEnv('VITE_SUPABASE_URL', 'https://home-project.supabase.co')
   vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-anon-key')
@@ -113,12 +209,28 @@ function renderDashboard(
       initialState={{
         error: null,
         status: 'signed-in',
-        user: { email: 'member@example.com', id: 'member-1' },
+        user: { email: `${userId}@example.com`, id: userId },
       }}
     >
       <MemoryRouter initialEntries={[initialEntry]}>{page}</MemoryRouter>
     </AuthProvider>,
   )
+}
+
+function authContextValue(userId: string): AuthContextValue {
+  return {
+    requestPasswordRecovery: vi.fn(),
+    resetPassword: vi.fn().mockResolvedValue(false),
+    retrySession: vi.fn(),
+    signIn: vi.fn(),
+    signOut: vi.fn().mockResolvedValue(undefined),
+    signUp: vi.fn().mockResolvedValue(undefined),
+    state: {
+      error: null,
+      status: 'signed-in',
+      user: { email: `${userId}@example.com`, id: userId },
+    },
+  }
 }
 
 afterEach(() => {
@@ -128,25 +240,211 @@ afterEach(() => {
 })
 
 describe('HomePage', () => {
-  it('guides a signed-in first-time user to challenge setup', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(response([]))
+  it('reflects canonical personal save, edit, and delete after returning to Overview', async () => {
+    const today = localDateOnly()
+    const yesterdayDate = new Date(`${today}T00:00:00.000Z`)
+    yesterdayDate.setUTCDate(yesterdayDate.getUTCDate() - 1)
+    const yesterday = yesterdayDate.toISOString().slice(0, 10)
+    let rows: Array<{
+      id: string
+      user_id: string
+      note: string | null
+      recorded_date: string
+      shared_challenge_ids: string[]
+      created_at: string
+      updated_at: string
+      weight_kg: number
+    }> = [
+      {
+        id: 'existing-entry',
+        user_id: 'member-1',
+        note: null,
+        recorded_date: yesterday,
+        shared_challenge_ids: [] as string[],
+        created_at: `${yesterday}T10:00:00.000Z`,
+        updated_at: `${yesterday}T10:00:00.000Z`,
+        weight_kg: 88,
+      },
+    ]
+    const fetchMock = vi.fn((input: RequestInfo, init?: RequestInit) => {
+      const url = String(input)
+      if (url.includes('/challenges?'))
+        return Promise.resolve(
+          response([
+            {
+              created_at: `${yesterday}T10:00:00.000Z`,
+              created_by: 'member-1',
+              description: null,
+              end_date: '2026-12-31',
+              id: 'challenge-1',
+              name: 'Autumn challenge',
+              owner_id: 'member-1',
+              start_date: '2026-09-17',
+              status: 'active',
+              target_weight_kg: null,
+              updated_at: `${yesterday}T10:00:00.000Z`,
+            },
+          ]),
+        )
+      if (url.includes('/participants?'))
+        return Promise.resolve(
+          response([
+            {
+              challenge_id: 'challenge-1',
+              created_at: `${yesterday}T10:00:00.000Z`,
+              display_name: 'Member',
+              id: 'participant-1',
+              joined_at: `${yesterday}T10:00:00.000Z`,
+              starting_weight_kg: 100,
+              status: 'active',
+              target_weight_kg: 80,
+              updated_at: `${yesterday}T10:00:00.000Z`,
+              user_id: 'member-1',
+            },
+          ]),
+        )
+      if (url.includes('/rpc/list_my_personal_weigh_ins'))
+        return Promise.resolve(response(rows))
+      if (url.includes('/rpc/save_personal_weigh_in')) {
+        const body = JSON.parse(String(init?.body)) as {
+          target_note: string | null
+          target_recorded_date: string
+          target_shared_challenge_ids: string[]
+          target_weigh_in_id: string | null
+          target_weight_kg: number
+        }
+        const saved = {
+          id: body.target_weigh_in_id ?? 'new-entry',
+          user_id: 'member-1',
+          note: body.target_note,
+          recorded_date: body.target_recorded_date,
+          shared_challenge_ids: body.target_shared_challenge_ids,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          weight_kg: body.target_weight_kg,
+        }
+        rows = [saved, ...rows.filter((row) => row.id !== saved.id)]
+        return Promise.resolve(response([saved]))
+      }
+      if (url.includes('/rpc/delete_personal_weigh_in')) {
+        const body = JSON.parse(String(init?.body)) as {
+          target_weigh_in_id: string
+        }
+        rows = rows.filter((row) => row.id !== body.target_weigh_in_id)
+        return Promise.resolve(response(true))
+      }
+      return Promise.resolve(groupProgressResponse())
+    })
+
+    const renderRemotePage = (page: React.ReactNode) => {
+      vi.stubEnv('VITE_SUPABASE_URL', 'https://home-project.supabase.co')
+      vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-anon-key')
+      vi.stubGlobal('fetch', fetchMock)
+      render(
+        <AuthProvider
+          initialState={{
+            error: null,
+            status: 'signed-in',
+            user: { email: 'member@example.com', id: 'member-1' },
+          }}
+        >
+          <MemoryRouter>{page}</MemoryRouter>
+        </AuthProvider>,
+      )
+    }
+
+    renderRemotePage(<HomePage />)
+    expect(await screen.findByText('88 kg')).toBeInTheDocument()
+    cleanup()
+
+    renderRemotePage(<PersonalWeighInsPage />)
+    await screen.findByRole('form', { name: 'Personal weigh-in form' })
+    fireEvent.change(screen.getByLabelText('Weight in kg'), {
+      target: { value: '89' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save weight' }))
+    await screen.findByText(/89 kg/)
+    fireEvent.click(
+      screen.getByRole('button', { name: `Edit weight ${today}` }),
+    )
+    fireEvent.change(screen.getByLabelText('Weight in kg'), {
+      target: { value: '90' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Update weight' }))
+    await screen.findByText(/90 kg/)
+    fireEvent.click(screen.getByRole('button', { name: `Delete ${today}` }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete weight' }))
+    await screen.findByText(
+      'Weigh-in and its group shares were deleted.',
+      {},
+      { timeout: 5000 },
+    )
+    cleanup()
+
+    renderRemotePage(<HomePage />)
+    expect(await screen.findByText('88 kg')).toBeInTheDocument()
+    expect(screen.queryByText('90 kg')).not.toBeInTheDocument()
+  })
+
+  it('shows a session-loading state while authentication is being restored', () => {
+    const contextValue: AuthContextValue = {
+      requestPasswordRecovery: vi.fn(),
+      resetPassword: vi.fn().mockResolvedValue(false),
+      retrySession: vi.fn(),
+      signIn: vi.fn(),
+      signOut: vi.fn(),
+      signUp: vi.fn(),
+      state: { error: null, status: 'loading', user: null },
+    }
+    render(
+      <AuthContext.Provider value={contextValue}>
+        <MemoryRouter>
+          <HomePage />
+        </MemoryRouter>
+      </AuthContext.Provider>,
+    )
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Checking your saved session…',
+    )
+  })
+
+  it('shows an accessible error state when saved challenges cannot load', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementation((input: RequestInfo) =>
+        String(input).includes('/challenges?')
+          ? response({ message: 'Remote request failed' }, 500)
+          : response([]),
+      )
     renderSignedIn(fetchMock)
 
-    await waitFor(() => {
-      expect(
-        screen.getByText(
-          'No saved challenge is available for this account yet.',
-        ),
-      ).toBeInTheDocument()
-    })
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Your challenges could not be loaded. Try refreshing.',
+    )
+  })
+
+  it('guides a signed-in first-time user to challenge setup', async () => {
+    const fetchMock = vi.fn().mockImplementation(() => response([]))
+    renderSignedIn(fetchMock)
+
+    expect(
+      await screen.findByText(/No saved challenge is available/),
+    ).toBeInTheDocument()
     expect(
       screen.getByRole('link', { name: 'Set up a challenge' }),
     ).toHaveAttribute('href', '/challenge/setup')
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: 'Sign in to join a challenge' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: 'Today' }),
+    ).not.toBeInTheDocument()
   })
 
-  it('lets a returning user select a saved challenge for account navigation', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
+  it('shows owner enrollment and invite actions without member-only destinations', async () => {
+    const fetchMock = vi.fn()
+    fetchMock.mockResolvedValueOnce(
       response([
         {
           created_at: '2026-09-17T10:00:00.000Z',
@@ -161,55 +459,43 @@ describe('HomePage', () => {
           target_weight_kg: null,
           updated_at: '2026-09-17T10:00:00.000Z',
         },
-        {
-          created_at: '2026-09-18T10:00:00.000Z',
-          created_by: 'member-1',
-          description: null,
-          end_date: '2026-11-01',
-          id: 'challenge-2',
-          name: 'Winter challenge',
-          owner_id: 'member-1',
-          start_date: '2026-10-01',
-          status: 'draft',
-          target_weight_kg: null,
-          updated_at: '2026-09-18T10:00:00.000Z',
-        },
       ]),
     )
+    fetchMock.mockResolvedValueOnce(response([]))
     renderSignedIn(fetchMock)
 
-    await waitFor(() => {
-      expect(
-        screen.getByRole('option', { name: 'Autumn challenge' }),
-      ).toBeInTheDocument()
+    const enrollLinks = await screen.findAllByRole('link', {
+      name: 'Enroll yourself',
     })
-    expect(screen.getByRole('link', { name: 'Today' })).toHaveAttribute(
-      'href',
-      '/today?challenge=challenge-1',
+    expect(enrollLinks).toHaveLength(2)
+    enrollLinks.forEach((enrollLink) =>
+      expect(enrollLink).toHaveAttribute(
+        'href',
+        '/challenge/participants/enroll?challenge=challenge-1&self=owner',
+      ),
     )
-    fireEvent.change(screen.getByRole('combobox'), {
-      target: { value: 'challenge-2' },
-    })
-    expect(screen.getByRole('link', { name: 'Progress' })).toHaveAttribute(
-      'href',
-      '/progress?challenge=challenge-2',
-    )
-    expect(screen.getByRole('link', { name: 'Goals' })).toHaveAttribute(
-      'href',
-      '/goals?challenge=challenge-2',
-    )
-    expect(screen.getByRole('link', { name: 'Group' })).toHaveAttribute(
-      'href',
-      '/group?challenge=challenge-2',
-    )
-    const challengeRequest = fetchMock.mock.calls.find(([url]) =>
-      String(url).includes('/challenges?'),
-    )
-    expect(String(challengeRequest?.[0])).not.toContain('owner_id=')
+    expect(
+      screen.getAllByRole('link', { name: 'Invite participants' }),
+    ).toHaveLength(2)
+    screen
+      .getAllByRole('link', { name: 'Invite participants' })
+      .forEach((inviteLink) =>
+        expect(inviteLink).toHaveAttribute(
+          'href',
+          '/challenge/invites?challenge=challenge-1',
+        ),
+      )
+    expect(
+      screen.queryByRole('link', { name: 'Today' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('Weekly group comparison'),
+    ).not.toBeInTheDocument()
   })
 
-  it('shows a joined challenge even when the signed-in member does not own it', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
+  it('shows actual personal and permitted group summaries to a joined member, but no owner actions', async () => {
+    const fetchMock = vi.fn()
+    fetchMock.mockResolvedValueOnce(
       response([
         {
           created_at: '2026-09-17T10:00:00.000Z',
@@ -226,20 +512,167 @@ describe('HomePage', () => {
         },
       ]),
     )
+    fetchMock.mockResolvedValueOnce(
+      response([
+        {
+          challenge_id: 'joined-challenge',
+          created_at: '2026-09-17T10:00:00.000Z',
+          display_name: 'Saved member',
+          id: 'participant-1',
+          joined_at: '2026-09-17T10:00:00.000Z',
+          starting_weight_kg: 100,
+          status: 'active',
+          target_weight_kg: 80,
+          updated_at: '2026-09-17T10:00:00.000Z',
+          user_id: 'member-1',
+        },
+      ]),
+    )
+    fetchMock.mockResolvedValueOnce(
+      response([
+        {
+          id: 'private-weigh-in',
+          user_id: 'member-1',
+          note: 'Private note content',
+          recorded_date: '2026-09-17',
+          shared_challenge_ids: [],
+          updated_at: '2026-09-17T10:00:00.000Z',
+          weight_kg: 95,
+        },
+        {
+          id: 'latest-weigh-in',
+          user_id: 'member-1',
+          note: null,
+          recorded_date: '2026-09-18',
+          shared_challenge_ids: [],
+          updated_at: '2026-09-18T10:00:00.000Z',
+          weight_kg: 90,
+        },
+        {
+          id: 'future-weigh-in',
+          user_id: 'member-1',
+          note: null,
+          recorded_date: '2099-01-01',
+          shared_challenge_ids: [],
+          updated_at: '2099-01-01T10:00:00.000Z',
+          weight_kg: 1,
+        },
+      ]),
+    )
+    fetchMock.mockResolvedValueOnce(
+      response([
+        {
+          active_participant_count: 3,
+          average_completion_percentage: 25,
+          challenge_id: 'joined-challenge',
+          current_sunday: mostRecentSunday(),
+          eligible_participant_count: 2,
+          participants_with_progress_count: 2,
+          participants_with_recorded_weight_count: 3,
+          previous_sunday: '2026-09-20',
+          reached_target_count: 0,
+          weekly_winner_count: 1,
+          weekly_winner_names: ['Not shown on Home'],
+        },
+      ]),
+    )
     renderSignedIn(fetchMock)
 
-    await waitFor(() =>
-      expect(
-        screen.getByRole('option', { name: 'Owner hosted challenge' }),
-      ).toBeInTheDocument(),
-    )
+    expect(
+      await screen.findByRole('button', { name: /Owner hosted challenge/ }),
+    ).toHaveAttribute('aria-pressed', 'true')
+    expect(await screen.findByText('90 kg')).toBeInTheDocument()
+    expect(screen.queryByText('1 kg')).not.toBeInTheDocument()
+    expect(
+      fetchMock.mock.calls.some(([url]) =>
+        String(url).includes('/rpc/list_my_personal_weigh_ins'),
+      ),
+    ).toBe(true)
+    expect(
+      screen.getByText((_, element) =>
+        /^2\s*\/\s*3$/.test(element?.textContent?.trim() ?? ''),
+      ),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Private note content')).not.toBeInTheDocument()
+    expect(screen.queryByText('Not shown on Home')).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Today' })).toHaveAttribute(
       'href',
       '/today?challenge=joined-challenge',
     )
+    expect(
+      screen.queryByRole('link', { name: 'Invite participants' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: 'Set up another challenge' }),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText('My steady goal')).not.toBeInTheDocument()
+    expect(screen.queryByText('Autumn Reset')).not.toBeInTheDocument()
+    expect(screen.queryByText('91.8 kg')).not.toBeInTheDocument()
   })
 
-  it('keeps the public foundation separate from signed-in challenge data', () => {
+  it('preserves a directly loaded selection and updates navigation when changed', async () => {
+    const fetchMock = vi.fn()
+    fetchMock.mockResolvedValueOnce(
+      response([
+        {
+          created_at: '2026-09-18T10:00:00.000Z',
+          created_by: 'member-1',
+          description: null,
+          end_date: '2026-10-01',
+          id: 'challenge-1',
+          name: 'Autumn challenge',
+          owner_id: 'member-1',
+          start_date: '2026-09-17',
+          status: 'active',
+          target_weight_kg: null,
+          updated_at: '2026-09-18T10:00:00.000Z',
+        },
+        {
+          created_at: '2026-09-17T10:00:00.000Z',
+          created_by: 'member-1',
+          description: null,
+          end_date: '2026-10-01',
+          id: 'challenge-2',
+          name: 'Winter challenge',
+          owner_id: 'member-1',
+          start_date: '2026-09-17',
+          status: 'active',
+          target_weight_kg: null,
+          updated_at: '2026-09-17T10:00:00.000Z',
+        },
+      ]),
+    )
+    fetchMock.mockResolvedValueOnce(response([]))
+    renderSignedIn(fetchMock, '/?challenge=challenge-2')
+
+    const winter = await screen.findByRole('button', {
+      name: /Winter challenge/,
+    })
+    expect(winter).toHaveAttribute('aria-pressed', 'true')
+    expect(
+      screen.getAllByRole('link', { name: 'Enroll yourself' }),
+    ).toHaveLength(2)
+    screen
+      .getAllByRole('link', { name: 'Enroll yourself' })
+      .forEach((enrollLink) =>
+        expect(enrollLink).toHaveAttribute(
+          'href',
+          '/challenge/participants/enroll?challenge=challenge-2&self=owner',
+        ),
+      )
+    fireEvent.click(screen.getByRole('button', { name: /Autumn challenge/ }))
+    expect(
+      screen.getByRole('button', { name: /Autumn challenge/ }),
+    ).toHaveAttribute('aria-pressed', 'true')
+    expect(
+      screen.getAllByRole('link', { name: 'Enroll yourself' })[0],
+    ).toHaveAttribute(
+      'href',
+      '/challenge/participants/enroll?challenge=challenge-1&self=owner',
+    )
+  })
+
+  it('keeps the signed-out welcome path on login and registration', () => {
     render(
       <MemoryRouter>
         <HomePage />
@@ -247,24 +680,81 @@ describe('HomePage', () => {
     )
 
     expect(
-      screen.getByRole('heading', { name: 'Your challenge starts here.' }),
+      screen.getByRole('heading', { name: 'Keep showing up. It adds up.' }),
     ).toBeInTheDocument()
-    expect(screen.getByText('Public preview')).toBeInTheDocument()
-    expect(screen.queryByText('Signed in as')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+      'href',
+      '/login',
+    )
+    expect(
+      screen.getByRole('link', { name: 'Create your account' }),
+    ).toHaveAttribute('href', '/register')
+    expect(
+      screen.queryByRole('link', { name: 'Set up a challenge' }),
+    ).not.toBeInTheDocument()
   })
 
-  it('renders Today from the selected participant and saved weigh-ins', async () => {
+  it('keeps owner invites available when the owner is also an active member', async () => {
     const fetchMock = vi.fn()
     dashboardResponses().forEach((item) =>
       fetchMock.mockResolvedValueOnce(item),
     )
+    fetchMock.mockResolvedValueOnce(groupProgressResponse())
+    renderSignedIn(fetchMock)
+
+    await screen.findByRole('heading', { name: 'Your latest weigh-in' })
+    const actions = screen.getByRole('navigation', {
+      name: 'Selected challenge actions',
+    })
+    expect(
+      within(actions).getByRole('link', { name: 'Invite participants' }),
+    ).toHaveAttribute('href', '/challenge/invites?challenge=challenge-1')
+    expect(
+      screen.getByRole('link', { name: 'Set up another challenge' }),
+    ).toHaveAttribute('href', '/challenge/setup')
+    expect(
+      within(actions).getByRole('link', { name: 'Group progress' }),
+    ).toHaveAttribute('href', '/group?challenge=challenge-1')
+  })
+
+  it('renders Today from the selected participant and saved weigh-ins', async () => {
+    const fetchMock = vi.fn()
+    dashboardResponses(
+      'owner-1',
+      'A private note for this participant.',
+    ).forEach((item) => fetchMock.mockResolvedValueOnce(item))
+    fetchMock.mockResolvedValueOnce(groupProgressResponse())
     renderDashboard(<TodayPage />, fetchMock)
 
-    await waitFor(() => expect(screen.getByText('90 kg')).toBeInTheDocument())
-    expect(screen.getByText('100 kg')).toBeInTheDocument()
-    expect(screen.getByText('80 kg')).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: 'Your latest weigh-in' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('90 kg')).toBeInTheDocument()
+    expect(
+      screen.getByText('A private note for this participant.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Private note · only you can see this'),
+    ).toBeInTheDocument()
+    await waitFor(() =>
+      expect(
+        screen.getByRole('article', { name: 'This week’s check-ins' }),
+      ).toHaveTextContent(/2\s*\/\s*3/),
+    )
     expect(
       screen.getByText('You are 10 kg away from your target weight.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Record weight' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: 'See group progress' }),
+    ).toHaveAttribute('href', '/group?challenge=challenge-1')
+    expect(screen.queryByText('Private sample winner')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', {
+        name: 'One entry, optional group sharing',
+      }),
     ).toBeInTheDocument()
     expect(
       screen.queryByRole('heading', { name: 'No challenge yet' }),
@@ -281,20 +771,18 @@ describe('HomePage', () => {
     renderDashboard(<TodayPage />, fetchMock)
 
     expect(
-      await screen.findByText(
-        'Enroll yourself in the selected challenge before viewing your dashboard.',
-      ),
+      await screen.findByText('You have not enrolled in this challenge yet.'),
     ).toBeInTheDocument()
     expect(
       screen.getByRole('link', { name: 'Enroll yourself' }),
     ).toHaveAttribute(
       'href',
-      '/challenge/participants/enroll?challenge=challenge-1',
+      '/challenge/participants/enroll?challenge=challenge-1&self=owner',
     )
   })
 
   it('shows a keyboard-accessible setup action on Today when no challenge exists', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(response([]))
+    const fetchMock = vi.fn().mockImplementation(() => response([]))
     renderDashboard(<TodayPage />, fetchMock)
 
     await waitFor(() =>
@@ -307,6 +795,262 @@ describe('HomePage', () => {
     expect(setupLink).toHaveProperty('tabIndex', 0)
   })
 
+  it('defaults Today to the active joined challenge instead of an owned challenge', async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo) => {
+      const url = String(input)
+      if (url.includes('/challenges?')) {
+        return response([
+          {
+            created_at: '2026-09-17T10:00:00.000Z',
+            created_by: 'member-1',
+            description: null,
+            end_date: '2026-10-01',
+            id: 'owned-challenge',
+            name: 'My unjoined challenge',
+            owner_id: 'member-1',
+            start_date: '2026-09-17',
+            status: 'active',
+            target_weight_kg: null,
+            updated_at: '2026-09-17T10:00:00.000Z',
+          },
+          {
+            created_at: '2026-09-18T10:00:00.000Z',
+            created_by: 'owner-2',
+            description: null,
+            end_date: '2026-10-01',
+            id: 'joined-challenge',
+            name: 'Challenge I joined',
+            owner_id: 'owner-2',
+            start_date: '2026-09-17',
+            status: 'active',
+            target_weight_kg: null,
+            updated_at: '2026-09-18T10:00:00.000Z',
+          },
+        ])
+      }
+      if (url.includes('/participants?')) {
+        return response([
+          {
+            challenge_id: 'joined-challenge',
+            created_at: '2026-09-18T10:00:00.000Z',
+            display_name: 'Current member',
+            id: 'joined-participant',
+            joined_at: '2026-09-18T10:00:00.000Z',
+            starting_weight_kg: 100,
+            status: 'active',
+            target_weight_kg: 80,
+            updated_at: '2026-09-18T10:00:00.000Z',
+            user_id: 'member-1',
+          },
+        ])
+      }
+      if (url.includes('/rpc/list_my_personal_weigh_ins')) {
+        return response([
+          {
+            id: 'joined-weigh-in',
+            user_id: 'member-1',
+            note: null,
+            recorded_date: '2026-09-18',
+            shared_challenge_ids: [],
+            updated_at: '2026-09-18T10:00:00.000Z',
+            weight_kg: 89,
+          },
+        ])
+      }
+      return groupProgressResponse('joined-challenge')
+    })
+    renderDashboard(<TodayPage />, fetchMock, '/today')
+
+    expect(
+      await screen.findByText('Group · Challenge I joined · Active'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('89 kg')).toBeInTheDocument()
+    expect(screen.queryByText('My unjoined challenge')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: 'Enroll yourself' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('does not offer an ownerless member a dead enrollment action', async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo) => {
+      if (String(input).includes('/challenges?')) {
+        return response([
+          {
+            created_at: '2026-09-17T10:00:00.000Z',
+            created_by: 'owner-2',
+            description: null,
+            end_date: '2026-10-01',
+            id: 'challenge-1',
+            name: 'Another owner’s challenge',
+            owner_id: 'owner-2',
+            start_date: '2026-09-17',
+            status: 'active',
+            target_weight_kg: null,
+            updated_at: '2026-09-17T10:00:00.000Z',
+          },
+        ])
+      }
+      return response([])
+    })
+    renderDashboard(<TodayPage />, fetchMock)
+
+    expect(
+      await screen.findByText(/Ask its owner for an invitation/),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: 'Enroll yourself' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: 'Choose a joined challenge' }),
+    ).toHaveAttribute('href', '/')
+  })
+
+  it('shows a distinct loading and error state on Today', async () => {
+    let finishChallenges: (result: Response) => void = () => undefined
+    const challengeResponse = new Promise<Response>((resolve) => {
+      finishChallenges = resolve
+    })
+    const fetchMock = vi
+      .fn()
+      .mockImplementation((input: RequestInfo) =>
+        String(input).includes('/challenges?')
+          ? challengeResponse
+          : response([]),
+      )
+    renderDashboard(<TodayPage />, fetchMock)
+    expect(
+      screen.getByText('Loading your saved dashboard…'),
+    ).toBeInTheDocument()
+    finishChallenges(response({ message: 'Challenge request failed' }, 500))
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Your challenges could not be loaded. Try refreshing.',
+    )
+    expect(
+      screen.queryByRole('heading', { name: 'No challenge yet' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('hides prior-account Today data while a newly selected account loads', async () => {
+    vi.stubEnv('VITE_SUPABASE_URL', 'https://home-project.supabase.co')
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-anon-key')
+    let challengeRequestCount = 0
+    let finishSecondChallenge: (result: Response) => void = () => undefined
+    const secondChallengeResponse = new Promise<Response>((resolve) => {
+      finishSecondChallenge = resolve
+    })
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo) => {
+      const url = String(input)
+      if (url.includes('/challenges?')) {
+        challengeRequestCount += 1
+        return challengeRequestCount === 1
+          ? response([
+              {
+                created_at: '2026-09-17T10:00:00.000Z',
+                created_by: 'member-1',
+                description: null,
+                end_date: '2026-10-01',
+                id: 'account-one-challenge',
+                name: 'Account one challenge',
+                owner_id: 'member-1',
+                start_date: '2026-09-17',
+                status: 'active',
+                target_weight_kg: null,
+                updated_at: '2026-09-17T10:00:00.000Z',
+              },
+            ])
+          : secondChallengeResponse
+      }
+      if (url.includes('/participants?')) {
+        const secondAccount = challengeRequestCount > 1
+        return response([
+          {
+            challenge_id: secondAccount
+              ? 'account-two-challenge'
+              : 'account-one-challenge',
+            created_at: '2026-09-17T10:00:00.000Z',
+            display_name: 'Current participant',
+            id: secondAccount ? 'participant-two' : 'participant-one',
+            joined_at: '2026-09-17T10:00:00.000Z',
+            starting_weight_kg: 100,
+            status: 'active',
+            target_weight_kg: 80,
+            updated_at: '2026-09-17T10:00:00.000Z',
+            user_id: secondAccount ? 'member-2' : 'member-1',
+          },
+        ])
+      }
+      if (url.includes('/rpc/list_my_personal_weigh_ins')) {
+        const secondAccount = challengeRequestCount > 1
+        return response([
+          {
+            id: secondAccount ? 'weigh-in-two' : 'weigh-in-one',
+            user_id: secondAccount ? 'member-2' : 'member-1',
+            note: secondAccount
+              ? 'Account two private note'
+              : 'Account one private note',
+            recorded_date: '2026-09-17',
+            shared_challenge_ids: [],
+            updated_at: '2026-09-17T10:00:00.000Z',
+            weight_kg: secondAccount ? 70 : 90,
+          },
+        ])
+      }
+      return groupProgressResponse(
+        challengeRequestCount > 1
+          ? 'account-two-challenge'
+          : 'account-one-challenge',
+      )
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { rerender } = render(
+      <AuthContext.Provider value={authContextValue('member-1')}>
+        <MemoryRouter initialEntries={['/today']}>
+          <TodayPage />
+        </MemoryRouter>
+      </AuthContext.Provider>,
+    )
+
+    expect(
+      await screen.findByText('Account one private note'),
+    ).toBeInTheDocument()
+    rerender(
+      <AuthContext.Provider value={authContextValue('member-2')}>
+        <MemoryRouter initialEntries={['/today']}>
+          <TodayPage />
+        </MemoryRouter>
+      </AuthContext.Provider>,
+    )
+    expect(
+      screen.queryByText('Account one private note'),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByText('Loading your saved dashboard…'),
+    ).toBeInTheDocument()
+
+    finishSecondChallenge(
+      response([
+        {
+          created_at: '2026-09-18T10:00:00.000Z',
+          created_by: 'owner-2',
+          description: null,
+          end_date: '2026-10-01',
+          id: 'account-two-challenge',
+          name: 'Account two challenge',
+          owner_id: 'owner-2',
+          start_date: '2026-09-17',
+          status: 'active',
+          target_weight_kg: null,
+          updated_at: '2026-09-18T10:00:00.000Z',
+        },
+      ]),
+    )
+    expect(
+      await screen.findByText('Account two private note'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('70 kg')).toBeInTheDocument()
+    expect(screen.queryByText('Account one challenge')).not.toBeInTheDocument()
+  })
+
   it('renders saved history and trend on Progress', async () => {
     const fetchMock = vi.fn()
     dashboardResponses().forEach((item) =>
@@ -315,12 +1059,30 @@ describe('HomePage', () => {
     fetchMock.mockResolvedValueOnce(response([]))
     renderDashboard(<ProgressPage />, fetchMock)
 
-    await waitFor(() => {
-      const historyItems = screen.getAllByRole('listitem')
-      expect(historyItems[0]).toHaveTextContent('2026-09-18: 90 kg')
-      expect(historyItems[1]).toHaveTextContent('2026-09-17: 95 kg')
+    const historyTable = await screen.findByRole('table', {
+      name: 'Your saved personal weigh-ins',
     })
-    expect(screen.getByText('Trend: -5 kg')).toBeInTheDocument()
+    const historyRows = within(historyTable).getAllByRole('row')
+    expect(historyRows[1]).toHaveTextContent('90.00 kg')
+    expect(historyRows[1]).toHaveTextContent('−5 kg')
+    expect(historyRows[2]).toHaveTextContent('95.00 kg')
+    expect(
+      within(historyTable).getAllByRole('button', { name: /^Edit weight/ }),
+    ).toHaveLength(2)
+    expect(
+      screen.queryByRole('list', { name: 'Your own personal entry actions' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByText(/Change from first to latest saved check-in: −5 kg/),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('img', { name: /2 saved weigh-ins/ }),
+    ).toHaveAttribute(
+      'aria-label',
+      expect.stringContaining(
+        '2026-09-17, 95 kilograms to 2026-09-18, 90 kilograms',
+      ),
+    )
   })
 
   it('shows the provisional shared leader from the authorized RPC only', async () => {
@@ -371,7 +1133,7 @@ describe('HomePage', () => {
     })
     expect(
       fetchMock.mock.calls.filter(([url]) =>
-        String(url).includes('/weigh_ins?'),
+        String(url).includes('/rpc/list_my_personal_weigh_ins'),
       ),
     ).toHaveLength(1)
   })
@@ -447,6 +1209,27 @@ describe('HomePage', () => {
     expect(screen.getByText('Weight-loss goal')).toBeInTheDocument()
   })
 
+  it('keeps Goals loading and error feedback distinct', async () => {
+    const pendingFetch = vi.fn(() => new Promise<Response>(() => undefined))
+    renderDashboard(<GoalsPage />, pendingFetch, '/goals?challenge=challenge-1')
+    expect(
+      screen.getByText('Loading your saved dashboard…'),
+    ).toBeInTheDocument()
+    cleanup()
+
+    const failedFetch = vi
+      .fn()
+      .mockImplementation((input: RequestInfo) =>
+        String(input).includes('/challenges?')
+          ? response({ message: 'Request failed' }, 500)
+          : response([]),
+      )
+    renderDashboard(<GoalsPage />, failedFetch, '/goals?challenge=challenge-1')
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Your challenges could not be loaded. Try refreshing.',
+    )
+  })
+
   it.each([
     {
       current: 90,
@@ -465,13 +1248,20 @@ describe('HomePage', () => {
     {
       current: 80,
       directionLabel: 'Maintenance goal',
-      expected: 100,
       starting: 80,
       target: 80,
+      maintenance: true,
     },
   ])(
     'renders bounded saved progress for $directionLabel',
-    async ({ current, directionLabel, expected, starting, target }) => {
+    async ({
+      current,
+      directionLabel,
+      expected,
+      starting,
+      target,
+      maintenance,
+    }) => {
       const [challengeResponse, participantResponse] = dashboardResponses()
       const challenge = await challengeResponse.json()
       const participant = await participantResponse.json()
@@ -497,12 +1287,19 @@ describe('HomePage', () => {
 
       renderDashboard(<GoalsPage />, fetchMock)
 
-      const progress = await screen.findByRole('progressbar', {
-        name: `Milestone progress: ${expected}% complete`,
-      })
-      expect(progress).toHaveAttribute('aria-valuenow', `${expected}`)
+      if (maintenance) {
+        expect(
+          await screen.findByText(/Normal check-in fluctuations are shown/),
+        ).toBeInTheDocument()
+        expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+      } else {
+        const progress = await screen.findByRole('progressbar', {
+          name: `Milestone progress: ${expected}% complete`,
+        })
+        expect(progress).toHaveAttribute('aria-valuenow', `${expected}`)
+        expect(progress).not.toHaveAttribute('aria-valuenow', 'NaN')
+      }
       expect(screen.getByText(directionLabel)).toBeInTheDocument()
-      expect(progress).not.toHaveAttribute('aria-valuenow', 'NaN')
     },
   )
 
@@ -544,11 +1341,17 @@ describe('HomePage', () => {
       renderDashboard(page, fetchMock)
 
       await waitFor(() =>
-        expect(screen.getByText('Autumn challenge')).toBeInTheDocument(),
+        expect(
+          screen.getByText(
+            _ === 'Today'
+              ? /Autumn challenge · Active/
+              : 'Group · Autumn challenge',
+          ),
+        ).toBeInTheDocument(),
       )
       expect(
         fetchMock.mock.calls.some(([url]) =>
-          String(url).includes('participant_id=eq.participant-1'),
+          String(url).includes('/rpc/list_my_personal_weigh_ins'),
         ),
       ).toBe(true)
       const challengeRequest = fetchMock.mock.calls.find(([url]) =>
@@ -579,6 +1382,20 @@ describe('GroupDashboardPage', () => {
         target_weight_kg: null,
         updated_at: '2026-09-17T10:00:00.000Z',
       },
+      {
+        challenge_kind: 'personal',
+        created_at: '2026-09-17T10:00:00.000Z',
+        created_by: 'owner-1',
+        description: null,
+        end_date: '2026-10-01',
+        id: 'personal-1',
+        name: 'Private plan',
+        owner_id: 'owner-1',
+        start_date: '2026-09-17',
+        status: 'active',
+        target_weight_kg: 75,
+        updated_at: '2026-09-17T10:00:00.000Z',
+      },
     ]
     const fetchMock = vi
       .fn()
@@ -602,6 +1419,7 @@ describe('GroupDashboardPage', () => {
           },
         ]),
       )
+      .mockResolvedValueOnce(provisionalLeaderResponse())
       .mockResolvedValueOnce(response(challengePayload))
       .mockResolvedValueOnce(
         response([
@@ -620,6 +1438,13 @@ describe('GroupDashboardPage', () => {
           },
         ]),
       )
+      .mockResolvedValueOnce(
+        provisionalLeaderResponse({
+          eligibleParticipantCount: 0,
+          leaderNames: [],
+          state: 'no-eligible-candidates',
+        }),
+      )
       .mockResolvedValueOnce(response(challengePayload))
       .mockResolvedValueOnce(
         response([
@@ -637,26 +1462,84 @@ describe('GroupDashboardPage', () => {
             weekly_winner_names: ['Casey'],
           },
         ]),
+      )
+      .mockResolvedValueOnce(
+        provisionalLeaderResponse({
+          eligibleParticipantCount: 0,
+          leaderNames: [],
+          state: 'no-eligible-candidates',
+        }),
       )
 
     renderDashboard(
       <GroupDashboardPage />,
-      fetchMock,
-      '/group?challenge=challenge-1',
+      vi.fn((url: RequestInfo | URL, init?: RequestInit) =>
+        String(url).includes('/rpc/get_group_chart_history') ||
+        String(url).includes('/rpc/get_group_member_progress')
+          ? Promise.resolve(response([]))
+          : fetchMock(url, init),
+      ),
+      '/group?challenge=',
     )
 
     expect(
-      await screen.findByRole('heading', { name: 'Weekly winners' }),
+      await screen.findByRole('heading', { name: 'Weekly result' }),
     ).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: /Group · Autumn challenge/ }),
+    ).toHaveAttribute('aria-current', 'page')
+    expect(
+      screen.queryByRole('link', { name: /Personal tracking/ }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: /Personal ·/ }),
+    ).not.toBeInTheDocument()
     expect(screen.getByText('48.5%')).toBeInTheDocument()
     expect(screen.getByText(/Shared weekly winners/)).toBeInTheDocument()
     expect(
       screen.getByText(/based on 2 of 3 active members/),
     ).toBeInTheDocument()
-    expect(screen.getByText('Ava')).toBeInTheDocument()
-    expect(screen.getByText('Ben')).toBeInTheDocument()
+    expect(screen.getAllByText('Ava')).toHaveLength(2)
+    expect(screen.getAllByText('Ben')).toHaveLength(2)
+    expect(
+      screen.getByRole('heading', { name: 'Provisional leader' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Shared provisional leaders')).toBeInTheDocument()
+    const provisionalLeaderRegion = screen.getByRole('region', {
+      name: 'Provisional leader',
+    })
+    expect(provisionalLeaderRegion).toHaveTextContent('Ties are shared')
+    expect(
+      screen.queryByRole('navigation', { name: 'Group sections' }),
+    ).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(
+        screen.getByRole('region', {
+          name: 'Group chart and weigh-in history',
+        }),
+      ).toBeInTheDocument(),
+    )
+    const unavailableHistory = screen.getByRole('region', {
+      name: 'Group chart and weigh-in history',
+    })
+    expect(unavailableHistory).not.toHaveAttribute('aria-disabled')
+    expect(unavailableHistory).toHaveTextContent(
+      'Explicitly shared dates and weights only.',
+    )
+    expect(
+      within(unavailableHistory).queryByRole('img'),
+    ).not.toBeInTheDocument()
+    expect(
+      within(unavailableHistory).queryByRole('table'),
+    ).not.toBeInTheDocument()
+    expect(
+      within(unavailableHistory).queryByRole('button'),
+    ).not.toBeInTheDocument()
     expect(
       screen.queryByText('do not render private notes'),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('do not expose provisional notes'),
     ).not.toBeInTheDocument()
     expect(screen.queryByText('91.5')).not.toBeInTheDocument()
     expect(
@@ -670,12 +1553,24 @@ describe('GroupDashboardPage', () => {
       target_challenge_id: 'challenge-1',
       target_current_sunday: currentSunday,
     })
+    const provisionalRequest = fetchMock.mock.calls.find(([url]) =>
+      String(url).includes('/rpc/get_provisional_group_leader_summary'),
+    )
+    expect(JSON.parse(String(provisionalRequest?.[1]?.body))).toEqual({
+      target_challenge_id: 'challenge-1',
+      target_current_date: localDateOnly(),
+    })
 
     fireEvent.click(
       screen.getByRole('button', { name: 'Refresh shared progress' }),
     )
     expect(await screen.findByText('Casey')).toBeInTheDocument()
     expect(screen.queryByText('Ava')).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(
+        screen.getByRole('region', { name: 'Provisional leader' }),
+      ).toHaveTextContent('No provisional leader is available yet'),
+    )
     expect(
       await screen.findByText('Weekly result updated: Casey.'),
     ).toHaveAttribute('role', 'status')
@@ -690,7 +1585,57 @@ describe('GroupDashboardPage', () => {
     )
   })
 
-  it('does not render group data when the membership-checked RPC denies access', async () => {
+  it('loads selected-group summaries for an owner who is not enrolled', async () => {
+    const fetchMock = vi.fn((...args: Parameters<typeof fetch>) => {
+      const url = String(args[0])
+      if (url.includes('/challenges?')) {
+        return response([
+          {
+            created_at: '2026-09-17T10:00:00.000Z',
+            created_by: 'owner-1',
+            description: null,
+            end_date: '2026-10-01',
+            id: 'challenge-1',
+            name: 'Autumn challenge',
+            owner_id: 'owner-1',
+            start_date: '2026-09-17',
+            status: 'active',
+            target_weight_kg: null,
+            updated_at: '2026-09-17T10:00:00.000Z',
+          },
+        ])
+      }
+      if (url.includes('/rpc/get_group_progress_summary')) {
+        return groupProgressResponse()
+      }
+      if (url.includes('/rpc/get_provisional_group_leader_summary')) {
+        return provisionalLeaderResponse()
+      }
+      return response([])
+    })
+
+    renderDashboard(
+      <GroupDashboardPage />,
+      fetchMock,
+      '/group?challenge=challenge-1',
+      'owner-1',
+    )
+
+    expect(await screen.findByText('40%')).toBeInTheDocument()
+    expect(
+      screen.getByRole('region', { name: 'Weekly result' }),
+    ).toBeInTheDocument()
+    expect(
+      fetchMock.mock.calls.some(([url]) =>
+        String(url).includes('/rpc/get_provisional_group_leader_summary'),
+      ),
+    ).toBe(true)
+  })
+
+  it('allows an owner who is an active challenge member', async () => {
+    const currentSunday = mostRecentSunday()
+    const previousSundayDate = new Date(`${currentSunday}T00:00:00.000Z`)
+    previousSundayDate.setUTCDate(previousSundayDate.getUTCDate() - 7)
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
@@ -711,15 +1656,315 @@ describe('GroupDashboardPage', () => {
         ]),
       )
       .mockResolvedValueOnce(
-        response(
+        response([
           {
-            code: '42501',
-            details: 'internal row detail',
-            hint: null,
-            message: 'Group membership required.',
+            active_participant_count: 2,
+            average_completion_percentage: 35,
+            challenge_id: 'challenge-1',
+            current_sunday: currentSunday,
+            eligible_participant_count: 1,
+            participants_with_progress_count: 1,
+            participants_with_recorded_weight_count: 1,
+            previous_sunday: previousSundayDate.toISOString().slice(0, 10),
+            reached_target_count: 0,
+            weekly_winner_count: 1,
+            weekly_winner_names: ['Owner'],
           },
-          403,
-        ),
+        ]),
+      )
+      .mockResolvedValueOnce(
+        provisionalLeaderResponse({
+          activeParticipantCount: 2,
+          eligibleParticipantCount: 1,
+          leaderNames: ['Owner'],
+        }),
+      )
+
+    renderDashboard(
+      <GroupDashboardPage />,
+      fetchMock,
+      '/group?challenge=challenge-1',
+      'owner-1',
+    )
+
+    expect(await screen.findByText('35%')).toBeInTheDocument()
+    expect(screen.getAllByText('Owner')).toHaveLength(2)
+    expect(
+      screen.queryByText(/Shared progress is unavailable for this challenge/),
+    ).not.toBeInTheDocument()
+  })
+
+  it('keeps authorized summary visible when the provisional RPC fails', async () => {
+    const challengePayload = [
+      {
+        created_at: '2026-09-17T10:00:00.000Z',
+        created_by: 'owner-1',
+        description: null,
+        end_date: '2026-10-01',
+        id: 'challenge-1',
+        name: 'Autumn challenge',
+        owner_id: 'owner-1',
+        start_date: '2026-09-17',
+        status: 'active',
+        target_weight_kg: null,
+        updated_at: '2026-09-17T10:00:00.000Z',
+      },
+    ]
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(response(challengePayload))
+      .mockResolvedValueOnce(groupProgressResponse())
+      .mockResolvedValueOnce(
+        response({ message: 'Internal server error' }, 500),
+      )
+
+    renderDashboard(
+      <GroupDashboardPage />,
+      fetchMock,
+      '/group?challenge=challenge-1',
+    )
+
+    expect(await screen.findByText('40%')).toBeInTheDocument()
+    expect(
+      await screen.findByText(
+        'Provisional group progress is unavailable right now.',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Internal server error')).not.toBeInTheDocument()
+  })
+
+  it('does not render outsider data after membership RPC denial', async () => {
+    const challengePayload = [
+      {
+        created_at: '2026-09-17T10:00:00.000Z',
+        created_by: 'owner-1',
+        description: null,
+        end_date: '2026-10-01',
+        id: 'challenge-1',
+        name: 'Autumn challenge',
+        owner_id: 'owner-1',
+        start_date: '2026-09-17',
+        status: 'active',
+        target_weight_kg: null,
+        updated_at: '2026-09-17T10:00:00.000Z',
+      },
+    ]
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(response(challengePayload))
+      .mockResolvedValueOnce(
+        response({ message: 'Group membership required.' }, 403),
+      )
+
+    renderDashboard(
+      <GroupDashboardPage />,
+      fetchMock,
+      '/group?challenge=challenge-1',
+      'outsider-1',
+    )
+
+    expect(
+      await screen.findByText(
+        /Shared progress is unavailable for this challenge/,
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('region', { name: 'Weekly result' }),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText('Ava')).not.toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps outsider data unavailable when no challenge is visible', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(response([]))
+    renderDashboard(
+      <GroupDashboardPage />,
+      fetchMock,
+      '/group?challenge=challenge-1',
+      'outsider-1',
+    )
+
+    expect(
+      await screen.findByText(
+        'No group challenge is available for this account.',
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { name: 'Group progress' }),
+    ).not.toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('switches and refreshes only the selected challenge summary', async () => {
+    const challenges = [
+      {
+        created_at: '2026-09-17T10:00:00.000Z',
+        created_by: 'owner-1',
+        description: null,
+        end_date: '2026-10-01',
+        id: 'challenge-1',
+        name: 'Autumn challenge',
+        owner_id: 'owner-1',
+        start_date: '2026-09-17',
+        status: 'active',
+        target_weight_kg: null,
+        updated_at: '2026-09-17T10:00:00.000Z',
+      },
+      {
+        created_at: '2026-09-17T10:00:00.000Z',
+        created_by: 'member-1',
+        description: null,
+        end_date: '2026-12-01',
+        id: 'challenge-2',
+        name: 'Winter challenge',
+        owner_id: 'member-1',
+        start_date: '2026-10-01',
+        status: 'active',
+        target_weight_kg: null,
+        updated_at: '2026-09-17T10:00:00.000Z',
+      },
+    ]
+    const currentSunday = mostRecentSunday()
+    const previousSundayDate = new Date(`${currentSunday}T00:00:00.000Z`)
+    previousSundayDate.setUTCDate(previousSundayDate.getUTCDate() - 7)
+    const previousSunday = previousSundayDate.toISOString().slice(0, 10)
+    const groupResponses = [
+      {
+        activeCount: 3,
+        average: 45.1,
+        challengeId: 'challenge-1',
+      },
+      {
+        activeCount: 5,
+        average: 61.2,
+        challengeId: 'challenge-2',
+      },
+      {
+        activeCount: 6,
+        average: 64.3,
+        challengeId: 'challenge-2',
+      },
+    ]
+    const leaderResponses = [
+      { challengeId: 'challenge-1', leaderNames: ['Ava'] },
+      { challengeId: 'challenge-2', leaderNames: ['Jamie'] },
+      { challengeId: 'challenge-2', leaderNames: ['Jo'] },
+    ]
+    const fetchMock = vi.fn((...args: Parameters<typeof fetch>) => {
+      const url = String(args[0])
+      if (url.includes('/challenges?')) return response(challenges)
+      if (url.includes('/rpc/get_group_progress_summary')) {
+        const result = groupResponses.shift()!
+        return response([
+          {
+            active_participant_count: result.activeCount,
+            average_completion_percentage: result.average,
+            challenge_id: result.challengeId,
+            current_sunday: currentSunday,
+            eligible_participant_count: 0,
+            participants_with_progress_count: result.activeCount,
+            participants_with_recorded_weight_count: result.activeCount,
+            previous_sunday: previousSunday,
+            reached_target_count: 0,
+            weekly_winner_count: 0,
+            weekly_winner_names: [],
+          },
+        ])
+      }
+      if (url.includes('/rpc/get_provisional_group_leader_summary')) {
+        const result = leaderResponses.shift()!
+        return provisionalLeaderResponse({
+          activeParticipantCount: 3,
+          challengeId: result.challengeId,
+          eligibleParticipantCount: result.leaderNames.length,
+          leaderNames: result.leaderNames,
+        })
+      }
+      return response([])
+    })
+
+    renderDashboard(
+      <GroupDashboardPage />,
+      fetchMock,
+      '/group?challenge=challenge-1',
+    )
+
+    expect(await screen.findByText('45.1%')).toBeInTheDocument()
+    const challengeSelector = screen.getByRole('link', {
+      name: 'Group · Winter challenge',
+    })
+    fireEvent.click(challengeSelector)
+    expect(await screen.findByText('61.2%')).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: /Group · Winter challenge/ }),
+    ).toHaveAttribute('aria-current', 'page')
+    expect(screen.queryByText('45.1%')).not.toBeInTheDocument()
+    expect(await screen.findByText('Jamie')).toBeInTheDocument()
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Refresh shared progress' }),
+    )
+    expect(await screen.findByText('64.3%')).toBeInTheDocument()
+    expect(screen.queryByText('61.2%')).not.toBeInTheDocument()
+    expect(await screen.findByText('Jo')).toBeInTheDocument()
+
+    const groupRequests = fetchMock.mock.calls.filter(([url]) =>
+      String(url).includes('/rpc/get_group_progress_summary'),
+    )
+    expect(
+      groupRequests.map(
+        ([, requestInit]) =>
+          JSON.parse(String(requestInit?.body)).target_challenge_id,
+      ),
+    ).toEqual(['challenge-1', 'challenge-2', 'challenge-2'])
+  })
+
+  it('shows real zero-data states without inventing group values', async () => {
+    const challengePayload = [
+      {
+        created_at: '2026-09-17T10:00:00.000Z',
+        created_by: 'owner-1',
+        description: null,
+        end_date: '2026-10-01',
+        id: 'challenge-1',
+        name: 'Autumn challenge',
+        owner_id: 'owner-1',
+        start_date: '2026-09-17',
+        status: 'active',
+        target_weight_kg: null,
+        updated_at: '2026-09-17T10:00:00.000Z',
+      },
+    ]
+    const currentSunday = mostRecentSunday()
+    const previousSundayDate = new Date(`${currentSunday}T00:00:00.000Z`)
+    previousSundayDate.setUTCDate(previousSundayDate.getUTCDate() - 7)
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(response(challengePayload))
+      .mockResolvedValueOnce(
+        response([
+          {
+            active_participant_count: 0,
+            average_completion_percentage: null,
+            challenge_id: 'challenge-1',
+            current_sunday: currentSunday,
+            eligible_participant_count: 0,
+            participants_with_progress_count: 0,
+            participants_with_recorded_weight_count: 0,
+            previous_sunday: previousSundayDate.toISOString().slice(0, 10),
+            reached_target_count: 0,
+            weekly_winner_count: 0,
+            weekly_winner_names: [],
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        provisionalLeaderResponse({
+          activeParticipantCount: 0,
+          eligibleParticipantCount: 0,
+          leaderNames: [],
+          state: 'solo-challenge',
+        }),
       )
 
     renderDashboard(
@@ -729,9 +1974,156 @@ describe('GroupDashboardPage', () => {
     )
 
     expect(
-      await screen.findByText(/available to active members only/),
+      await screen.findByText(
+        'No weekly result is available until participants record both Sunday weigh-ins.',
+      ),
     ).toBeInTheDocument()
-    expect(screen.queryByText('Weekly winners')).not.toBeInTheDocument()
-    expect(screen.queryByText('internal row detail')).not.toBeInTheDocument()
+    const activeMembers = screen.getByText('Active members').parentElement
+    expect(activeMembers).toHaveTextContent('0')
+    const averageProgress = screen.getByText(
+      'Average goal progress',
+    ).parentElement
+    expect(averageProgress).toHaveTextContent('—')
+    expect(
+      screen.getByText(
+        'No active members are available for a provisional result.',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/sample/i)).not.toBeInTheDocument()
+  })
+
+  it('keeps Group loading and error feedback distinct', async () => {
+    const pendingFetch = vi.fn(() => new Promise<Response>(() => undefined))
+    renderDashboard(
+      <GroupDashboardPage />,
+      pendingFetch,
+      '/group?challenge=challenge-1',
+    )
+    expect(
+      screen.getByText('Loading your saved dashboard…'),
+    ).toBeInTheDocument()
+    cleanup()
+
+    const failedFetch = vi
+      .fn()
+      .mockImplementation((input: RequestInfo) =>
+        String(input).includes('/challenges?')
+          ? response({ message: 'Request failed' }, 500)
+          : response([]),
+      )
+    renderDashboard(
+      <GroupDashboardPage />,
+      failedFetch,
+      '/group?challenge=challenge-1',
+    )
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Unable to load the selected group challenge.',
+    )
+  })
+})
+
+describe('personal/group challenge boundaries', () => {
+  it('does not request shared progress for a selected personal challenge', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      response([
+        {
+          challenge_kind: 'personal',
+          created_at: '2026-09-17T10:00:00.000Z',
+          created_by: 'member-1',
+          description: null,
+          end_date: '2026-10-01',
+          id: 'personal-1',
+          name: 'Private plan',
+          owner_id: 'member-1',
+          start_date: '2026-09-17',
+          status: 'active',
+          target_weight_kg: null,
+          updated_at: '2026-09-17T10:00:00.000Z',
+        },
+      ]),
+    )
+
+    renderDashboard(
+      <GroupDashboardPage />,
+      fetchMock,
+      '/group?challenge=personal-1',
+    )
+
+    expect(
+      await screen.findByText(/Personal challenges are private/),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: /Personal/ }),
+    ).not.toBeInTheDocument()
+    expect(
+      fetchMock.mock.calls.some(([url]) =>
+        String(url).includes('/rpc/get_group_progress_summary'),
+      ),
+    ).toBe(false)
+  })
+
+  it('keeps personal and group contexts visible while withholding personal group actions', async () => {
+    const rows = [
+      {
+        id: 'personal-1',
+        name: 'Private plan',
+        challenge_kind: 'personal',
+        owner_id: 'member-1',
+        created_by: 'member-1',
+        start_date: '2026-09-17',
+        end_date: '2026-12-01',
+        status: 'active',
+        created_at: '2026-09-17T00:00:00Z',
+        updated_at: '2026-09-17T00:00:00Z',
+        description: null,
+        target_weight_kg: null,
+      },
+      {
+        id: 'group-1',
+        name: 'Team reset',
+        challenge_kind: 'group',
+        owner_id: 'member-1',
+        created_by: 'member-1',
+        start_date: '2026-09-17',
+        end_date: '2026-12-01',
+        status: 'active',
+        created_at: '2026-09-17T00:00:00Z',
+        updated_at: '2026-09-17T00:00:00Z',
+        description: null,
+        target_weight_kg: null,
+      },
+    ]
+    const fetchMock = vi.fn((input: RequestInfo | URL) =>
+      Promise.resolve(
+        response(String(input).includes('/challenges?') ? rows : []),
+      ),
+    )
+    renderSignedIn(fetchMock, '/?challenge=personal-1')
+    expect(
+      await screen.findByRole('region', { name: 'Personal challenge' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('region', { name: 'Group challenges' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /Private plan/ }),
+    ).toHaveAttribute('aria-pressed', 'true')
+    expect(
+      screen.queryByRole('link', { name: 'Invite participants' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: 'Group progress' }),
+    ).not.toBeInTheDocument()
+    expect(
+      fetchMock.mock.calls.some(([url]) => String(url).includes('/rpc/')),
+    ).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: /Team reset/ }))
+    expect(screen.getByRole('button', { name: /Team reset/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(
+      screen.getAllByRole('link', { name: 'Invite participants' })[0],
+    ).toHaveAttribute('href', '/challenge/invites?challenge=group-1')
   })
 })

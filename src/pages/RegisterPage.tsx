@@ -95,7 +95,7 @@ export function RegisterPage() {
   return (
     <section
       aria-labelledby="register-title"
-      className="mx-auto flex w-full max-w-xl flex-1 items-center"
+      className="auth-page mx-auto flex w-full max-w-md flex-1 items-center"
     >
       <Card className="w-full p-8 sm:p-10">
         <PageHeader
@@ -157,8 +157,8 @@ export function RegisterPage() {
               aria-live="polite"
               className={
                 state.status === 'error' || submitError
-                  ? 'text-sm text-red-700'
-                  : 'text-sm text-emerald-700'
+                  ? 'text-sm text-danger-800'
+                  : 'text-sm text-forest-700'
               }
             >
               {state.status === 'error'
@@ -176,10 +176,10 @@ export function RegisterPage() {
           </Button>
         </form>
 
-        <p className="mt-6 text-sm leading-6 text-slate-600">
+        <p className="mt-6 text-sm leading-6 text-ink-muted">
           Already have an account?{' '}
           <Link
-            className="text-emerald-700 underline"
+            className="text-forest-700 underline"
             state={location.state}
             to="/login"
           >
@@ -191,13 +191,13 @@ export function RegisterPage() {
           className="mt-6 flex flex-col items-start gap-4"
         >
           <Link
-            className="inline-block text-sm text-emerald-700 underline"
+            className="inline-block text-sm text-forest-700 underline"
             to="/forgot-password"
           >
             Forgot your password?
           </Link>
           <Link
-            className="inline-block text-sm text-emerald-700 underline"
+            className="inline-block text-sm text-forest-700 underline"
             to="/"
           >
             Back to home
@@ -205,7 +205,7 @@ export function RegisterPage() {
         </nav>
         {state.status === 'verification-pending' ? (
           <Link
-            className="mt-4 inline-block text-sm text-emerald-700 underline"
+            className="mt-4 inline-block text-sm text-forest-700 underline"
             state={location.state}
             to="/login"
           >

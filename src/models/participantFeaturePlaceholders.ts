@@ -16,14 +16,14 @@ export type ParticipantFeaturePlaceholders = {
 function noRecordsPlaceholder(feature: 'streak' | 'weekly-win') {
   if (feature === 'streak') {
     return {
-      message: 'Record a weigh-in before future streak tracking can begin.',
+      message: 'Record weight before future streak tracking can begin.',
       state: 'no-records' as const,
       value: null,
     }
   }
 
   return {
-    message: 'Record a weigh-in before weekly wins can be assessed.',
+    message: 'Record weight before weekly wins can be assessed.',
     state: 'no-records' as const,
     value: null,
   }

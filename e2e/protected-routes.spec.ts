@@ -22,7 +22,7 @@ test('keeps the group dashboard behind the authenticated route boundary', async 
     page.getByRole('heading', { name: 'Welcome back.' }),
   ).toBeVisible()
   await expect(
-    page.getByRole('heading', { name: 'Group dashboard' }),
+    page.getByRole('heading', { name: 'Group', exact: true }),
   ).not.toBeVisible()
 })
 

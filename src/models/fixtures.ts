@@ -2,6 +2,7 @@ import type { Challenge } from './challenge'
 import type { Participant } from './participant'
 
 export const challengeFixture: Challenge = {
+  kind: 'group',
   createdAt: '2026-09-15T08:00:00.000Z',
   createdBy: 'user-owner',
   description: 'A shared sustainable progress challenge.',

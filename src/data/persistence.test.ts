@@ -13,6 +13,39 @@ afterEach(() => {
 })
 
 describe('challenge and participant persistence', () => {
+  it('reads legacy local challenges as groups without rewriting saved JSON', async () => {
+    const legacyJson = JSON.stringify([
+      {
+        createdAt: '2026-09-17T10:00:00.000Z',
+        createdBy: 'legacy-owner',
+        endDate: '2026-12-01',
+        id: 'legacy-challenge',
+        name: 'Legacy group',
+        ownerId: 'legacy-owner',
+        startDate: '2026-09-01',
+        status: 'draft',
+        updatedAt: '2026-09-17T10:00:00.000Z',
+      },
+    ])
+    window.localStorage.setItem('slimpossible.local.challenges', legacyJson)
+    const persistence = createPersistence(signedOutState)
+    if (persistence.mode !== 'local') {
+      throw new Error('Expected local persistence without public configuration')
+    }
+
+    await expect(
+      persistence.repositories.challenges.listOwned('legacy-owner'),
+    ).resolves.toMatchObject({
+      data: [
+        expect.objectContaining({ id: 'legacy-challenge', kind: 'group' }),
+      ],
+      state: 'success',
+    })
+    expect(window.localStorage.getItem('slimpossible.local.challenges')).toBe(
+      legacyJson,
+    )
+  })
+
   it('shows owners and active members only in the local challenge preview', async () => {
     const persistence = createPersistence(signedOutState)
     if (persistence.mode !== 'local') {
@@ -157,6 +190,7 @@ describe('challenge and participant persistence', () => {
           date: '2026-10-01',
           note: 'Corrected reading.',
           participantId: firstParticipant.data.id,
+          shareWithGroup: false,
           weightKg: 91.5,
         },
       ],
@@ -172,10 +206,141 @@ describe('challenge and participant persistence', () => {
           date: '2026-10-01',
           note: 'Second participant private note.',
           participantId: secondParticipant.data.id,
+          shareWithGroup: false,
           weightKg: 85.7,
         },
       ],
       state: 'success',
+    })
+  })
+
+  it('keeps personal weigh-ins independent of challenges and unique by user/date', async () => {
+    const persistence = createPersistence(signedOutState)
+    if (persistence.mode !== 'local') {
+      throw new Error('Expected local persistence without public configuration')
+    }
+
+    const first = await persistence.repositories.personalWeighIns.save(
+      'member-1',
+      {
+        date: '2026-10-06',
+        note: 'Private note',
+        sharedChallengeIds: [],
+        weightKg: 82.4,
+      },
+    )
+    expect(first.state).toBe('success')
+
+    const correction = await persistence.repositories.personalWeighIns.save(
+      'member-1',
+      {
+        date: '2026-10-06',
+        note: 'Corrected private note',
+        sharedChallengeIds: [],
+        weightKg: 82.1,
+      },
+    )
+    expect(correction).toMatchObject({
+      data: {
+        date: '2026-10-06',
+        note: 'Corrected private note',
+        sharedChallengeIds: [],
+        weightKg: 82.1,
+      },
+      state: 'success',
+    })
+    if (first.state === 'success' && correction.state === 'success') {
+      expect(correction.data.id).toBe(first.data.id)
+    }
+    await expect(
+      persistence.repositories.personalWeighIns.listForUser('member-1'),
+    ).resolves.toMatchObject({ data: [{ weightKg: 82.1 }], state: 'success' })
+    await expect(
+      persistence.repositories.personalWeighIns.listForUser('member-2'),
+    ).resolves.toEqual({ data: [], state: 'empty' })
+    await expect(
+      persistence.repositories.personalWeighIns.delete(
+        'member-2',
+        correction.state === 'success' ? correction.data.id : '',
+      ),
+    ).resolves.toEqual({ data: null, state: 'empty' })
+  })
+
+  it('shares setup-default draft groups for owners and active members, rejecting other lifecycle/access states atomically', async () => {
+    const persistence = createPersistence(signedOutState)
+    if (persistence.mode !== 'local')
+      throw new Error('Expected local persistence')
+    const group = await persistence.repositories.challenges.create({
+      name: 'Setup default',
+      ownerId: 'owner-1',
+      createdBy: 'owner-1',
+      startDate: '2026-10-01',
+      endDate: '2026-12-31',
+    })
+    if (group.state !== 'success') throw new Error('Expected group')
+    expect(group.data.status).toBe('draft')
+    const input = {
+      date: '2026-10-06',
+      weightKg: 82,
+      sharedChallengeIds: [group.data.id],
+    }
+    expect(
+      await persistence.repositories.personalWeighIns.save('owner-1', input),
+    ).toMatchObject({ state: 'success' })
+    const member = await persistence.repositories.participants.create({
+      challengeId: group.data.id,
+      userId: 'member-1',
+      displayName: 'Member',
+      status: 'active',
+      startingWeightKg: 90,
+      targetWeightKg: 80,
+    })
+    if (member.state !== 'success') throw new Error('Expected member')
+    expect(
+      await persistence.repositories.personalWeighIns.save('member-1', input),
+    ).toMatchObject({ state: 'success' })
+    expect(
+      await persistence.repositories.personalWeighIns.save('outsider', input),
+    ).toMatchObject({ state: 'error' })
+    await persistence.repositories.participants.update(member.data.id, {
+      ...member.data,
+      status: 'withdrawn',
+    })
+    expect(
+      await persistence.repositories.personalWeighIns.save('member-1', {
+        ...input,
+        weightKg: 81,
+      }),
+    ).toMatchObject({ state: 'error' })
+    for (const status of ['completed', 'archived'] as const) {
+      await persistence.repositories.challenges.update(group.data.id, {
+        ...group.data,
+        status,
+      })
+      expect(
+        await persistence.repositories.personalWeighIns.save('owner-1', input),
+      ).toMatchObject({ state: 'error' })
+    }
+    const personal = await persistence.repositories.challenges.create({
+      name: 'Private',
+      kind: 'personal',
+      ownerId: 'owner-1',
+      createdBy: 'owner-1',
+      startDate: '2026-10-01',
+      endDate: '2026-12-31',
+    })
+    if (personal.state !== 'success')
+      throw new Error('Expected personal challenge')
+    expect(
+      await persistence.repositories.personalWeighIns.save('owner-1', {
+        ...input,
+        sharedChallengeIds: [personal.data.id],
+      }),
+    ).toMatchObject({ state: 'error' })
+    expect(
+      await persistence.repositories.personalWeighIns.listForUser('member-1'),
+    ).toMatchObject({
+      data: [{ weightKg: 82, sharedChallengeIds: [group.data.id] }],
     })
   })
 

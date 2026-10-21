@@ -12,40 +12,51 @@ test('keeps the application shell usable at 390px without page overflow', async 
   ).toBeVisible()
   await expect(page.getByRole('main')).toBeVisible()
   await expect(page.getByRole('contentinfo')).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Overview' })).toHaveAttribute(
-    'aria-current',
-    'page',
-  )
   await expect(
-    page.getByRole('button', { name: 'Group history, coming soon' }),
-  ).toBeDisabled()
+    page.getByRole('link', { name: 'Log in', exact: true }),
+  ).toHaveAttribute('href', '/login')
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Primary navigation' })
+      .getByRole('link'),
+  ).toHaveCount(3)
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
     .toBe(390)
 
-  await page.getByRole('link', { name: 'Today' }).click()
+  await page.getByRole('link', { name: 'Log in', exact: true }).click()
   await expect(page).toHaveURL(/\/login$/)
   await expect(
     page.getByRole('heading', { name: 'Welcome back.' }),
   ).toBeVisible()
 })
 
-test('shows all live destinations without horizontal overflow on desktop', async ({
+test('shows only the actual workspaces without horizontal overflow on desktop', async ({
   page,
 }) => {
   await page.setViewportSize({ height: 900, width: 1440 })
   await page.goto('/')
 
-  for (const label of [
-    'Overview',
-    'Today',
-    'My progress',
-    'Group',
-    'Goals',
-    'Weigh-in',
-  ]) {
+  for (const label of ['Home', 'Log in', 'Register']) {
     await expect(page.getByRole('link', { name: label })).toBeVisible()
   }
+  for (const retired of [
+    'Dashboard',
+    'Group',
+    'Challenges',
+    'My progress',
+    'Goals',
+  ])
+    await expect(
+      page
+        .getByRole('navigation', { name: 'Primary navigation' })
+        .getByRole('link', { name: retired, exact: true }),
+    ).toHaveCount(0)
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Primary navigation' })
+      .getByRole('link', { name: 'Weigh-in', exact: true }),
+  ).toHaveCount(0)
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
     .toBe(1440)

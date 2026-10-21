@@ -12,6 +12,13 @@ export type GroupProgressSummary = {
   weeklyWinnerNames: string[]
 }
 
+export type GroupWeighInHistoryEntry = {
+  changeSincePreviousKg: number | null
+  date: string
+  displayName: string
+  weightKg: number
+}
+
 export function mostRecentSunday(date = new Date()) {
   const sunday = new Date(date)
   sunday.setHours(0, 0, 0, 0)

@@ -17,7 +17,8 @@ Issue #117 adds the first version-controlled Supabase migration at
   normal day-to-day fluctuations.
 - `weigh_ins` stores one dated weight record for a participant. Its unique
   `(participant_id, recorded_date)` constraint prevents duplicate same-day
-  records.
+  records. The per-entry `share_with_group` flag defaults to `false`, so
+  historical rows remain private unless a participant explicitly opts in.
 
 The foreign-key path is:
 

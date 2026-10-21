@@ -4,6 +4,7 @@ export type WeighIn = {
   date: DateOnly
   note?: string
   participantId: string
+  shareWithGroup?: boolean
   weightKg: number
 }
 
