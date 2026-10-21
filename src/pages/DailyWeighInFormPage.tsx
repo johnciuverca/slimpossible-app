@@ -291,7 +291,11 @@ export function DailyWeighInFormPage() {
     setIsSaving(false)
 
     if (saved.state === 'error') {
-      setSubmitError(saved.error.message)
+      setSubmitError(
+        saved.error.code === '42501'
+          ? 'This app version can no longer save challenge weigh-ins. Refresh the page to use the latest app, then try again.'
+          : saved.error.message,
+      )
       setSuccessMessage('')
       return
     }

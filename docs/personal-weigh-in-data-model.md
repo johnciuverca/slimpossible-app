@@ -73,7 +73,12 @@ For unambiguous single-row dates, copy the exact date, weight, note, and timesta
 2. Run the read-only duplicate/conflict inventory and stop if any duplicate `(user_id, recorded_date)` needs a decision.
 3. After owner resolution, copy only unambiguous rows and exact prior opt-ins in one transaction, retaining source rows and a reconciliation map.
 4. Switch reads/writes to canonical entries while keeping explicit compatibility reads for the old challenge-specific scoring until those consumers are migrated and tested.
-5. Retire legacy writes or tables only in a separately reviewed migration after all consumers and hosted acceptance are proven.
+5. After the canonical app is live and its smoke checks pass, disable only
+   authenticated legacy INSERT/UPDATE through the separately gated manual
+   post-deploy SQL in `supabase/post-deploy/disable_legacy_weigh_in_writes.sql`;
+   do not put this cutover in the automatic migration set.
+6. Retire legacy tables only in a separately reviewed migration after all
+   consumers, retained source data, and hosted acceptance are proven.
 
 ## Application rollback
 

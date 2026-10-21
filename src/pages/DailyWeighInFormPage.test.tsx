@@ -743,6 +743,58 @@ describe('DailyWeighInFormPage', () => {
     expect(screen.getByText('No weigh-ins saved yet.')).toBeInTheDocument()
   })
 
+  it('tells a stale legacy client to refresh after legacy writes are revoked', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.includes('/participants?')) {
+        return Promise.resolve(
+          response([
+            participantRow(
+              'member-1',
+              'participant-one',
+              'challenge-one',
+              'Saved member',
+            ),
+          ]),
+        )
+      }
+      if (url.includes('/challenges?')) {
+        return Promise.resolve(
+          response([challengeRow('challenge-one', 'Saved challenge')]),
+        )
+      }
+      if (url.includes('/weigh_ins?') && init?.method === 'POST') {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              code: '42501',
+              message: 'permission denied for table weigh_ins',
+            }),
+            {
+              headers: { 'Content-Type': 'application/json' },
+              status: 403,
+            },
+          ),
+        )
+      }
+      return Promise.resolve(response([]))
+    })
+
+    renderRemotePage(fetchMock, ['/weigh-ins?challenge=challenge-one'])
+    await screen.findByText('Saved member')
+    fireEvent.change(screen.getByLabelText('Weight in kg'), {
+      target: { value: '86.2' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save weight' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'This app version can no longer save challenge weigh-ins. Refresh the page to use the latest app, then try again.',
+    )
+    expect(
+      screen.queryByText('Weigh-in saved remotely.'),
+    ).not.toBeInTheDocument()
+  })
+
   it('orders history, keeps missing days absent, and edits an existing entry', async () => {
     await renderPage()
 
