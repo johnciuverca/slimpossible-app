@@ -1,36 +1,66 @@
 # 16.5 — Connected sharing release gate status
 
-As of 2026-10-21, issue #212 remains **OPEN / NOT READY FOR RELEASE**. The
-latest staging branch was verified at
-`ed9b9a9155f072824bdfd3f96f95e50113a78582` (merge of PR #303). PR #303 adds
-release documentation and local grant-audit tests; it does not change
-application or migration behavior. The connected application evidence below
-therefore remains tied to the application tree accepted at `d24a593`, not a
-newly repeated walkthrough on the documentation/test merge.
+As of 2026-10-21, issue #212 remains **OPEN / NOT READY FOR PRODUCTION
+RELEASE**. The latest staging commit is
+`c561477de2ceda91c42fd6ac3398472a76babe6e` (PR #307), and its Vercel status
+is successful. GitHub's commit-run lookup returned no workflow run for this
+merge commit; the Quality workflows passed on the constituent PR heads
+through #307.
+
+Compared with the app tree accepted at `d24a593`, the intervening work is
+scoped: PR #303 adds local Data API grant-audit tests and release docs; PR #304
+refreshes this status doc; PR #305 changes only the legacy
+`DailyWeighInFormPage` stale-write error response and adds local cutover tests;
+PRs #306 and #307 update the owner-only recovery/cutover documentation. No
+canonical personal-sharing, group-projection, chart, or Sunday-result code
+changed. The one app behavior delta is covered by the passing local PR #305
+tests, but its SQL fence has not been executed in staging, so the stale-client
+message has not been observed against a fenced staging database. That
+operational acceptance remains under #247 and must not be inferred from local
+tests or a successful Vercel deployment.
 
 Issue #207 is **CLOSED / COMPLETED**. Its authoritative completion record says
-all six acceptance criteria were satisfied on the same application tree at
+all six acceptance criteria were satisfied on the application tree at
 `d24a593`, including responsive/mobile, keyboard/accessibility, and
-loading/empty/error-state evidence. The accessible-name concern was separately
+loading/empty/error-state evidence. Those connected results remain applicable
+to the unchanged canonical personal/group flows on `c561477`; do not repeat
+the owner/member/outsider or Sunday-result journeys. The accessible-name concern was separately
 corrected as a false alarm: Profile and Log out have accessible names, keyboard
 focus reaches both, and Escape closes the menu. Reuse the evidence recorded in
 [#207](https://github.com/johnciuverca/slimpossible-app/issues/207) and its
-linked comments; do not repeat those checks solely for PR #303.
+linked comments; do not repeat checks for the documentation/test-only PRs
+#303, #304, #306, or #307. PR #305's isolated legacy-client error branch has
+local coverage but no connected test, pending the separately gated write
+fence.
 
 The five core sharing, privacy, history, and Sunday-result criteria in #212
-are recorded complete. This does not constitute final owner sign-off. Keep
-#212 open until the release-review record is reconciled and the owner records
-the required sign-off. Production promotion remains separately gated by #247.
-No production configuration, database, backup, migration, merge, or deployment
-was changed or authorized by this status update.
+are recorded complete on candidate `911808aba56f9f8ed82f97306aa4fabc927ba79c`
+(same canonical app behavior as `d24a593`; PR #301 changed test expectations
+only). The exact prior staging project/candidates and redacted results are
+recorded in #207/#212. The current candidate `c561477` has Vercel success, but
+has not received a new connected flow walkthrough. This does not constitute
+final owner sign-off. Production promotion remains separately gated by #247.
+No production configuration, database, backup, migration, or deployment was
+changed or authorized by this status update.
 
 ## Current remaining gates
 
-- Reconcile #212's stale checklist/status text with #207's completed record and
-  the already-recorded #212 evidence. Preserve evidence provenance and exact
-  tested candidates; do not replay completed UI or authorization suites.
-- Obtain and record explicit owner sign-off for #212. It has not been inferred
-  from #207's closure or from passing tests.
+- **Completed from existing evidence:** mobile/responsive, accessibility,
+  keyboard/focus, and general loading/empty/error review under #207; the five
+  core #212 sharing/privacy/history/Sunday criteria; read-only environment and
+  Auth-redirect separation review under #247; migration ordering and stop/hold
+  rules documented in the #247 runbook. Do not rerun completed UI, SQL/RPC,
+  sharing, account-switch, or Sunday-result flows.
+- **Still needs owner action:** record explicit owner sign-off for #212; it is
+  not inferred from #207 closure, merges, or passing tests. The #212 checklist
+  item combining release review with exact-candidate evidence should retain the
+  tested candidate `911808a` and identify current staging `c561477` as
+  deployment-verified but not newly connected-walkthrough-tested.
+- **Current-candidate limitation:** PR #305's legacy-client `42501` refresh
+  message has local tests, but no connected observation on a staging database
+  with the manual fence applied. Do not apply the fence for this review. If
+  stale-client behavior is required for promotion, verify it only in #247's
+  separately approved cutover/rehearsal sequence.
 - For any later production promotion under #247, first obtain a private backup
   and successful isolated restore proof; rehearse the migration baseline and
   exact pending set; resolve and test the stale-client legacy-write control;
@@ -39,16 +69,14 @@ was changed or authorized by this status update.
   catalog equivalence is not proof of applied migration history. The proposed
   sequence is five catalog-reconciled baseline versions followed by twelve
   timestamp-ordered migrations, and has not been executed on production.
-- Keep production configuration, migration execution, main merge, and deploy
-  as separate owner approvals. The existing records say environment and Auth
-  redirect separation were checked read-only; no production setting change is
-  authorized here.
-- #247 lists post-deploy smoke coverage, but the records do not establish a
-  tested feature-disable procedure or production database rollback. Several
-  migrations have no safe inverse, and some inverses can lose sharing state.
-  Before production release, document owner-reviewed disable triggers and a
-  forward-compatible recovery/compatibility path; do not automatically run an
-  inverse migration after failure.
+- **Still open under #247, not a missing #212 feature:** fresh production
+  backup plus isolated restore proof; production migration-ledger/schema
+  reconciliation and rehearsal; and owner approval for exact SQL, main merge,
+  and deployment operations. The runbook documents post-deploy smoke order and
+  stop conditions, but no executed production smoke exists. An owner-reviewed
+  feature-disable trigger and forward-compatible recovery/compatibility plan
+  is still missing; several migrations have no safe inverse, so do not
+  automatically run inverse migrations after failure.
 
 ## Historical status snapshot — 2026-10-15 (superseded)
 
