@@ -4,10 +4,15 @@
 human-requested pause and data-preserving investigation path for the limited
 pilot. It is not an implemented kill switch, technical write lock, automated
 alert, database rollback, or authorization to change hosting/database state.
-The pilot-only backup waiver in
-[`production-backup-restore-rehearsal.md`](production-backup-restore-rehearsal.md)
-is unchanged; it is not recovery evidence. Production promotion still requires
-the separate #247 backup, migration-history, rehearsal, and approval gates.
+Backup and isolated-restore rehearsal remain **NOT EXECUTED** and are waived
+only for this limited family pilot, as recorded in the
+[`#247 runbook`](production-backup-restore-rehearsal.md). The waiver is not
+recovery evidence, does not authorize hosted SQL, migrations, settings changes,
+or deployment, and does not extend to broader release or later operations.
+Fresh schema/migration-history preflight, applicable isolated migration
+rehearsal, cutover steps, and separate exact-operation approvals remain
+distinct gates. A broader production release or later operation remains
+subject to the runbook's backup/restore requirements.
 
 ## Trigger and immediate human response
 
@@ -105,9 +110,12 @@ current state and evidence. If code is defective, prepare a reviewed,
 backward-compatible forward correction that preserves canonical and legacy
 data; use the approved staging review/test process before asking the owner
 whether to resume. If data integrity is uncertain, do not resume on the basis
-of a frontend patch alone. A production recovery decision still requires the
-fresh backup/isolated-restore and exact-operation approval gates in the #247
-runbook; the limited pilot waiver does not waive those production gates.
+of a frontend patch alone. Do not assume a backup or verified restore exists:
+both remain **NOT EXECUTED** and waived only for this limited pilot. Before any
+broader production release or later operation outside the waiver, complete the
+runbook's verified backup/restore gate. The waiver does not remove the fresh
+schema/migration-history preflight, applicable migration rehearsal, cutover, or
+separate exact-operation approval requirements.
 
 ## Resume criteria
 
