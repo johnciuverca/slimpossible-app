@@ -23,7 +23,7 @@ select n.nspname as schema_name,
        acl.is_grantable
 from pg_catalog.pg_namespace n
 cross join lateral pg_catalog.aclexplode(
-  coalesce(n.nspacl, pg_catalog.acldefault('n', n.nspowner))
+  coalesce(n.nspacl, pg_catalog.acldefault('n'::"char", n.nspowner))
 ) as acl
 left join pg_catalog.pg_roles grantee on grantee.oid = acl.grantee
 where n.nspname in ('public', 'supabase_migrations')
@@ -98,7 +98,8 @@ from pg_catalog.pg_class c
 join pg_catalog.pg_namespace n on n.oid = c.relnamespace
 cross join lateral pg_catalog.aclexplode(
   coalesce(c.relacl, pg_catalog.acldefault(
-    case when c.relkind = 'S' then 'S' else 'r' end, c.relowner
+    case when c.relkind = 'S' then 'S'::"char" else 'r'::"char" end,
+    c.relowner
   ))
 ) as acl
 left join pg_catalog.pg_roles grantee on grantee.oid = acl.grantee
@@ -147,7 +148,7 @@ select n.nspname as schema_name,
 from pg_catalog.pg_proc p
 join pg_catalog.pg_namespace n on n.oid = p.pronamespace
 cross join lateral pg_catalog.aclexplode(
-  coalesce(p.proacl, pg_catalog.acldefault('f', p.proowner))
+  coalesce(p.proacl, pg_catalog.acldefault('f'::"char", p.proowner))
 ) as acl
 left join pg_catalog.pg_roles grantee on grantee.oid = acl.grantee
 where n.nspname = 'public'
