@@ -45,20 +45,23 @@ export function AuthProvider({
       (!initialState && isRecoveryCallback(window.location)),
   )
   const blockedUserKey = useRef<string | null>(null)
-  const initializedProfiles = useRef(new Set<string>())
-  const pendingProfiles = useRef(new Map<string, Promise<void>>())
+  const initializedProfiles = useRef(new Map<string, string | undefined>())
+  const pendingProfiles = useRef(new Map<string, Promise<string | undefined>>())
 
   const ensureProfileOnce = useCallback(
     (
       user: NonNullable<Extract<AuthState, { status: 'signed-in' }>['user']>,
     ) => {
       const key = userKey(user)
-      if (initializedProfiles.current.has(key)) return Promise.resolve()
+      if (initializedProfiles.current.has(key)) {
+        return Promise.resolve(initializedProfiles.current.get(key))
+      }
       const pending = pendingProfiles.current.get(key)
       if (pending) return pending
 
-      const next = authGateway.ensureProfile(user).then(() => {
-        initializedProfiles.current.add(key)
+      const next = authGateway.ensureProfile(user).then((displayName) => {
+        initializedProfiles.current.set(key, displayName)
+        return displayName
       })
       pendingProfiles.current.set(key, next)
       void next
@@ -117,21 +120,51 @@ export function AuthProvider({
           return
         }
 
-        void ensureProfileOnce(user).catch((error) => {
-          if (
-            generation === operationGeneration.current &&
-            currentUserKey.current === key
-          ) {
-            setState({
-              error: errorMessage(
-                error,
-                'We could not initialize your profile. Try again.',
-              ),
-              status: 'error',
-              user: null,
+        void ensureProfileOnce(user)
+          .then((displayName) => {
+            if (
+              generation !== operationGeneration.current ||
+              currentUserKey.current !== key
+            ) {
+              return
+            }
+            setState((current) => {
+              if (
+                current.status !== 'signed-in' ||
+                userKey(current.user) !== key
+              ) {
+                return current
+              }
+              const nextName = displayName || current.user.displayName
+              if (
+                nextName === current.user.displayName &&
+                !current.profileError
+              ) {
+                return current
+              }
+              return {
+                error: null,
+                status: 'signed-in',
+                user: { ...current.user, displayName: nextName },
+              }
             })
-          }
-        })
+          })
+          .catch(() => {
+            if (
+              generation === operationGeneration.current &&
+              currentUserKey.current === key
+            ) {
+              setState((current) =>
+                current.status === 'signed-in' && userKey(current.user) === key
+                  ? {
+                      ...current,
+                      profileError:
+                        'Your profile name could not be saved. You are still signed in.',
+                    }
+                  : current,
+              )
+            }
+          })
       }, 0)
     },
     [ensureProfileOnce],

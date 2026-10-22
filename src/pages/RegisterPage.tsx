@@ -9,6 +9,7 @@ import {
   TextInput,
 } from '../components/ui'
 import { safeInternalPath } from '../auth/authRedirects'
+import { PROFILE_NAME_MAX_LENGTH } from '../auth/profileName'
 import { useAuth } from '../auth/useAuth'
 import { getAuthenticationEnvironmentLabel } from '../auth/supabaseConfig'
 import { isValidEmail } from './authValidation'
@@ -30,6 +31,8 @@ function validateRegistration(
 
   if (!name.trim()) {
     errors.name = 'Enter your name.'
+  } else if (name.trim().length > PROFILE_NAME_MAX_LENGTH) {
+    errors.name = `Use ${PROFILE_NAME_MAX_LENGTH} characters or fewer.`
   }
 
   if (!email.trim()) {
@@ -117,7 +120,9 @@ export function RegisterPage() {
             error={errors.name}
             id="register-name"
             label="Full name"
+            maxLength={PROFILE_NAME_MAX_LENGTH}
             onChange={(event) => setName(event.target.value)}
+            required
             type="text"
             value={name}
           />

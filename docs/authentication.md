@@ -67,8 +67,12 @@ repository boundary. The minimum stored field is `display_name`; the verified
 Auth email remains the account email source and is not duplicated into the
 profile table. Participant records use that same authenticated profile ID as
 `participants.user_id`, so the existing RLS policies enforce identity
-ownership. Profile initialization failures remain visible as a retryable auth
-state; no local fake profile is presented as remote persistence.
+ownership. Profile initialization is best-effort after Auth succeeds: a failed
+profile read or write does not block the session, and the Profile dialog shows
+a non-blocking notice. The signed-in identity uses the saved profile name when
+available, then a safe Auth name, and never the email as a public fallback.
+Accounts with no usable name stay signed in with the accessible “Your account”
+fallback and do not get a fabricated profile row.
 
 Issue #144 keeps confirmation-required sign-up anonymous: a profile write is
 attempted only after a session-bearing sign-up, sign-in, or restored session.

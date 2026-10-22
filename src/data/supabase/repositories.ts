@@ -125,7 +125,7 @@ export type Profile = {
 
 export type ProfileRepository = {
   ensure: (input: {
-    displayName: string
+    displayName?: string
     id: string
   }) => Promise<RepositoryResult<Profile>>
 }
@@ -1013,9 +1013,12 @@ export function createRepositories(client: DatabaseClient): Repositories {
         if (existing.data)
           return mapSingle(existing.data, mapProfile, 'profile')
 
+        const displayName = input.displayName?.trim()
+        if (!displayName) return { data: null, state: 'empty' }
+
         const { data, error } = await client
           .from('profiles')
-          .insert({ id: input.id, display_name: input.displayName })
+          .insert({ id: input.id, display_name: displayName })
           .select('*')
           .single()
 

@@ -9,7 +9,12 @@ export type AuthUser = {
 export type AuthState =
   | { error: null; status: 'loading'; user: null }
   | { error: null; status: 'signed-out'; user: null }
-  | { error: null; status: 'signed-in'; user: AuthUser }
+  | {
+      error: null
+      profileError?: string
+      status: 'signed-in'
+      user: AuthUser
+    }
   | { error: null; status: 'verification-pending'; user: null }
   | { error: null; status: 'recovery-requested'; user: null }
   | { error: null; status: 'recovery-ready'; user: AuthUser }
@@ -33,7 +38,7 @@ export type AuthProviderProps = {
 }
 
 export type AuthGateway = {
-  ensureProfile: (user: AuthUser) => Promise<void>
+  ensureProfile: (user: AuthUser) => Promise<string | undefined>
   getSession: () => Promise<AuthUser | null>
   onAuthStateChange: (
     callback: (user: AuthUser | null, event?: string) => void,

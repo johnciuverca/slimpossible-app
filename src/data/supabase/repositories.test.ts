@@ -476,7 +476,7 @@ describe('Supabase repositories', () => {
     expect(fetch).toHaveBeenCalledTimes(2)
   })
 
-  it('preserves an existing profile display name during initialization', async () => {
+  it('preserves an existing profile name when auth metadata is unavailable', async () => {
     stubResponse({
       created_at: '2026-09-17T10:00:00.000Z',
       display_name: 'Existing name',
@@ -485,7 +485,6 @@ describe('Supabase repositories', () => {
     })
 
     const result = await createRepositories(client).profiles.ensure({
-      displayName: 'Auth email fallback',
       id: 'user-1',
     })
 
@@ -493,6 +492,20 @@ describe('Supabase repositories', () => {
       data: { displayName: 'Existing name', id: 'user-1' },
       state: 'success',
     })
+  })
+
+  it('does not create an unnamed profile when no name is available', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('null', { status: 200 })),
+    )
+
+    const result = await createRepositories(client).profiles.ensure({
+      id: 'user-1',
+    })
+
+    expect(result).toEqual({ data: null, state: 'empty' })
+    expect(fetch).toHaveBeenCalledTimes(1)
   })
 
   it('creates and maps a challenge through the repository', async () => {

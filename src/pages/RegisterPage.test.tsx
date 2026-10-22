@@ -46,6 +46,35 @@ describe('RegisterPage', () => {
     expect(screen.getByText('Passwords must match.')).toBeInTheDocument()
   })
 
+  it('requires a reusable name within the supported length', () => {
+    render(
+      <AuthProvider
+        initialState={{ error: null, status: 'signed-out', user: null }}
+      >
+        <MemoryRouter>
+          <RegisterPage />
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+
+    const name = screen.getByLabelText('Full name')
+    expect(name).toBeRequired()
+    expect(name).toHaveAttribute('maxLength', '80')
+    fireEvent.change(name, { target: { value: 'n'.repeat(81) } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Email' }), {
+      target: { value: 'person@example.com' },
+    })
+    fireEvent.change(screen.getByLabelText('Password'), {
+      target: { value: 'password123' },
+    })
+    fireEvent.change(screen.getByLabelText('Confirm password'), {
+      target: { value: 'password123' },
+    })
+    fireEvent.submit(screen.getByRole('form', { name: 'Registration form' }))
+
+    expect(screen.getByText('Use 80 characters or fewer.')).toBeInTheDocument()
+  })
+
   it('shows configuration guidance without starting a remote request', async () => {
     render(
       <AuthProvider

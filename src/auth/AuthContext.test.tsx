@@ -22,7 +22,15 @@ function AuthHarness() {
   return (
     <>
       <output>{state.status}</output>
-      {state.status === 'signed-in' ? <p>{state.user.email}</p> : null}
+      {state.status === 'signed-in' ? (
+        <>
+          <p>{state.user.email}</p>
+          <p>{state.user.displayName}</p>
+          {state.profileError ? (
+            <p role="status">{state.profileError}</p>
+          ) : null}
+        </>
+      ) : null}
       <button onClick={() => void signIn('person@example.com', 'password')}>
         Sign in locally
       </button>
@@ -173,12 +181,82 @@ describe('AuthContext', () => {
     expect(ensureProfile).toHaveBeenCalledTimes(1)
   })
 
+  it('uses the persisted profile name after session restoration', async () => {
+    vi.useFakeTimers()
+    const user = {
+      displayName: 'Signup metadata',
+      email: 'person@example.com',
+      id: 'user-1',
+    }
+
+    render(
+      <AuthProvider
+        authGateway={createGateway({
+          ensureProfile: async () => 'Saved profile name',
+          getSession: async () => user,
+        })}
+      >
+        <AuthHarness />
+      </AuthProvider>,
+    )
+
+    await act(async () => {
+      vi.runOnlyPendingTimers()
+      await Promise.resolve()
+      vi.runOnlyPendingTimers()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(screen.getByText('Saved profile name')).toBeInTheDocument()
+    expect(screen.getByText('signed-in')).toBeInTheDocument()
+  })
+
+  it('keeps the authenticated session when profile initialization fails', async () => {
+    vi.useFakeTimers()
+
+    render(
+      <AuthProvider
+        authGateway={createGateway({
+          ensureProfile: async () => {
+            throw new Error('private database detail')
+          },
+          getSession: async () => ({
+            email: 'person@example.com',
+            id: 'user-1',
+          }),
+        })}
+      >
+        <AuthHarness />
+      </AuthProvider>,
+    )
+
+    await act(async () => {
+      vi.runOnlyPendingTimers()
+      await Promise.resolve()
+      vi.runOnlyPendingTimers()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(screen.getByText('signed-in')).toBeInTheDocument()
+    expect(screen.getByText('person@example.com')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Your profile name could not be saved. You are still signed in.',
+      ),
+    ).toHaveAttribute('role', 'status')
+    expect(
+      screen.queryByText('private database detail'),
+    ).not.toBeInTheDocument()
+  })
+
   it('defers repeated auth-event profile work and shares one in-flight request', async () => {
     vi.useFakeTimers()
     const user = { email: 'person@example.com', id: 'user-1' }
     let emitAuthEvent: ((nextUser: typeof user | null) => void) | undefined
-    let resolveProfile!: () => void
-    const profileRequest = new Promise<void>((resolve) => {
+    let resolveProfile!: (displayName?: string) => void
+    const profileRequest = new Promise<string | undefined>((resolve) => {
       resolveProfile = resolve
     })
     const ensureProfile = vi.fn(() => profileRequest)

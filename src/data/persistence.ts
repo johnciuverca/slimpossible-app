@@ -628,8 +628,10 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
 
   const profiles: ProfileRepository = {
     async ensure(input) {
+      const displayName = input.displayName?.trim()
+      if (!displayName) return { data: null, state: 'empty' }
       return {
-        data: { displayName: input.displayName, id: input.id },
+        data: { displayName, id: input.id },
         state: 'success',
       }
     },
