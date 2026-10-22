@@ -42,8 +42,8 @@ export function PersonalProgressChart({
   const minimum = Math.floor((Math.min(...weights) - padding) * 2) / 2
   const maximum = Math.ceil((Math.max(...weights) + padding) * 2) / 2
   const tickWeights = Array.from(
-    { length: Math.round((maximum - minimum) * 2) + 1 },
-    (_, index) => minimum + index * 0.5,
+    { length: Math.floor(maximum - minimum + Number.EPSILON) + 1 },
+    (_, index) => minimum + index,
   )
   const yFor = (weight: number) =>
     bottom - ((weight - minimum) / (maximum - minimum)) * (bottom - top)
@@ -172,27 +172,27 @@ export function PersonalProgressChart({
                   {point.date}: {formatWeight(point.weightKg)} kg recorded
                 </title>
               </circle>
-              {index === 0 || index === points.length - 1 ? (
-                <text
-                  x={
-                    point.x +
-                    (index === 0 ? 8 : index === points.length - 1 ? -8 : 0)
-                  }
-                  y={point.y - 12}
-                  textAnchor={
-                    index === 0
-                      ? 'start'
-                      : index === points.length - 1
-                        ? 'end'
-                        : 'middle'
-                  }
-                  className="chart-value"
-                  fontSize="6"
-                  fontWeight="700"
-                >
-                  {formatWeight(point.weightKg)}
-                </text>
-              ) : null}
+              <text
+                x={
+                  point.x +
+                  (index === 0 ? 8 : index === points.length - 1 ? -8 : 0)
+                }
+                y={point.y - 12}
+                textAnchor={
+                  index === 0
+                    ? 'start'
+                    : index === points.length - 1
+                      ? 'end'
+                      : 'middle'
+                }
+                className="chart-value"
+                fontSize="6"
+                fontWeight="700"
+                data-date={point.date}
+                data-weight-kg={point.weightKg}
+              >
+                {formatWeight(point.weightKg)}
+              </text>
             </g>
           ))}
           {dateTicks.map((date, index) => {

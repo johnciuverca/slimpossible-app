@@ -32,7 +32,9 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
   )
   expect(
     weights.every(
-      (weight, index) => index === 0 || weight - weights[index - 1] === 0.5,
+      (weight, index) =>
+        Number.isInteger(weight * 2) &&
+        (index === 0 || weight - weights[index - 1] === 1),
     ),
   ).toBe(true)
   const dates = Array.from(
@@ -80,4 +82,32 @@ it('shows one saved entry without a derived trend or invented target', () => {
     screen.getByRole('img').querySelector('[data-chart-reference]'),
   ).toBeNull()
   expect(screen.getByRole('img').querySelector('.chart-legend')).toBeNull()
+})
+
+it('labels every saved weigh-in with only its numeric value', () => {
+  const weighIns = [
+    { date: '2026-10-01', weightKg: 90, participantId: 'own' },
+    { date: '2026-10-08', weightKg: 89.5, participantId: 'own' },
+    { date: '2026-10-15', weightKg: 88.5, participantId: 'own' },
+    { date: '2026-10-22', weightKg: 87, participantId: 'own' },
+  ]
+  render(<PersonalProgressChart weighIns={weighIns} />)
+  const chart = screen.getByRole('img')
+  const points = Array.from(chart.querySelectorAll('circle[data-date]'))
+  const labels = Array.from(chart.querySelectorAll('.chart-value'))
+  expect(points).toHaveLength(weighIns.length)
+  expect(labels).toHaveLength(points.length)
+  expect(
+    labels.map((label) => [
+      label.getAttribute('data-date'),
+      label.getAttribute('data-weight-kg'),
+      label.textContent,
+      label.getAttribute('font-size'),
+    ]),
+  ).toEqual([
+    ['2026-10-01', '90', '90', '6'],
+    ['2026-10-08', '89.5', '89.5', '6'],
+    ['2026-10-15', '88.5', '88.5', '6'],
+    ['2026-10-22', '87', '87', '6'],
+  ])
 })
