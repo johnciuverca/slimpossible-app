@@ -15,7 +15,7 @@ for (const width of [1280, 390]) {
             id: `synthetic-visual-${index}`,
             userId: 'user-alex',
             date: ago(days),
-            weightKg: [96, 96.5, 97.2, 98, 40][index],
+            weightKg: [87.4, 87.8, 88.2, 88.8, 90][index],
             sharedChallengeIds: [],
             note: 'Synthetic design test',
           })),
@@ -46,10 +46,34 @@ for (const width of [1280, 390]) {
     await expect(chart.locator('circle[data-date]')).toHaveCount(5)
     await expect(chart.locator('[data-chart-trend]')).toHaveCount(1)
     await expect(chart.locator('[data-chart-reference]')).toHaveCount(1)
+    await expect(chart.locator('[data-chart-trend]')).toHaveAttribute(
+      'opacity',
+      '0.35',
+    )
+    await expect(chart.locator('.chart-legend')).toHaveCount(0)
+    await expect(chart).toHaveAccessibleDescription(/least-squares fit/)
+    await expect(chart.locator('.chart-value')).toHaveCount(5)
+    for (const label of await chart.locator('.chart-value').all())
+      await expect(label).toHaveAttribute('font-size', '6.6')
+    const yTicks = await chart
+      .locator('[data-chart-tick]')
+      .evaluateAll((ticks) =>
+        ticks.map((tick) => Number(tick.getAttribute('data-chart-tick'))),
+      )
+    expect(
+      yTicks.every(
+        (tick, index) =>
+          Number.isInteger(tick * 2) &&
+          (index === 0 || tick - yTicks[index - 1] === 1),
+      ),
+    ).toBe(true)
     await expect(
-      page.getByRole('list', { name: 'Personal chart legend' }),
-    ).toContainText('Derived trend')
+      chart.locator('[data-chart-date-tick]').first(),
+    ).toHaveAttribute('font-size', '6.5')
     await expect(page.getByText('Weight (kg)', { exact: true })).toHaveCount(1)
+    await chart.screenshot({
+      path: test.info().outputPath('personal-chart-narrow-preview.png'),
+    })
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,

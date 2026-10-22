@@ -39,12 +39,20 @@ export function PersonalProgressChart({
     (Math.max(...weights) - Math.min(...weights)) * 0.14,
     0.5,
   )
-  const minimum = Math.min(...weights) - padding,
-    maximum = Math.max(...weights) + padding
+  const minimum = Math.floor((Math.min(...weights) - padding) * 2) / 2
+  const maximum = Math.ceil((Math.max(...weights) + padding) * 2) / 2
+  const tickWeights = Array.from(
+    { length: Math.floor(maximum - minimum + Number.EPSILON) + 1 },
+    (_, index) => minimum + index,
+  )
   const yFor = (weight: number) =>
     bottom - ((weight - minimum) / (maximum - minimum)) * (bottom - top)
   const firstDay = Date.parse(`${first.date}T00:00:00Z`)
   const span = Date.parse(`${latest.date}T00:00:00Z`) - firstDay
+  const dateTicks = Array.from(
+    { length: span ? Math.floor(span / (7 * 86400000)) + 1 : 1 },
+    (_, index) => firstDay + index * 7 * 86400000,
+  )
   const points = chronological.map((point) => ({
     ...point,
     x: span
@@ -61,6 +69,10 @@ export function PersonalProgressChart({
     first.date === latest.date
       ? `${first.date}, ${formatWeight(first.weightKg)} kilograms`
       : `${first.date}, ${formatWeight(first.weightKg)} kilograms to ${latest.date}, ${formatWeight(latest.weightKg)} kilograms`
+  const referenceDescription =
+    reference === null
+      ? ''
+      : ` The dashed reference line marks ${referenceLabel ?? 'the selected goal target'} at ${formatWeight(reference)} kilograms.`
   return (
     <figure
       className="personal-weight-chart mt-5"
@@ -83,16 +95,16 @@ export function PersonalProgressChart({
           <desc id={`${id}-description`}>
             Recorded points show saved dates and weights. The dashed trend is a
             least-squares fit of only these visible records, not additional
-            weigh-ins. Private notes are never plotted.
+            weigh-ins. The solid line connects recorded weights.
+            {referenceDescription} Private notes are never plotted.
           </desc>
           <text x={left} y="17" className="chart-axis" fontSize="13">
             Weight (kg)
           </text>
-          {Array.from({ length: 5 }, (_, index) => {
-            const weight = minimum + ((maximum - minimum) * index) / 4
+          {tickWeights.map((weight) => {
             const y = yFor(weight)
             return (
-              <g key={index}>
+              <g key={weight} data-chart-tick={weight}>
                 <line
                   x1={left}
                   x2={right}
@@ -141,6 +153,7 @@ export function PersonalProgressChart({
               stroke="var(--chart-trend, #a86312)"
               strokeWidth="2"
               strokeDasharray="3 6"
+              opacity="0.35"
             />
           ) : null}
           {points.map((point, index) => (
@@ -160,76 +173,60 @@ export function PersonalProgressChart({
                   {point.date}: {formatWeight(point.weightKg)} kg recorded
                 </title>
               </circle>
-              {index === 0 || index === points.length - 1 ? (
-                <text
-                  x={
-                    point.x +
-                    (index === 0 ? 8 : index === points.length - 1 ? -8 : 0)
-                  }
-                  y={point.y - 12}
-                  textAnchor={
-                    index === 0
-                      ? 'start'
-                      : index === points.length - 1
-                        ? 'end'
-                        : 'middle'
-                  }
-                  className="chart-value"
-                  fontSize="12"
-                  fontWeight="700"
-                >
-                  {formatWeight(point.weightKg)} kg · recorded
-                </text>
-              ) : null}
+              <text
+                x={
+                  point.x +
+                  (index === 0 ? 8 : index === points.length - 1 ? -8 : 0)
+                }
+                y={point.y - 12}
+                textAnchor={
+                  index === 0
+                    ? 'start'
+                    : index === points.length - 1
+                      ? 'end'
+                      : 'middle'
+                }
+                className="chart-value"
+                fontSize="6.6"
+                fontWeight="700"
+                data-date={point.date}
+                data-weight-kg={point.weightKg}
+              >
+                {formatWeight(point.weightKg)}
+              </text>
             </g>
           ))}
-          <text
-            x={span ? left : (left + right) / 2}
-            y="247"
-            textAnchor={span ? 'start' : 'middle'}
-            className="chart-axis"
-            fontSize="13"
-          >
-            {first.date}
-          </text>
-          {span ? (
-            <text
-              x={right}
-              y="247"
-              textAnchor="end"
-              className="chart-axis"
-              fontSize="13"
-            >
-              {latest.date}
-            </text>
-          ) : null}
+          {dateTicks.map((date, index) => {
+            const x = span
+              ? left + ((date - firstDay) / span) * (right - left)
+              : (left + right) / 2
+            const textAnchor =
+              dateTicks.length === 1
+                ? 'middle'
+                : index === 0
+                  ? 'start'
+                  : index === dateTicks.length - 1
+                    ? 'end'
+                    : 'middle'
+            return (
+              <text
+                key={date}
+                x={x}
+                y="247"
+                textAnchor={textAnchor}
+                className="chart-axis"
+                fontSize="6.5"
+                data-chart-date-tick={new Date(date).toISOString().slice(0, 10)}
+              >
+                {new Date(date).toISOString().slice(0, 10)}
+              </text>
+            )
+          })}
         </svg>
       </div>
       <p className="mt-2 text-xs text-ink-muted sm:hidden">
         Scroll sideways to see every recorded date.
       </p>
-      <ul
-        className="chart-legend mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm"
-        aria-label="Personal chart legend"
-      >
-        <li>
-          <span className="legend-recorded" />
-          Recorded weights
-        </li>
-        {trend ? (
-          <li>
-            <span className="legend-trend" />
-            Derived trend
-          </li>
-        ) : null}
-        {reference !== null ? (
-          <li>
-            <span className="legend-reference" />
-            {referenceLabel ?? 'Selected goal target'}:{' '}
-            {formatWeight(reference)} kg
-          </li>
-        ) : null}
-      </ul>
       <figcaption
         id={`${id}-caption`}
         className="mt-3 text-sm leading-6 text-ink-muted"
