@@ -18,7 +18,7 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
   expect(chart.querySelector('[data-chart-trend]')).toBeInTheDocument()
   expect(chart.querySelector('[data-chart-trend]')).toHaveAttribute(
     'opacity',
-    '0.7',
+    '0.35',
   )
   expect(chart.querySelector('[data-chart-reference]')).toBeInTheDocument()
   expect(screen.getByText('Weight (kg)')).toBeInTheDocument()
