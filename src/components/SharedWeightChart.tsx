@@ -69,6 +69,17 @@ export function SharedWeightChart({
     span
       ? left + ((day(date) - firstDay) / span) * (right - left)
       : (left + right) / 2
+  const labelAnchor = (date: string) =>
+    span === 0
+      ? 'middle'
+      : day(date) === firstDay
+        ? 'start'
+        : day(date) === lastDay
+          ? 'end'
+          : 'middle'
+  const labelX = (date: string) =>
+    x(date) +
+    (labelAnchor(date) === 'start' ? 8 : labelAnchor(date) === 'end' ? -8 : 0)
   const y = (value: number) =>
     bottom - ((value - min) / (max - min)) * (bottom - top)
   const tickStep = Math.max(1, Math.ceil((max - min) / maxTicks))
@@ -206,22 +217,9 @@ export function SharedWeightChart({
               </circle>
               {point.label ? (
                 <text
-                  x={
-                    x(point.date) +
-                    (index === 0
-                      ? 8
-                      : index === item.points.length - 1
-                        ? -8
-                        : 0)
-                  }
+                  x={labelX(point.date)}
                   y={y(point.value) - 12}
-                  textAnchor={
-                    index === 0
-                      ? 'start'
-                      : index === item.points.length - 1
-                        ? 'end'
-                        : 'middle'
-                  }
+                  textAnchor={labelAnchor(point.date)}
                   className="chart-value"
                   fontSize="6.6"
                   fontWeight="700"
@@ -252,18 +250,9 @@ export function SharedWeightChart({
           </circle>
           {point.label ? (
             <text
-              x={
-                x(point.date) +
-                (index === 0 ? 8 : index === points.length - 1 ? -8 : 0)
-              }
+              x={labelX(point.date)}
               y={y(point.value) - 12}
-              textAnchor={
-                index === 0
-                  ? 'start'
-                  : index === points.length - 1
-                    ? 'end'
-                    : 'middle'
-              }
+              textAnchor={labelAnchor(point.date)}
               className="chart-value"
               fontSize="6.6"
               fontWeight="700"

@@ -42,3 +42,39 @@ it('shares axis, weekly date ticks, numeric labels and exact tooltips without br
   expect(chart.querySelector('[data-series="recorded-connection"]')).toBeNull()
   expect(chart.querySelector('circle title')).toHaveTextContent('Member: 90 kg')
 })
+
+it('anchors a one-point member label to the shared chart edge, not its local series start', () => {
+  render(
+    <SharedWeightChart
+      title="Members"
+      description="Shared records only."
+      yLabel="Weight (kg)"
+      min={70}
+      max={100}
+      maxTicks={8}
+      series={[
+        {
+          id: 'long-history',
+          color: '#31dbb0',
+          points: [
+            { date: '2026-10-01', value: 90, title: 'first', label: '90' },
+            { date: '2026-10-03', value: 89, title: 'last', label: '89' },
+          ],
+        },
+        {
+          id: 'single-latest',
+          color: '#67a5ff',
+          points: [
+            { date: '2026-10-03', value: 75, title: 'single', label: '75' },
+          ],
+        },
+      ]}
+    />,
+  )
+  const chart = screen.getByRole('img', { name: 'Members' })
+  const label = chart.querySelector(
+    'text[data-date="2026-10-03"][data-value="75"]',
+  )
+  expect(label).toHaveAttribute('text-anchor', 'end')
+  expect(Number(label?.getAttribute('x'))).toBe(688)
+})
