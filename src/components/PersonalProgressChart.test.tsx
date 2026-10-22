@@ -18,7 +18,6 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
   expect(chart.querySelector('[data-chart-trend]')).toBeInTheDocument()
   expect(chart.querySelector('[data-chart-reference]')).toBeInTheDocument()
   expect(screen.getByText('Weight (kg)')).toBeInTheDocument()
-  expect(screen.getByText('Own selected goal: 80 kg')).toBeInTheDocument()
   expect(
     Array.from(
       chart.querySelectorAll('.chart-value'),
@@ -29,12 +28,15 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
     Array.from(chart.querySelectorAll('.chart-value'), (label) =>
       label.getAttribute('font-size'),
     ),
-  ).toEqual(['10', '10'])
+  ).toEqual(['5', '5'])
+  expect(chart.querySelectorAll('.chart-value')).toHaveLength(2)
+  expect(chart.querySelectorAll('.chart-legend')).toHaveLength(0)
+  expect(chart).toHaveAccessibleName(/Own selected goal at 80 kilograms/i)
   expect(chart.querySelectorAll('circle title')[0]).toHaveTextContent(
     '2026-10-01: 100 kg recorded',
   )
   expect(chart).toHaveAccessibleDescription(
-    /Recorded points show saved dates and weights/,
+    /ticks every 1 kilogram.*exact weight/i,
   )
 })
 it('shows one saved entry without a derived trend or invented target', () => {
@@ -45,12 +47,14 @@ it('shows one saved entry without a derived trend or invented target', () => {
   )
   const chart = screen.getByRole('img')
   expect(chart.querySelectorAll('circle')).toHaveLength(1)
+  expect(chart.querySelectorAll('.chart-value')).toHaveLength(1)
   expect(chart.querySelector('.chart-value')).toHaveTextContent(/^100$/)
+  expect(chart.querySelector('.chart-legend')).toBeNull()
   expect(chart.querySelector('[data-chart-trend]')).toBeNull()
   expect(chart.querySelector('[data-chart-reference]')).toBeNull()
 })
 
-it('keeps dense recorded values mapped to their dates while labeling only numeric endpoints', () => {
+it('labels every dense saved point and keeps one-kilogram axis ticks', () => {
   const weighIns = Array.from({ length: 40 }, (_, index) => ({
     date: new Date(Date.UTC(2026, 0, index + 1)).toISOString().slice(0, 10),
     weightKg: 100 - index / 10,
@@ -73,12 +77,34 @@ it('keeps dense recorded values mapped to their dates while labeling only numeri
     ]),
   ).toEqual(weighIns.map(({ date, weightKg }) => [date, String(weightKg)]))
   const labels = Array.from(chart.querySelectorAll('.chart-value'))
-  expect(labels.map((label) => label.textContent)).toEqual(['100', '96.1'])
+  expect(labels.map((label) => label.textContent)).toEqual(
+    weighIns.map(({ weightKg }) =>
+      new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(
+        weightKg,
+      ),
+    ),
+  )
+  expect(labels.every((label) => label.getAttribute('font-size') === '5')).toBe(
+    true,
+  )
   expect(
-    labels.every((label) => label.getAttribute('font-size') === '10'),
+    labels.map((label) => [
+      label.getAttribute('data-date'),
+      label.getAttribute('data-weight-kg'),
+    ]),
+  ).toEqual(weighIns.map(({ date, weightKg }) => [date, String(weightKg)]))
+  const ticks = Array.from(
+    chart.querySelectorAll('[data-chart-tick]'),
+    (tick) => Number(tick.getAttribute('data-chart-tick')),
+  )
+  expect(ticks.length).toBeGreaterThan(1)
+  expect(
+    ticks.every((tick, index) => index === 0 || tick - ticks[index - 1] === 1),
   ).toBe(true)
   expect(chart).toHaveAccessibleName(/40 saved weigh-ins/)
-  expect(chart).toHaveAccessibleDescription(/least-squares fit/)
+  expect(chart).toHaveAccessibleDescription(
+    /ticks every 1 kilogram.*least-squares fit/i,
+  )
   expect(screen.getByText('Weight (kg)')).toBeInTheDocument()
-  expect(screen.getByText('Selected target: 80 kg')).toBeInTheDocument()
+  expect(chart.querySelector('.chart-legend')).toBeNull()
 })
