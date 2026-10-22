@@ -6,8 +6,9 @@ source initialized by registration. Username accepts a name or nickname with
 email/password sign-in is unchanged. Auth signup metadata is only an initial
 seed and is not written by profile editing.
 
-The field is read-only until the accessible pencil button is selected. Edit mode
-focuses the field and offers Save and Cancel; successful save returns to read-only,
+Username is plain text like Email until the accessible pencil button is selected;
+there is no textbox in viewing mode. Edit mode
+focuses the field and offers Save and Cancel; successful save returns to plain text,
 and Cancel restores the saved value without a write.
 
 Saving verifies the active Supabase user before upserting the explicit profile

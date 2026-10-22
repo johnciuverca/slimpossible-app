@@ -55,7 +55,9 @@ async function openProfile(name = 'Alex', edit = true) {
   await screen.findByText(name)
   fireEvent.click(screen.getByText(name))
   fireEvent.click(screen.getByRole('button', { name: 'Profile' }))
-  expect(screen.getByLabelText('Username')).toHaveAttribute('readonly')
+  expect(
+    screen.queryByRole('textbox', { name: 'Username' }),
+  ).not.toBeInTheDocument()
   if (edit)
     fireEvent.click(screen.getByRole('button', { name: 'Edit username' }))
 }
@@ -101,15 +103,17 @@ describe('Profile username editing', () => {
       'role',
       'status',
     )
-    expect(screen.getByLabelText('Username')).toHaveAttribute('readonly')
+    expect(
+      screen.queryByRole('textbox', { name: 'Username' }),
+    ).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Edit username' })).toHaveFocus()
-    expect(screen.getByText('Nickname')).toBeInTheDocument()
+    expect(screen.getAllByText('Nickname')).toHaveLength(2)
     expect(save).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'alex' }),
       'Nickname',
     )
     await act(async () => emit(alex))
-    expect(screen.getByText('Nickname')).toBeInTheDocument()
+    expect(screen.getAllByText('Nickname')).toHaveLength(2)
     first.unmount()
     session(auth)
     expect(await screen.findByText('Nickname')).toBeInTheDocument()
@@ -139,7 +143,7 @@ describe('Profile username editing', () => {
     expect(screen.getByLabelText('Username')).toHaveValue('Retry nickname')
     fireEvent.submit(screen.getByRole('form', { name: 'Edit username' }))
     expect(await screen.findByText('Username saved.')).toBeInTheDocument()
-    expect(screen.getByText('Retry nickname')).toBeInTheDocument()
+    expect(screen.getAllByText('Retry nickname')).toHaveLength(2)
   })
 
   it('discards a stale save after switching away and back to the same account', async () => {
@@ -176,7 +180,7 @@ describe('Profile username editing', () => {
     submit('New nickname')
     await screen.findByText('Username saved.')
     await act(async () => request.resolve('Old database name'))
-    expect(screen.getByText('New nickname')).toBeInTheDocument()
+    expect(screen.getAllByText('New nickname')).toHaveLength(2)
     expect(screen.queryByText('Old database name')).not.toBeInTheDocument()
   })
 
@@ -193,7 +197,7 @@ describe('Profile username editing', () => {
     expect(screen.getByLabelText('Username')).toHaveValue('')
     submit('First nickname')
     await screen.findByText('Username saved.')
-    expect(screen.getByText('First nickname')).toBeInTheDocument()
+    expect(screen.getAllByText('First nickname')).toHaveLength(2)
   })
 
   it('starts read-only and Cancel restores the saved value without writing', async () => {
@@ -214,8 +218,10 @@ describe('Profile username editing', () => {
       target: { value: 'Unsaved nickname' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
-    expect(screen.getByLabelText('Username')).toHaveValue('Alex')
-    expect(screen.getByLabelText('Username')).toHaveAttribute('readonly')
+    expect(screen.getAllByText('Alex')).toHaveLength(2)
+    expect(
+      screen.queryByRole('textbox', { name: 'Username' }),
+    ).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Edit username' })).toHaveFocus()
     expect(save).not.toHaveBeenCalled()
   })

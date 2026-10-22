@@ -67,27 +67,34 @@ export function ProfileNameForm({ displayName }: { displayName: string }) {
     >
       <div className="flex items-end gap-2">
         <div className="min-w-0 flex-1">
-          <TextInput
-            autoComplete="nickname"
-            disabled={saving}
-            readOnly={!editing}
-            tabIndex={editing ? 0 : -1}
-            error={validation}
-            id="profile-username"
-            label="Username"
-            maxLength={PROFILE_NAME_MAX_LENGTH}
-            placeholder="name or nickname"
-            required
-            value={name}
-            onChange={(event) => {
-              if (!editing) return
-              setName(event.target.value)
-              setDirty(true)
-              setValidation(undefined)
-              setError(undefined)
-              setSaved(false)
-            }}
-          />
+          {editing ? (
+            <TextInput
+              autoComplete="nickname"
+              disabled={saving}
+              error={validation}
+              id="profile-username"
+              label="Username"
+              maxLength={PROFILE_NAME_MAX_LENGTH}
+              placeholder="name or nickname"
+              required
+              value={name}
+              onChange={(event) => {
+                if (!editing) return
+                setName(event.target.value)
+                setDirty(true)
+                setValidation(undefined)
+                setError(undefined)
+                setSaved(false)
+              }}
+            />
+          ) : (
+            <dl>
+              <dt className="text-sm text-ink-muted">Username</dt>
+              <dd className="break-words font-semibold">
+                {displayName || 'Not set'}
+              </dd>
+            </dl>
+          )}
         </div>
         {!editing ? (
           <Button
