@@ -1283,6 +1283,13 @@ for (const viewport of [
       name: 'Weight (kg) — shared group history',
     })
     await expect(chart).toBeVisible()
+    const groupLegend = page.getByRole('list', {
+      name: 'Group chart legend',
+    })
+    await expect(groupLegend.locator('li')).toHaveText([
+      'Ava (member 1)',
+      'Ava (member 2)',
+    ])
     const originalPoints = await chart
       .locator('circle')
       .evaluateAll((elements) =>
@@ -1392,6 +1399,9 @@ for (const viewport of [
     const individualChart = page.getByRole('img', {
       name: /Change from first shared weight \(kg\)/,
     })
+    await expect(
+      page.getByRole('list', { name: 'Group chart legend' }).locator('li'),
+    ).toHaveText(['Ava (member 2)'])
     await expect(individualChart.locator('circle[data-date]')).toHaveCount(2)
     const individualTrack = page.getByRole('group', {
       name: 'Adjust visible date range',

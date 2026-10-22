@@ -25,7 +25,7 @@ const persistence = (
     repositories: { groupProgress: { getChartHistory: load } },
   }) as unknown as Persistence
 describe('Group chart history', () => {
-  it('separates same-group targets and trends from actual shared records', async () => {
+  it('lists only challenge member names while keeping target and trend chart lines', async () => {
     const groupProgress: GroupMemberProgress[] = [
       {
         memberKey: 'a',
@@ -36,13 +36,26 @@ describe('Group chart history', () => {
         progressState: 'in_progress',
         reachedTargetMilestones: [],
       },
+      {
+        memberKey: 'b',
+        displayName: 'Nora',
+        targetWeightKg: 74,
+        startingWeightKg: 76,
+        completionPercentage: 50,
+        progressState: 'in_progress',
+        reachedTargetMilestones: [],
+      },
+    ]
+    const entries: GroupChartEntry[] = [
+      ...rows,
+      { memberKey: 'b', displayName: 'Nora', date: '2026-09-02', weightKg: 76 },
     ]
     render(
       <GroupChartHistory
         challengeId="group"
         viewerId="viewer"
         persistence={persistence(
-          vi.fn().mockResolvedValue({ state: 'success', data: rows }),
+          vi.fn().mockResolvedValue({ state: 'success', data: entries }),
         )}
         refreshVersion={0}
         memberProgress={groupProgress}
@@ -57,12 +70,16 @@ describe('Group chart history', () => {
     expect(
       chart.querySelector('[data-series="derived-trend"]'),
     ).toHaveAttribute('stroke-dasharray', '3 6')
-    expect(chart.querySelectorAll('circle')).toHaveLength(2)
+    expect(chart.querySelectorAll('circle')).toHaveLength(3)
     const legend = screen.getByRole('list', { name: 'Group chart legend' })
-    expect(legend).toHaveTextContent('recorded weights')
-    expect(legend).toHaveTextContent('Target/reference weight')
-    expect(legend).toHaveTextContent('Derived trend from displayed points')
-    expect(legend).toHaveTextContent('first shared 2026-09-01')
+    expect(
+      Array.from(legend.querySelectorAll('li'), (item) =>
+        item.textContent?.trim(),
+      ),
+    ).toEqual(['Ava', 'Nora'])
+    expect(legend).not.toHaveTextContent(
+      /recorded weights|first shared|baseline|target\/reference|derived trend/i,
+    )
     expect(screen.getByRole('rowheader', { name: '2026-09-03' })).toBeVisible()
   })
   it('uses the same view-only ranges for all members and an individual member chart', async () => {
@@ -119,6 +136,14 @@ describe('Group chart history', () => {
       name: /Change from first shared weight \(kg\)/,
     })
     expect(individual.querySelectorAll('circle[data-date]')).toHaveLength(5)
+    expect(
+      Array.from(
+        screen
+          .getByRole('list', { name: 'Group chart legend' })
+          .querySelectorAll('li'),
+        (item) => item.textContent?.trim(),
+      ),
+    ).toEqual(['Ava'])
     expect(
       screen.getByRole('group', { name: 'Chart date range controls' }),
     ).toBeInTheDocument()
@@ -361,8 +386,13 @@ describe('Group chart history', () => {
       screen.getByRole('region', { name: 'Scrollable shared group weights' }),
     ).toHaveAttribute('tabindex', '0')
     expect(
-      screen.getByRole('list', { name: 'Group chart legend' }),
-    ).toHaveTextContent('first shared 2026-09-01')
+      Array.from(
+        screen
+          .getByRole('list', { name: 'Group chart legend' })
+          .querySelectorAll('li'),
+        (item) => item.textContent?.trim(),
+      ),
+    ).toEqual(['Ava'])
   })
   it('hides old account/challenge data immediately and ignores late results', async () => {
     let resolveOld!: (result: RepositoryListResult<GroupChartEntry>) => void

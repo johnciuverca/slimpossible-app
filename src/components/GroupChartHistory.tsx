@@ -560,7 +560,7 @@ export function GroupChartHistory({
                 >
                   {series.map((member, index) => (
                     <li
-                      key={`recorded:${member.memberKey}`}
+                      key={member.memberKey}
                       className="flex items-center gap-2"
                     >
                       <span
@@ -568,38 +568,7 @@ export function GroupChartHistory({
                         className="inline-block w-6 border-t-2"
                         style={{ borderColor: colors[index % colors.length] }}
                       />
-                      {member.label} · recorded weights
-                    </li>
-                  ))}
-                  {targetWeights.length > 0 ? (
-                    <li className="flex items-center gap-2">
-                      <span
-                        aria-hidden="true"
-                        className="inline-block w-6 border-t-2 border-dashed"
-                        style={{ borderColor: referenceColor }}
-                      />
-                      Target/reference weight
-                    </li>
-                  ) : null}
-                  {trends.some(({ trend }) => trend !== null) ? (
-                    <li className="flex items-center gap-2">
-                      <span
-                        aria-hidden="true"
-                        className="inline-block w-6 border-t-2 border-dotted"
-                        style={{ borderColor: trendColor }}
-                      />
-                      Derived trend from displayed points
-                    </li>
-                  ) : null}
-                  {series.map((member) => (
-                    <li
-                      key={`baseline:${member.memberKey}`}
-                      className="text-ink-muted"
-                    >
-                      {member.label} · {absolute ? 'first shared' : 'baseline'}{' '}
-                      <time dateTime={member.baselineDate}>
-                        {member.baselineDate}
-                      </time>
+                      {member.label}
                     </li>
                   ))}
                 </ul>
