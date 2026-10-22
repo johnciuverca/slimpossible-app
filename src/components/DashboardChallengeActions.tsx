@@ -71,9 +71,7 @@ function OwnedGroupActions({
     `/challenge/invites?${new URLSearchParams({ challenge: id })}`
   return (
     <Card
-      className={
-        recordAction ? 'dashboard-actions-region space-y-4' : 'space-y-4 p-6'
-      }
+      className={recordAction ? 'dashboard-actions-region' : 'space-y-4 p-6'}
       role="region"
       aria-labelledby="dashboard-connect-title"
     >
