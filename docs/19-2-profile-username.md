@@ -6,6 +6,10 @@ source initialized by registration. Username accepts a name or nickname with
 email/password sign-in is unchanged. Auth signup metadata is only an initial
 seed and is not written by profile editing.
 
+The field is read-only until the accessible pencil button is selected. Edit mode
+focuses the field and offers Save and Cancel; successful save returns to read-only,
+and Cancel restores the saved value without a write.
+
 Saving verifies the active Supabase user before upserting the explicit profile
 UUID and display name. Existing `profiles_insert_own`, `profiles_update_own`,
 and `profiles_select_own` RLS policies restrict these operations to `auth.uid()`.

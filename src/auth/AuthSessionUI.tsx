@@ -106,7 +106,7 @@ function AccountControl({
     if (!profile) return
     const element = dialog.current
     element?.showModal()
-    element?.querySelector<HTMLInputElement>('input')?.focus()
+    element?.querySelector<HTMLButtonElement>('button')?.focus()
     return () => element?.close()
   }, [profile])
   const close = () => {

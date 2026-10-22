@@ -51,10 +51,13 @@ function session(authGateway: AuthGateway) {
   )
 }
 
-async function openProfile(name = 'Alex') {
+async function openProfile(name = 'Alex', edit = true) {
   await screen.findByText(name)
   fireEvent.click(screen.getByText(name))
   fireEvent.click(screen.getByRole('button', { name: 'Profile' }))
+  expect(screen.getByLabelText('Username')).toHaveAttribute('readonly')
+  if (edit)
+    fireEvent.click(screen.getByRole('button', { name: 'Edit username' }))
 }
 
 function submit(name: string) {
@@ -98,6 +101,8 @@ describe('Profile username editing', () => {
       'role',
       'status',
     )
+    expect(screen.getByLabelText('Username')).toHaveAttribute('readonly')
+    expect(screen.getByRole('button', { name: 'Edit username' })).toHaveFocus()
     expect(screen.getByText('Nickname')).toBeInTheDocument()
     expect(save).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'alex' }),
@@ -189,5 +194,29 @@ describe('Profile username editing', () => {
     submit('First nickname')
     await screen.findByText('Username saved.')
     expect(screen.getByText('First nickname')).toBeInTheDocument()
+  })
+
+  it('starts read-only and Cancel restores the saved value without writing', async () => {
+    const save = vi.fn(async (_user: AuthUser, name: string) => name)
+    session(gateway({ saveProfileName: save }))
+    await openProfile('Alex', false)
+    expect(
+      screen.queryByRole('button', { name: 'Save' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Cancel' }),
+    ).not.toBeInTheDocument()
+    fireEvent.submit(screen.getByRole('form', { name: 'Edit username' }))
+    expect(save).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Edit username' }))
+    expect(screen.getByLabelText('Username')).toHaveFocus()
+    fireEvent.change(screen.getByLabelText('Username'), {
+      target: { value: 'Unsaved nickname' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.getByLabelText('Username')).toHaveValue('Alex')
+    expect(screen.getByLabelText('Username')).toHaveAttribute('readonly')
+    expect(screen.getByRole('button', { name: 'Edit username' })).toHaveFocus()
+    expect(save).not.toHaveBeenCalled()
   })
 })
