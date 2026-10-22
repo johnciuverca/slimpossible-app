@@ -12,6 +12,7 @@ import { localDateOnly } from '../models/provisionalGroupLeader'
 import { WeightEntryCard } from './WeightEntryCard'
 import { deriveGroupChartTrend } from '../models/groupChartTrend'
 import type { GroupMemberProgress } from '../models/groupMemberProgress'
+import { SharedWeightChart } from './SharedWeightChart'
 
 const colors = ['#31dbb0', '#67a5ff', '#ff8ba7', '#c49cff', '#ffc164']
 const trendColor = '#ffbf69'
@@ -301,12 +302,99 @@ export function GroupChartHistory({
                   tabIndex={0}
                   className="mt-4 overflow-x-auto focus-visible:outline-2 focus-visible:outline-emerald-700"
                 >
+                  <SharedWeightChart
+                    title={
+                      absolute
+                        ? 'Weight (kg) — shared group history'
+                        : 'Change from first shared weight (kg)'
+                    }
+                    description={
+                      absolute
+                        ? 'Each member is plotted at their actual shared weight in kilograms, not a common zero baseline. Points represent shared dates; lines connect only consecutive days. The table below provides every exact recorded weight.'
+                        : 'Each member has their own zero baseline. Points represent shared recorded dates. Lines connect only consecutive days. The table below provides every date, exact weight and kg change.'
+                    }
+                    yLabel={absolute ? 'Weight (kg)' : 'Change (kg)'}
+                    min={min}
+                    max={max}
+                    maxTicks={8}
+                    className="w-full min-w-[36rem]"
+                    viewBox="0 0 760 266"
+                    series={series.map((member, index) => ({
+                      id: member.memberKey,
+                      color: colors[index % colors.length],
+                      title: `${member.label} recorded shared weights`,
+                      points: member.points.map((point) => ({
+                        date: point.date,
+                        value: pointValue(point),
+                        label: absolute
+                          ? String(point.weightKg)
+                          : `${point.changeKg > 0 ? '+' : ''}${point.changeKg}`,
+                        title: `${member.label}: ${point.date}, ${absolute ? `${point.weightKg} kg` : signed(point.changeKg)}`,
+                        markerLabel: `${member.label}: ${point.date}, ${absolute ? `${point.weightKg} kg` : signed(point.changeKg)}`,
+                      })),
+                    }))}
+                    lines={[
+                      ...series.flatMap((member) => {
+                        const target = memberProgress.find(
+                          (candidate) =>
+                            candidate.memberKey === member.memberKey,
+                        )?.targetWeightKg
+                        return target === null ||
+                          target === undefined ||
+                          !Number.isFinite(target)
+                          ? []
+                          : [
+                              {
+                                id: `target:${member.memberKey}`,
+                                from: {
+                                  date: member.points[0].date,
+                                  value: chartValue(member.memberKey, target),
+                                },
+                                to: {
+                                  date: member.points.at(-1)!.date,
+                                  value: chartValue(member.memberKey, target),
+                                },
+                                color: referenceColor,
+                                title: `${member.label} target reference: ${target} kg`,
+                                kind: 'reference' as const,
+                              },
+                            ]
+                      }),
+                      ...trends.flatMap(({ memberKey, trend }) =>
+                        trend
+                          ? [
+                              {
+                                id: `trend:${memberKey}`,
+                                from: {
+                                  date: trend.startDate,
+                                  value: chartValue(
+                                    memberKey,
+                                    trend.startWeightKg,
+                                  ),
+                                },
+                                to: {
+                                  date: trend.endDate,
+                                  value: chartValue(
+                                    memberKey,
+                                    trend.endWeightKg,
+                                  ),
+                                },
+                                color: trendColor,
+                                title: `${series.find((member) => member.memberKey === memberKey)?.label ?? 'Member'} derived trend from displayed shared points`,
+                                kind: 'trend' as const,
+                              },
+                            ]
+                          : [],
+                      ),
+                    ]}
+                  />
                   <svg
+                    aria-hidden="true"
                     viewBox="0 0 720 265"
                     role="img"
                     aria-labelledby={`${id}-chart-title`}
                     aria-describedby={`${id}-chart-description`}
-                    className="w-full min-w-[36rem]"
+                    className="hidden"
                   >
                     <title id={`${id}-chart-title`}>
                       {absolute
