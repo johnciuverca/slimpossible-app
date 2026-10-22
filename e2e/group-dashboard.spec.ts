@@ -496,19 +496,28 @@ for (const layout of [
       const comparison = page.getByRole('img', {
         name: 'Weight (kg) — shared group history',
       })
-      expect(
-        await comparison.locator('text').evaluateAll((elements) =>
-          elements.every((element) => {
+      const outOfBoundsLabels = await comparison
+        .locator('text')
+        .evaluateAll((elements) =>
+          elements.flatMap((element) => {
             const box = (element as SVGGraphicsElement).getBBox()
-            return (
-              box.x >= 0 &&
+            return box.x >= 0 &&
               box.x + box.width <= 720 &&
               box.y >= 0 &&
               box.y + box.height <= 265
-            )
+              ? []
+              : [
+                  {
+                    text: element.textContent,
+                    x: box.x,
+                    y: box.y,
+                    width: box.width,
+                    height: box.height,
+                  },
+                ]
           }),
-        ),
-      ).toBe(true)
+        )
+      expect(outOfBoundsLabels).toEqual([])
       expect(
         (await matrix
           .getByRole('columnheader', { name: 'Recorded date' })

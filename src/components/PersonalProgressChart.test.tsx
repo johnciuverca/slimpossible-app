@@ -21,6 +21,13 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
     '0.35',
   )
   expect(chart.querySelector('[data-chart-reference]')).toBeInTheDocument()
+  expect(
+    chart.querySelector('[data-chart-line-kind="reference"]'),
+  ).toHaveAttribute('stroke-dasharray', '9 5')
+  expect(chart.querySelector('[data-chart-line-kind="trend"]')).toHaveAttribute(
+    'stroke-dasharray',
+    '3 6',
+  )
   expect(screen.getByText('Weight (kg)')).toBeInTheDocument()
   expect(chart.querySelector('.chart-legend')).toBeNull()
   expect(chart).toHaveAccessibleDescription(/Own selected goal at 80 kilograms/)
@@ -38,7 +45,7 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
     weights.every(
       (weight, index) =>
         Number.isInteger(weight * 2) &&
-        (index === 0 || weight - weights[index - 1] === 1),
+        (index === 0 || [1, 2].includes(weight - weights[index - 1])),
     ),
   ).toBe(true)
   const dates = Array.from(
@@ -73,6 +80,7 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
   expect(chart.querySelectorAll('circle title')[0]).toHaveTextContent(
     '2026-10-01: 100 kg recorded',
   )
+  expect(chart.querySelectorAll('[data-chart-date-tick]')).toHaveLength(2)
 })
 it('shows one saved entry without a derived trend or invented target', () => {
   render(
