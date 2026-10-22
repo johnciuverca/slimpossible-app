@@ -72,7 +72,7 @@ describe('Group chart history', () => {
     ).toHaveAttribute('stroke-dasharray', '3 6')
     expect(chart.querySelectorAll('circle')).toHaveLength(3)
     const legend = screen.getByRole('list', { name: 'Group chart legend' })
-    expect(legend).toHaveClass('justify-center')
+    expect(legend).toHaveClass('w-full', 'justify-center')
     expect(
       Array.from(legend.querySelectorAll('li'), (item) =>
         item.textContent?.trim(),
@@ -137,12 +137,13 @@ describe('Group chart history', () => {
       name: /Change from first shared weight \(kg\)/,
     })
     expect(individual.querySelectorAll('circle[data-date]')).toHaveLength(5)
+    const individualLegend = screen.getByRole('list', {
+      name: 'Group chart legend',
+    })
+    expect(individualLegend).toHaveClass('w-full', 'justify-center')
     expect(
-      Array.from(
-        screen
-          .getByRole('list', { name: 'Group chart legend' })
-          .querySelectorAll('li'),
-        (item) => item.textContent?.trim(),
+      Array.from(individualLegend.querySelectorAll('li'), (item) =>
+        item.textContent?.trim(),
       ),
     ).toEqual(['Ava'])
     expect(

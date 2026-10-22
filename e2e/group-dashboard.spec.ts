@@ -1290,6 +1290,26 @@ for (const viewport of [
       'Ava (member 1)',
       'Ava (member 2)',
     ])
+    const chartRegion = page.getByRole('region', {
+      name: 'Scrollable group comparison chart',
+    })
+    const expectLegendCentered = async () => {
+      const [legendBox, chartRegionBox] = await Promise.all([
+        groupLegend.boundingBox(),
+        chartRegion.boundingBox(),
+      ])
+      expect(legendBox).not.toBeNull()
+      expect(chartRegionBox).not.toBeNull()
+      expect(
+        Math.abs(
+          legendBox!.x +
+            legendBox!.width / 2 -
+            chartRegionBox!.x -
+            chartRegionBox!.width / 2,
+        ),
+      ).toBeLessThanOrEqual(1)
+    }
+    await expectLegendCentered()
     const originalPoints = await chart
       .locator('circle')
       .evaluateAll((elements) =>
@@ -1399,9 +1419,8 @@ for (const viewport of [
     const individualChart = page.getByRole('img', {
       name: /Change from first shared weight \(kg\)/,
     })
-    await expect(
-      page.getByRole('list', { name: 'Group chart legend' }).locator('li'),
-    ).toHaveText(['Ava (member 2)'])
+    await expect(groupLegend.locator('li')).toHaveText(['Ava (member 2)'])
+    await expectLegendCentered()
     await expect(individualChart.locator('circle[data-date]')).toHaveCount(2)
     const individualTrack = page.getByRole('group', {
       name: 'Adjust visible date range',
