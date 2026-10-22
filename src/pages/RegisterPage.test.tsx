@@ -60,11 +60,9 @@ describe('RegisterPage', () => {
     )
 
     const name = screen.getByLabelText('Username')
-    expect(name).toHaveAccessibleDescription(
-      'Your name or nickname shown in the app.',
-    )
+    expect(name).not.toHaveAttribute('aria-describedby')
     expect(name).toHaveAttribute('autocomplete', 'nickname')
-    expect(name).toHaveAttribute('placeholder', 'Your name or nickname')
+    expect(name).toHaveAttribute('placeholder', 'name or nickname')
     expect(name).toBeRequired()
     expect(name).toHaveAttribute('maxLength', '80')
     fireEvent.change(name, { target: { value: 'n'.repeat(81) } })
@@ -83,7 +81,7 @@ describe('RegisterPage', () => {
       screen.getByText('Use 80 characters or fewer for your username.'),
     ).toBeInTheDocument()
     expect(name).toHaveAccessibleDescription(
-      'Your name or nickname shown in the app. Use 80 characters or fewer for your username.',
+      'Use 80 characters or fewer for your username.',
     )
   })
 

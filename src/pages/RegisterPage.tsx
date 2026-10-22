@@ -115,28 +115,18 @@ export function RegisterPage() {
           noValidate
           onSubmit={handleSubmit}
         >
-          <div>
-            <TextInput
-              aria-describedby={
-                errors.name
-                  ? 'register-name-help register-name-error'
-                  : 'register-name-help'
-              }
-              autoComplete="nickname"
-              error={errors.name}
-              id="register-name"
-              label="Username"
-              placeholder="Your name or nickname"
-              maxLength={PROFILE_NAME_MAX_LENGTH}
-              onChange={(event) => setName(event.target.value)}
-              required
-              type="text"
-              value={name}
-            />
-            <p id="register-name-help" className="mt-2 text-sm text-ink-muted">
-              Your name or nickname shown in the app.
-            </p>
-          </div>
+          <TextInput
+            autoComplete="nickname"
+            error={errors.name}
+            id="register-name"
+            label="Username"
+            placeholder="name or nickname"
+            maxLength={PROFILE_NAME_MAX_LENGTH}
+            onChange={(event) => setName(event.target.value)}
+            required
+            type="text"
+            value={name}
+          />
           <TextInput
             autoComplete="email"
             error={errors.email}

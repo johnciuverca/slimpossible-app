@@ -14,7 +14,7 @@ test('shows accessible registration validation and local fallback', async ({
   await expect(page.getByText('Confirm your password.')).toBeVisible()
 
   await expect(page.getByLabel('Username')).toHaveAccessibleDescription(
-    'Your name or nickname shown in the app. Enter your username or nickname.',
+    'Enter your username or nickname.',
   )
   await page.getByLabel('Username').fill('Participant')
   await page.getByRole('textbox', { name: 'Email' }).fill('person@example.com')
