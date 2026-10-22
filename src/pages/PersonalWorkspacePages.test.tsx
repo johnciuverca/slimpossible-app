@@ -568,6 +568,96 @@ describe('personal Dashboard and My Progress', () => {
     })
   })
 
+  it('keeps Dashboard save confirmation over the Create column, supports dismissal, and expires repeat saves', async () => {
+    render(page(<PersonalDashboardPage />))
+    await screen.findByText('No record yet')
+    fireEvent.click(screen.getByRole('button', { name: 'Record weight' }))
+    let dialog = screen.getByRole('dialog', { name: 'Record weight' })
+    fireEvent.change(within(dialog).getByLabelText('Weight in kg'), {
+      target: { value: '82.1' },
+    })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save weight' }))
+
+    let confirmation = await screen.findByText('Personal weight saved.', {
+      selector: '.dashboard-save-confirmation',
+    })
+    expect(document.querySelector('.page-title-row')).toContainElement(
+      confirmation,
+    )
+    expect(
+      document.querySelector('.dashboard-save-confirmation-slot'),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText('Personal weight saved.', {
+        selector: '.dashboard-action-grid *',
+      }),
+    ).not.toBeInTheDocument()
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Dismiss save confirmation' }),
+    )
+    expect(
+      screen.queryByText('Personal weight saved.', {
+        selector: '.dashboard-save-confirmation',
+      }),
+    ).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Record weight' }))
+    dialog = screen.getByRole('dialog', { name: 'Edit weight' })
+    fireEvent.change(within(dialog).getByLabelText('Weight in kg'), {
+      target: { value: '82.2' },
+    })
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Update weight' }),
+    )
+    confirmation = await screen.findByText('Personal weight saved.', {
+      selector: '.dashboard-save-confirmation',
+    })
+    expect(document.querySelector('.page-title-row')).toContainElement(
+      confirmation,
+    )
+    expect(
+      await local().repositories.personalWeighIns.listForUser('user-alex'),
+    ).toMatchObject({ data: [{ weightKg: 82.2 }] })
+
+    await waitFor(
+      () =>
+        expect(
+          screen.queryByText('Personal weight saved.', {
+            selector: '.dashboard-save-confirmation',
+          }),
+        ).not.toBeInTheDocument(),
+      { interval: 50, timeout: 6000 },
+    )
+    expect(
+      document.querySelector('.dashboard-save-confirmation-slot'),
+    ).toBeInTheDocument()
+  })
+
+  it('does not show Dashboard success confirmation when saving fails', async () => {
+    const storage = local()
+    vi.spyOn(storage.repositories.personalWeighIns, 'save').mockRejectedValue(
+      new Error('temporary write failure'),
+    )
+    vi.spyOn(persistenceModule, 'createPersistence').mockReturnValue(storage)
+    render(page(<PersonalDashboardPage />))
+    await screen.findByText('No record yet')
+    fireEvent.click(screen.getByRole('button', { name: 'Record weight' }))
+    const dialog = screen.getByRole('dialog', { name: 'Record weight' })
+    fireEvent.change(within(dialog).getByLabelText('Weight in kg'), {
+      target: { value: '82' },
+    })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save weight' }))
+    expect(await within(dialog).findByRole('alert')).toBeInTheDocument()
+    expect(dialog).toHaveTextContent(
+      'Your weigh-in could not be saved. Try again.',
+    )
+    expect(
+      screen.queryByText('Personal weight saved.', {
+        selector: '.dashboard-save-confirmation',
+      }),
+    ).not.toBeInTheDocument()
+  })
+
   it('preserves today’s explicit share on correction without requesting Dashboard group summaries', async () => {
     seedGroups()
     const storage = local()
