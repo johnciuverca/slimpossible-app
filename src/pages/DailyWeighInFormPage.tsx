@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 
 import { participantFixture } from '../models/fixtures'
 import { sortWeighInsByDate, upsertWeighIn } from '../models/weighInStore'
 import type { WeighInValidationField } from '../models/weighIn'
 import type { WeighIn } from '../models/weighIn'
+import type { ChallengeKind } from '../models/challenge'
 import type { Participant } from '../models/participant'
 import {
   Button,
@@ -56,51 +57,94 @@ export function DailyWeighInFormPage() {
   const persistence = useMemo(() => createPersistence(authState), [authState])
   const [values, setValues] = useState(initialValues)
   const [weighIns, setWeighIns] = useState<WeighIn[]>([])
-  const [participant, setParticipant] = useState<Participant | null>(() =>
-    persistence.mode === 'local' ? participantFixture : null,
-  )
+  const [participant, setParticipant] = useState<Participant | null>(null)
+  const [selectedChallengeName, setSelectedChallengeName] = useState('')
+  const [selectedChallengeKind, setSelectedChallengeKind] =
+    useState<ChallengeKind | null>(null)
+  const [shareWithGroup, setShareWithGroup] = useState(false)
   const [errors, setErrors] = useState<WeighInFormErrors>({})
-  const [isLoading, setIsLoading] = useState(persistence.mode !== 'local')
+  const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [hasNoEligibleParticipant, setHasNoEligibleParticipant] =
     useState(false)
   const [editingDate, setEditingDate] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  const requestKey = JSON.stringify([
+    authState.status,
+    authState.user?.id ?? null,
+    challengeParam,
+    persistence.mode,
+  ])
+  const [loadedRequestKey, setLoadedRequestKey] = useState('')
+  const latestRequestKey = useRef(requestKey)
+  latestRequestKey.current = requestKey
 
   useEffect(() => {
     let isCurrent = true
 
+    setIsLoading(true)
+    setParticipant(null)
+    setSelectedChallengeName('')
+    setSelectedChallengeKind(null)
+    setWeighIns([])
+    setHasNoEligibleParticipant(false)
+    setIsSaving(false)
+    setEditingDate(null)
+    setValues(initialValues)
+    setShareWithGroup(false)
+    setErrors({})
+    setSubmitError('')
+    setSuccessMessage('')
+    setLoadedRequestKey('')
+
+    function finishLoading() {
+      setLoadedRequestKey(requestKey)
+      setIsLoading(false)
+    }
+
     async function loadWeighIns() {
       if (persistence.mode === 'local') {
-        const result =
-          await persistence.repositories.weighIns.listForParticipant(
+        const [result, visibleChallenges] = await Promise.all([
+          persistence.repositories.weighIns.listForParticipant(
             participantFixture.id,
-          )
+          ),
+          persistence.repositories.challenges.listVisibleToUser(
+            participantFixture.userId,
+          ),
+        ])
         if (!isCurrent) {
           return
         }
 
         setParticipant(participantFixture)
+        setSelectedChallengeName(
+          visibleChallenges.state === 'success'
+            ? (visibleChallenges.data.find(
+                ({ id }) => id === participantFixture.challengeId,
+              )?.name ?? '')
+            : '',
+        )
+        setSelectedChallengeKind(
+          visibleChallenges.state === 'success'
+            ? (visibleChallenges.data.find(
+                ({ id }) => id === participantFixture.challengeId,
+              )?.kind ?? null)
+            : null,
+        )
         if (result.state === 'error') {
           setSubmitError(result.error.message)
         } else if (result.state === 'success') {
           setWeighIns(result.data)
         }
-        setIsLoading(false)
+        finishLoading()
         return
       }
-
-      setIsLoading(true)
-      setParticipant(null)
-      setWeighIns([])
-      setHasNoEligibleParticipant(false)
-      setSubmitError('')
 
       if (persistence.mode === 'unavailable') {
         if (isCurrent) {
           setSubmitError(persistence.message)
-          setIsLoading(false)
+          finishLoading()
         }
         return
       }
@@ -111,22 +155,24 @@ export function DailyWeighInFormPage() {
           setSubmitError(
             'A signed-in account is required to load saved weigh-ins.',
           )
-          setIsLoading(false)
+          finishLoading()
         }
         return
       }
 
-      const participants =
-        await persistence.repositories.participants.listForUser(
+      const [participants, visibleChallenges] = await Promise.all([
+        persistence.repositories.participants.listForUser(authenticatedUserId),
+        persistence.repositories.challenges.listVisibleToUser(
           authenticatedUserId,
-        )
+        ),
+      ])
       if (!isCurrent) {
         return
       }
 
       if (participants.state === 'error') {
         setSubmitError(participants.error.message)
-        setIsLoading(false)
+        finishLoading()
         return
       }
 
@@ -139,10 +185,24 @@ export function DailyWeighInFormPage() {
 
       if (!savedParticipant) {
         setHasNoEligibleParticipant(true)
-        setIsLoading(false)
+        finishLoading()
         return
       }
 
+      setSelectedChallengeName(
+        visibleChallenges.state === 'success'
+          ? (visibleChallenges.data.find(
+              ({ id }) => id === savedParticipant.challengeId,
+            )?.name ?? '')
+          : '',
+      )
+      setSelectedChallengeKind(
+        visibleChallenges.state === 'success'
+          ? (visibleChallenges.data.find(
+              ({ id }) => id === savedParticipant.challengeId,
+            )?.kind ?? null)
+          : null,
+      )
       const result = await persistence.repositories.weighIns.listForParticipant(
         savedParticipant.id,
       )
@@ -156,14 +216,14 @@ export function DailyWeighInFormPage() {
       } else if (result.state === 'success') {
         setWeighIns(result.data)
       }
-      setIsLoading(false)
+      finishLoading()
     }
 
     void loadWeighIns()
     return () => {
       isCurrent = false
     }
-  }, [authState.user?.id, challengeParam, persistence])
+  }, [authState.user?.id, challengeParam, persistence, requestKey])
 
   function updateValue(field: WeighInFormField, value: string) {
     setValues((currentValues) => ({ ...currentValues, [field]: value }))
@@ -179,6 +239,7 @@ export function DailyWeighInFormPage() {
       note: weighIn.note ?? '',
       weightKg: String(weighIn.weightKg),
     })
+    setShareWithGroup(weighIn.shareWithGroup ?? false)
     setErrors({})
     setSubmitError('')
     setSuccessMessage('')
@@ -187,6 +248,7 @@ export function DailyWeighInFormPage() {
   function cancelEditing() {
     setEditingDate(null)
     setValues(initialValues)
+    setShareWithGroup(false)
     setErrors({})
     setSubmitError('')
     setSuccessMessage('')
@@ -195,7 +257,7 @@ export function DailyWeighInFormPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (!participant) {
+    if (!participant || loadedRequestKey !== requestKey) {
       return
     }
 
@@ -203,6 +265,7 @@ export function DailyWeighInFormPage() {
       date: values.date,
       note: values.note.trim() || undefined,
       participantId: participant.id,
+      shareWithGroup: selectedChallengeKind === 'group' && shareWithGroup,
       weightKg: Number(values.weightKg),
     }
     const result = upsertWeighIn(weighIns, input)
@@ -222,10 +285,17 @@ export function DailyWeighInFormPage() {
 
     setIsSaving(true)
     const saved = await persistence.repositories.weighIns.upsert(input)
+    if (latestRequestKey.current !== requestKey) {
+      return
+    }
     setIsSaving(false)
 
     if (saved.state === 'error') {
-      setSubmitError(saved.error.message)
+      setSubmitError(
+        saved.error.code === '42501'
+          ? 'This app version can no longer save challenge weigh-ins. Refresh the page to use the latest app, then try again.'
+          : saved.error.message,
+      )
       setSuccessMessage('')
       return
     }
@@ -249,6 +319,7 @@ export function DailyWeighInFormPage() {
     setSubmitError('')
     setEditingDate(null)
     setValues(initialValues)
+    setShareWithGroup(false)
     setSuccessMessage(
       persistence.mode === 'remote'
         ? 'Weigh-in saved remotely.'
@@ -261,46 +332,84 @@ export function DailyWeighInFormPage() {
   return (
     <section
       aria-labelledby="daily-weigh-in-title"
-      className="mx-auto flex w-full max-w-4xl flex-1 items-center"
+      className="mx-auto w-full max-w-6xl space-y-6"
     >
-      <div className="grid w-full gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]">
-        <Card className="p-8 sm:p-10">
-          <PageHeader
-            description={
-              persistence.mode === 'local'
-                ? 'Record today’s weight for the local preview participant.'
-                : 'Record today’s weight for your saved participant.'
-            }
-            title="Daily weigh-in."
-            titleId="daily-weigh-in-title"
-          >
-            <StatusPill>
-              {persistence.mode === 'remote'
-                ? 'Remote data'
-                : persistence.mode === 'unavailable'
-                  ? 'Remote unavailable'
-                  : 'Local storage'}
-            </StatusPill>
-          </PageHeader>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <PageHeader
+          eyebrow="DAILY CHECK-IN"
+          description={
+            persistence.mode === 'local'
+              ? 'A private check-in for the challenge selected in this preview.'
+              : 'Record one weigh-in for your currently selected challenge.'
+          }
+          title={editingDate ? 'Edit weight' : 'Record weight'}
+          titleId="daily-weigh-in-title"
+        />
+        <StatusPill>
+          {persistence.mode === 'remote'
+            ? 'Remote data'
+            : persistence.mode === 'unavailable'
+              ? 'Remote unavailable'
+              : 'Local storage'}
+        </StatusPill>
+      </div>
 
-          <p className="mt-6 text-sm text-slate-600">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
+        <Card className="p-6 sm:p-8">
+          <div className="mb-7 rounded-2xl border border-forest-200 bg-forest-50 p-5 sm:p-6">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest-800">
+              Active destination
+            </p>
+            <h2
+              className="mt-2 text-xl font-bold text-ink"
+              id="selected-weigh-in-challenge"
+            >
+              {selectedChallengeName || 'Selected challenge'}
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-ink-muted">
+              Only this selected challenge receives the weigh-in. No second
+              destination is active.
+            </p>
+            <button
+              aria-label="Additional destination, coming soon"
+              aria-describedby="second-destination-copy"
+              className="mt-4 inline-flex min-h-11 w-full cursor-not-allowed items-center justify-between rounded-xl border border-dashed border-line bg-panel px-4 py-3 text-left text-sm font-semibold text-ink-muted opacity-70 sm:w-auto sm:min-w-64"
+              disabled
+              type="button"
+            >
+              <span>Additional destination</span>
+              <span className="rounded-full border border-line px-2 py-1 text-xs font-bold uppercase tracking-wide">
+                Coming soon
+              </span>
+            </button>
+            <p
+              className="mt-2 text-xs leading-5 text-ink-muted"
+              id="second-destination-copy"
+            >
+              This option is unavailable and will not be saved.
+            </p>
+          </div>
+
+          <p className="text-sm text-ink-muted">
             Participant:{' '}
-            <strong>{participant?.displayName ?? 'Not available'}</strong>
+            <strong className="text-ink">
+              {participant?.displayName ?? 'Not available'}
+            </strong>
           </p>
 
-          {isLoading ? (
+          {isLoading || loadedRequestKey !== requestKey ? (
             <p
               aria-live="polite"
-              className="mt-8 text-sm text-slate-600"
+              className="mt-8 text-sm text-ink-muted"
               role="status"
             >
-              Loading saved participant…
+              Loading your selected challenge and saved weigh-ins…
             </p>
           ) : hasNoEligibleParticipant ? (
             <div className="mt-8 space-y-4">
               <p
                 aria-live="polite"
-                className="text-sm text-slate-600"
+                className="text-sm text-ink-muted"
                 role="status"
               >
                 No saved participant is available for this account. Set up a
@@ -308,13 +417,13 @@ export function DailyWeighInFormPage() {
               </p>
               <div className="flex flex-wrap gap-3">
                 <Link
-                  className="text-sm text-emerald-700 underline"
+                  className="text-sm font-semibold text-forest-800 underline"
                   to="/challenge/setup"
                 >
                   Set up a challenge
                 </Link>
                 <Link
-                  className="text-sm text-emerald-700 underline"
+                  className="text-sm font-semibold text-forest-800 underline"
                   to={
                     challengeParam
                       ? `/challenge/participants/enroll?challenge=${encodeURIComponent(challengeParam)}`
@@ -328,7 +437,7 @@ export function DailyWeighInFormPage() {
           ) : participant ? (
             <form
               aria-label="Daily weigh-in form"
-              className="mt-8 space-y-5"
+              className="mt-7 space-y-5"
               noValidate
               onSubmit={handleSubmit}
             >
@@ -351,6 +460,7 @@ export function DailyWeighInFormPage() {
                 onChange={(event) =>
                   updateValue('weightKg', event.target.value)
                 }
+                onWheel={(event) => event.currentTarget.blur()}
                 step="0.1"
                 type="number"
                 value={values.weightKg}
@@ -358,22 +468,26 @@ export function DailyWeighInFormPage() {
 
               <div>
                 <label
-                  className="text-sm font-semibold text-slate-700"
+                  className="text-sm font-semibold text-ink"
                   htmlFor="daily-weigh-in-note"
                 >
-                  Note{' '}
-                  <span className="font-normal text-slate-500">(optional)</span>
+                  Private note{' '}
+                  <span className="font-normal text-ink-muted">(optional)</span>
                 </label>
                 <textarea
                   aria-describedby={
                     errors.note ? 'daily-weigh-in-note-error' : undefined
                   }
                   aria-invalid={errors.note ? true : undefined}
-                  className="mt-2 block min-h-24 w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                  className="mt-2 block min-h-32 w-full rounded-xl border border-line bg-panel px-4 py-3 text-ink outline-none transition placeholder:text-ink-muted focus:border-forest-700 focus:ring-2 focus:ring-forest-100"
                   id="daily-weigh-in-note"
                   onChange={(event) => updateValue('note', event.target.value)}
                   value={values.note}
                 />
+                <p className="mt-2 text-xs leading-5 text-ink-muted">
+                  Only you can see this note. It is never included in group
+                  views.
+                </p>
                 {errors.note ? (
                   <p
                     className="mt-2 text-sm text-red-700"
@@ -384,10 +498,34 @@ export function DailyWeighInFormPage() {
                 ) : null}
               </div>
 
+              {selectedChallengeKind === 'group' ? (
+                <div className="rounded-xl border border-forest-200 bg-forest-50 p-4">
+                  <label className="flex items-start gap-3 text-sm font-semibold text-ink">
+                    <input
+                      checked={shareWithGroup}
+                      className="mt-1 size-4 accent-forest-800"
+                      onChange={(event) =>
+                        setShareWithGroup(event.target.checked)
+                      }
+                      type="checkbox"
+                    />
+                    <span>
+                      Share this date and weight with this group’s active
+                      members and owner.
+                    </span>
+                  </label>
+                  <p className="ml-7 mt-2 text-xs leading-5 text-ink-muted">
+                    This is optional. Your private note is never shared. Older
+                    entries stay private unless you edit and opt in; you can
+                    uncheck this later to remove an entry from group history.
+                  </p>
+                </div>
+              ) : null}
+
               {successMessage ? (
                 <p
                   aria-live="polite"
-                  className="text-sm text-emerald-800"
+                  className="text-sm text-forest-800"
                   role="status"
                 >
                   {successMessage}
@@ -396,7 +534,7 @@ export function DailyWeighInFormPage() {
 
               <div className="flex flex-wrap gap-3">
                 <Button disabled={isSaving} type="submit">
-                  {editingDate ? 'Update weigh-in' : 'Save weigh-in'}
+                  {editingDate ? 'Update weight' : 'Save weight'}
                 </Button>
                 {editingDate ? (
                   <Button
@@ -420,75 +558,112 @@ export function DailyWeighInFormPage() {
               {submitError}
             </p>
           ) : null}
-
-          <Link
-            className="mt-6 inline-block text-sm text-emerald-700 underline"
-            to="/today"
-          >
-            Back to today
-          </Link>
         </Card>
 
-        <Card aria-labelledby="saved-weigh-ins-title" className="p-8 sm:p-10">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">
-            {persistence.mode === 'remote' ? 'Saved data' : 'Local preview'}
-          </p>
-          <h2
-            className="mt-4 text-2xl font-bold tracking-tight text-slate-950"
-            id="saved-weigh-ins-title"
-          >
-            Saved weigh-ins
-          </h2>
-          {isLoading ? (
-            <p
-              aria-live="polite"
-              className="mt-5 text-sm text-slate-600"
-              role="status"
+        <div className="space-y-6">
+          <Card aria-labelledby="weigh-in-privacy-title" className="p-6 sm:p-7">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest-800">
+              Current sharing rules
+            </p>
+            <h2
+              className="mt-2 text-xl font-bold text-ink"
+              id="weigh-in-privacy-title"
             >
-              Loading saved weigh-ins…
+              Your note stays private
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-ink-muted">
+              Active members and the owner can see dates and weights you
+              explicitly choose to share in a group challenge. They never see
+              your private notes; unchecked entries stay private.
             </p>
-          ) : weighIns.length === 0 ? (
-            <p className="mt-5 text-sm leading-6 text-slate-600">
-              No weigh-ins saved yet.
+            <dl className="mt-5 divide-y divide-line rounded-xl border border-line bg-page px-4">
+              <div className="flex items-baseline justify-between gap-4 py-3">
+                <dt className="text-sm text-ink-muted">Your note</dt>
+                <dd className="text-sm font-semibold text-forest-800">
+                  Only you
+                </dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-4 py-3">
+                <dt className="text-sm text-ink-muted">Second destination</dt>
+                <dd className="text-sm font-semibold text-ink-muted">
+                  Not active
+                </dd>
+              </div>
+            </dl>
+          </Card>
+
+          <Card aria-labelledby="saved-weigh-ins-title" className="p-6 sm:p-7">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest-800">
+              {persistence.mode === 'remote' ? 'Saved data' : 'Local preview'}
             </p>
-          ) : (
-            <ul className="mt-5 space-y-3" aria-label="Saved weigh-ins">
-              {sortWeighInsByDate(weighIns).map((weighIn) => (
-                <li
-                  className="rounded-2xl border border-stone-200 bg-stone-50 p-4"
-                  key={`${weighIn.participantId}-${weighIn.date}`}
-                >
-                  <p className="font-semibold text-slate-900">
-                    {weighIn.date}: {weighIn.weightKg} kg
-                  </p>
-                  {weighIn.note ? (
-                    <p className="mt-1 text-sm text-slate-600">
-                      {weighIn.note}
-                    </p>
-                  ) : null}
-                  <Button
-                    className="mt-3"
-                    onClick={() => startEditing(weighIn)}
-                    type="button"
-                    variant="secondary"
+            <h2
+              className="mt-2 text-xl font-bold text-ink"
+              id="saved-weigh-ins-title"
+            >
+              Your saved weigh-ins
+            </h2>
+            {isLoading || loadedRequestKey !== requestKey ? (
+              <p
+                aria-live="polite"
+                className="mt-5 text-sm text-ink-muted"
+                role="status"
+              >
+                Loading saved weigh-ins…
+              </p>
+            ) : weighIns.length === 0 ? (
+              <p className="mt-5 text-sm leading-6 text-ink-muted">
+                No weigh-ins saved yet.
+              </p>
+            ) : (
+              <ul className="mt-5 space-y-3" aria-label="Saved weigh-ins">
+                {sortWeighInsByDate(weighIns).map((weighIn) => (
+                  <li
+                    className="rounded-xl border border-line bg-page p-4"
+                    key={`${weighIn.participantId}-${weighIn.date}`}
                   >
-                    Edit {weighIn.date}
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <p className="mt-6 text-sm leading-6 text-slate-600">
-            Missing calendar days stay absent; no record or change is created
-            for them.
-          </p>
-          <p className="mt-6 text-xs leading-5 text-slate-500">
-            {persistence.mode === 'remote'
-              ? 'Weigh-ins are loaded from the owner-authorized repository.'
-              : 'This local preview is stored in this browser and is available after refresh.'}
-          </p>
-        </Card>
+                    <p className="font-semibold text-ink">
+                      {weighIn.date}: {weighIn.weightKg} kg
+                    </p>
+                    {weighIn.note ? (
+                      <p className="mt-1 text-sm text-ink-muted">
+                        {weighIn.note}
+                      </p>
+                    ) : null}
+                    <Button
+                      className="mt-3"
+                      onClick={() => startEditing(weighIn)}
+                      type="button"
+                      variant="secondary"
+                    >
+                      Edit weight {weighIn.date}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-5 text-sm leading-6 text-ink-muted">
+              Missing calendar days stay absent; no record or change is created
+              for them.
+            </p>
+            <p className="mt-5 text-xs leading-5 text-ink-muted">
+              {persistence.mode === 'remote'
+                ? 'These entries are loaded from your selected participant’s authorized records.'
+                : 'This local preview is stored in this browser and is available after refresh.'}
+            </p>
+          </Card>
+        </div>
       </div>
+
+      <Link
+        className="inline-flex min-h-11 items-center text-sm font-semibold text-forest-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700"
+        to={
+          (participant?.challengeId ?? challengeParam)
+            ? `/today?challenge=${encodeURIComponent(participant?.challengeId ?? challengeParam ?? '')}`
+            : '/today'
+        }
+      >
+        Back to today
+      </Link>
     </section>
   )
 }

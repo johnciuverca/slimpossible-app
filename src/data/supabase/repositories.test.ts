@@ -26,6 +26,39 @@ afterEach(() => {
 })
 
 describe('Supabase repositories', () => {
+  it('maps chart identity and exact shared values without notes, emails or raw identities', async () => {
+    stubResponse([
+      {
+        member_key: 'opaque',
+        display_name: 'Ava',
+        recorded_date: '2026-09-20',
+        weight_kg: 88.5,
+        note: 'private',
+        email: 'private',
+        user_id: 'private',
+      },
+    ])
+    const result =
+      await createRepositories(client).groupProgress.getChartHistory('group-a')
+    expect(result).toEqual({
+      state: 'success',
+      data: [
+        {
+          memberKey: 'opaque',
+          displayName: 'Ava',
+          date: '2026-09-20',
+          weightKg: 88.5,
+        },
+      ],
+    })
+    expect(JSON.stringify(result)).not.toContain('private')
+    expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain(
+      '/rpc/get_group_chart_history',
+    )
+    expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body))).toEqual(
+      { target_challenge_id: 'group-a' },
+    )
+  })
   it('maps only names, comparison dates, and counts for provisional leaders', async () => {
     stubResponse([
       {
@@ -121,6 +154,249 @@ describe('Supabase repositories', () => {
     expect(JSON.parse(String(request?.[1]?.body))).toEqual({
       target_challenge_id: 'challenge-1',
       target_current_sunday: '2026-09-20',
+    })
+  })
+
+  it('maps only the challenge-scoped shared weigh-in contract', async () => {
+    stubResponse([
+      {
+        change_since_previous_kg: -1.5,
+        display_name: 'Ava',
+        recorded_date: '2026-09-20',
+        weight_kg: 88.5,
+        note: 'must not escape',
+        participant_id: 'must not escape',
+      },
+    ])
+
+    const result =
+      await createRepositories(client).groupProgress.getWeighInHistory(
+        'challenge-1',
+      )
+
+    expect(result).toEqual({
+      data: [
+        {
+          changeSincePreviousKg: -1.5,
+          date: '2026-09-20',
+          displayName: 'Ava',
+          weightKg: 88.5,
+        },
+      ],
+      state: 'success',
+    })
+    expect(JSON.stringify(result)).not.toContain('must not escape')
+    expect(JSON.stringify(result)).not.toContain('participant')
+    expect(JSON.stringify(result)).not.toContain('note')
+    const request = vi.mocked(fetch).mock.calls[0]
+    expect(String(request?.[0])).toContain('/rpc/get_group_weigh_in_history')
+    expect(JSON.parse(String(request?.[1]?.body))).toEqual({
+      target_challenge_id: 'challenge-1',
+    })
+  })
+
+  it('maps group target milestones without measurements or raw identities', async () => {
+    stubResponse([
+      {
+        member_key: 'opaque-member',
+        display_name: 'Ava',
+        target_weight_kg: 80,
+        achieved_on: '2026-10-01',
+        state: 'reached',
+        weight_kg: 79,
+        note: 'private',
+        user_id: 'private-user',
+        participant_id: 'private-participant',
+      },
+    ])
+    const result =
+      await createRepositories(client).groupProgress.getReachedTargetMilestones(
+        'challenge-1',
+      )
+    expect(result).toEqual({
+      data: [
+        {
+          achievedOn: '2026-10-01',
+          displayName: 'Ava',
+          memberKey: 'opaque-member',
+          state: 'reached',
+          targetWeightKg: 80,
+        },
+      ],
+      state: 'success',
+    })
+    expect(JSON.stringify(result)).not.toMatch(
+      /private|79|user_id|participant_id/,
+    )
+    const request = vi.mocked(fetch).mock.calls[0]
+    expect(String(request?.[0])).toContain('/rpc/get_group_target_milestones')
+    expect(JSON.parse(String(request?.[1]?.body))).toEqual({
+      target_challenge_id: 'challenge-1',
+    })
+  })
+
+  it('maps the self-scoped target change RPC and its optional reached milestone', async () => {
+    stubResponse([
+      {
+        challenge_id: 'challenge-1',
+        starting_weight_kg: 100,
+        target_weight_kg: 75,
+        previous_target_weight_kg: 80,
+        previous_target_achieved_on: '2026-10-01',
+      },
+    ])
+    const result = await createRepositories(
+      client,
+    ).participants.changeOwnGroupTarget('challenge-1', 75)
+    expect(result).toEqual({
+      data: {
+        challengeId: 'challenge-1',
+        startingWeightKg: 100,
+        targetWeightKg: 75,
+        previousTargetMilestone: {
+          achievedOn: '2026-10-01',
+          state: 'reached',
+          targetWeightKg: 80,
+        },
+      },
+      state: 'success',
+    })
+    const request = vi.mocked(fetch).mock.calls[0]
+    expect(String(request?.[0])).toContain('/rpc/change_my_group_target')
+    expect(JSON.parse(String(request?.[1]?.body))).toEqual({
+      target_challenge_id: 'challenge-1',
+      target_target_weight_kg: 75,
+    })
+  })
+
+  it('maps the narrowly scoped own starting-weight correction RPC', async () => {
+    stubResponse([
+      {
+        challenge_id: 'challenge-1',
+        starting_weight_kg: 110,
+        target_weight_kg: 80,
+      },
+    ])
+    const result = await createRepositories(
+      client,
+    ).participants.correctOwnEnrollmentStartingWeight('challenge-1', 110)
+    expect(result).toEqual({
+      data: {
+        challengeId: 'challenge-1',
+        startingWeightKg: 110,
+        targetWeightKg: 80,
+      },
+      state: 'success',
+    })
+    const request = vi.mocked(fetch).mock.calls[0]
+    expect(String(request?.[0])).toContain(
+      '/rpc/correct_my_enrollment_starting_weight',
+    )
+    expect(JSON.parse(String(request?.[1]?.body))).toEqual({
+      target_challenge_id: 'challenge-1',
+      target_starting_weight_kg: 110,
+    })
+  })
+
+  it('maps privately readable target milestones, including a null date without inventing one', async () => {
+    stubResponse([
+      { target_weight_kg: 90, achieved_on: null, state: 'reached' },
+    ])
+    const result =
+      await createRepositories(
+        client,
+      ).participants.listOwnGroupTargetMilestones('challenge-1')
+    expect(result).toEqual({
+      data: [
+        {
+          achievedOn: null,
+          state: 'reached',
+          targetWeightKg: 90,
+        },
+      ],
+      state: 'success',
+    })
+    expect(String(vi.mocked(fetch).mock.calls[0]?.[0])).toContain(
+      '/rpc/list_my_group_target_milestones',
+    )
+  })
+
+  it('uses the atomic personal save RPC and keeps its private result owner-scoped', async () => {
+    stubResponse([
+      {
+        id: 'personal-entry-1',
+        user_id: 'member-1',
+        recorded_date: '2026-10-07',
+        weight_kg: 82.4,
+        note: 'private note',
+        created_at: '2026-10-07T08:00:00.000Z',
+        updated_at: '2026-10-07T08:00:00.000Z',
+        shared_challenge_ids: ['group-1', 'group-2'],
+      },
+    ])
+
+    const result = await createRepositories(client).personalWeighIns.save(
+      'member-1',
+      {
+        id: 'personal-entry-1',
+        date: '2026-10-07',
+        note: ' private note ',
+        sharedChallengeIds: ['group-1', 'group-2'],
+        weightKg: 82.4,
+      },
+    )
+
+    expect(result).toEqual({
+      data: {
+        id: 'personal-entry-1',
+        date: '2026-10-07',
+        note: 'private note',
+        sharedChallengeIds: ['group-1', 'group-2'],
+        weightKg: 82.4,
+      },
+      state: 'success',
+    })
+    const request = vi.mocked(fetch).mock.calls[0]
+    expect(String(request?.[0])).toContain('/rpc/save_personal_weigh_in')
+    expect(JSON.parse(String(request?.[1]?.body))).toEqual({
+      target_note: 'private note',
+      target_recorded_date: '2026-10-07',
+      target_shared_challenge_ids: ['group-1', 'group-2'],
+      target_weigh_in_id: 'personal-entry-1',
+      target_weight_kg: 82.4,
+    })
+  })
+
+  it('lists only the session owner’s personal entries and deletes through the server', async () => {
+    stubResponse([
+      {
+        id: 'personal-entry-1',
+        user_id: 'member-1',
+        recorded_date: '2026-10-07',
+        weight_kg: 82.4,
+        note: 'private note',
+        created_at: '2026-10-07T08:00:00.000Z',
+        updated_at: '2026-10-07T08:00:00.000Z',
+        shared_challenge_ids: [],
+      },
+    ])
+    const listed =
+      await createRepositories(client).personalWeighIns.listForUser('member-1')
+    expect(listed.state).toBe('success')
+    expect(String(vi.mocked(fetch).mock.calls[0]?.[0])).toContain(
+      '/rpc/list_my_personal_weigh_ins',
+    )
+
+    stubResponse(true)
+    const deleted = await createRepositories(client).personalWeighIns.delete(
+      'member-1',
+      'personal-entry-1',
+    )
+    expect(deleted).toEqual({ data: true, state: 'success' })
+    const request = vi.mocked(fetch).mock.calls.at(-1)
+    expect(String(request?.[0])).toContain('/rpc/delete_personal_weigh_in')
+    expect(JSON.parse(String(request?.[1]?.body))).toEqual({
+      target_weigh_in_id: 'personal-entry-1',
     })
   })
 
@@ -221,6 +497,7 @@ describe('Supabase repositories', () => {
 
   it('creates and maps a challenge through the repository', async () => {
     stubResponse({
+      challenge_kind: 'group',
       created_at: '2026-09-17T10:00:00.000Z',
       created_by: 'owner-1',
       description: null,
@@ -254,6 +531,43 @@ describe('Supabase repositories', () => {
       String(vi.mocked(fetch).mock.calls[0]?.[1]?.body),
     ) as Record<string, unknown>
     expect(requestBody).not.toHaveProperty('target_weight_kg')
+    expect(requestBody).toHaveProperty('challenge_kind', 'group')
+  })
+
+  it('creates an explicit personal challenge without defaulting it to group', async () => {
+    stubResponse({
+      challenge_kind: 'personal',
+      created_at: '2026-09-17T10:00:00.000Z',
+      created_by: 'owner-1',
+      description: null,
+      end_date: '2026-10-01',
+      id: 'personal-1',
+      name: 'Private challenge',
+      owner_id: 'owner-1',
+      start_date: '2026-09-17',
+      status: 'draft',
+      target_weight_kg: null,
+      updated_at: '2026-09-17T10:00:00.000Z',
+    })
+
+    const result = await createRepositories(client).challenges.create({
+      createdBy: 'owner-1',
+      endDate: '2026-10-01',
+      kind: 'personal',
+      name: 'Private challenge',
+      ownerId: 'owner-1',
+      startDate: '2026-09-17',
+    })
+
+    expect(result).toMatchObject({
+      data: { id: 'personal-1', kind: 'personal' },
+      state: 'success',
+    })
+    expect(
+      JSON.parse(String(vi.mocked(fetch).mock.calls[0]?.[1]?.body)),
+    ).toMatchObject({
+      challenge_kind: 'personal',
+    })
   })
 
   it('preserves a legacy challenge target when updating without one', async () => {
@@ -295,6 +609,7 @@ describe('Supabase repositories', () => {
   it('maps a database challenge row to the domain shape', async () => {
     stubResponse([
       {
+        challenge_kind: null,
         created_at: '2026-09-17T10:00:00.000Z',
         created_by: 'creator-1',
         description: 'A focused challenge',
@@ -315,6 +630,7 @@ describe('Supabase repositories', () => {
     expect(result).toEqual({
       data: [
         {
+          kind: 'group',
           createdBy: 'creator-1',
           createdAt: '2026-09-17T10:00:00.000Z',
           description: 'A focused challenge',
@@ -414,6 +730,7 @@ describe('Supabase repositories', () => {
       note: 'Corrected reading.',
       participant_id: 'participant-1',
       recorded_date: '2026-09-17',
+      share_with_group: true,
       updated_at: '2026-09-17T11:00:00.000Z',
       weight_kg: 91.5,
     })
@@ -422,6 +739,7 @@ describe('Supabase repositories', () => {
       date: '2026-09-17',
       note: 'Corrected reading.',
       participantId: 'participant-1',
+      shareWithGroup: true,
       weightKg: 91.5,
     })
 
@@ -429,9 +747,14 @@ describe('Supabase repositories', () => {
       data: {
         date: '2026-09-17',
         participantId: 'participant-1',
+        shareWithGroup: true,
         weightKg: 91.5,
       },
       state: 'success',
+    })
+    const request = vi.mocked(fetch).mock.calls[0]
+    expect(JSON.parse(String(request?.[1]?.body))).toMatchObject({
+      share_with_group: true,
     })
   })
 

@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App'
@@ -13,7 +13,7 @@ describe('App foundation screen', () => {
     window.history.pushState({}, '', '/')
   })
 
-  it('shows the shared layout and foundation content', () => {
+  it('shows the shared layout and signed-out Home welcome content', async () => {
     render(<App />)
 
     expect(screen.getByRole('banner')).toHaveTextContent('Slimpossible')
@@ -21,18 +21,23 @@ describe('App foundation screen', () => {
       screen.getByRole('navigation', { name: 'Primary navigation' }),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('heading', { name: 'Your challenge starts here.' }),
+      await screen.findByRole('heading', {
+        name: 'Keep showing up. It adds up.',
+      }),
     ).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('Public preview')
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+      'href',
+      '/login',
+    )
+    expect(
+      screen.getByRole('link', { name: 'Create your account' }),
+    ).toHaveAttribute('href', '/register')
   })
 
   it('redirects signed-out users from protected pages to login', async () => {
     vi.useFakeTimers()
+    window.history.pushState({}, '', '/progress?challenge=private-plan#goals')
     render(<App />)
-
-    fireEvent.click(screen.getByRole('link', { name: 'My progress' }))
-
-    expect(window.location.pathname).toBe('/progress')
     await act(async () => {
       vi.advanceTimersByTime(150)
       await Promise.resolve()

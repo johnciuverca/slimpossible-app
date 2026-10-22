@@ -18,6 +18,12 @@ export type Participant = {
   userId: string
 }
 
+export type OwnStartingWeightCorrection = {
+  challengeId: string
+  startingWeightKg: number
+  targetWeightKg: number
+}
+
 export type ParticipantValidationField = keyof Participant
 
 export type ParticipantValidationIssue = {

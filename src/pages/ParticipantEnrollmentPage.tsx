@@ -6,6 +6,7 @@ import type {
   ParticipantValidationField,
 } from '../models/participant'
 import { validateParticipant } from '../models/participant'
+import type { ChallengeKind } from '../models/challenge'
 import {
   Button,
   Card,
@@ -63,6 +64,7 @@ export function ParticipantEnrollmentPage() {
   const [successMessage, setSuccessMessage] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [challengeId, setChallengeId] = useState(localChallengeId)
+  const [challengeKind, setChallengeKind] = useState<ChallengeKind | null>(null)
   const [ownerBoundUserId, setOwnerBoundUserId] = useState('')
   const [existingOwnerMembership, setExistingOwnerMembership] =
     useState<Participant | null>(null)
@@ -81,6 +83,7 @@ export function ParticipantEnrollmentPage() {
       }
 
       setIsLoading(true)
+      setChallengeKind(null)
       setOwnerBoundUserId('')
       setExistingOwnerMembership(null)
       setSubmitError('')
@@ -158,6 +161,7 @@ export function ParticipantEnrollmentPage() {
             ? (selectedChallenge?.ownerId ?? '')
             : ''
       setChallengeId(nextChallengeId)
+      setChallengeKind(selectedChallenge?.kind ?? null)
       setOwnerBoundUserId(nextOwnerBoundUserId)
       const result =
         await persistence.repositories.participants.listForChallenge(
@@ -317,12 +321,14 @@ export function ParticipantEnrollmentPage() {
                 >
                   Go to Today
                 </Link>
-                <Link
-                  className="text-sm font-semibold text-emerald-700 underline"
-                  to={`/challenge/invites?challenge=${encodeURIComponent(challengeId)}`}
-                >
-                  Invite participants
-                </Link>
+                {challengeKind === 'group' ? (
+                  <Link
+                    className="text-sm font-semibold text-emerald-700 underline"
+                    to={`/challenge/invites?challenge=${encodeURIComponent(challengeId)}`}
+                  >
+                    Invite participants
+                  </Link>
+                ) : null}
               </div>
             </div>
           ) : (
@@ -332,6 +338,21 @@ export function ParticipantEnrollmentPage() {
               noValidate
               onSubmit={handleSubmit}
             >
+              {challengeKind === 'group' ? (
+                <aside
+                  aria-label="Group sharing and privacy"
+                  className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5"
+                >
+                  <h2 className="font-semibold text-slate-950">
+                    What group members can see
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-slate-700">
+                    Only dates and weights you explicitly share are visible to
+                    active challenge members and the owner. Your notes remain
+                    private.
+                  </p>
+                </aside>
+              ) : null}
               <TextInput
                 autoComplete="off"
                 error={errors.displayName}

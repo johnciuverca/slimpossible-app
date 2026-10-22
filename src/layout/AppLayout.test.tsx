@@ -7,12 +7,8 @@ import type { AuthState } from '../auth/context'
 import { AppLayout } from './AppLayout'
 
 const liveNavigation = [
-  { label: 'Overview', path: '/' },
-  { label: 'Today', path: '/today' },
-  { label: 'My progress', path: '/progress' },
+  { label: 'Dashboard', path: '/dashboard' },
   { label: 'Group', path: '/group' },
-  { label: 'Goals', path: '/goals' },
-  { label: 'Weigh-in', path: '/weigh-ins' },
 ]
 
 function renderLayout(path: string, state: AuthState) {
@@ -21,6 +17,7 @@ function renderLayout(path: string, state: AuthState) {
       <MemoryRouter initialEntries={[path]}>
         <AppLayout>
           <p>Live route content</p>
+          <CurrentRoute />
         </AppLayout>
       </MemoryRouter>
     </AuthProvider>,
@@ -39,12 +36,38 @@ function CurrentRoute() {
 }
 
 const signedOut: AuthState = { error: null, status: 'signed-out', user: null }
+const signedIn: AuthState = {
+  error: null,
+  status: 'signed-in',
+  user: { id: 'owner-1', email: 'owner@example.invalid' },
+}
 
 afterEach(() => cleanup())
 
 describe('AppLayout', () => {
-  it('renders accessible landmarks and all six existing live destinations', () => {
-    renderLayout('/', signedOut)
+  it.each([
+    [
+      'signed-in',
+      {
+        error: null,
+        status: 'signed-in',
+        user: { id: 'owner-1', email: 'owner@example.invalid' },
+      } satisfies AuthState,
+      '/dashboard',
+    ],
+    ['signed-out', signedOut, '/'],
+  ])(
+    'the %s logo opens its canonical home without challenge parameters',
+    (_label, state, destination) => {
+      renderLayout('/group?challenge=private%2Fplan&tab=progress', state)
+      const logo = screen.getByRole('link', { name: 'Slimpossible' })
+      expect(logo).toHaveAttribute('href', destination)
+      fireEvent.click(logo)
+      expect(screen.getByTestId('current-route').textContent).toBe(destination)
+    },
+  )
+  it('renders only the actual Dashboard and Group workspaces in primary navigation', () => {
+    renderLayout('/dashboard', signedIn)
 
     expect(screen.getByRole('banner')).toHaveTextContent('Slimpossible')
     expect(
@@ -52,6 +75,9 @@ describe('AppLayout', () => {
     ).toBeInTheDocument()
     expect(screen.getByRole('main')).toHaveTextContent('Live route content')
     expect(screen.getByRole('contentinfo')).toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: 'Weigh-in' }),
+    ).not.toBeInTheDocument()
 
     for (const { label, path } of liveNavigation) {
       expect(screen.getByRole('link', { name: label })).toHaveAttribute(
@@ -59,15 +85,64 @@ describe('AppLayout', () => {
         path,
       )
     }
-    expect(screen.getByRole('link', { name: 'Log in' })).toHaveAttribute(
+    for (const retired of ['Challenges', 'My progress', 'Goals']) {
+      expect(
+        screen.queryByRole('link', { name: retired }),
+      ).not.toBeInTheDocument()
+    }
+  })
+
+  it('uses the Dashboard shell for signed-in root without changing public or challenge routes', () => {
+    const { unmount } = renderLayout('/', signedIn)
+
+    const dashboardShell = document.querySelector('.app-shell')
+    expect(dashboardShell).toHaveClass('shared-layout', 'dashboard-shell')
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    expect(screen.getByRole('button', { name: 'Profile' })).toBeInTheDocument()
+
+    unmount()
+    renderLayout('/', signedOut)
+    expect(document.querySelector('.app-shell')).not.toHaveClass(
+      'shared-layout',
+      'dashboard-shell',
+    )
+    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute(
       'href',
-      '/login',
+      '/',
+    )
+
+    cleanup()
+    renderLayout('/?challenge=private%2Fplan', signedIn)
+    expect(document.querySelector('.app-shell')).not.toHaveClass(
+      'shared-layout',
+      'dashboard-shell',
     )
   })
 
+  it.each(['/login', '/register'])(
+    'shows public navigation without protected controls on %s',
+    (path) => {
+      renderLayout(path, signedOut)
+      for (const [name, href] of [
+        ['Home', '/'],
+        ['Log in', '/login'],
+        ['Register', '/register'],
+      ]) {
+        expect(screen.getByRole('link', { name })).toHaveAttribute('href', href)
+      }
+      for (const name of ['Dashboard', 'Group', 'Profile', 'Log out']) {
+        expect(screen.queryByRole('link', { name })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
+      }
+    },
+  )
+
   it('preserves the selected challenge across shared header navigation', () => {
     render(
-      <AuthProvider initialState={signedOut}>
+      <AuthProvider initialState={signedIn}>
         <MemoryRouter
           initialEntries={[
             '/challenge/participants/enroll?challenge=private%2Fplan',
@@ -82,27 +157,27 @@ describe('AppLayout', () => {
 
     expect(screen.getByRole('link', { name: 'Slimpossible' })).toHaveAttribute(
       'href',
-      '/?challenge=private%2Fplan',
+      '/dashboard',
     )
 
     for (const { label, path } of liveNavigation) {
       expect(screen.getByRole('link', { name: label })).toHaveAttribute(
         'href',
-        `${path}?challenge=private%2Fplan`,
+        ['/dashboard', '/weigh-ins'].includes(path)
+          ? path
+          : `${path}?challenge=private%2Fplan`,
       )
     }
 
-    fireEvent.click(screen.getByRole('link', { name: 'Today' }))
+    fireEvent.click(screen.getByRole('link', { name: 'Dashboard' }))
 
-    expect(screen.getByTestId('current-route')).toHaveTextContent(
-      '/today?challenge=private%2Fplan',
-    )
+    expect(screen.getByTestId('current-route')).toHaveTextContent('/dashboard')
   })
 
   it.each(liveNavigation)(
     'identifies $label as the current page without color-only state',
     ({ label, path }) => {
-      renderLayout(path, signedOut)
+      renderLayout(path, signedIn)
 
       const currentLink = screen.getByRole('link', { name: label })
       expect(currentLink).toHaveAttribute('aria-current', 'page')
@@ -111,21 +186,18 @@ describe('AppLayout', () => {
     },
   )
 
-  it('labels unavailable group history as disabled, without making it a link', () => {
+  it('does not add a duplicate or unavailable Group history destination', () => {
     renderLayout('/group', signedOut)
 
-    const unavailable = screen.getByRole('button', {
-      name: 'Group history, coming soon',
-    })
-    expect(unavailable).toBeDisabled()
-    expect(unavailable).toHaveTextContent('Coming soon')
+    expect(
+      screen.queryByRole('button', { name: /Group history/ }),
+    ).not.toBeInTheDocument()
     expect(
       screen.queryByRole('link', { name: /Group history/ }),
     ).not.toBeInTheDocument()
   })
 
   it.each([
-    ['signed-out', signedOut],
     [
       'challenge owner',
       {

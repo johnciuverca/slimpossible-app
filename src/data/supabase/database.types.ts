@@ -11,6 +11,7 @@ export type Database = {
     Tables: {
       challenges: {
         Row: {
+          challenge_kind: 'personal' | 'group' | null
           created_at: string
           created_by: string
           description: string | null
@@ -24,6 +25,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          challenge_kind?: 'personal' | 'group' | null
           created_at?: string
           created_by: string
           description?: string | null
@@ -37,6 +39,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          challenge_kind?: 'personal' | 'group' | null
           created_at?: string
           created_by?: string
           description?: string | null
@@ -111,6 +114,54 @@ export type Database = {
         }
         Relationships: []
       }
+      personal_weigh_ins: {
+        Row: {
+          id: string
+          user_id: string
+          recorded_date: string
+          weight_kg: number
+          note: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          recorded_date: string
+          weight_kg: number
+          note?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          recorded_date?: string
+          weight_kg?: number
+          note?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      personal_weigh_in_group_shares: {
+        Row: {
+          personal_weigh_in_id: string
+          challenge_id: string
+          created_at: string
+        }
+        Insert: {
+          personal_weigh_in_id: string
+          challenge_id: string
+          created_at?: string
+        }
+        Update: {
+          personal_weigh_in_id?: string
+          challenge_id?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       weigh_ins: {
         Row: {
           created_at: string
@@ -118,6 +169,7 @@ export type Database = {
           note: string | null
           participant_id: string
           recorded_date: string
+          share_with_group: boolean
           updated_at: string
           weight_kg: number
         }
@@ -127,6 +179,7 @@ export type Database = {
           note?: string | null
           participant_id: string
           recorded_date: string
+          share_with_group?: boolean
           updated_at?: string
           weight_kg: number
         }
@@ -136,6 +189,7 @@ export type Database = {
           note?: string | null
           participant_id?: string
           recorded_date?: string
+          share_with_group?: boolean
           updated_at?: string
           weight_kg?: number
         }
@@ -144,6 +198,42 @@ export type Database = {
     }
     Views: Record<string, never>
     Functions: {
+      delete_personal_weigh_in: {
+        Args: { target_weigh_in_id: string }
+        Returns: boolean
+      }
+      list_my_personal_weigh_ins: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          user_id: string
+          recorded_date: string
+          weight_kg: number
+          note: string | null
+          created_at: string
+          updated_at: string
+          shared_challenge_ids: string[]
+        }[]
+      }
+      save_personal_weigh_in: {
+        Args: {
+          target_note: string | null
+          target_recorded_date: string
+          target_shared_challenge_ids: string[]
+          target_weigh_in_id: string | null
+          target_weight_kg: number
+        }
+        Returns: {
+          id: string
+          user_id: string
+          recorded_date: string
+          weight_kg: number
+          note: string | null
+          created_at: string
+          updated_at: string
+          shared_challenge_ids: string[]
+        }[]
+      }
       accept_challenge_invite: {
         Args: {
           invite_token: string
@@ -189,6 +279,79 @@ export type Database = {
           reached_target_count: number
           weekly_winner_count: number
           weekly_winner_names: string[]
+        }[]
+      }
+      get_group_weigh_in_history: {
+        Args: { target_challenge_id: string }
+        Returns: {
+          change_since_previous_kg: number | null
+          display_name: string
+          recorded_date: string
+          weight_kg: number
+        }[]
+      }
+      get_group_chart_history: {
+        Args: { target_challenge_id: string }
+        Returns: {
+          member_key: string
+          display_name: string
+          recorded_date: string
+          weight_kg: number
+        }[]
+      }
+      get_group_member_progress: {
+        Args: { target_challenge_id: string }
+        Returns: {
+          member_key: string
+          display_name: string
+          starting_weight_kg: number | null
+          target_weight_kg: number | null
+          latest_recorded_date: string | null
+          completion_percentage: number | null
+          progress_state: string
+          reached_target_milestones: Json
+        }[]
+      }
+      change_my_group_target: {
+        Args: {
+          target_challenge_id: string
+          target_target_weight_kg: number
+        }
+        Returns: {
+          challenge_id: string
+          starting_weight_kg: number
+          target_weight_kg: number
+          previous_target_weight_kg: number | null
+          previous_target_achieved_on: string | null
+        }[]
+      }
+      correct_my_enrollment_starting_weight: {
+        Args: {
+          target_challenge_id: string
+          target_starting_weight_kg: number
+        }
+        Returns: {
+          challenge_id: string
+          starting_weight_kg: number
+          target_weight_kg: number
+        }[]
+      }
+      list_my_group_target_milestones: {
+        Args: { target_challenge_id: string }
+        Returns: {
+          target_weight_kg: number
+          achieved_on: string | null
+          state: string
+        }[]
+      }
+      get_group_target_milestones: {
+        Args: { target_challenge_id: string }
+        Returns: {
+          member_key: string
+          display_name: string
+          target_weight_kg: number
+          achieved_on: string
+          state: string
         }[]
       }
       get_provisional_group_leader_summary: {

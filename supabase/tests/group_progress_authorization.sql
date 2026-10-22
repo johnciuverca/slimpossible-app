@@ -119,14 +119,28 @@ begin
 
   execute 'set local role authenticated';
   perform set_config('request.jwt.claim.sub', owner_id::text, true);
-  begin
-    perform * from public.get_group_progress_summary(owner_only_challenge_id, '2026-09-20');
-    insert into slimpossible_group_progress_checks values
-      ('owner_without_membership_is_denied', false);
-  exception when insufficient_privilege then
-    insert into slimpossible_group_progress_checks values
-      ('owner_without_membership_is_denied', true);
-  end;
+  select to_jsonb(result) into summary
+  from public.get_group_progress_summary(owner_only_challenge_id, '2026-09-20') as result;
+  insert into slimpossible_group_progress_checks
+  values ('non_enrolled_owner_receives_safe_empty_summary',
+    summary ->> 'challenge_id' = owner_only_challenge_id::text
+    and summary ->> 'active_participant_count' = '0'
+    and summary ->> 'eligible_participant_count' = '0'
+    and not (summary ? 'note')
+    and not (summary ? 'weight_kg')
+    and not (summary ? 'participant_id'));
+
+  select to_jsonb(result) into summary
+  from public.get_provisional_group_leader_summary(owner_only_challenge_id, '2026-09-15') as result;
+  insert into slimpossible_group_progress_checks
+  values ('non_enrolled_owner_receives_safe_empty_provisional_summary',
+    summary ->> 'challenge_id' = owner_only_challenge_id::text
+    and summary ->> 'active_participant_count' = '0'
+    and summary ->> 'eligible_participant_count' = '0'
+    and summary ->> 'state' = 'solo-challenge'
+    and not (summary ? 'note')
+    and not (summary ? 'weight_kg')
+    and not (summary ? 'participant_id'));
 
   execute 'reset role';
   insert into public.weigh_ins (participant_id, recorded_date, weight_kg, note)

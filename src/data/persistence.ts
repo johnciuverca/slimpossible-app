@@ -5,6 +5,11 @@ import {
 } from './supabase/client'
 import type { Challenge } from '../models/challenge'
 import type { Participant } from '../models/participant'
+import { isEligibleSharingGroup } from '../models/groupSharingEligibility'
+import type {
+  PersonalWeighIn,
+  PersonalWeighInInput,
+} from '../models/personalWeighIn'
 import {
   getChallengeInviteStatus,
   type ChallengeInvite,
@@ -37,6 +42,7 @@ export type PersistenceRepositories = Pick<
   | 'groupProgress'
   | 'invites'
   | 'participants'
+  | 'personalWeighIns'
   | 'profiles'
   | 'weighIns'
 >
@@ -69,6 +75,7 @@ export type InvitePersistence =
 const challengesStorageKey = 'slimpossible.local.challenges'
 const participantsStorageKey = 'slimpossible.local.participants'
 const weighInsStorageKey = 'slimpossible.local.weigh-ins'
+const personalWeighInsStorageKey = 'slimpossible.local.personal-weigh-ins'
 const invitesStorageKey = 'slimpossible.local.challenge-invites'
 
 type LocalChallengeInvite = ChallengeInvite & { token: string }
@@ -84,6 +91,16 @@ function readList<T>(storage: Storage, key: string): T[] {
   } catch {
     return []
   }
+}
+
+function readLocalChallenges(storage: Storage): Challenge[] {
+  return readList<Challenge>(storage, challengesStorageKey).map(
+    (challenge) => ({
+      ...challenge,
+      // Existing local previews predate challenge kinds and remain group contexts.
+      kind: challenge.kind ?? 'group',
+    }),
+  )
 }
 
 function writeList<T>(storage: Storage, key: string, values: T[]) {
@@ -110,6 +127,7 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
     async create(input: ChallengeWriteInput) {
       const now = new Date().toISOString()
       const challenge: Challenge = {
+        kind: input.kind ?? 'group',
         createdAt: now,
         createdBy: input.createdBy,
         ...(input.description ? { description: input.description } : {}),
@@ -131,7 +149,7 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
       return { data: challenge, state: 'success' }
     },
     async findOwnedById(id: string, ownerId: string) {
-      const challenge = readList<Challenge>(storage, challengesStorageKey).find(
+      const challenge = readLocalChallenges(storage).find(
         (value) => value.id === id && value.ownerId === ownerId,
       )
       return challenge
@@ -139,7 +157,7 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
         : { data: null, state: 'empty' }
     },
     async listOwned(ownerId?: string) {
-      const values = readList<Challenge>(storage, challengesStorageKey).filter(
+      const values = readLocalChallenges(storage).filter(
         (value) => !ownerId || value.ownerId === ownerId,
       )
       return values.length > 0
@@ -155,7 +173,7 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
           )
           .map((participant) => participant.challengeId),
       )
-      const values = readList<Challenge>(storage, challengesStorageKey).filter(
+      const values = readLocalChallenges(storage).filter(
         (challenge) =>
           challenge.ownerId === userId || joinedChallengeIds.has(challenge.id),
       )
@@ -164,7 +182,7 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
         : { data: [], state: 'empty' }
     },
     async update(id: string, input: ChallengeWriteInput) {
-      const values = readList<Challenge>(storage, challengesStorageKey)
+      const values = readLocalChallenges(storage)
       const index = values.findIndex((value) => value.id === id)
       if (index < 0) {
         return { data: null, state: 'empty' }
@@ -253,6 +271,36 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
         return localStorageError()
       }
       return { data: participant, state: 'success' }
+    },
+    async changeOwnGroupTarget() {
+      return {
+        error: {
+          kind: 'request',
+          message:
+            'Changing a group target requires a signed-in server session.',
+        },
+        state: 'error',
+      }
+    },
+    async correctOwnEnrollmentStartingWeight() {
+      return {
+        error: {
+          kind: 'request',
+          message:
+            'Correcting an enrollment starting weight requires a signed-in server session.',
+        },
+        state: 'error',
+      }
+    },
+    async listOwnGroupTargetMilestones() {
+      return {
+        error: {
+          kind: 'request',
+          message:
+            'Target milestone history requires a signed-in server session.',
+        },
+        state: 'error',
+      }
     },
   }
 
@@ -401,6 +449,7 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
         date: input.date,
         ...(input.note ? { note: input.note } : {}),
         participantId: input.participantId,
+        shareWithGroup: input.shareWithGroup ?? false,
         weightKg: input.weightKg,
       }
       const values = readList<WeighIn>(storage, weighInsStorageKey)
@@ -430,6 +479,7 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
         date: input.date,
         ...(input.note ? { note: input.note } : {}),
         participantId: input.participantId,
+        shareWithGroup: input.shareWithGroup ?? false,
         weightKg: input.weightKg,
       }
       values[index] = weighIn
@@ -449,6 +499,7 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
         date: input.date,
         ...(input.note ? { note: input.note } : {}),
         participantId: input.participantId,
+        shareWithGroup: input.shareWithGroup ?? false,
         weightKg: input.weightKg,
       }
 
@@ -464,6 +515,117 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
     },
   }
 
+  const personalWeighIns: Repositories['personalWeighIns'] = {
+    async listForUser(userId) {
+      const values = readList<PersonalWeighIn & { userId: string }>(
+        storage,
+        personalWeighInsStorageKey,
+      )
+        .filter((value) => value.userId === userId)
+        .map(({ id, date, note, sharedChallengeIds, weightKg }) => ({
+          id,
+          date,
+          ...(note ? { note } : {}),
+          sharedChallengeIds,
+          weightKg,
+        }))
+      return values.length > 0
+        ? { data: values, state: 'success' }
+        : { data: [], state: 'empty' }
+    },
+    async save(userId: string, input: PersonalWeighInInput) {
+      if (!userId) {
+        return {
+          error: {
+            kind: 'request',
+            message: 'A signed-in user is required to save a weigh-in.',
+          },
+          state: 'error',
+        }
+      }
+      const allValues = readList<PersonalWeighIn & { userId: string }>(
+        storage,
+        personalWeighInsStorageKey,
+      )
+      const existingById = input.id
+        ? allValues.find(
+            (value) => value.id === input.id && value.userId === userId,
+          )
+        : undefined
+      if (input.id && !existingById) return { data: null, state: 'empty' }
+      const existingByDate = allValues.find(
+        (value) => value.userId === userId && value.date === input.date,
+      )
+      const existing = existingById ?? (input.id ? undefined : existingByDate)
+      const dateCollision = allValues.find(
+        (value) =>
+          value.userId === userId &&
+          value.date === input.date &&
+          value.id !== existing?.id,
+      )
+      if (dateCollision) {
+        return {
+          error: {
+            kind: 'request',
+            code: '23505',
+            message: 'A weigh-in already exists for that date.',
+          },
+          state: 'error',
+        }
+      }
+
+      const groups = readLocalChallenges(storage)
+      const participants = readList<Participant>(
+        storage,
+        participantsStorageKey,
+      )
+      const permittedIds = new Set(
+        groups
+          .filter((challenge) =>
+            isEligibleSharingGroup(challenge, userId, participants),
+          )
+          .map(({ id }) => id),
+      )
+      if (input.sharedChallengeIds.some((id) => !permittedIds.has(id))) {
+        return {
+          error: {
+            kind: 'request',
+            message: 'One or more selected groups are no longer available.',
+          },
+          state: 'error',
+        }
+      }
+
+      const saved: PersonalWeighIn = {
+        id: existing?.id ?? createLocalId('personal-weigh-in'),
+        date: input.date,
+        ...(input.note?.trim() ? { note: input.note.trim() } : {}),
+        sharedChallengeIds: [...input.sharedChallengeIds],
+        weightKg: input.weightKg,
+      }
+      const values = allValues.filter((value) => value.id !== existing?.id)
+      values.unshift({ ...saved, userId })
+      if (!writeList(storage, personalWeighInsStorageKey, values)) {
+        return localStorageError()
+      }
+      return { data: saved, state: 'success' }
+    },
+    async delete(userId, id) {
+      const values = readList<PersonalWeighIn & { userId: string }>(
+        storage,
+        personalWeighInsStorageKey,
+      )
+      const filtered = values.filter(
+        (value) => value.id !== id || value.userId !== userId,
+      )
+      if (filtered.length === values.length)
+        return { data: null, state: 'empty' }
+      return writeList(storage, personalWeighInsStorageKey, filtered)
+        ? { data: true, state: 'success' }
+        : localStorageError()
+    },
+  }
+
   const profiles: ProfileRepository = {
     async ensure(input) {
       return {
@@ -474,6 +636,24 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
   }
 
   const groupProgress: GroupProgressRepository = {
+    async getMemberProgress() {
+      return {
+        error: {
+          kind: 'request',
+          message: 'Shared group progress requires a signed-in server session.',
+        },
+        state: 'error',
+      }
+    },
+    async getChartHistory() {
+      return {
+        error: {
+          kind: 'request',
+          message: 'Shared group history requires a signed-in server session.',
+        },
+        state: 'error',
+      }
+    },
     async getForChallenge() {
       return {
         error: {
@@ -492,6 +672,25 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
         state: 'error',
       }
     },
+    async getWeighInHistory() {
+      return {
+        error: {
+          kind: 'request',
+          message: 'Shared group history requires a signed-in server session.',
+        },
+        state: 'error',
+      }
+    },
+    async getReachedTargetMilestones() {
+      return {
+        error: {
+          kind: 'request',
+          message:
+            'Shared target milestones require a signed-in server session.',
+        },
+        state: 'error',
+      }
+    },
   }
 
   return {
@@ -500,6 +699,7 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
     invites,
     participants,
     profiles,
+    personalWeighIns,
     weighIns,
   }
 }

@@ -7,10 +7,14 @@ import {
   waitFor,
 } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 
 import { AuthProvider } from '../auth/AuthContext'
-import type { AuthGateway } from '../auth/context'
+import {
+  AuthContext,
+  type AuthContextValue,
+  type AuthGateway,
+} from '../auth/context'
 import { ParticipantEnrollmentPage } from './ParticipantEnrollmentPage'
 import { ChallengeSetupPage } from './ChallengeSetupPage'
 
@@ -23,10 +27,34 @@ afterEach(() => {
 })
 
 describe('ChallengeSetupPage', () => {
-  function renderPage() {
+  function CurrentLocation() {
+    const location = useLocation()
+    return (
+      <output data-testid="current-location">
+        {location.pathname}
+        {location.search}
+      </output>
+    )
+  }
+
+  function renderPage(initialEntry = '/') {
     render(
-      <MemoryRouter>
-        <ChallengeSetupPage />
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <Routes>
+          <Route
+            element={<ParticipantEnrollmentPage />}
+            path="/challenge/participants/enroll"
+          />
+          <Route
+            element={
+              <>
+                <ChallengeSetupPage />
+                <CurrentLocation />
+              </>
+            }
+            path="*"
+          />
+        </Routes>
       </MemoryRouter>,
     )
   }
@@ -148,6 +176,238 @@ describe('ChallengeSetupPage', () => {
     expect(screen.getByLabelText('End date')).toHaveValue('2026-12-01')
     expect(
       screen.queryByLabelText('Target weight in kg (optional)'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('opens the requested owned challenge directly for editing', async () => {
+    window.localStorage.setItem(
+      'slimpossible.local.challenges',
+      JSON.stringify([
+        {
+          createdAt: '2026-09-17T10:00:00.000Z',
+          createdBy: 'local-owner',
+          description: 'Keep this private description',
+          endDate: '2026-12-01',
+          id: 'challenge-to-edit',
+          kind: 'personal',
+          name: 'Selected private challenge',
+          ownerId: 'local-owner',
+          startDate: '2026-09-01',
+          status: 'active',
+          updatedAt: '2026-09-17T10:00:00.000Z',
+        },
+      ]),
+    )
+    renderPage('/challenge/setup?challenge=challenge-to-edit')
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Saved challenge')).toHaveValue(
+        'challenge-to-edit',
+      ),
+    )
+    expect(screen.getByRole('textbox', { name: 'Challenge name' })).toHaveValue(
+      'Selected private challenge',
+    )
+    expect(screen.getByLabelText('Description (optional)')).toHaveValue(
+      'Keep this private description',
+    )
+    fireEvent.change(screen.getByRole('textbox', { name: 'Challenge name' }), {
+      target: { value: 'Edited selected challenge' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Update challenge' }))
+
+    await waitFor(() =>
+      expect(
+        JSON.parse(
+          window.localStorage.getItem('slimpossible.local.challenges') ?? '[]',
+        ),
+      ).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: 'challenge-to-edit',
+            name: 'Edited selected challenge',
+          }),
+        ]),
+      ),
+    )
+    expect(
+      JSON.parse(
+        window.localStorage.getItem('slimpossible.local.challenges') ?? '[]',
+      ),
+    ).toHaveLength(1)
+  })
+
+  it('does not turn an unavailable challenge management link into a new challenge', async () => {
+    renderPage('/challenge/setup?challenge=not-owned')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'That saved challenge is unavailable for this account',
+    )
+    expect(screen.queryByLabelText('Challenge name')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Create a new challenge' }),
+    ).toBeEnabled()
+  })
+
+  it('recovers an unavailable link by selecting an owned challenge and syncing the URL', async () => {
+    window.localStorage.setItem(
+      'slimpossible.local.challenges',
+      JSON.stringify([
+        {
+          createdAt: '2026-09-17T10:00:00.000Z',
+          createdBy: 'local-owner',
+          endDate: '2026-12-01',
+          id: 'owned-challenge',
+          kind: 'group',
+          name: 'Owned challenge',
+          ownerId: 'local-owner',
+          startDate: '2026-09-01',
+          status: 'draft',
+          updatedAt: '2026-09-17T10:00:00.000Z',
+        },
+      ]),
+    )
+    renderPage('/challenge/setup?challenge=stale-challenge')
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    fireEvent.change(
+      screen.getByRole('combobox', {
+        name: 'Choose one of your saved challenges',
+      }),
+      { target: { value: 'owned-challenge' } },
+    )
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Update challenge' }),
+      ).toBeEnabled(),
+    )
+    expect(screen.getByTestId('current-location')).toHaveTextContent(
+      '/challenge/setup?challenge=owned-challenge',
+    )
+    expect(screen.getByRole('textbox', { name: 'Challenge name' })).toHaveValue(
+      'Owned challenge',
+    )
+  })
+
+  it('explicitly clears an unavailable link before creating when no owned challenges exist', async () => {
+    renderPage('/challenge/setup?challenge=stale-challenge')
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Create a new challenge' }),
+    )
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByTestId('current-location')).toHaveTextContent(
+      '/challenge/setup',
+    )
+    expect(screen.getByRole('button', { name: 'Save challenge' })).toBeEnabled()
+    expect(screen.getByRole('textbox', { name: 'Challenge name' })).toHaveValue(
+      '',
+    )
+  })
+
+  it('hides a requested challenge during loading and never carries prior-account fields into recovery', async () => {
+    vi.stubEnv('VITE_SUPABASE_URL', 'https://project.supabase.co')
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-anon-key')
+    const responses: Array<(response: Response) => void> = []
+    const fetchMock = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          responses.push(resolve)
+        }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const authValue = (id: string) =>
+      ({
+        state: {
+          error: null,
+          status: 'signed-in',
+          user: { email: `${id}@example.com`, id },
+        },
+        requestPasswordRecovery: vi.fn(),
+        resetPassword: vi.fn(),
+        retrySession: vi.fn(),
+        signIn: vi.fn(),
+        signOut: vi.fn(),
+        signUp: vi.fn(),
+      }) as unknown as AuthContextValue
+
+    const view = (id: string) => (
+      <AuthContext.Provider value={authValue(id)}>
+        <MemoryRouter initialEntries={['/challenge/setup?challenge=shared-id']}>
+          <Routes>
+            <Route
+              element={
+                <>
+                  <ChallengeSetupPage />
+                  <CurrentLocation />
+                </>
+              }
+              path="*"
+            />
+          </Routes>
+        </MemoryRouter>
+      </AuthContext.Provider>
+    )
+
+    const { rerender } = render(view('owner-a'))
+    await waitFor(() => expect(responses).toHaveLength(1))
+    expect(screen.queryByLabelText('Challenge name')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Save challenge' }),
+    ).not.toBeInTheDocument()
+    await act(async () => {
+      responses[0](
+        new Response(
+          JSON.stringify([
+            {
+              created_at: '2026-09-17T10:00:00.000Z',
+              created_by: 'owner-a',
+              end_date: '2026-12-01',
+              id: 'shared-id',
+              kind: 'personal',
+              name: 'Owner A private title',
+              owner_id: 'owner-a',
+              start_date: '2026-09-01',
+              status: 'draft',
+              updated_at: '2026-09-17T10:00:00.000Z',
+            },
+          ]),
+          { headers: { 'Content-Type': 'application/json' }, status: 200 },
+        ),
+      )
+    })
+    expect(
+      await screen.findByRole('textbox', { name: 'Challenge name' }),
+    ).toHaveValue('Owner A private title')
+
+    rerender(view('owner-b'))
+    await waitFor(() => expect(responses).toHaveLength(2))
+    expect(screen.queryByLabelText('Challenge name')).not.toBeInTheDocument()
+    expect(screen.queryByText('Owner A private title')).not.toBeInTheDocument()
+    await act(async () => {
+      responses[1](
+        new Response(JSON.stringify([]), {
+          headers: { 'Content-Type': 'application/json' },
+          status: 200,
+        }),
+      )
+    })
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'That saved challenge is unavailable for this account',
+    )
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Create a new challenge' }),
+    )
+    expect(screen.getByRole('textbox', { name: 'Challenge name' })).toHaveValue(
+      '',
+    )
+    expect(
+      screen.queryByDisplayValue('Owner A private title'),
     ).not.toBeInTheDocument()
   })
 
@@ -318,6 +578,49 @@ describe('ChallengeSetupPage', () => {
     ).not.toBeInTheDocument()
   })
 
+  it('creates a private personal challenge without implicitly enrolling its owner', async () => {
+    renderPage('/challenge/setup?kind=personal')
+
+    expect(
+      screen.getByRole('radio', { name: /Personal challenge \(private\)/ }),
+    ).toBeChecked()
+    expect(
+      screen.getByText(/Creating it does not enroll you/),
+    ).toBeInTheDocument()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Challenge name' }), {
+      target: { value: 'Private plan' },
+    })
+    fireEvent.change(screen.getByLabelText('Start date'), {
+      target: { value: '2026-10-01' },
+    })
+    fireEvent.change(screen.getByLabelText('End date'), {
+      target: { value: '2026-11-01' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save challenge' }))
+
+    expect(
+      await screen.findByText('Enroll in your personal challenge?'),
+    ).toBeInTheDocument()
+    const [savedChallenge] = JSON.parse(
+      window.localStorage.getItem('slimpossible.local.challenges') ?? '[]',
+    ) as Array<Record<string, unknown>>
+    expect(savedChallenge).toMatchObject({
+      kind: 'personal',
+      name: 'Private plan',
+    })
+    expect(
+      window.localStorage.getItem('slimpossible.local.participants'),
+    ).toBeNull()
+    expect(screen.getByRole('link', { name: 'Enroll me' })).toHaveAttribute(
+      'href',
+      `/challenge/participants/enroll?challenge=${String(savedChallenge.id)}&self=owner`,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Not now' }))
+    expect(
+      screen.queryByRole('link', { name: 'Invite participants' }),
+    ).not.toBeInTheDocument()
+  })
+
   it('offers self-enrollment for the newly saved challenge and keeps it on back navigation', async () => {
     window.localStorage.setItem(
       'slimpossible.local.challenges',
@@ -467,8 +770,11 @@ describe('ChallengeSetupPage', () => {
       screen.getByRole('link', { name: 'Invite participants' }),
     ).toHaveAttribute('href', `/challenge/invites?challenge=${challengeId}`)
     expect(
-      screen.getByRole('link', { name: 'Join later from Today' }),
-    ).toHaveAttribute('href', `/today?challenge=${challengeId}`)
+      screen.getByRole('link', { name: 'Enroll me later' }),
+    ).toHaveAttribute(
+      'href',
+      `/challenge/participants/enroll?challenge=${challengeId}&self=owner`,
+    )
     expect(window.localStorage.getItem('slimpossible.local.participants')).toBe(
       null,
     )
@@ -488,6 +794,40 @@ describe('ChallengeSetupPage', () => {
     expect(
       screen.queryByText('Will you participate too?'),
     ).not.toBeInTheDocument()
+  })
+
+  it('routes create, organizer-only, and enroll-later through explicit self-enrollment', async () => {
+    renderPage('/challenge/setup?kind=group')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Challenge name' }), {
+      target: { value: 'Organizer later enrollment' },
+    })
+    fireEvent.change(screen.getByLabelText('Start date'), {
+      target: { value: '2026-10-01' },
+    })
+    fireEvent.change(screen.getByLabelText('End date'), {
+      target: { value: '2026-11-01' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save challenge' }))
+    await screen.findByText('Will you participate too?')
+
+    const [challenge] = JSON.parse(
+      window.localStorage.getItem('slimpossible.local.challenges') ?? '[]',
+    ) as Array<{ id: string }>
+    fireEvent.click(
+      screen.getByRole('button', { name: 'No, I’ll organize only' }),
+    )
+    fireEvent.click(screen.getByRole('link', { name: 'Enroll me later' }))
+
+    expect(
+      await screen.findByRole('form', { name: 'Participant enrollment form' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByLabelText('Group sharing and privacy'),
+    ).toBeInTheDocument()
+    expect(
+      window.localStorage.getItem('slimpossible.local.participants'),
+    ).toBeNull()
+    expect(challenge.id).toBeTruthy()
   })
 
   it('preserves a legacy challenge target when editing a saved challenge', async () => {
