@@ -234,12 +234,15 @@ for (const width of [1280, 390]) {
           }),
         ).toBeVisible()
         await expect(chart.locator('[data-chart-reference]')).toHaveCount(1)
-        await expect(
-          page.getByRole('list', { name: 'Personal chart legend' }),
-        ).toContainText('Synthetic personal goal target')
-        await expect(
-          page.getByRole('list', { name: 'Personal chart legend' }),
-        ).not.toContainText('Synthetic first group target')
+        await expect(chart).toHaveAccessibleName(
+          /dashed reference line marks Synthetic personal goal target at .* kilograms/,
+        )
+        await expect(chart).toHaveAccessibleDescription(
+          /dashed reference line marks Synthetic personal goal target at .* kilograms/,
+        )
+        await expect(chart).not.toHaveAccessibleName(
+          /Synthetic first group target/,
+        )
         await expect(
           goals.getByRole('button', { name: 'Edit starting weight' }),
         ).toBeVisible()
