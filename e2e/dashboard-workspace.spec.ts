@@ -2,6 +2,49 @@ import { expect, test } from '@playwright/test'
 const fixture = (path = '/dashboard', native = false) =>
   `/e2e/fixtures/dashboard-workspace-harness.html?${new URLSearchParams({ path, ...(native ? { native: '1' } : {}) })}`
 
+for (const viewport of [
+  { label: 'desktop', width: 1280 },
+  { label: 'narrow', width: 390 },
+]) {
+  test(`latest-weight card aligns with dashboard actions on ${viewport.label}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: 900 })
+    await page.goto(fixture())
+    await expect(page.getByText('Latest personal weight')).toBeVisible()
+    const latestCard = page.locator('.dashboard-latest')
+    const actionGrid = page.locator('.dashboard-action-grid')
+    await expect(
+      actionGrid.getByRole('button', { name: 'Record weight', exact: true }),
+    ).toBeVisible()
+    await expect(
+      actionGrid.getByRole('link', { name: 'Create challenge' }),
+    ).toBeVisible()
+    await expect(
+      actionGrid.getByRole('button', { name: 'Invite people' }),
+    ).toBeVisible()
+    await expect(
+      actionGrid.getByRole('button', { name: 'Join with invitation' }),
+    ).toBeVisible()
+    const [cardBox, gridBox] = await Promise.all([
+      latestCard.boundingBox(),
+      actionGrid.boundingBox(),
+    ])
+    expect(cardBox).not.toBeNull()
+    expect(gridBox).not.toBeNull()
+
+    if (viewport.width >= 1100) {
+      expect(Math.abs(cardBox!.y - gridBox!.y)).toBeLessThanOrEqual(1)
+      expect(
+        Math.abs(cardBox!.y + cardBox!.height - gridBox!.y - gridBox!.height),
+      ).toBeLessThanOrEqual(1)
+    } else {
+      expect(gridBox!.y).toBeGreaterThanOrEqual(cardBox!.y + cardBox!.height)
+      expect(Math.abs(cardBox!.height - gridBox!.height)).toBeGreaterThan(1)
+    }
+  })
+}
+
 test('Combined Dashboard has one chart/table and keyboard history access at 390px', async ({
   page,
 }) => {
