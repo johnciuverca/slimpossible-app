@@ -147,7 +147,7 @@ for (const width of [1280, 390]) {
     await expect(chart.locator('circle[data-date]')).toHaveCount(5)
   })
 
-  test(`every dense chart label stays non-overlapping and unclipped at ${width}px`, async ({
+  test(`dense history retains the fixed chart frame and every saved label at ${width}px`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 900 })
@@ -177,33 +177,38 @@ for (const width of [1280, 390]) {
     await expect(chart.locator('.chart-value')).toHaveCount(40)
     const metrics = await chart.evaluate((svg) => {
       const labels = [...svg.querySelectorAll<SVGTextElement>('.chart-value')]
-      const boxes = labels.map((label) => label.getBBox())
-      const view = svg.viewBox.baseVal
+      const points = [
+        ...svg.querySelectorAll<SVGCircleElement>('circle[data-date]'),
+      ]
       return {
         fontSizes: labels.map((label) => label.getAttribute('font-size')),
-        insideViewBox: boxes.every(
-          (box) =>
-            box.x >= 0 &&
-            box.y >= 0 &&
-            box.x + box.width <= view.width &&
-            box.y + box.height <= view.height,
+        mappedLabels: labels.every(
+          (label, index) =>
+            label.dataset.date === points[index].dataset.date &&
+            label.dataset.weightKg === points[index].dataset.weightKg,
         ),
-        noLabelOverlap: boxes.every((box, index) =>
-          boxes
-            .slice(index + 1)
-            .every(
-              (other) =>
-                box.x + box.width <= other.x ||
-                other.x + other.width <= box.x ||
-                box.y + box.height <= other.y ||
-                other.y + other.height <= box.y,
-            ),
-        ),
+        viewBox: svg.getAttribute('viewBox'),
+        width: svg.getAttribute('width'),
+        height: svg.getAttribute('height'),
+        weeklyTicks: [
+          ...svg.querySelectorAll<SVGGElement>('[data-chart-date-tick]'),
+        ].map((tick) => tick.dataset.chartDateTick),
       }
     })
     expect(metrics.fontSizes.every((fontSize) => fontSize === '5')).toBe(true)
-    expect(metrics.insideViewBox).toBe(true)
-    expect(metrics.noLabelOverlap).toBe(true)
+    expect(metrics.mappedLabels).toBe(true)
+    expect(metrics.viewBox).toBe('0 0 760 266')
+    expect(metrics.width).toBe('760')
+    expect(metrics.height).toBe('266')
+    expect(
+      metrics.weeklyTicks.every(
+        (tick, index) =>
+          index === 0 ||
+          Date.parse(`${tick}T00:00:00Z`) -
+            Date.parse(`${metrics.weeklyTicks[index - 1]}T00:00:00Z`) ===
+            7 * 86400000,
+      ),
+    ).toBe(true)
     await page.screenshot({
       path: test.info().outputPath(`dense-chart-${width}.png`),
       fullPage: true,
