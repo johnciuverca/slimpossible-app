@@ -317,6 +317,10 @@ export function GroupChartHistory({
                     min={min}
                     max={max}
                     maxTicks={8}
+                    paddingRatio={absolute ? 0.05 : 0}
+                    paddingMinimum={0.5}
+                    floorAtZero={absolute}
+                    includeZero={!absolute}
                     className="w-full min-w-[36rem]"
                     viewBox="0 0 760 266"
                     series={series.map((member, index) => ({

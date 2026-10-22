@@ -74,6 +74,29 @@ for (const width of [1280, 390]) {
     await chart.screenshot({
       path: test.info().outputPath('personal-chart-narrow-preview.png'),
     })
+    const dateControls = page.getByRole('group', {
+      name: 'Chart date range controls',
+    })
+    await expect(dateControls).toBeVisible()
+    await dateControls
+      .getByRole('button', { name: 'Show last 1 month' })
+      .click()
+    await expect(chart.locator('circle[data-date]')).toHaveCount(4)
+    const startSlider = dateControls.getByRole('slider', {
+      name: 'Visible range start',
+    })
+    const originalStart = await startSlider.getAttribute('aria-valuetext')
+    await startSlider.focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(startSlider).not.toHaveAttribute(
+      'aria-valuetext',
+      originalStart!,
+    )
+    await dateControls.getByRole('button', { name: 'Show all dates' }).click()
+    await expect(chart.locator('circle[data-date]')).toHaveCount(5)
+    await expect(
+      dateControls.getByRole('button', { name: 'Show all dates' }),
+    ).toHaveAttribute('aria-pressed', 'true')
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,

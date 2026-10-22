@@ -65,6 +65,56 @@ describe('Group chart history', () => {
     expect(legend).toHaveTextContent('first shared 2026-09-01')
     expect(screen.getByRole('rowheader', { name: '2026-09-03' })).toBeVisible()
   })
+  it('uses the same view-only ranges for all members and an individual member chart', async () => {
+    const entries: GroupChartEntry[] = [
+      { memberKey: 'a', displayName: 'Ava', date: '2026-01-01', weightKg: 90 },
+      { memberKey: 'a', displayName: 'Ava', date: '2026-02-01', weightKg: 89 },
+      { memberKey: 'a', displayName: 'Ava', date: '2026-03-01', weightKg: 88 },
+      { memberKey: 'a', displayName: 'Ava', date: '2026-04-01', weightKg: 87 },
+      { memberKey: 'a', displayName: 'Ava', date: '2026-05-01', weightKg: 86 },
+    ]
+    const load = vi.fn().mockResolvedValue({ state: 'success', data: entries })
+    render(
+      <GroupChartHistory
+        challengeId="group"
+        viewerId="viewer"
+        persistence={persistence(load)}
+        refreshVersion={0}
+        memberProgress={[
+          {
+            memberKey: 'a',
+            displayName: 'Ava',
+            targetWeightKg: 82,
+            startingWeightKg: 90,
+            completionPercentage: 50,
+            progressState: 'in_progress',
+            reachedTargetMilestones: [],
+          },
+        ]}
+      />,
+    )
+    const chart = await screen.findByRole('img', {
+      name: 'Weight (kg) — shared group history',
+    })
+    expect(chart.querySelectorAll('circle[data-date]')).toHaveLength(5)
+    fireEvent.click(screen.getByRole('button', { name: 'Show last 1 month' }))
+    expect(chart.querySelectorAll('circle[data-date]')).toHaveLength(2)
+    expect(chart.querySelector('[data-chart-reference]')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Show last 3 months' }))
+    expect(chart.querySelectorAll('circle[data-date]')).toHaveLength(4)
+    fireEvent.click(screen.getByRole('tab', { name: 'Ava' }))
+    const individual = screen.getByRole('img', {
+      name: /Change from first shared weight \(kg\)/,
+    })
+    expect(individual.querySelectorAll('circle[data-date]')).toHaveLength(4)
+    expect(
+      screen.getByRole('group', { name: 'Chart date range controls' }),
+    ).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Show all dates' }))
+    expect(individual.querySelectorAll('circle[data-date]')).toHaveLength(5)
+    expect(load).toHaveBeenCalledTimes(1)
+    expect(load).toHaveBeenCalledWith('group')
+  })
   it('plots four actual-kg member series with padded axes, preserves gaps and keeps individual change view', async () => {
     const records = [80, 100, 90, 110].map((weightKg, index) => ({
       memberKey: String(index),

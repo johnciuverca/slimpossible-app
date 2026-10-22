@@ -96,6 +96,8 @@ export function PersonalProgressChart({
           yLabel="Weight (kg)"
           min={minimum}
           max={maximum}
+          paddingRatio={0.14}
+          paddingMinimum={0.5}
         />
       </div>
       <p className="mt-2 text-xs text-ink-muted sm:hidden">

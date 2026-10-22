@@ -1306,6 +1306,26 @@ for (const viewport of [
     await chart.screenshot({
       path: test.info().outputPath('actual-kg-chart.png'),
     })
+    const rangeControls = page.getByRole('group', {
+      name: 'Chart date range controls',
+    })
+    const initialChartPoints = await chart.locator('circle[data-date]').count()
+    const groupStartSlider = rangeControls.getByRole('slider', {
+      name: 'Visible range start',
+    })
+    const initialStartDate =
+      await groupStartSlider.getAttribute('aria-valuetext')
+    await groupStartSlider.focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(groupStartSlider).not.toHaveAttribute(
+      'aria-valuetext',
+      initialStartDate!,
+    )
+    await expect(chart.locator('circle[data-date]')).toHaveCount(2)
+    await rangeControls.getByRole('button', { name: 'Show all dates' }).click()
+    await expect(chart.locator('circle[data-date]')).toHaveCount(
+      initialChartPoints,
+    )
     await expect(table.getByRole('columnheader')).toHaveText([
       'Date',
       'Ava (member 1) (kg)',
@@ -1337,6 +1357,23 @@ for (const viewport of [
     await expect(table).not.toContainText('88.50 kg')
     await page.keyboard.press('Home')
     await expect(all).toBeFocused()
+    await tabs.getByRole('tab', { name: 'Ava (member 2)' }).click()
+    const individualChart = page.getByRole('img', {
+      name: /Change from first shared weight \(kg\)/,
+    })
+    await expect(individualChart.locator('circle[data-date]')).toHaveCount(2)
+    const individualStart = page
+      .getByRole('group', { name: 'Chart date range controls' })
+      .getByRole('slider', { name: 'Visible range start' })
+    await individualStart.focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(individualChart.locator('circle[data-date]')).toHaveCount(1)
+    await page
+      .getByRole('group', { name: 'Chart date range controls' })
+      .getByRole('button', { name: 'Show all dates' })
+      .click()
+    await expect(individualChart.locator('circle[data-date]')).toHaveCount(2)
+    await all.click()
     const weights = page.getByRole('region', {
       name: 'Scrollable shared group weights',
     })
