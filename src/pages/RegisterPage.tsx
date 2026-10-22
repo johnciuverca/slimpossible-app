@@ -30,9 +30,9 @@ function validateRegistration(
   const errors: RegisterErrors = {}
 
   if (!name.trim()) {
-    errors.name = 'Enter your name.'
+    errors.name = 'Enter your username or nickname.'
   } else if (name.trim().length > PROFILE_NAME_MAX_LENGTH) {
-    errors.name = `Use ${PROFILE_NAME_MAX_LENGTH} characters or fewer.`
+    errors.name = `Use ${PROFILE_NAME_MAX_LENGTH} characters or fewer for your username.`
   }
 
   if (!email.trim()) {
@@ -115,17 +115,28 @@ export function RegisterPage() {
           noValidate
           onSubmit={handleSubmit}
         >
-          <TextInput
-            autoComplete="name"
-            error={errors.name}
-            id="register-name"
-            label="Full name"
-            maxLength={PROFILE_NAME_MAX_LENGTH}
-            onChange={(event) => setName(event.target.value)}
-            required
-            type="text"
-            value={name}
-          />
+          <div>
+            <TextInput
+              aria-describedby={
+                errors.name
+                  ? 'register-name-help register-name-error'
+                  : 'register-name-help'
+              }
+              autoComplete="nickname"
+              error={errors.name}
+              id="register-name"
+              label="Username"
+              placeholder="Your name or nickname"
+              maxLength={PROFILE_NAME_MAX_LENGTH}
+              onChange={(event) => setName(event.target.value)}
+              required
+              type="text"
+              value={name}
+            />
+            <p id="register-name-help" className="mt-2 text-sm text-ink-muted">
+              Your name or nickname shown in the app.
+            </p>
+          </div>
           <TextInput
             autoComplete="email"
             error={errors.email}

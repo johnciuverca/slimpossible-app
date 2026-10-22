@@ -24,12 +24,14 @@ describe('RegisterPage', () => {
 
     fireEvent.submit(screen.getByRole('form', { name: 'Registration form' }))
 
-    expect(screen.getByText('Enter your name.')).toBeInTheDocument()
+    expect(
+      screen.getByText('Enter your username or nickname.'),
+    ).toBeInTheDocument()
     expect(screen.getByText('Enter your email address.')).toBeInTheDocument()
     expect(screen.getByText('Create a password.')).toBeInTheDocument()
     expect(screen.getByText('Confirm your password.')).toBeInTheDocument()
 
-    fireEvent.change(screen.getByLabelText('Full name'), {
+    fireEvent.change(screen.getByLabelText('Username'), {
       target: { value: 'Participant' },
     })
     fireEvent.change(screen.getByRole('textbox', { name: 'Email' }), {
@@ -57,7 +59,12 @@ describe('RegisterPage', () => {
       </AuthProvider>,
     )
 
-    const name = screen.getByLabelText('Full name')
+    const name = screen.getByLabelText('Username')
+    expect(name).toHaveAccessibleDescription(
+      'Your name or nickname shown in the app.',
+    )
+    expect(name).toHaveAttribute('autocomplete', 'nickname')
+    expect(name).toHaveAttribute('placeholder', 'Your name or nickname')
     expect(name).toBeRequired()
     expect(name).toHaveAttribute('maxLength', '80')
     fireEvent.change(name, { target: { value: 'n'.repeat(81) } })
@@ -72,7 +79,12 @@ describe('RegisterPage', () => {
     })
     fireEvent.submit(screen.getByRole('form', { name: 'Registration form' }))
 
-    expect(screen.getByText('Use 80 characters or fewer.')).toBeInTheDocument()
+    expect(
+      screen.getByText('Use 80 characters or fewer for your username.'),
+    ).toBeInTheDocument()
+    expect(name).toHaveAccessibleDescription(
+      'Your name or nickname shown in the app. Use 80 characters or fewer for your username.',
+    )
   })
 
   it('shows configuration guidance without starting a remote request', async () => {
@@ -86,7 +98,7 @@ describe('RegisterPage', () => {
       </AuthProvider>,
     )
 
-    fireEvent.change(screen.getByLabelText('Full name'), {
+    fireEvent.change(screen.getByLabelText('Username'), {
       target: { value: 'Participant' },
     })
     fireEvent.change(screen.getByRole('textbox', { name: 'Email' }), {
