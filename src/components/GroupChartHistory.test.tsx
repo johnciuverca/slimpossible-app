@@ -102,14 +102,38 @@ describe('Group chart history', () => {
     expect(chart.querySelector('[data-chart-reference]')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Show last 3 months' }))
     expect(chart.querySelectorAll('circle[data-date]')).toHaveLength(4)
+    const allMembersTrack = screen.getByRole('group', {
+      name: 'Adjust visible date range',
+    })
+    expect(allMembersTrack.querySelectorAll('[role="slider"]')).toHaveLength(2)
+    fireEvent.keyDown(
+      screen.getByRole('slider', { name: 'Visible range end' }),
+      {
+        key: 'ArrowLeft',
+      },
+    )
+    expect(chart.querySelectorAll('circle[data-date]')).toHaveLength(3)
+    fireEvent.click(screen.getByRole('button', { name: 'Show all dates' }))
     fireEvent.click(screen.getByRole('tab', { name: 'Ava' }))
     const individual = screen.getByRole('img', {
       name: /Change from first shared weight \(kg\)/,
     })
-    expect(individual.querySelectorAll('circle[data-date]')).toHaveLength(4)
+    expect(individual.querySelectorAll('circle[data-date]')).toHaveLength(5)
     expect(
       screen.getByRole('group', { name: 'Chart date range controls' }),
     ).toBeInTheDocument()
+    expect(
+      screen
+        .getByRole('group', { name: 'Adjust visible date range' })
+        .querySelectorAll('[role="slider"]'),
+    ).toHaveLength(2)
+    fireEvent.keyDown(
+      screen.getByRole('slider', { name: 'Visible range end' }),
+      {
+        key: 'ArrowLeft',
+      },
+    )
+    expect(individual.querySelectorAll('circle[data-date]')).toHaveLength(4)
     fireEvent.click(screen.getByRole('button', { name: 'Show all dates' }))
     expect(individual.querySelectorAll('circle[data-date]')).toHaveLength(5)
     expect(load).toHaveBeenCalledTimes(1)

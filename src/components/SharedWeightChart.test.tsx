@@ -142,15 +142,18 @@ it('applies quick ranges, adjustable date endpoints, clipped trend/reference lin
   fireEvent.click(screen.getByRole('button', { name: 'Show all dates' }))
   expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(5)
 
+  const sliders = screen.getAllByRole('slider')
+  expect(sliders).toHaveLength(2)
   const start = screen.getByRole('slider', { name: 'Visible range start' })
-  fireEvent.change(start, {
-    target: {
-      value: String(
-        Math.floor(new Date('2026-01-02T00:00:00Z').getTime() / 86400000),
-      ),
-    },
-  })
+  const end = screen.getByRole('slider', { name: 'Visible range end' })
+  fireEvent.keyDown(start, { key: 'ArrowRight' })
   expect(range).toBeInTheDocument()
   expect(start).toHaveAttribute('aria-valuetext', '2026-01-02')
   expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(4)
+  fireEvent.keyDown(end, { key: 'ArrowLeft' })
+  expect(end).toHaveAttribute('aria-valuetext', '2026-04-30')
+  expect(screen.getByLabelText('Visible date range')).toHaveTextContent(
+    '2026-01-02 – 2026-04-30',
+  )
+  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(3)
 })

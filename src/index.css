@@ -32,6 +32,47 @@ body {
   color: var(--color-ink);
 }
 
+.date-range-handle {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin: 0;
+  transform: translate(-50%, -50%);
+  border: 0;
+  border-radius: 9999px;
+  background: transparent;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.date-range-handle::before {
+  position: absolute;
+  inset: 0.3125rem;
+  content: '';
+  border: 2px solid var(--color-panel);
+  border-radius: 9999px;
+  background: var(--group-accent-strong, #326746);
+  box-shadow: 0 0 0 1px var(--group-accent-strong, #326746);
+}
+
+.date-range-handle-end {
+  z-index: 3;
+}
+
+.date-range-handle:focus-visible {
+  z-index: 5;
+  outline: 2px solid var(--color-ink);
+  outline-offset: 3px;
+}
+
+.date-range-handle:disabled,
+.date-range-handle:disabled::before {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .app-nav-scroll {
   overscroll-behavior-x: contain;
   scrollbar-width: none;

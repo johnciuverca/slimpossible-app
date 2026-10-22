@@ -78,11 +78,26 @@ for (const width of [1280, 390]) {
       name: 'Chart date range controls',
     })
     await expect(dateControls).toBeVisible()
+    const dateRangeLabel = await dateControls
+      .getByText('Date range', { exact: true })
+      .boundingBox()
+    const chartBox = await chart.boundingBox()
+    expect(dateRangeLabel).not.toBeNull()
+    expect(chartBox).not.toBeNull()
+    expect(
+      Math.abs(
+        dateRangeLabel!.x - (chartBox!.x + (64 / 760) * chartBox!.width),
+      ),
+    ).toBeLessThan(2)
+    const sliderTrack = page.getByRole('group', {
+      name: 'Adjust visible date range',
+    })
+    await expect(sliderTrack.getByRole('slider')).toHaveCount(2)
     await dateControls
       .getByRole('button', { name: 'Show last 1 month' })
       .click()
     await expect(chart.locator('circle[data-date]')).toHaveCount(4)
-    const startSlider = dateControls.getByRole('slider', {
+    const startSlider = sliderTrack.getByRole('slider', {
       name: 'Visible range start',
     })
     const originalStart = await startSlider.getAttribute('aria-valuetext')
@@ -91,6 +106,42 @@ for (const width of [1280, 390]) {
     await expect(startSlider).not.toHaveAttribute(
       'aria-valuetext',
       originalStart!,
+    )
+    await dateControls.getByRole('button', { name: 'Show all dates' }).click()
+    await expect(chart.locator('circle[data-date]')).toHaveCount(5)
+    const endSlider = sliderTrack.getByRole('slider', {
+      name: 'Visible range end',
+    })
+    if (width === 1280) {
+      const endThumb = await endSlider.boundingBox()
+      expect(endThumb).not.toBeNull()
+      const beforeMouseDrag = await endSlider.getAttribute('aria-valuetext')
+      const thumbY = endThumb!.y + endThumb!.height / 2
+      const thumbCenterX = endThumb!.x + endThumb!.width / 2
+      await page.mouse.move(thumbCenterX, thumbY)
+      await page.mouse.down()
+      await page.mouse.move(thumbCenterX - 60, thumbY, { steps: 8 })
+      await page.mouse.up()
+      await expect(endSlider).not.toHaveAttribute(
+        'aria-valuetext',
+        beforeMouseDrag!,
+      )
+      await expect(chart.locator('circle[data-date]')).toHaveCount(3)
+      await dateControls.getByRole('button', { name: 'Show all dates' }).click()
+      await expect(chart.locator('circle[data-date]')).toHaveCount(5)
+    }
+    const originalEnd = await endSlider.getAttribute('aria-valuetext')
+    await endSlider.focus()
+    await page.keyboard.press('ArrowLeft')
+    await expect(endSlider).not.toHaveAttribute('aria-valuetext', originalEnd!)
+    await expect(chart.locator('circle[data-date]')).toHaveCount(4)
+    await chart.scrollIntoViewIfNeeded()
+    const chartBottomBox = await chart.boundingBox()
+    const sliderBox = await sliderTrack.boundingBox()
+    expect(sliderBox).not.toBeNull()
+    expect(chartBottomBox).not.toBeNull()
+    expect(sliderBox!.y).toBeGreaterThan(
+      chartBottomBox!.y + chartBottomBox!.height - 1,
     )
     await dateControls.getByRole('button', { name: 'Show all dates' }).click()
     await expect(chart.locator('circle[data-date]')).toHaveCount(5)

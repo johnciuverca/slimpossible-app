@@ -145,6 +145,14 @@ it('changes the personal chart window without changing saved weigh-ins', () => {
   expect(
     chart().querySelectorAll('[data-chart-date-tick]').length,
   ).toBeLessThan(18)
+  const rangeTrack = screen.getByRole('group', {
+    name: 'Adjust visible date range',
+  })
+  expect(rangeTrack.querySelectorAll('[role="slider"]')).toHaveLength(2)
+  fireEvent.keyDown(screen.getByRole('slider', { name: 'Visible range end' }), {
+    key: 'ArrowLeft',
+  })
+  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(1)
   expect(weighIns).toHaveLength(5)
   fireEvent.click(screen.getByRole('button', { name: 'Show all dates' }))
   expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(5)

@@ -1309,8 +1309,23 @@ for (const viewport of [
     const rangeControls = page.getByRole('group', {
       name: 'Chart date range controls',
     })
+    const chartControlsTrack = page.getByRole('group', {
+      name: 'Adjust visible date range',
+    })
+    await expect(chartControlsTrack.getByRole('slider')).toHaveCount(2)
+    const quickRangeLabel = await rangeControls
+      .getByText('Date range', { exact: true })
+      .boundingBox()
+    const chartBounds = await chart.boundingBox()
+    expect(quickRangeLabel).not.toBeNull()
+    expect(chartBounds).not.toBeNull()
+    expect(
+      Math.abs(
+        quickRangeLabel!.x - (chartBounds!.x + (64 / 760) * chartBounds!.width),
+      ),
+    ).toBeLessThan(2)
     const initialChartPoints = await chart.locator('circle[data-date]').count()
-    const groupStartSlider = rangeControls.getByRole('slider', {
+    const groupStartSlider = chartControlsTrack.getByRole('slider', {
       name: 'Visible range start',
     })
     const initialStartDate =
@@ -1322,6 +1337,22 @@ for (const viewport of [
       initialStartDate!,
     )
     await expect(chart.locator('circle[data-date]')).toHaveCount(2)
+    await rangeControls.getByRole('button', { name: 'Show all dates' }).click()
+    await expect(chart.locator('circle[data-date]')).toHaveCount(
+      initialChartPoints,
+    )
+    const allMembersEnd = chartControlsTrack.getByRole('slider', {
+      name: 'Visible range end',
+    })
+    const originalAllMembersEnd =
+      await allMembersEnd.getAttribute('aria-valuetext')
+    await allMembersEnd.focus()
+    await page.keyboard.press('ArrowLeft')
+    await expect(allMembersEnd).not.toHaveAttribute(
+      'aria-valuetext',
+      originalAllMembersEnd!,
+    )
+    await expect(chart.locator('circle[data-date]')).toHaveCount(3)
     await rangeControls.getByRole('button', { name: 'Show all dates' }).click()
     await expect(chart.locator('circle[data-date]')).toHaveCount(
       initialChartPoints,
@@ -1362,14 +1393,35 @@ for (const viewport of [
       name: /Change from first shared weight \(kg\)/,
     })
     await expect(individualChart.locator('circle[data-date]')).toHaveCount(2)
-    const individualStart = page
-      .getByRole('group', { name: 'Chart date range controls' })
-      .getByRole('slider', { name: 'Visible range start' })
+    const individualTrack = page.getByRole('group', {
+      name: 'Adjust visible date range',
+    })
+    const individualStart = individualTrack.getByRole('slider', {
+      name: 'Visible range start',
+    })
     await individualStart.focus()
     await page.keyboard.press('ArrowRight')
     await expect(individualChart.locator('circle[data-date]')).toHaveCount(1)
-    await page
-      .getByRole('group', { name: 'Chart date range controls' })
+    const individualControls = page.getByRole('group', {
+      name: 'Chart date range controls',
+    })
+    await individualControls
+      .getByRole('button', { name: 'Show all dates' })
+      .click()
+    await expect(individualChart.locator('circle[data-date]')).toHaveCount(2)
+    const individualEnd = individualTrack.getByRole('slider', {
+      name: 'Visible range end',
+    })
+    const originalIndividualEnd =
+      await individualEnd.getAttribute('aria-valuetext')
+    await individualEnd.focus()
+    await page.keyboard.press('ArrowLeft')
+    await expect(individualEnd).not.toHaveAttribute(
+      'aria-valuetext',
+      originalIndividualEnd!,
+    )
+    await expect(individualChart.locator('circle[data-date]')).toHaveCount(1)
+    await individualControls
       .getByRole('button', { name: 'Show all dates' })
       .click()
     await expect(individualChart.locator('circle[data-date]')).toHaveCount(2)
@@ -1980,3 +2032,68 @@ for (const viewport of [
     ).toHaveLength(1)
   })
 }
+
+test('the shared chart range handles respond to mobile touch dragging', async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    hasTouch: true,
+    viewport: { width: 390, height: 900 },
+  })
+  try {
+    const page = await context.newPage()
+    await installGroupFixtures(page, true)
+    await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    const chart = page.getByRole('img', {
+      name: 'Weight (kg) — shared group history',
+    })
+    const points = chart.locator('circle[data-date]')
+    await expect(points).toHaveCount(4)
+    const controls = page.getByRole('group', {
+      name: 'Chart date range controls',
+    })
+    const sliderTrack = page.getByRole('group', {
+      name: 'Adjust visible date range',
+    })
+    await expect(sliderTrack.getByRole('slider')).toHaveCount(2)
+    const start = sliderTrack.getByRole('slider', {
+      name: 'Visible range start',
+    })
+    await sliderTrack.scrollIntoViewIfNeeded()
+    const initialDate = await start.getAttribute('aria-valuetext')
+    const bounds = await sliderTrack.boundingBox()
+    expect(bounds).not.toBeNull()
+    const touch = await context.newCDPSession(page)
+    const y = bounds!.y + bounds!.height / 2
+    await touch.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x: bounds!.x + 1, y, id: 1 }],
+    })
+    for (const progress of [0.25, 0.5, 0.75, 1]) {
+      await touch.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [
+          { x: bounds!.x + (bounds!.width - 2) * progress + 1, y, id: 1 },
+        ],
+      })
+    }
+    await touch.send('Input.dispatchTouchEvent', {
+      type: 'touchEnd',
+      touchPoints: [],
+    })
+    await expect(start).not.toHaveAttribute('aria-valuetext', initialDate!)
+    await expect(points).toHaveCount(1)
+    const outputBox = await page
+      .getByRole('status', { name: 'Visible date range' })
+      .boundingBox()
+    const sliderBox = await sliderTrack.boundingBox()
+    expect(outputBox).not.toBeNull()
+    expect(sliderBox).not.toBeNull()
+    expect(sliderBox!.y).toBeGreaterThan(outputBox!.y)
+    await controls.getByRole('button', { name: 'Show all dates' }).tap()
+    await expect(points).toHaveCount(4)
+    await touch.detach()
+  } finally {
+    await context.close()
+  }
+})

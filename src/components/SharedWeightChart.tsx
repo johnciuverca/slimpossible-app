@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from 'react'
+import { useId, useRef, useState, type ReactNode } from 'react'
 
 export type SharedChartPoint = {
   date: string
@@ -82,6 +82,7 @@ export function SharedWeightChart({
   viewBox?: string
 }) {
   const rangeId = useId()
+  const rangeTrackRef = useRef<HTMLDivElement>(null)
   const [selectedRange, setSelectedRange] = useState<{
     start: number
     end: number
@@ -195,103 +196,127 @@ export function SharedWeightChart({
   const chartTitle = fullRange
     ? title
     : `${title}. Showing ${visibleCount} of ${totalCount} recorded entries from ${dateAtDay(startDay)} to ${dateAtDay(endDay)}.`
+  const rangePercent = (value: number) =>
+    span === 0 ? 0 : ((value - firstDay) / (lastDay - firstDay)) * 100
+  const viewBoxWidth = Number(viewBox.trim().split(/\s+/)[2]) || 760
+  const plotStartPercent = (left / viewBoxWidth) * 100
+  const plotWidthPercent = ((right - left) / viewBoxWidth) * 100
+  const setThumbValue = (thumb: 'start' | 'end', value: number) => {
+    if (thumb === 'start') {
+      setSelectedRange({ start: Math.min(value, endDay), end: endDay })
+    } else {
+      setSelectedRange({ start: startDay, end: Math.max(value, startDay) })
+    }
+  }
+  const moveThumbFromPointer = (thumb: 'start' | 'end', clientX: number) => {
+    const bounds = rangeTrackRef.current?.getBoundingClientRect()
+    if (!bounds || lastDay === firstDay) return
+    const usableWidth = Math.max(1, bounds.width)
+    const percent = Math.max(
+      0,
+      Math.min(1, (clientX - bounds.left) / usableWidth),
+    )
+    setThumbValue(thumb, Math.round(firstDay + percent * (lastDay - firstDay)))
+  }
+  const renderThumb = (thumb: 'start' | 'end') => {
+    const isStart = thumb === 'start'
+    const value = isStart ? startDay : endDay
+    const thumbMin = isStart ? firstDay : startDay
+    const thumbMax = isStart ? endDay : lastDay
+    return (
+      <button
+        id={`${rangeId}-${thumb}`}
+        key={thumb}
+        type="button"
+        role="slider"
+        aria-label={isStart ? 'Visible range start' : 'Visible range end'}
+        aria-valuemin={thumbMin}
+        aria-valuemax={thumbMax}
+        aria-valuenow={value}
+        aria-valuetext={dateAtDay(value)}
+        aria-orientation="horizontal"
+        disabled={firstDay === lastDay}
+        className={`date-range-handle date-range-handle-${thumb}`}
+        style={{ left: `${rangePercent(value)}%` }}
+        onPointerDown={(event) => {
+          event.currentTarget.setPointerCapture(event.pointerId)
+          moveThumbFromPointer(thumb, event.clientX)
+        }}
+        onPointerMove={(event) => {
+          if (event.currentTarget.hasPointerCapture(event.pointerId))
+            moveThumbFromPointer(thumb, event.clientX)
+        }}
+        onKeyDown={(event) => {
+          const step = event.shiftKey ? 7 : 1
+          let nextValue: number | null = null
+          if (event.key === 'ArrowLeft' || event.key === 'ArrowDown')
+            nextValue = value - step
+          else if (event.key === 'ArrowRight' || event.key === 'ArrowUp')
+            nextValue = value + step
+          else if (event.key === 'PageDown') nextValue = value - 7
+          else if (event.key === 'PageUp') nextValue = value + 7
+          else if (event.key === 'Home') nextValue = thumbMin
+          else if (event.key === 'End') nextValue = thumbMax
+          if (nextValue !== null) {
+            event.preventDefault()
+            setThumbValue(
+              thumb,
+              Math.max(thumbMin, Math.min(thumbMax, nextValue)),
+            )
+          }
+        }}
+      />
+    )
+  }
   return (
-    <div className="w-full min-w-0">
+    <div className="w-full min-w-[600px]">
       <div
         role="group"
         aria-label="Chart date range controls"
-        className="mb-3 flex w-full flex-wrap items-center gap-2 text-sm"
+        className="w-full text-sm"
       >
-        <span className="font-semibold text-ink">Date range</span>
-        <button
-          type="button"
-          aria-label="Show last 1 month"
-          aria-pressed={endDay === lastDay && startDay === oneMonthStart}
-          disabled={firstDay === lastDay}
-          onClick={() =>
-            setSelectedRange({ start: oneMonthStart, end: lastDay })
-          }
-          className="min-h-9 rounded-full border border-line bg-page px-3 text-ink hover:bg-panel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:opacity-50"
+        <div
+          role="group"
+          className="mb-3 flex w-full flex-wrap items-center gap-2"
+          aria-label="Quick date ranges"
+          style={{ paddingLeft: `${plotStartPercent}%` }}
         >
-          1M
-        </button>
-        <button
-          type="button"
-          aria-label="Show last 3 months"
-          aria-pressed={endDay === lastDay && startDay === threeMonthStart}
-          disabled={firstDay === lastDay}
-          onClick={() =>
-            setSelectedRange({ start: threeMonthStart, end: lastDay })
-          }
-          className="min-h-9 rounded-full border border-line bg-page px-3 text-ink hover:bg-panel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:opacity-50"
-        >
-          3M
-        </button>
-        <button
-          type="button"
-          aria-label="Show all dates"
-          aria-pressed={fullRange}
-          disabled={fullRange}
-          onClick={() => setSelectedRange(null)}
-          className="min-h-9 rounded-full border border-line bg-page px-3 text-ink hover:bg-panel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:opacity-50"
-        >
-          All
-        </button>
-        <label
-          htmlFor={`${rangeId}-start`}
-          className="flex min-h-9 items-center gap-2"
-        >
-          <span>From</span>
-          <input
-            id={`${rangeId}-start`}
-            aria-label="Visible range start"
-            aria-valuetext={dateAtDay(startDay)}
-            type="range"
-            min={firstDay}
-            max={lastDay}
-            step={1}
-            value={startDay}
+          <span className="mr-1 font-semibold text-ink">Date range</span>
+          <button
+            type="button"
+            aria-label="Show last 1 month"
+            aria-pressed={endDay === lastDay && startDay === oneMonthStart}
             disabled={firstDay === lastDay}
-            onChange={(event) =>
-              setSelectedRange({
-                start: Math.min(Number(event.target.value), endDay),
-                end: endDay,
-              })
+            onClick={() =>
+              setSelectedRange({ start: oneMonthStart, end: lastDay })
             }
-            className="w-24 accent-emerald-700 sm:w-32"
-          />
-        </label>
-        <label
-          htmlFor={`${rangeId}-end`}
-          className="flex min-h-9 items-center gap-2"
-        >
-          <span>To</span>
-          <input
-            id={`${rangeId}-end`}
-            aria-label="Visible range end"
-            aria-valuetext={dateAtDay(endDay)}
-            type="range"
-            min={firstDay}
-            max={lastDay}
-            step={1}
-            value={endDay}
+            className="min-h-9 rounded-full border border-line bg-page px-3 text-ink hover:bg-panel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:opacity-50"
+          >
+            1M
+          </button>
+          <button
+            type="button"
+            aria-label="Show last 3 months"
+            aria-pressed={endDay === lastDay && startDay === threeMonthStart}
             disabled={firstDay === lastDay}
-            onChange={(event) =>
-              setSelectedRange({
-                start: startDay,
-                end: Math.max(Number(event.target.value), startDay),
-              })
+            onClick={() =>
+              setSelectedRange({ start: threeMonthStart, end: lastDay })
             }
-            className="w-24 accent-emerald-700 sm:w-32"
-          />
-        </label>
-        <output
-          aria-label="Visible date range"
-          aria-live="polite"
-          className="text-xs text-ink-muted"
-        >
-          {dateAtDay(startDay)} – {dateAtDay(endDay)}
-        </output>
+            className="min-h-9 rounded-full border border-line bg-page px-3 text-ink hover:bg-panel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:opacity-50"
+          >
+            3M
+          </button>
+          <button
+            type="button"
+            aria-label="Show all dates"
+            aria-pressed={fullRange}
+            disabled={fullRange}
+            onClick={() => setSelectedRange(null)}
+            className="min-h-9 rounded-full border border-line bg-page px-3 text-ink hover:bg-panel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:opacity-50"
+          >
+            All
+          </button>
+        </div>
       </div>
       <svg
         role="img"
@@ -473,6 +498,40 @@ export function SharedWeightChart({
           </text>
         ))}
       </svg>
+      <div
+        className="mt-2 px-2"
+        style={{
+          marginLeft: `${plotStartPercent}%`,
+          width: `${plotWidthPercent}%`,
+        }}
+      >
+        <output
+          aria-label="Visible date range"
+          aria-live="polite"
+          className="mb-1 block text-center text-xs text-ink-muted"
+        >
+          {dateAtDay(startDay)} – {dateAtDay(endDay)}
+        </output>
+        <div
+          className="relative h-8 touch-none"
+          role="group"
+          aria-label="Adjust visible date range"
+        >
+          <div ref={rangeTrackRef} className="absolute inset-0">
+            <div className="pointer-events-none absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-line">
+              <div
+                className="absolute inset-y-0 rounded-full bg-emerald-700"
+                style={{
+                  left: `${rangePercent(startDay)}%`,
+                  width: `${rangePercent(endDay) - rangePercent(startDay)}%`,
+                }}
+              />
+            </div>
+            {renderThumb('start')}
+            {renderThumb('end')}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
