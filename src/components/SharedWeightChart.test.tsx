@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it } from 'vitest'
 import { SharedWeightChart } from './SharedWeightChart'
 
@@ -77,4 +77,83 @@ it('anchors a one-point member label to the shared chart edge, not its local ser
   )
   expect(label).toHaveAttribute('text-anchor', 'end')
   expect(Number(label?.getAttribute('x'))).toBe(688)
+})
+
+it('applies quick ranges, adjustable date endpoints, clipped trend/reference lines, and restores all records', () => {
+  const dates = [
+    '2026-01-01',
+    '2026-02-01',
+    '2026-03-01',
+    '2026-04-01',
+    '2026-05-01',
+  ]
+  const points = dates.map((date, index) => ({
+    date,
+    value: 90 - index,
+    title: `${date}: ${90 - index} kg`,
+    label: String(90 - index),
+  }))
+  render(
+    <SharedWeightChart
+      title="Date range chart"
+      description="Only saved records are shown."
+      yLabel="Weight (kg)"
+      min={80}
+      max={95}
+      paddingRatio={0.1}
+      points={points}
+      lines={[
+        {
+          id: 'goal',
+          from: { date: dates[0], value: 82 },
+          to: { date: dates.at(-1)!, value: 82 },
+          color: '#8055ad',
+          kind: 'reference',
+        },
+        {
+          id: 'trend',
+          from: { date: dates[0], value: 90 },
+          to: { date: dates.at(-1)!, value: 86 },
+          color: '#a86312',
+          kind: 'trend',
+        },
+      ]}
+    />,
+  )
+  const chart = () => screen.getByRole('img', { name: /Date range chart/ })
+  const range = screen.getByRole('group', { name: 'Chart date range controls' })
+  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(5)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Show last 1 month' }))
+  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(2)
+  expect(chart().querySelectorAll('[data-chart-tick]')).not.toHaveLength(0)
+  expect(chart().querySelector('[data-chart-reference]')).toBeInTheDocument()
+  expect(chart().querySelector('[data-chart-trend]')).toHaveAttribute(
+    'x1',
+    '64',
+  )
+  expect(screen.getByLabelText('Visible date range')).toHaveTextContent(
+    '2026-04-01 – 2026-05-01',
+  )
+  expect(points).toHaveLength(5)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Show last 3 months' }))
+  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(4)
+  fireEvent.click(screen.getByRole('button', { name: 'Show all dates' }))
+  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(5)
+
+  const sliders = screen.getAllByRole('slider')
+  expect(sliders).toHaveLength(2)
+  const start = screen.getByRole('slider', { name: 'Visible range start' })
+  const end = screen.getByRole('slider', { name: 'Visible range end' })
+  fireEvent.keyDown(start, { key: 'ArrowRight' })
+  expect(range).toBeInTheDocument()
+  expect(start).toHaveAttribute('aria-valuetext', '2026-01-02')
+  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(4)
+  fireEvent.keyDown(end, { key: 'ArrowLeft' })
+  expect(end).toHaveAttribute('aria-valuetext', '2026-04-30')
+  expect(screen.getByLabelText('Visible date range')).toHaveTextContent(
+    '2026-01-02 – 2026-04-30',
+  )
+  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(3)
 })

@@ -1283,6 +1283,33 @@ for (const viewport of [
       name: 'Weight (kg) — shared group history',
     })
     await expect(chart).toBeVisible()
+    const groupLegend = page.getByRole('list', {
+      name: 'Group chart legend',
+    })
+    await expect(groupLegend.locator('li')).toHaveText([
+      'Ava (member 1)',
+      'Ava (member 2)',
+    ])
+    const chartRegion = page.getByRole('region', {
+      name: 'Scrollable group comparison chart',
+    })
+    const expectLegendCentered = async () => {
+      const [legendBox, chartRegionBox] = await Promise.all([
+        groupLegend.boundingBox(),
+        chartRegion.boundingBox(),
+      ])
+      expect(legendBox).not.toBeNull()
+      expect(chartRegionBox).not.toBeNull()
+      expect(
+        Math.abs(
+          legendBox!.x +
+            legendBox!.width / 2 -
+            chartRegionBox!.x -
+            chartRegionBox!.width / 2,
+        ),
+      ).toBeLessThanOrEqual(1)
+    }
+    await expectLegendCentered()
     const originalPoints = await chart
       .locator('circle')
       .evaluateAll((elements) =>
@@ -1306,6 +1333,57 @@ for (const viewport of [
     await chart.screenshot({
       path: test.info().outputPath('actual-kg-chart.png'),
     })
+    const rangeControls = page.getByRole('group', {
+      name: 'Chart date range controls',
+    })
+    const chartControlsTrack = page.getByRole('group', {
+      name: 'Adjust visible date range',
+    })
+    await expect(chartControlsTrack.getByRole('slider')).toHaveCount(2)
+    const quickRangeLabel = await rangeControls
+      .getByText('Date range', { exact: true })
+      .boundingBox()
+    const chartBounds = await chart.boundingBox()
+    expect(quickRangeLabel).not.toBeNull()
+    expect(chartBounds).not.toBeNull()
+    expect(
+      Math.abs(
+        quickRangeLabel!.x - (chartBounds!.x + (64 / 760) * chartBounds!.width),
+      ),
+    ).toBeLessThan(2)
+    const initialChartPoints = await chart.locator('circle[data-date]').count()
+    const groupStartSlider = chartControlsTrack.getByRole('slider', {
+      name: 'Visible range start',
+    })
+    const initialStartDate =
+      await groupStartSlider.getAttribute('aria-valuetext')
+    await groupStartSlider.focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(groupStartSlider).not.toHaveAttribute(
+      'aria-valuetext',
+      initialStartDate!,
+    )
+    await expect(chart.locator('circle[data-date]')).toHaveCount(2)
+    await rangeControls.getByRole('button', { name: 'Show all dates' }).click()
+    await expect(chart.locator('circle[data-date]')).toHaveCount(
+      initialChartPoints,
+    )
+    const allMembersEnd = chartControlsTrack.getByRole('slider', {
+      name: 'Visible range end',
+    })
+    const originalAllMembersEnd =
+      await allMembersEnd.getAttribute('aria-valuetext')
+    await allMembersEnd.focus()
+    await page.keyboard.press('ArrowLeft')
+    await expect(allMembersEnd).not.toHaveAttribute(
+      'aria-valuetext',
+      originalAllMembersEnd!,
+    )
+    await expect(chart.locator('circle[data-date]')).toHaveCount(3)
+    await rangeControls.getByRole('button', { name: 'Show all dates' }).click()
+    await expect(chart.locator('circle[data-date]')).toHaveCount(
+      initialChartPoints,
+    )
     await expect(table.getByRole('columnheader')).toHaveText([
       'Date',
       'Ava (member 1) (kg)',
@@ -1337,6 +1415,46 @@ for (const viewport of [
     await expect(table).not.toContainText('88.50 kg')
     await page.keyboard.press('Home')
     await expect(all).toBeFocused()
+    await tabs.getByRole('tab', { name: 'Ava (member 2)' }).click()
+    const individualChart = page.getByRole('img', {
+      name: /Change from first shared weight \(kg\)/,
+    })
+    await expect(groupLegend.locator('li')).toHaveText(['Ava (member 2)'])
+    await expectLegendCentered()
+    await expect(individualChart.locator('circle[data-date]')).toHaveCount(2)
+    const individualTrack = page.getByRole('group', {
+      name: 'Adjust visible date range',
+    })
+    const individualStart = individualTrack.getByRole('slider', {
+      name: 'Visible range start',
+    })
+    await individualStart.focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(individualChart.locator('circle[data-date]')).toHaveCount(1)
+    const individualControls = page.getByRole('group', {
+      name: 'Chart date range controls',
+    })
+    await individualControls
+      .getByRole('button', { name: 'Show all dates' })
+      .click()
+    await expect(individualChart.locator('circle[data-date]')).toHaveCount(2)
+    const individualEnd = individualTrack.getByRole('slider', {
+      name: 'Visible range end',
+    })
+    const originalIndividualEnd =
+      await individualEnd.getAttribute('aria-valuetext')
+    await individualEnd.focus()
+    await page.keyboard.press('ArrowLeft')
+    await expect(individualEnd).not.toHaveAttribute(
+      'aria-valuetext',
+      originalIndividualEnd!,
+    )
+    await expect(individualChart.locator('circle[data-date]')).toHaveCount(1)
+    await individualControls
+      .getByRole('button', { name: 'Show all dates' })
+      .click()
+    await expect(individualChart.locator('circle[data-date]')).toHaveCount(2)
+    await all.click()
     const weights = page.getByRole('region', {
       name: 'Scrollable shared group weights',
     })
@@ -1632,7 +1750,11 @@ for (const viewport of [
     expect(contrast.body).toBeGreaterThanOrEqual(4.5)
     await expect(historyPanel.getByRole('img')).toHaveCount(1)
     await expect(historyPanel.getByRole('table')).toHaveCount(1)
-    await expect(historyPanel.getByRole('button')).toHaveCount(0)
+    const quickRanges = historyPanel.getByRole('group', {
+      name: 'Quick date ranges',
+    })
+    await expect(quickRanges.getByRole('button')).toHaveCount(3)
+    await expect(historyPanel.getByRole('button')).toHaveCount(3)
 
     await expect(
       page.getByText('fixture private note must never render'),
@@ -1943,3 +2065,73 @@ for (const viewport of [
     ).toHaveLength(1)
   })
 }
+
+test('the shared chart range handles respond to mobile touch dragging', async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    hasTouch: true,
+    viewport: { width: 390, height: 900 },
+  })
+  try {
+    const page = await context.newPage()
+    await installGroupFixtures(page, true)
+    await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    const chart = page.getByRole('img', {
+      name: 'Weight (kg) — shared group history',
+    })
+    const points = chart.locator('circle[data-date]')
+    await expect(points).toHaveCount(4)
+    const controls = page.getByRole('group', {
+      name: 'Chart date range controls',
+    })
+    const sliderTrack = page.getByRole('group', {
+      name: 'Adjust visible date range',
+    })
+    await expect(sliderTrack.getByRole('slider')).toHaveCount(2)
+    const start = sliderTrack.getByRole('slider', {
+      name: 'Visible range start',
+    })
+    await sliderTrack.scrollIntoViewIfNeeded()
+    const initialDate = await start.getAttribute('aria-valuetext')
+    const bounds = await sliderTrack.boundingBox()
+    expect(bounds).not.toBeNull()
+    const touch = await context.newCDPSession(page)
+    const y = bounds!.y + bounds!.height / 2
+    await touch.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x: bounds!.x + 1, y, id: 1 }],
+    })
+    for (const progress of [0.25, 0.5, 0.75, 1]) {
+      await touch.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [
+          { x: bounds!.x + (bounds!.width - 2) * progress + 1, y, id: 1 },
+        ],
+      })
+    }
+    await touch.send('Input.dispatchTouchEvent', {
+      type: 'touchEnd',
+      touchPoints: [],
+    })
+    await expect(start).not.toHaveAttribute('aria-valuetext', initialDate!)
+    await expect(points).toHaveCount(1)
+    const outputBox = await page
+      .getByRole('status', { name: 'Visible date range' })
+      .boundingBox()
+    const sliderBox = await sliderTrack.boundingBox()
+    expect(outputBox).not.toBeNull()
+    expect(sliderBox).not.toBeNull()
+    expect(sliderBox!.y).toBeGreaterThan(outputBox!.y)
+    const showAllDates = controls.getByRole('button', {
+      name: 'Show all dates',
+    })
+    await expect(showAllDates).toBeEnabled()
+    await showAllDates.click()
+    await expect(showAllDates).toHaveAttribute('aria-pressed', 'true')
+    await expect(points).toHaveCount(4)
+    await touch.detach()
+  } finally {
+    await context.close()
+  }
+})

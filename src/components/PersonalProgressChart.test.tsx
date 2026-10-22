@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it } from 'vitest'
 import { PersonalProgressChart } from './PersonalProgressChart'
 afterEach(cleanup)
@@ -122,4 +122,38 @@ it('labels every saved weigh-in with only its numeric value', () => {
     ['2026-10-15', '88.5', '88.5', '6.6'],
     ['2026-10-22', '87', '87', '6.6'],
   ])
+})
+
+it('changes the personal chart window without changing saved weigh-ins', () => {
+  const weighIns = [
+    '2026-01-01',
+    '2026-02-01',
+    '2026-03-01',
+    '2026-04-01',
+    '2026-05-01',
+  ].map((date, index) => ({
+    date,
+    weightKg: 90 - index,
+    participantId: 'own',
+  }))
+  render(<PersonalProgressChart weighIns={weighIns} />)
+  const chart = () =>
+    screen.getByRole('img', { name: /Personal weight history chart/ })
+  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(5)
+  fireEvent.click(screen.getByRole('button', { name: 'Show last 1 month' }))
+  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(2)
+  expect(
+    chart().querySelectorAll('[data-chart-date-tick]').length,
+  ).toBeLessThan(18)
+  const rangeTrack = screen.getByRole('group', {
+    name: 'Adjust visible date range',
+  })
+  expect(rangeTrack.querySelectorAll('[role="slider"]')).toHaveLength(2)
+  fireEvent.keyDown(screen.getByRole('slider', { name: 'Visible range end' }), {
+    key: 'ArrowLeft',
+  })
+  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(1)
+  expect(weighIns).toHaveLength(5)
+  fireEvent.click(screen.getByRole('button', { name: 'Show all dates' }))
+  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(5)
 })

@@ -25,7 +25,7 @@ const persistence = (
     repositories: { groupProgress: { getChartHistory: load } },
   }) as unknown as Persistence
 describe('Group chart history', () => {
-  it('separates same-group targets and trends from actual shared records', async () => {
+  it('lists only challenge member names while keeping target and trend chart lines', async () => {
     const groupProgress: GroupMemberProgress[] = [
       {
         memberKey: 'a',
@@ -36,13 +36,26 @@ describe('Group chart history', () => {
         progressState: 'in_progress',
         reachedTargetMilestones: [],
       },
+      {
+        memberKey: 'b',
+        displayName: 'Nora',
+        targetWeightKg: 74,
+        startingWeightKg: 76,
+        completionPercentage: 50,
+        progressState: 'in_progress',
+        reachedTargetMilestones: [],
+      },
+    ]
+    const entries: GroupChartEntry[] = [
+      ...rows,
+      { memberKey: 'b', displayName: 'Nora', date: '2026-09-02', weightKg: 76 },
     ]
     render(
       <GroupChartHistory
         challengeId="group"
         viewerId="viewer"
         persistence={persistence(
-          vi.fn().mockResolvedValue({ state: 'success', data: rows }),
+          vi.fn().mockResolvedValue({ state: 'success', data: entries }),
         )}
         refreshVersion={0}
         memberProgress={groupProgress}
@@ -57,13 +70,101 @@ describe('Group chart history', () => {
     expect(
       chart.querySelector('[data-series="derived-trend"]'),
     ).toHaveAttribute('stroke-dasharray', '3 6')
-    expect(chart.querySelectorAll('circle')).toHaveLength(2)
+    expect(chart.querySelectorAll('circle')).toHaveLength(3)
     const legend = screen.getByRole('list', { name: 'Group chart legend' })
-    expect(legend).toHaveTextContent('recorded weights')
-    expect(legend).toHaveTextContent('Target/reference weight')
-    expect(legend).toHaveTextContent('Derived trend from displayed points')
-    expect(legend).toHaveTextContent('first shared 2026-09-01')
+    expect(legend).toHaveClass('w-full', 'justify-center')
+    expect(
+      Array.from(legend.querySelectorAll('li'), (item) =>
+        item.textContent?.trim(),
+      ),
+    ).toEqual(['Ava', 'Nora'])
+    expect(legend).not.toHaveTextContent(
+      /recorded weights|first shared|baseline|target\/reference|derived trend/i,
+    )
     expect(screen.getByRole('rowheader', { name: '2026-09-03' })).toBeVisible()
+  })
+  it('uses the same view-only ranges for all members and an individual member chart', async () => {
+    const entries: GroupChartEntry[] = [
+      { memberKey: 'a', displayName: 'Ava', date: '2026-01-01', weightKg: 90 },
+      { memberKey: 'a', displayName: 'Ava', date: '2026-02-01', weightKg: 89 },
+      { memberKey: 'a', displayName: 'Ava', date: '2026-03-01', weightKg: 88 },
+      { memberKey: 'a', displayName: 'Ava', date: '2026-04-01', weightKg: 87 },
+      { memberKey: 'a', displayName: 'Ava', date: '2026-05-01', weightKg: 86 },
+    ]
+    const load = vi.fn().mockResolvedValue({ state: 'success', data: entries })
+    render(
+      <GroupChartHistory
+        challengeId="group"
+        viewerId="viewer"
+        persistence={persistence(load)}
+        refreshVersion={0}
+        memberProgress={[
+          {
+            memberKey: 'a',
+            displayName: 'Ava',
+            targetWeightKg: 82,
+            startingWeightKg: 90,
+            completionPercentage: 50,
+            progressState: 'in_progress',
+            reachedTargetMilestones: [],
+          },
+        ]}
+      />,
+    )
+    const chart = await screen.findByRole('img', {
+      name: 'Weight (kg) — shared group history',
+    })
+    expect(chart.querySelectorAll('circle[data-date]')).toHaveLength(5)
+    fireEvent.click(screen.getByRole('button', { name: 'Show last 1 month' }))
+    expect(chart.querySelectorAll('circle[data-date]')).toHaveLength(2)
+    expect(chart.querySelector('[data-chart-reference]')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Show last 3 months' }))
+    expect(chart.querySelectorAll('circle[data-date]')).toHaveLength(4)
+    const allMembersTrack = screen.getByRole('group', {
+      name: 'Adjust visible date range',
+    })
+    expect(allMembersTrack.querySelectorAll('[role="slider"]')).toHaveLength(2)
+    fireEvent.keyDown(
+      screen.getByRole('slider', { name: 'Visible range end' }),
+      {
+        key: 'ArrowLeft',
+      },
+    )
+    expect(chart.querySelectorAll('circle[data-date]')).toHaveLength(3)
+    fireEvent.click(screen.getByRole('button', { name: 'Show all dates' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Ava' }))
+    const individual = screen.getByRole('img', {
+      name: /Change from first shared weight \(kg\)/,
+    })
+    expect(individual.querySelectorAll('circle[data-date]')).toHaveLength(5)
+    const individualLegend = screen.getByRole('list', {
+      name: 'Group chart legend',
+    })
+    expect(individualLegend).toHaveClass('w-full', 'justify-center')
+    expect(
+      Array.from(individualLegend.querySelectorAll('li'), (item) =>
+        item.textContent?.trim(),
+      ),
+    ).toEqual(['Ava'])
+    expect(
+      screen.getByRole('group', { name: 'Chart date range controls' }),
+    ).toBeInTheDocument()
+    expect(
+      screen
+        .getByRole('group', { name: 'Adjust visible date range' })
+        .querySelectorAll('[role="slider"]'),
+    ).toHaveLength(2)
+    fireEvent.keyDown(
+      screen.getByRole('slider', { name: 'Visible range end' }),
+      {
+        key: 'ArrowLeft',
+      },
+    )
+    expect(individual.querySelectorAll('circle[data-date]')).toHaveLength(4)
+    fireEvent.click(screen.getByRole('button', { name: 'Show all dates' }))
+    expect(individual.querySelectorAll('circle[data-date]')).toHaveLength(5)
+    expect(load).toHaveBeenCalledTimes(1)
+    expect(load).toHaveBeenCalledWith('group')
   })
   it('plots four actual-kg member series with padded axes, preserves gaps and keeps individual change view', async () => {
     const records = [80, 100, 90, 110].map((weightKg, index) => ({
@@ -287,8 +388,13 @@ describe('Group chart history', () => {
       screen.getByRole('region', { name: 'Scrollable shared group weights' }),
     ).toHaveAttribute('tabindex', '0')
     expect(
-      screen.getByRole('list', { name: 'Group chart legend' }),
-    ).toHaveTextContent('first shared 2026-09-01')
+      Array.from(
+        screen
+          .getByRole('list', { name: 'Group chart legend' })
+          .querySelectorAll('li'),
+        (item) => item.textContent?.trim(),
+      ),
+    ).toEqual(['Ava'])
   })
   it('hides old account/challenge data immediately and ignores late results', async () => {
     let resolveOld!: (result: RepositoryListResult<GroupChartEntry>) => void

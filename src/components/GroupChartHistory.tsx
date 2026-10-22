@@ -317,6 +317,10 @@ export function GroupChartHistory({
                     min={min}
                     max={max}
                     maxTicks={8}
+                    paddingRatio={absolute ? 0.05 : 0}
+                    paddingMinimum={0.5}
+                    floorAtZero={absolute}
+                    includeZero={!absolute}
                     className="w-full min-w-[36rem]"
                     viewBox="0 0 760 266"
                     series={series.map((member, index) => ({
@@ -552,11 +556,11 @@ export function GroupChartHistory({
                 </div>
                 <ul
                   aria-label="Group chart legend"
-                  className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm"
+                  className="mt-3 flex w-full flex-wrap justify-center gap-x-5 gap-y-2 text-sm"
                 >
                   {series.map((member, index) => (
                     <li
-                      key={`recorded:${member.memberKey}`}
+                      key={member.memberKey}
                       className="flex items-center gap-2"
                     >
                       <span
@@ -564,38 +568,7 @@ export function GroupChartHistory({
                         className="inline-block w-6 border-t-2"
                         style={{ borderColor: colors[index % colors.length] }}
                       />
-                      {member.label} · recorded weights
-                    </li>
-                  ))}
-                  {targetWeights.length > 0 ? (
-                    <li className="flex items-center gap-2">
-                      <span
-                        aria-hidden="true"
-                        className="inline-block w-6 border-t-2 border-dashed"
-                        style={{ borderColor: referenceColor }}
-                      />
-                      Target/reference weight
-                    </li>
-                  ) : null}
-                  {trends.some(({ trend }) => trend !== null) ? (
-                    <li className="flex items-center gap-2">
-                      <span
-                        aria-hidden="true"
-                        className="inline-block w-6 border-t-2 border-dotted"
-                        style={{ borderColor: trendColor }}
-                      />
-                      Derived trend from displayed points
-                    </li>
-                  ) : null}
-                  {series.map((member) => (
-                    <li
-                      key={`baseline:${member.memberKey}`}
-                      className="text-ink-muted"
-                    >
-                      {member.label} · {absolute ? 'first shared' : 'baseline'}{' '}
-                      <time dateTime={member.baselineDate}>
-                        {member.baselineDate}
-                      </time>
+                      {member.label}
                     </li>
                   ))}
                 </ul>
