@@ -37,6 +37,7 @@ function renderPage(
 
 function makeAuthValue(state: AuthState): AuthContextValue {
   return {
+    saveProfileName: async () => false,
     requestPasswordRecovery: vi.fn(async () => undefined),
     resetPassword: vi.fn(async () => true),
     retrySession: vi.fn(),

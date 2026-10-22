@@ -5,6 +5,7 @@ import { Button, FeedbackPanel } from '../components/ui'
 import { safeProfileDisplayName } from './profileName'
 import { useAuth } from './useAuth'
 import { trapDialogFocus } from '../components/dialogFocus'
+import { ProfileNameForm } from './ProfileNameForm'
 
 export function AuthSessionUI() {
   const { retrySession, signOut, state } = useAuth()
@@ -52,6 +53,9 @@ export function AuthSessionUI() {
           'Your account'
         }
         email={state.user.email}
+        displayName={
+          safeProfileDisplayName(state.user.displayName, state.user.email) ?? ''
+        }
         profileError={state.profileError}
         onLogout={handleLogout}
       />
@@ -70,11 +74,13 @@ export function AuthSessionUI() {
 
 function AccountControl({
   name,
+  displayName,
   email,
   profileError,
   onLogout,
 }: {
   name: string
+  displayName: string
   email: string
   profileError?: string
   onLogout: () => Promise<void>
@@ -100,7 +106,7 @@ function AccountControl({
     if (!profile) return
     const element = dialog.current
     element?.showModal()
-    element?.querySelector<HTMLButtonElement>('button')?.focus()
+    element?.querySelector<HTMLInputElement>('input')?.focus()
     return () => element?.close()
   }, [profile])
   const close = () => {
@@ -183,11 +189,8 @@ function AccountControl({
               {profileError}
             </p>
           ) : null}
+          <ProfileNameForm displayName={displayName} />
           <dl className="my-6 space-y-4">
-            <div>
-              <dt className="text-sm text-ink-muted">Name</dt>
-              <dd className="break-words font-semibold">{name}</dd>
-            </div>
             <div>
               <dt className="text-sm text-ink-muted">Email</dt>
               <dd className="break-all font-semibold">{email}</dd>

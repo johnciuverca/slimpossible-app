@@ -276,6 +276,7 @@ export function Harness() {
         displayName: 'Synthetic account',
       },
     },
+    saveProfileName: async () => false,
     requestPasswordRecovery: async () => undefined,
     resetPassword: async () => false,
     retrySession: () => undefined,

@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
+  getUser: vi.fn(),
+  saveName: vi.fn(),
   ensureProfile: vi.fn(),
   resetPasswordForEmail: vi.fn(),
   signUp: vi.fn(),
@@ -10,6 +12,7 @@ vi.mock('../data/supabase/client', () => ({
   createSupabaseBrowserClient: () => ({
     client: {
       auth: {
+        getUser: mocks.getUser,
         resetPasswordForEmail: mocks.resetPasswordForEmail,
         signUp: mocks.signUp,
       },
@@ -20,7 +23,7 @@ vi.mock('../data/supabase/client', () => ({
 
 vi.mock('../data/supabase/repositories', () => ({
   createRepositories: vi.fn(() => ({
-    profiles: { ensure: mocks.ensureProfile },
+    profiles: { ensure: mocks.ensureProfile, saveName: mocks.saveName },
   })),
 }))
 
@@ -31,6 +34,8 @@ describe('Supabase auth redirect configuration', () => {
     mocks.resetPasswordForEmail.mockReset()
     mocks.signUp.mockReset()
     mocks.ensureProfile.mockReset()
+    mocks.getUser.mockReset()
+    mocks.saveName.mockReset()
   })
 
   it('uses fixed same-origin verification and recovery destinations', async () => {
@@ -133,5 +138,40 @@ describe('Supabase auth redirect configuration', () => {
         id: 'user-1',
       }),
     ).resolves.toBe('Updated saved name')
+  })
+
+  it('saves only the authenticated UUID and trimmed canonical profile name', async () => {
+    mocks.getUser.mockResolvedValue({
+      data: { user: { id: 'user-1' } },
+      error: null,
+    })
+    mocks.saveName.mockResolvedValue({
+      state: 'success',
+      data: { id: 'user-1', displayName: 'New nickname' },
+    })
+    await expect(
+      createSupabaseAuthGateway().saveProfileName(
+        { id: 'user-1', email: 'person@example.com' },
+        '  New nickname  ',
+      ),
+    ).resolves.toBe('New nickname')
+    expect(mocks.saveName).toHaveBeenCalledWith({
+      id: 'user-1',
+      displayName: 'New nickname',
+    })
+  })
+
+  it('does not write when the authenticated account has switched', async () => {
+    mocks.getUser.mockResolvedValue({
+      data: { user: { id: 'user-2' } },
+      error: null,
+    })
+    await expect(
+      createSupabaseAuthGateway().saveProfileName(
+        { id: 'user-1', email: 'person@example.com' },
+        'Nickname',
+      ),
+    ).rejects.toThrow('Your account changed')
+    expect(mocks.saveName).not.toHaveBeenCalled()
   })
 })

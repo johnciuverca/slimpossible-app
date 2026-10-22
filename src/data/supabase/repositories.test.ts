@@ -445,6 +445,35 @@ describe('Supabase repositories', () => {
     })
   })
 
+  it('upserts only the profile UUID and username, including an unnamed account with no row', async () => {
+    stubResponse({ id: 'user-1', display_name: 'New nickname' })
+    const result = await createRepositories(client).profiles.saveName({
+      id: 'user-1',
+      displayName: '  New nickname  ',
+    })
+    expect(result).toEqual({
+      state: 'success',
+      data: { id: 'user-1', displayName: 'New nickname' },
+    })
+    const [url, request] = vi.mocked(fetch).mock.calls[0]
+    expect(String(url)).toContain('/profiles?on_conflict=id')
+    expect(JSON.parse(String(request?.body))).toEqual({
+      id: 'user-1',
+      display_name: 'New nickname',
+    })
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports a profile write failure without leaking database details', async () => {
+    stubResponse({ code: '42501', message: 'private detail' }, 403)
+    const result = await createRepositories(client).profiles.saveName({
+      id: 'user-1',
+      displayName: 'Nickname',
+    })
+    expect(result.state).toBe('error')
+    expect(JSON.stringify(result)).not.toContain('private detail')
+  })
+
   it('inserts a profile when the authenticated user has no profile yet', async () => {
     vi.stubGlobal(
       'fetch',

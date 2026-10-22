@@ -41,6 +41,7 @@ function auth(id: string): AuthContextValue {
     signIn: async () => undefined,
     signOut: async () => undefined,
     signUp: async () => undefined,
+    saveProfileName: async () => false,
     requestPasswordRecovery: async () => undefined,
     resetPassword: async () => false,
     retrySession: () => undefined,

@@ -9,7 +9,7 @@ import {
   TextInput,
 } from '../components/ui'
 import { safeInternalPath } from '../auth/authRedirects'
-import { PROFILE_NAME_MAX_LENGTH } from '../auth/profileName'
+import { PROFILE_NAME_MAX_LENGTH, profileNameError } from '../auth/profileName'
 import { useAuth } from '../auth/useAuth'
 import { getAuthenticationEnvironmentLabel } from '../auth/supabaseConfig'
 import { isValidEmail } from './authValidation'
@@ -29,11 +29,8 @@ function validateRegistration(
 ): RegisterErrors {
   const errors: RegisterErrors = {}
 
-  if (!name.trim()) {
-    errors.name = 'Enter your username or nickname.'
-  } else if (name.trim().length > PROFILE_NAME_MAX_LENGTH) {
-    errors.name = `Use ${PROFILE_NAME_MAX_LENGTH} characters or fewer for your username.`
-  }
+  const nameError = profileNameError(name)
+  if (nameError) errors.name = nameError
 
   if (!email.trim()) {
     errors.email = 'Enter your email address.'

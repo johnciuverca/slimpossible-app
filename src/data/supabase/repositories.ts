@@ -124,6 +124,10 @@ export type Profile = {
 }
 
 export type ProfileRepository = {
+  saveName: (input: {
+    id: string
+    displayName: string
+  }) => Promise<RepositoryResult<Profile>>
   ensure: (input: {
     displayName?: string
     id: string
@@ -997,6 +1001,22 @@ export function createRepositories(client: DatabaseClient): Repositories {
       },
     },
     profiles: {
+      async saveName(input) {
+        const { data, error } = await client
+          .from('profiles')
+          .upsert(
+            { id: input.id, display_name: input.displayName.trim() },
+            { onConflict: 'id' },
+          )
+          .select('*')
+          .single()
+        if (error)
+          return {
+            state: 'error',
+            error: requestError('save your username', error),
+          }
+        return mapSingle(data, mapProfile, 'profile')
+      },
       async ensure(input) {
         const existing = await client
           .from('profiles')

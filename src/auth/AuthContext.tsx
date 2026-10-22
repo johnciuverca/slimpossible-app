@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getRecoveryRedirectUrl, isRecoveryCallback } from './authRedirects'
 import { AuthContext, type AuthProviderProps, type AuthState } from './context'
 import { createSupabaseAuthGateway } from './supabaseAuth'
+import { profileNameError } from './profileName'
 
 export type { AuthState, AuthUser } from './context'
 
@@ -34,6 +35,10 @@ export function AuthProvider({
   const authGateway = providedAuthGateway ?? fallbackAuthGateway
   const [state, setState] = useState<AuthState>(initialState ?? loadingState)
   const operationGeneration = useRef(0)
+  const accountGeneration = useRef(0)
+  const profileVersions = useRef(new Map<string, number>())
+  const profileSave = useRef(0)
+  const pendingProfileSaves = useRef(new Set<string>())
   const currentUserKey = useRef(
     initialState?.status === 'signed-in' ||
       initialState?.status === 'recovery-ready'
@@ -59,7 +64,16 @@ export function AuthProvider({
       const pending = pendingProfiles.current.get(key)
       if (pending) return pending
 
+      const version = profileVersions.current.get(key) ?? 0
+      const account = accountGeneration.current
+      const generation = operationGeneration.current
       const next = authGateway.ensureProfile(user).then((displayName) => {
+        if (
+          account !== accountGeneration.current ||
+          generation !== operationGeneration.current ||
+          version !== (profileVersions.current.get(key) ?? 0)
+        )
+          return initializedProfiles.current.get(key)
         initializedProfiles.current.set(key, displayName)
         return displayName
       })
@@ -78,6 +92,7 @@ export function AuthProvider({
 
   const applySignedOut = useCallback((generation: number) => {
     if (generation !== operationGeneration.current) return
+    accountGeneration.current += 1
     currentUserKey.current = null
     blockedUserKey.current = null
     setState(signedOutState)
@@ -96,23 +111,38 @@ export function AuthProvider({
       }
 
       const key = userKey(user)
+      if (currentUserKey.current !== key) {
+        accountGeneration.current += 1
+        initializedProfiles.current.delete(key)
+        pendingProfiles.current.delete(key)
+      }
+      const account = accountGeneration.current
       currentUserKey.current = key
+      const profileVersion = profileVersions.current.get(key) ?? 0
+      const nextUser = initializedProfiles.current.has(key)
+        ? {
+            ...user,
+            displayName:
+              initializedProfiles.current.get(key) ?? user.displayName,
+          }
+        : user
       setState((currentState) => {
         if (
           currentState.status === 'signed-in' &&
           currentState.user.id === user.id &&
           currentState.user.email === user.email &&
-          currentState.user.displayName === user.displayName
+          currentState.user.displayName === nextUser.displayName
         ) {
           return currentState
         }
-        return { error: null, status: 'signed-in', user }
+        return { error: null, status: 'signed-in', user: nextUser }
       })
 
       // Supabase requires auth callbacks to return without starting another
       // Supabase request. Profile initialization is deliberately deferred.
       window.setTimeout(() => {
         if (
+          account !== accountGeneration.current ||
           generation !== operationGeneration.current ||
           currentUserKey.current !== key ||
           blockedUserKey.current === key
@@ -123,6 +153,7 @@ export function AuthProvider({
         void ensureProfileOnce(user)
           .then((displayName) => {
             if (
+              account !== accountGeneration.current ||
               generation !== operationGeneration.current ||
               currentUserKey.current !== key
             ) {
@@ -135,7 +166,11 @@ export function AuthProvider({
               ) {
                 return current
               }
-              const nextName = displayName || current.user.displayName
+              const nextName =
+                (profileVersions.current.get(key) ?? 0) !== profileVersion
+                  ? initializedProfiles.current.get(key) ||
+                    current.user.displayName
+                  : displayName || current.user.displayName
               if (
                 nextName === current.user.displayName &&
                 !current.profileError
@@ -151,8 +186,10 @@ export function AuthProvider({
           })
           .catch(() => {
             if (
+              account === accountGeneration.current &&
               generation === operationGeneration.current &&
-              currentUserKey.current === key
+              currentUserKey.current === key &&
+              (profileVersions.current.get(key) ?? 0) === profileVersion
             ) {
               setState((current) =>
                 current.status === 'signed-in' && userKey(current.user) === key
@@ -453,9 +490,61 @@ export function AuthProvider({
     [authGateway, state.status],
   )
 
+  const saveProfileName = useCallback(
+    async (name: string) => {
+      const invalid = profileNameError(name)
+      if (invalid) throw new Error(invalid)
+      if (
+        state.status !== 'signed-in' ||
+        !state.user.id ||
+        currentUserKey.current !== userKey(state.user)
+      )
+        throw new Error('Sign in again to edit your username.')
+      const user = state.user
+      const key = userKey(user)
+      if (pendingProfileSaves.current.has(key))
+        throw new Error('Your username is still saving. Try again shortly.')
+      pendingProfileSaves.current.add(key)
+      const generation = operationGeneration.current
+      const account = accountGeneration.current
+      const request = ++profileSave.current
+      profileVersions.current.set(
+        key,
+        (profileVersions.current.get(key) ?? 0) + 1,
+      )
+      const isCurrent = () =>
+        generation === operationGeneration.current &&
+        account === accountGeneration.current &&
+        currentUserKey.current === key &&
+        request === profileSave.current
+      try {
+        const displayName = await authGateway.saveProfileName(user, name.trim())
+        if (!isCurrent()) return false
+        initializedProfiles.current.set(key, displayName)
+        setState((current) =>
+          current.status === 'signed-in' && userKey(current.user) === key
+            ? {
+                error: null,
+                status: 'signed-in',
+                user: { ...current.user, displayName },
+              }
+            : current,
+        )
+        return true
+      } catch {
+        if (!isCurrent()) return false
+        throw new Error('We could not save your username. Try again.')
+      } finally {
+        pendingProfileSaves.current.delete(key)
+      }
+    },
+    [authGateway, state],
+  )
+
   const value = useMemo(
     () => ({
       requestPasswordRecovery,
+      saveProfileName,
       resetPassword,
       retrySession,
       signIn,
@@ -465,6 +554,7 @@ export function AuthProvider({
     }),
     [
       requestPasswordRecovery,
+      saveProfileName,
       resetPassword,
       retrySession,
       signIn,

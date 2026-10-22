@@ -6,6 +6,7 @@ import { AuthProvider } from './AuthContext'
 import { useAuth } from './useAuth'
 
 const signedOutGateway: AuthGateway = {
+  saveProfileName: async (_user, name) => name,
   ensureProfile: async () => undefined,
   getSession: async () => null,
   onAuthStateChange: () => () => undefined,

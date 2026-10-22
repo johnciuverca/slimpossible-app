@@ -22,6 +22,7 @@ export type AuthState =
   | { error: string; status: 'error'; user: null }
 
 export type AuthContextValue = {
+  saveProfileName: (name: string) => Promise<boolean>
   requestPasswordRecovery: (email: string) => Promise<void>
   resetPassword: (password: string) => Promise<boolean>
   retrySession: () => void
@@ -38,6 +39,7 @@ export type AuthProviderProps = {
 }
 
 export type AuthGateway = {
+  saveProfileName: (user: AuthUser, name: string) => Promise<string>
   ensureProfile: (user: AuthUser) => Promise<string | undefined>
   getSession: () => Promise<AuthUser | null>
   onAuthStateChange: (

@@ -28,6 +28,7 @@ function authValue(id = 'user-alex'): AuthContextValue {
       user: { id, email: `${id}@example.invalid` },
       error: null,
     },
+    saveProfileName: async () => false,
     requestPasswordRecovery: async () => undefined,
     resetPassword: async () => false,
     retrySession: () => undefined,
