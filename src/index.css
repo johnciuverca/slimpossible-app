@@ -567,27 +567,6 @@ body {
 .chart-value {
   fill: var(--color-ink);
 }
-.chart-legend li {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.chart-legend span {
-  display: inline-block;
-  width: 24px;
-  border-top: 3px solid;
-}
-.legend-recorded {
-  color: var(--chart-recorded, #087756);
-}
-.legend-trend {
-  color: var(--chart-trend, #a86312);
-  border-top-style: dotted !important;
-}
-.legend-reference {
-  color: var(--chart-reference, #8055ad);
-  border-top-style: dashed !important;
-}
 .personal-weight-chart circle:focus-visible {
   outline: 3px solid var(--chart-trend, #a86312);
 }

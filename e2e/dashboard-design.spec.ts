@@ -46,10 +46,18 @@ for (const width of [1280, 390]) {
     await expect(chart.locator('circle[data-date]')).toHaveCount(5)
     await expect(chart.locator('[data-chart-trend]')).toHaveCount(1)
     await expect(chart.locator('[data-chart-reference]')).toHaveCount(1)
+    await expect(chart.locator('.chart-legend')).toHaveCount(0)
+    await expect(chart).toHaveAccessibleDescription(/least-squares fit/)
+    await expect(chart.locator('.chart-value')).toHaveCount(2)
+    for (const label of await chart.locator('.chart-value').all())
+      await expect(label).toHaveAttribute('font-size', '6')
     await expect(
-      page.getByRole('list', { name: 'Personal chart legend' }),
-    ).toContainText('Derived trend')
+      chart.locator('[data-chart-date-tick]').first(),
+    ).toHaveAttribute('font-size', '6.5')
     await expect(page.getByText('Weight (kg)', { exact: true })).toHaveCount(1)
+    await chart.screenshot({
+      path: test.info().outputPath('personal-chart-narrow-preview.png'),
+    })
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
