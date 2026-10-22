@@ -153,7 +153,7 @@ export function PersonalProgressChart({
               stroke="var(--chart-trend, #a86312)"
               strokeWidth="2"
               strokeDasharray="3 6"
-              opacity="0.5"
+              opacity="0.7"
             />
           ) : null}
           {points.map((point, index) => (

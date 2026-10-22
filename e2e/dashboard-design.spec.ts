@@ -48,7 +48,7 @@ for (const width of [1280, 390]) {
     await expect(chart.locator('[data-chart-reference]')).toHaveCount(1)
     await expect(chart.locator('[data-chart-trend]')).toHaveAttribute(
       'opacity',
-      '0.5',
+      '0.7',
     )
     await expect(chart.locator('.chart-legend')).toHaveCount(0)
     await expect(chart).toHaveAccessibleDescription(/least-squares fit/)
