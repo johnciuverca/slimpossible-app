@@ -153,6 +153,7 @@ export function PersonalProgressChart({
               stroke="var(--chart-trend, #a86312)"
               strokeWidth="2"
               strokeDasharray="3 6"
+              opacity="0.5"
             />
           ) : null}
           {points.map((point, index) => (
@@ -186,7 +187,7 @@ export function PersonalProgressChart({
                       : 'middle'
                 }
                 className="chart-value"
-                fontSize="6"
+                fontSize="6.6"
                 fontWeight="700"
                 data-date={point.date}
                 data-weight-kg={point.weightKg}

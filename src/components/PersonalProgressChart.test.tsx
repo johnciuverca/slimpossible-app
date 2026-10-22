@@ -16,6 +16,10 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
   const chart = screen.getByRole('img')
   expect(chart.querySelectorAll('circle[data-date]')).toHaveLength(2)
   expect(chart.querySelector('[data-chart-trend]')).toBeInTheDocument()
+  expect(chart.querySelector('[data-chart-trend]')).toHaveAttribute(
+    'opacity',
+    '0.5',
+  )
   expect(chart.querySelector('[data-chart-reference]')).toBeInTheDocument()
   expect(screen.getByText('Weight (kg)')).toBeInTheDocument()
   expect(chart.querySelector('.chart-legend')).toBeNull()
@@ -23,8 +27,8 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
   const labels = Array.from(chart.querySelectorAll('.chart-value'))
   expect(labels.map((label) => label.textContent)).toEqual(['100', '90'])
   expect(labels.map((label) => label.getAttribute('font-size'))).toEqual([
-    '6',
-    '6',
+    '6.6',
+    '6.6',
   ])
   const weights = Array.from(
     chart.querySelectorAll('[data-chart-tick]'),
@@ -105,9 +109,9 @@ it('labels every saved weigh-in with only its numeric value', () => {
       label.getAttribute('font-size'),
     ]),
   ).toEqual([
-    ['2026-10-01', '90', '90', '6'],
-    ['2026-10-08', '89.5', '89.5', '6'],
-    ['2026-10-15', '88.5', '88.5', '6'],
-    ['2026-10-22', '87', '87', '6'],
+    ['2026-10-01', '90', '90', '6.6'],
+    ['2026-10-08', '89.5', '89.5', '6.6'],
+    ['2026-10-15', '88.5', '88.5', '6.6'],
+    ['2026-10-22', '87', '87', '6.6'],
   ])
 })
