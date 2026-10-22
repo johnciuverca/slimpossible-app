@@ -66,10 +66,14 @@ export function RecordWeightAction({
   workspace,
   onRecorded,
   presentation = 'button',
+  showSavedFeedback = true,
+  onOpen,
 }: {
   workspace: PersonalWorkspace
   onRecorded?: () => void
   presentation?: 'button' | 'card'
+  showSavedFeedback?: boolean
+  onOpen?: () => void
 }) {
   const [openOwner, setOpenOwner] = useState<string | null>(null)
   const [savedOwner, setSavedOwner] = useState<string | null>(null)
@@ -91,7 +95,10 @@ export function RecordWeightAction({
         }
         data-weight-owner={workspace.ownerKey}
         disabled={workspace.personal.state !== 'ready'}
-        onClick={() => setOpenOwner(workspace.ownerKey)}
+        onClick={() => {
+          onOpen?.()
+          setOpenOwner(workspace.ownerKey)
+        }}
       >
         {presentation === 'card' ? (
           <>
@@ -115,7 +122,7 @@ export function RecordWeightAction({
           {workspace.personal.error}
         </p>
       ) : null}
-      {savedOwner === workspace.ownerKey ? (
+      {showSavedFeedback && savedOwner === workspace.ownerKey ? (
         <p role="status" className="mt-2 text-sm text-forest-800">
           Personal weight saved.
         </p>

@@ -6,6 +6,7 @@ type PageHeaderProps = {
   eyebrow?: string
   title: string
   titleId?: string
+  titleTrailing?: ReactNode
 }
 
 export function PageHeader({
@@ -14,18 +15,22 @@ export function PageHeader({
   eyebrow = 'Slimpossible',
   title,
   titleId = 'page-title',
+  titleTrailing,
 }: PageHeaderProps) {
   return (
     <div aria-labelledby={titleId}>
       <p className="text-sm font-bold uppercase tracking-[0.2em] text-forest-700">
         {eyebrow}
       </p>
-      <h1
-        className="mt-5 text-4xl font-bold tracking-tight text-ink sm:text-6xl"
-        id={titleId}
-      >
-        {title}
-      </h1>
+      <div className={titleTrailing ? 'page-title-row' : undefined}>
+        <h1
+          className="mt-5 text-4xl font-bold tracking-tight text-ink sm:text-6xl"
+          id={titleId}
+        >
+          {title}
+        </h1>
+        {titleTrailing}
+      </div>
       {description ? (
         <p className="mt-6 max-w-2xl text-lg leading-8 text-ink-muted">
           {description}

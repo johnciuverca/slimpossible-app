@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import {
   usePersonalWorkspace,
@@ -38,6 +38,23 @@ export function PersonalDashboardWorkspace({
   const [params] = useSearchParams()
   const { hash, pathname, search } = useLocation()
   const scrolled = useRef('')
+  const [saveConfirmation, setSaveConfirmation] = useState<{
+    ownerKey: string
+    count: number
+  } | null>(null)
+  useEffect(() => {
+    if (saveConfirmation?.ownerKey !== workspace.ownerKey) return
+    const confirmationCount = saveConfirmation.count
+    const timeout = window.setTimeout(() => {
+      setSaveConfirmation((current) =>
+        current?.ownerKey === workspace.ownerKey &&
+        current.count === confirmationCount
+          ? null
+          : current,
+      )
+    }, 4000)
+    return () => window.clearTimeout(timeout)
+  }, [saveConfirmation, workspace.ownerKey])
   useEffect(() => {
     const navigation = `${workspace.ownerKey}:${pathname}${search}${hash}`
     if (
@@ -111,6 +128,32 @@ export function PersonalDashboardWorkspace({
           title="Dashboard"
           titleId="dashboard-title"
           description="Your personal home. Track weight and progress with or without a challenge."
+          titleTrailing={
+            <div className="dashboard-save-confirmation-slot">
+              {saveConfirmation?.ownerKey === workspace.ownerKey &&
+              saveConfirmation.count ? (
+                <>
+                  <p
+                    key={saveConfirmation.count}
+                    className="dashboard-save-confirmation"
+                    role="status"
+                    aria-live="polite"
+                    aria-atomic="true"
+                  >
+                    Personal weight saved.
+                  </p>
+                  <button
+                    aria-label="Dismiss save confirmation"
+                    className="dashboard-save-confirmation-dismiss"
+                    onClick={() => setSaveConfirmation(null)}
+                    type="button"
+                  >
+                    Dismiss
+                  </button>
+                </>
+              ) : null}
+            </div>
+          }
         />
       </header>
       <div id="dashboard-overview-panel" className="dashboard-top-grid">
@@ -168,7 +211,21 @@ export function PersonalDashboardWorkspace({
         <DashboardChallengeActions
           workspace={workspace}
           recordAction={
-            <RecordWeightAction workspace={workspace} presentation="card" />
+            <RecordWeightAction
+              workspace={workspace}
+              presentation="card"
+              showSavedFeedback={false}
+              onOpen={() => setSaveConfirmation(null)}
+              onRecorded={() =>
+                setSaveConfirmation((current) => ({
+                  ownerKey: workspace.ownerKey,
+                  count:
+                    current?.ownerKey === workspace.ownerKey
+                      ? current.count + 1
+                      : 1,
+                }))
+              }
+            />
           }
         />
       </div>
