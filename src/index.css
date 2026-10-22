@@ -403,7 +403,7 @@ body {
   font-size: 1rem;
   line-height: 1.6;
 }
-.dashboard-shell .dashboard-workspace > header p:first-child {
+.dashboard-shell .dashboard-workspace > header > div > p:first-child {
   display: none;
 }
 .page-title-row {

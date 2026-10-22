@@ -54,6 +54,9 @@ for (const width of [1280, 390]) {
       .getByRole('button', { name: 'Save weight', exact: true })
       .click()
     await expect(editor).toHaveCount(0)
+    await expect(
+      page.locator('.dashboard-save-confirmation[role="status"]'),
+    ).toBeVisible()
 
     for (const path of [
       '/dashboard',
@@ -133,11 +136,6 @@ for (const width of [1280, 390]) {
       await editor
         .getByRole('button', { name: 'Update weight', exact: true })
         .click()
-      await expect(
-        page.getByText(
-          /Personal weight saved\.|Personal weigh-in saved in this browser\./,
-        ),
-      ).toBeVisible()
       const rows = await page.evaluate(() =>
         JSON.parse(
           localStorage.getItem('slimpossible.local.personal-weigh-ins') ?? '[]',
