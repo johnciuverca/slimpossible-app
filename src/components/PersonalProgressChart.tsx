@@ -175,10 +175,10 @@ export function PersonalProgressChart({
                         : 'middle'
                   }
                   className="chart-value"
-                  fontSize="12"
+                  fontSize="10"
                   fontWeight="700"
                 >
-                  {formatWeight(point.weightKg)} kg · recorded
+                  {formatWeight(point.weightKg)}
                 </text>
               ) : null}
             </g>

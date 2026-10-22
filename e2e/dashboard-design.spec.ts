@@ -44,12 +44,32 @@ for (const width of [1280, 390]) {
       name: /^Personal weight history chart/,
     })
     await expect(chart.locator('circle[data-date]')).toHaveCount(5)
+    const pointLabels = chart.locator('.chart-value')
+    await expect(pointLabels).toHaveCount(2)
+    await expect(pointLabels.nth(0)).toHaveText(/^[0-9]+(?:\.[0-9]+)?$/)
+    await expect(pointLabels.nth(1)).toHaveText(/^[0-9]+(?:\.[0-9]+)?$/)
+    for (const label of await pointLabels.all())
+      await expect(label).toHaveAttribute('font-size', '10')
+    await expect(chart.locator('circle[data-date]').first()).toHaveAttribute(
+      'data-date',
+      /.+/,
+    )
+    await expect(chart.locator('circle[data-date]').first()).toHaveAttribute(
+      'data-weight-kg',
+      '40',
+    )
+    await expect(chart.locator('circle title').last()).toContainText(
+      'kg recorded',
+    )
     await expect(chart.locator('[data-chart-trend]')).toHaveCount(1)
     await expect(chart.locator('[data-chart-reference]')).toHaveCount(1)
     await expect(
       page.getByRole('list', { name: 'Personal chart legend' }),
     ).toContainText('Derived trend')
     await expect(page.getByText('Weight (kg)', { exact: true })).toHaveCount(1)
+    await expect(
+      page.getByRole('list', { name: 'Personal chart legend' }),
+    ).toContainText('kg')
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
