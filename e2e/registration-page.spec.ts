@@ -10,10 +10,13 @@ test('shows accessible registration validation and local fallback', async ({
   ).toBeVisible()
 
   await page.getByRole('button', { name: 'Create account' }).click()
-  await expect(page.getByText('Enter your name.')).toBeVisible()
+  await expect(page.getByText('Enter your username or nickname.')).toBeVisible()
   await expect(page.getByText('Confirm your password.')).toBeVisible()
 
-  await page.getByLabel('Full name').fill('Participant')
+  await expect(page.getByLabel('Username')).toHaveAccessibleDescription(
+    'Enter your username or nickname.',
+  )
+  await page.getByLabel('Username').fill('Participant')
   await page.getByRole('textbox', { name: 'Email' }).fill('person@example.com')
   await page.getByLabel('Password', { exact: true }).fill('password123')
   await page.getByLabel('Confirm password').fill('password123')

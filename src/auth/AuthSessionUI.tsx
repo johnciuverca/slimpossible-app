@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 
 import { Button, FeedbackPanel } from '../components/ui'
+import { safeProfileDisplayName } from './profileName'
 import { useAuth } from './useAuth'
 import { trapDialogFocus } from '../components/dialogFocus'
 
@@ -46,8 +47,12 @@ export function AuthSessionUI() {
     return (
       <AccountControl
         key={`${state.user.id}:${state.user.email}`}
-        name={state.user.displayName?.trim() || 'Your account'}
+        name={
+          safeProfileDisplayName(state.user.displayName, state.user.email) ||
+          'Your account'
+        }
         email={state.user.email}
+        profileError={state.profileError}
         onLogout={handleLogout}
       />
     )
@@ -66,10 +71,12 @@ export function AuthSessionUI() {
 function AccountControl({
   name,
   email,
+  profileError,
   onLogout,
 }: {
   name: string
   email: string
+  profileError?: string
   onLogout: () => Promise<void>
 }) {
   const [profile, setProfile] = useState(false)
@@ -171,6 +178,11 @@ function AccountControl({
           <h2 id="account-profile-title" className="text-2xl font-bold">
             Profile
           </h2>
+          {profileError ? (
+            <p className="mt-4 text-sm text-danger-800" role="status">
+              {profileError}
+            </p>
+          ) : null}
           <dl className="my-6 space-y-4">
             <div>
               <dt className="text-sm text-ink-muted">Name</dt>

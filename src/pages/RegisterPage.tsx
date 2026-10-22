@@ -9,6 +9,7 @@ import {
   TextInput,
 } from '../components/ui'
 import { safeInternalPath } from '../auth/authRedirects'
+import { PROFILE_NAME_MAX_LENGTH } from '../auth/profileName'
 import { useAuth } from '../auth/useAuth'
 import { getAuthenticationEnvironmentLabel } from '../auth/supabaseConfig'
 import { isValidEmail } from './authValidation'
@@ -29,7 +30,9 @@ function validateRegistration(
   const errors: RegisterErrors = {}
 
   if (!name.trim()) {
-    errors.name = 'Enter your name.'
+    errors.name = 'Enter your username or nickname.'
+  } else if (name.trim().length > PROFILE_NAME_MAX_LENGTH) {
+    errors.name = `Use ${PROFILE_NAME_MAX_LENGTH} characters or fewer for your username.`
   }
 
   if (!email.trim()) {
@@ -113,11 +116,14 @@ export function RegisterPage() {
           onSubmit={handleSubmit}
         >
           <TextInput
-            autoComplete="name"
+            autoComplete="nickname"
             error={errors.name}
             id="register-name"
-            label="Full name"
+            label="Username"
+            placeholder="name or nickname"
+            maxLength={PROFILE_NAME_MAX_LENGTH}
             onChange={(event) => setName(event.target.value)}
+            required
             type="text"
             value={name}
           />
