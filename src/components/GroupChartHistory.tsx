@@ -556,7 +556,7 @@ export function GroupChartHistory({
                 </div>
                 <ul
                   aria-label="Group chart legend"
-                  className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm"
+                  className="mt-3 flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm"
                 >
                   {series.map((member, index) => (
                     <li

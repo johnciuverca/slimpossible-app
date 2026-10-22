@@ -72,6 +72,7 @@ describe('Group chart history', () => {
     ).toHaveAttribute('stroke-dasharray', '3 6')
     expect(chart.querySelectorAll('circle')).toHaveLength(3)
     const legend = screen.getByRole('list', { name: 'Group chart legend' })
+    expect(legend).toHaveClass('justify-center')
     expect(
       Array.from(legend.querySelectorAll('li'), (item) =>
         item.textContent?.trim(),
