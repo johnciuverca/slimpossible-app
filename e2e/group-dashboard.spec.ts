@@ -1750,7 +1750,11 @@ for (const viewport of [
     expect(contrast.body).toBeGreaterThanOrEqual(4.5)
     await expect(historyPanel.getByRole('img')).toHaveCount(1)
     await expect(historyPanel.getByRole('table')).toHaveCount(1)
-    await expect(historyPanel.getByRole('button')).toHaveCount(0)
+    const quickRanges = historyPanel.getByRole('group', {
+      name: 'Quick date ranges',
+    })
+    await expect(quickRanges.getByRole('button')).toHaveCount(3)
+    await expect(historyPanel.getByRole('button')).toHaveCount(3)
 
     await expect(
       page.getByText('fixture private note must never render'),
@@ -2119,7 +2123,12 @@ test('the shared chart range handles respond to mobile touch dragging', async ({
     expect(outputBox).not.toBeNull()
     expect(sliderBox).not.toBeNull()
     expect(sliderBox!.y).toBeGreaterThan(outputBox!.y)
-    await controls.getByRole('button', { name: 'Show all dates' }).tap()
+    const showAllDates = controls.getByRole('button', {
+      name: 'Show all dates',
+    })
+    await expect(showAllDates).toBeEnabled()
+    await showAllDates.click()
+    await expect(showAllDates).toHaveAttribute('aria-pressed', 'true')
     await expect(points).toHaveCount(4)
     await touch.detach()
   } finally {
