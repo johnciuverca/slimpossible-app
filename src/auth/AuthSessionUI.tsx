@@ -106,7 +106,7 @@ function AccountControl({
     if (!profile) return
     const element = dialog.current
     element?.showModal()
-    element?.querySelector<HTMLButtonElement>('button')?.focus()
+    element?.querySelector<HTMLButtonElement>('[data-profile-close]')?.focus()
     return () => element?.close()
   }, [profile])
   const close = () => {
@@ -196,7 +196,9 @@ function AccountControl({
               <dd className="break-all font-semibold">{email}</dd>
             </div>
           </dl>
-          <Button onClick={close}>Close Profile</Button>
+          <Button data-profile-close onClick={close}>
+            Close Profile
+          </Button>
         </dialog>
       ) : null}
     </>
