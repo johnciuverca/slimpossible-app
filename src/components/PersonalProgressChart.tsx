@@ -1,6 +1,7 @@
 import { useId } from 'react'
 import type { WeighIn } from '../models/weighIn'
 import { personalChartTrend } from '../models/personalChartTrend'
+import { formatChartDate } from '../models/chartDate'
 import { SharedWeightChart } from './SharedWeightChart'
 
 const formatWeight = (value: number) =>
@@ -40,9 +41,9 @@ export function PersonalProgressChart({
     date: point.date,
     value: point.weightKg,
     label: formatWeight(point.weightKg),
-    markerLabel: `Recorded weight on ${point.date}`,
-    tooltip: `${point.date}: ${formatWeight(point.weightKg)} kg`,
-    title: `${point.date}: ${formatWeight(point.weightKg)} kg recorded`,
+    markerLabel: `Recorded weight on ${formatChartDate(point.date)}`,
+    tooltip: `${formatChartDate(point.date)}: ${formatWeight(point.weightKg)} kg`,
+    title: `${formatChartDate(point.date)}: ${formatWeight(point.weightKg)} kg recorded`,
   }))
   const lines = [
     ...(reference === null
@@ -71,8 +72,8 @@ export function PersonalProgressChart({
   ]
   const rangeDescription =
     first.date === latest.date
-      ? `${first.date}, ${formatWeight(first.weightKg)} kilograms`
-      : `${first.date}, ${formatWeight(first.weightKg)} kilograms to ${latest.date}, ${formatWeight(latest.weightKg)} kilograms`
+      ? `${formatChartDate(first.date)}, ${formatWeight(first.weightKg)} kilograms`
+      : `${formatChartDate(first.date)}, ${formatWeight(first.weightKg)} kilograms to ${formatChartDate(latest.date)}, ${formatWeight(latest.weightKg)} kilograms`
   const referenceDescription =
     reference === null
       ? ''
@@ -107,7 +108,7 @@ export function PersonalProgressChart({
       <figcaption id={`${id}-caption`} className="sr-only">
         {points.length === 1
           ? 'One saved weigh-in is shown. Add another entry to compare your trend.'
-          : `${points.length} saved weigh-ins from ${first.date} to ${latest.date}. No missing weights are estimated.`}
+          : `${points.length} saved weigh-ins from ${formatChartDate(first.date)} to ${formatChartDate(latest.date)}. No missing weights are estimated.`}
         {trend
           ? ' The trend summarizes these recorded points; it is not a saved weigh-in or a prediction.'
           : null}

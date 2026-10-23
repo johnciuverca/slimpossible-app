@@ -1287,7 +1287,7 @@ for (const viewport of [
     await firstChartPoint.hover()
     const pointTooltip = page.getByRole('tooltip')
     await expect(pointTooltip).toContainText(
-      /Ava \(member 1\).*2026-09-20.*90 kg/,
+      /Ava \(member 1\).*20\.09\.2026.*90 kg/,
     )
     await page.mouse.move(8, 8)
     await expect(pointTooltip).toHaveCount(0)
@@ -1327,10 +1327,10 @@ for (const viewport of [
         })),
       )
     const heavier = originalPoints.find(
-      (point) => point.label === 'Ava (member 1): 2026-09-20, 90 kg',
+      (point) => point.label === 'Ava (member 1): 20.09.2026, 90 kg',
     )!
     const lighter = originalPoints.find(
-      (point) => point.label === 'Ava (member 2): 2026-09-20, 70 kg',
+      (point) => point.label === 'Ava (member 2): 20.09.2026, 70 kg',
     )!
     expect(heavier.y).toBeLessThan(lighter.y)
     for (const point of originalPoints) {
@@ -1429,7 +1429,7 @@ for (const viewport of [
     })
     await individualChart.locator('circle[data-chart-point]').first().hover()
     await expect(page.getByRole('tooltip')).toContainText(
-      /Ava \(member 2\).*2026-09-20.*70 kg/,
+      /Ava \(member 2\).*20\.09\.2026.*70 kg/,
     )
     await expect(groupLegend.locator('li')).toHaveText(['Ava (member 2)'])
     await expectLegendCentered()
@@ -2112,7 +2112,7 @@ test('the shared chart range handles respond to mobile touch dragging', async ({
       firstPointBounds!.y + firstPointBounds!.height / 2,
     )
     await expect(page.getByRole('tooltip')).toContainText(
-      /Ava \(member 1\).*2026-09-20.*90 kg/,
+      /Ava \(member 1\).*20\.09\.2026.*90 kg/,
     )
     await page.touchscreen.tap(5, 5)
     await expect(page.getByRole('tooltip')).toHaveCount(0)

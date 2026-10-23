@@ -1082,7 +1082,7 @@ describe('HomePage', () => {
     ).toHaveAttribute(
       'aria-label',
       expect.stringContaining(
-        '2026-09-17, 95 kilograms to 2026-09-18, 90 kilograms',
+        '17.09.2026, 95 kilograms to 18.09.2026, 90 kilograms',
       ),
     )
     expect(

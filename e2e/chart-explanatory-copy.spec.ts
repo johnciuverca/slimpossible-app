@@ -42,7 +42,7 @@ for (const width of [1280, 390]) {
     )
     await expect(explanation).toHaveClass('sr-only')
     await expect(
-      page.getByText(/3 saved weigh-ins from \d{4}-\d{2}-\d{2} to/),
+      page.getByText(/3 saved weigh-ins from \d{2}\.\d{2}\.\d{4} to/),
     ).toHaveClass('sr-only')
 
     const firstPoint = chart.locator('circle[data-chart-point]').first()

@@ -9,6 +9,7 @@ import {
   type GroupChartEntry,
 } from '../models/groupChartHistory'
 import { localDateOnly } from '../models/provisionalGroupLeader'
+import { formatChartDate } from '../models/chartDate'
 import { WeightEntryCard } from './WeightEntryCard'
 import { deriveGroupChartTrend } from '../models/groupChartTrend'
 import type { GroupMemberProgress } from '../models/groupMemberProgress'
@@ -335,9 +336,9 @@ export function GroupChartHistory({
                         label: absolute
                           ? String(point.weightKg)
                           : `${point.changeKg > 0 ? '+' : ''}${point.changeKg}`,
-                        title: `${member.label}: ${point.date}, ${absolute ? `${point.weightKg} kg` : signed(point.changeKg)}`,
-                        markerLabel: `Recorded weight for ${member.label}`,
-                        tooltip: `${member.label} — ${point.date}: ${formatWeight(point.weightKg)} kg`,
+                        title: `${member.label}: ${formatChartDate(point.date)}, ${absolute ? `${point.weightKg} kg` : signed(point.changeKg)}`,
+                        markerLabel: `Recorded weight for ${member.label} on ${formatChartDate(point.date)}`,
+                        tooltip: `${member.label} — ${formatChartDate(point.date)}: ${formatWeight(point.weightKg)} kg`,
                       })),
                     }))}
                     lines={[
@@ -538,7 +539,7 @@ export function GroupChartHistory({
                                 r={4}
                               >
                                 <title>
-                                  {member.label}: {point.date},{' '}
+                                  {member.label}: {formatChartDate(point.date)},{' '}
                                   {absolute
                                     ? `${point.weightKg} kg`
                                     : signed(point.changeKg)}
@@ -550,10 +551,14 @@ export function GroupChartHistory({
                       </g>
                     ))}
                     <text x={plotLeft} y={242} fontSize={12}>
-                      {new Date(start * 86400000).toISOString().slice(0, 10)}
+                      {formatChartDate(
+                        new Date(start * 86400000).toISOString().slice(0, 10),
+                      )}
                     </text>
                     <text x={675} y={242} textAnchor="end" fontSize={12}>
-                      {new Date(end * 86400000).toISOString().slice(0, 10)}
+                      {formatChartDate(
+                        new Date(end * 86400000).toISOString().slice(0, 10),
+                      )}
                     </text>
                   </svg>
                 </div>

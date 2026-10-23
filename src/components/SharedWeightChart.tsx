@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from 'react'
 import { layoutChartValueLabels } from '../models/chartValueLabelLayout'
+import { formatChartDate } from '../models/chartDate'
 
 export type SharedChartPoint = {
   date: string
@@ -333,7 +334,7 @@ export function SharedWeightChart({
     points.length + series.reduce((sum, item) => sum + item.points.length, 0)
   const chartTitle = fullRange
     ? title
-    : `${title}. Showing ${visibleCount} of ${totalCount} recorded entries from ${dateAtDay(startDay)} to ${dateAtDay(endDay)}.`
+    : `${title}. Showing ${visibleCount} of ${totalCount} recorded entries from ${formatChartDate(dateAtDay(startDay))} to ${formatChartDate(dateAtDay(endDay))}.`
   const rangePercent = (value: number) =>
     span === 0 ? 0 : ((value - firstDay) / (lastDay - firstDay)) * 100
   const plotStartPercent = (left / viewBoxWidth) * 100
@@ -370,7 +371,7 @@ export function SharedWeightChart({
         aria-valuemin={thumbMin}
         aria-valuemax={thumbMax}
         aria-valuenow={value}
-        aria-valuetext={dateAtDay(value)}
+        aria-valuetext={formatChartDate(dateAtDay(value))}
         aria-orientation="horizontal"
         disabled={firstDay === lastDay}
         className={`date-range-handle date-range-handle-${thumb}`}
@@ -724,7 +725,7 @@ export function SharedWeightChart({
               fontSize="6.5"
               data-chart-date-tick={dateAtDay(date)}
             >
-              {dateAtDay(date)}
+              {formatChartDate(dateAtDay(date))}
             </text>
           ))}
         </svg>
@@ -767,7 +768,8 @@ export function SharedWeightChart({
           aria-live="polite"
           className="mb-1 block text-center text-xs text-ink-muted"
         >
-          {dateAtDay(startDay)} – {dateAtDay(endDay)}
+          {formatChartDate(dateAtDay(startDay))} –{' '}
+          {formatChartDate(dateAtDay(endDay))}
         </output>
         <div
           className="relative h-8 touch-none"
