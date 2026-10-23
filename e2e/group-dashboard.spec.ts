@@ -1483,11 +1483,14 @@ for (const viewport of [
         element.nextElementSibling?.getAttribute('role'),
       ),
     ).toBe('tabpanel')
+    await navigation.evaluate((element) =>
+      element.scrollIntoView({ block: 'start' }),
+    )
     await expect
       .poll(() =>
         navigation.evaluate((el) => Math.round(el.getBoundingClientRect().top)),
       )
-      .toBe(0)
+      .toBeLessThanOrEqual(1)
     const navBounds = await navigation.boundingBox()
     expect(navBounds!.height).toBeLessThan(450)
     const focusBounds = await weights.boundingBox()

@@ -1085,6 +1085,11 @@ describe('HomePage', () => {
         '2026-09-17, 95 kilograms to 2026-09-18, 90 kilograms',
       ),
     )
+    expect(
+      screen.getByText(
+        /Your personal history is independent of the selected challenge/,
+      ),
+    ).toHaveClass('sr-only')
   })
 
   it('shows the provisional shared leader from the authorized RPC only', async () => {
@@ -1525,9 +1530,11 @@ describe('GroupDashboardPage', () => {
       name: 'Group chart and weigh-in history',
     })
     expect(unavailableHistory).not.toHaveAttribute('aria-disabled')
-    expect(unavailableHistory).toHaveTextContent(
-      'Explicitly shared dates and weights only.',
-    )
+    expect(
+      within(unavailableHistory).getByText(
+        /Explicitly shared dates and weights only/,
+      ),
+    ).toHaveClass('sr-only')
     expect(
       within(unavailableHistory).queryByRole('img'),
     ).not.toBeInTheDocument()

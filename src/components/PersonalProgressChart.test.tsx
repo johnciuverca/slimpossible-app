@@ -15,6 +15,12 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
     />,
   )
   const chart = screen.getByRole('img')
+  expect(chart).toHaveAccessibleDescription(
+    /The dashed trend is a least-squares fit/,
+  )
+  expect(
+    screen.getByText(/saved weigh-ins from 2026-10-01 to 2026-10-11/),
+  ).toHaveClass('sr-only')
   expect(chart.querySelectorAll('circle[data-date]')).toHaveLength(2)
   expect(chart.querySelector('[data-chart-trend]')).toBeInTheDocument()
   expect(chart.querySelector('[data-chart-trend]')).toHaveAttribute(

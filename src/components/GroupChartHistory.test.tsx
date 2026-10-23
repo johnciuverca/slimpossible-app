@@ -380,6 +380,13 @@ describe('Group chart history', () => {
     expect(table).toHaveTextContent('-1.5 kg')
     expect(load).toHaveBeenCalledWith('group-a')
     const chart = screen.getByRole('img')
+    expect(chart).toHaveAccessibleDescription(/Points represent shared dates/)
+    expect(
+      screen.getByText(/Explicitly shared dates and weights only/),
+    ).toHaveClass('sr-only')
+    expect(
+      screen.getByText(/Missing dates are gaps, not estimated weights/),
+    ).toHaveClass('sr-only')
     expect(chart.querySelectorAll('circle')).toHaveLength(2)
     expect(
       chart.querySelectorAll('[data-series="recorded-connection"]'),

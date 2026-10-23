@@ -258,7 +258,7 @@ export function GroupChartHistory({
                 {series[0].label} · shared with this group only
               </p>
             ) : null}
-            <p className="mt-2 text-sm leading-6 text-slate-700">
+            <p className="sr-only">
               Explicitly shared dates and weights only.{' '}
               {absolute ? (
                 'All members plots actual shared Weight (kg), not change from zero. A lower absolute weight is not a winner ranking. Notes and emails are never included.'
@@ -286,7 +286,7 @@ export function GroupChartHistory({
               </p>
             ) : (
               <>
-                <p className="mt-4 text-sm text-slate-700">
+                <p className="sr-only">
                   {absolute ? (
                     'Missing dates are gaps, not estimated weights. Each member starts at their first explicitly shared weight; unshared starting values are not added. Corrections and removed shares update this chart on refresh.'
                   ) : (
