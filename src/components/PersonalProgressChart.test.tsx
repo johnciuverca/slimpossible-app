@@ -130,6 +130,38 @@ it('uses aligned five-kilogram labels for wide visible spans and finer ticks aft
   expect(majorTicks().every((tick) => tick % 5 === 0)).toBe(true)
 })
 
+it('recalculates axis labels when an edited weigh-in widens or narrows the visible span', () => {
+  const weighIns = (latestWeightKg: number) => [
+    { date: '2026-10-01', weightKg: 89.7, participantId: 'own' },
+    { date: '2026-10-15', weightKg: latestWeightKg, participantId: 'own' },
+  ]
+  const { rerender } = render(
+    <PersonalProgressChart weighIns={weighIns(91.2)} />,
+  )
+  const chart = () =>
+    screen.getByRole('img', { name: /Personal weight history/ })
+  const majorTicks = () =>
+    Array.from(chart().querySelectorAll('[data-chart-tick]'), (tick) =>
+      Number(tick.getAttribute('data-chart-tick')),
+    )
+
+  expect(majorTicks().some((tick) => tick % 5 !== 0)).toBe(true)
+  expect(chart().querySelectorAll('[data-chart-minor-tick]')).toHaveLength(0)
+
+  rerender(<PersonalProgressChart weighIns={weighIns(99.7)} />)
+  const wideMajorTicks = majorTicks()
+  expect(wideMajorTicks.every((tick) => tick % 5 === 0)).toBe(true)
+  expect(Math.min(...wideMajorTicks)).toBeLessThanOrEqual(89.7)
+  expect(Math.max(...wideMajorTicks)).toBeGreaterThanOrEqual(99.7)
+  expect(chart().querySelectorAll('[data-chart-minor-tick]')).toHaveLength(
+    ((Math.max(...wideMajorTicks) - Math.min(...wideMajorTicks)) / 5) * 4,
+  )
+
+  rerender(<PersonalProgressChart weighIns={weighIns(91.2)} />)
+  expect(majorTicks().some((tick) => tick % 5 !== 0)).toBe(true)
+  expect(chart().querySelectorAll('[data-chart-minor-tick]')).toHaveLength(0)
+})
+
 it('keeps five-kilogram ticks aligned around low and negative generic ranges', () => {
   render(
     <SharedWeightChart
