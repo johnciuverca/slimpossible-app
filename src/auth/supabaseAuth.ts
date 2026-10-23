@@ -71,6 +71,25 @@ export function createSupabaseAuthGateway(): AuthGateway {
   }
 
   return {
+    async requestEmailChange(user, email) {
+      const client = getConfiguredClient()
+      const { data, error: sessionError } = await client.auth.getUser()
+      if (sessionError || !user.id || data.user?.id !== user.id)
+        throw new Error('Your account changed. Open Profile and try again.')
+      const { error } = await client.auth.updateUser({ email })
+      if (error) {
+        const message = error.message?.toLowerCase() ?? ''
+        if (error.status === 429 || message.includes('rate'))
+          throw new Error('Too many attempts. Wait a moment and try again.')
+        if (message.includes('email_exists') || message.includes('already'))
+          throw new Error('That email cannot be used. Check it or try another.')
+        if (message.includes('invalid') || message.includes('validation'))
+          throw new Error('Enter a valid email address and try again.')
+        if (error.status === undefined && message.includes('fetch'))
+          throw new Error('Check your connection and try again.')
+        throw new Error('We could not request the email change. Try again.')
+      }
+    },
     async saveProfileName(user, name) {
       const displayName = normalizeProfileName(name)
       if (!displayName)
