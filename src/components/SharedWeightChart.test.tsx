@@ -43,7 +43,52 @@ it('shares axis, weekly date ticks, numeric labels and exact tooltips without br
   expect(chart.querySelector('circle title')).toHaveTextContent('Member: 90 kg')
 })
 
-it('anchors a one-point member label to the shared chart edge, not its local series start', () => {
+it('centers endpoint values on their own dots and staggers a crowded run vertically', () => {
+  render(
+    <SharedWeightChart
+      title="Centered value labels"
+      description="Recorded weights."
+      yLabel="Weight (kg)"
+      min={80}
+      max={100}
+      points={[
+        { date: '2026-01-01', value: 90, label: '90', title: 'First: 90 kg' },
+        { date: '2026-01-02', value: 90, label: '90', title: 'Second: 90 kg' },
+        { date: '2026-01-03', value: 90, label: '90', title: 'Third: 90 kg' },
+        { date: '2026-04-01', value: 85, label: '85', title: 'Last: 85 kg' },
+      ]}
+    />,
+  )
+
+  const chart = screen.getByRole('img', { name: 'Centered value labels' })
+  const labels = Array.from(
+    chart.querySelectorAll<SVGTextElement>('.chart-value'),
+  )
+  expect(labels).toHaveLength(4)
+  for (const label of labels) {
+    const point = chart.querySelector(
+      `circle[data-chart-point][data-date="${label.dataset.date}"]`,
+    )
+    expect(label).toHaveAttribute('text-anchor', 'middle')
+    expect(label.getAttribute('x')).toBe(point?.getAttribute('cx'))
+    expect(Number(label.getAttribute('y'))).toBeLessThan(
+      Number(point?.getAttribute('cy')),
+    )
+  }
+
+  const clusteredRows = labels
+    .filter((label) =>
+      ['2026-01-01', '2026-01-02', '2026-01-03'].includes(
+        label.dataset.date ?? '',
+      ),
+    )
+    .map((label) => Number(label.getAttribute('y')))
+  expect(clusteredRows[0]).not.toBe(clusteredRows[1])
+  expect(clusteredRows[1]).not.toBe(clusteredRows[2])
+  expect(clusteredRows.every((row) => row > 0)).toBe(true)
+})
+
+it('centers a one-point member label over its point at the shared chart edge', () => {
   render(
     <SharedWeightChart
       title="Members"
@@ -75,8 +120,8 @@ it('anchors a one-point member label to the shared chart edge, not its local ser
   const label = chart.querySelector(
     'text[data-date="2026-10-03"][data-value="75"]',
   )
-  expect(label).toHaveAttribute('text-anchor', 'end')
-  expect(Number(label?.getAttribute('x'))).toBe(688)
+  expect(label).toHaveAttribute('text-anchor', 'middle')
+  expect(Number(label?.getAttribute('x'))).toBe(696)
 })
 
 it('shows an accessible themed point tooltip on hover, keyboard focus, and touch', () => {

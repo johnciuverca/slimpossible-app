@@ -6,6 +6,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react'
+import { layoutChartValueLabels } from '../models/chartValueLabelLayout'
 
 export type SharedChartPoint = {
   date: string
@@ -134,17 +135,6 @@ export function SharedWeightChart({
     span
       ? left + ((day(date) - startDay) / span) * (right - left)
       : (left + right) / 2
-  const labelAnchor = (date: string) =>
-    span === 0
-      ? 'middle'
-      : day(date) === startDay
-        ? 'start'
-        : day(date) === endDay
-          ? 'end'
-          : 'middle'
-  const labelX = (date: string) =>
-    x(date) +
-    (labelAnchor(date) === 'start' ? 8 : labelAnchor(date) === 'end' ? -8 : 0)
   const inRange = (date: string) => day(date) >= startDay && day(date) <= endDay
   const visiblePoints = points.filter((point) => inRange(point.date))
   const visibleSeries = series.map((item) => ({
@@ -225,6 +215,43 @@ export function SharedWeightChart({
   }
   const y = (value: number) =>
     bottom - ((value - yMinimum) / (yMaximum - yMinimum)) * (bottom - top)
+  const viewBoxParts = viewBox.trim().split(/\s+/).map(Number)
+  const viewBoxWidth = viewBoxParts[2] || 760
+  const viewBoxHeight = viewBoxParts[3] || 266
+  const chartValueLabelY = new Map(
+    layoutChartValueLabels(
+      [
+        ...visibleSeries.flatMap((item) =>
+          item.points.flatMap((point, index) =>
+            point.label
+              ? [
+                  {
+                    id: `series:${item.id}:${point.date}:${index}`,
+                    x: x(point.date),
+                    pointY: y(point.value),
+                    text: point.label,
+                  },
+                ]
+              : [],
+          ),
+        ),
+        ...visiblePoints.flatMap((point, index) =>
+          point.label
+            ? [
+                {
+                  id: `point:${point.date}:${index}`,
+                  x: x(point.date),
+                  pointY: y(point.value),
+                  text: point.label,
+                },
+              ]
+            : [],
+        ),
+      ],
+      viewBoxWidth,
+      viewBoxHeight,
+    ).map(({ id, y: labelY }) => [id, labelY]),
+  )
   const referenceLinesOutsideRange = adaptiveWeightTicks
     ? visibleLines.filter(
         (line) =>
@@ -257,9 +284,6 @@ export function SharedWeightChart({
         (_, index) => yMinimum + index + 1,
       ).filter((value) => value < yMaximum && value % 5 !== 0)
     : []
-  const viewBoxParts = viewBox.trim().split(/\s+/).map(Number)
-  const viewBoxWidth = viewBoxParts[2] || 760
-  const viewBoxHeight = viewBoxParts[3] || 266
   const tooltipPosition = visibleActivePoint
     ? {
         x: x(visibleActivePoint.point.date),
@@ -602,9 +626,9 @@ export function SharedWeightChart({
                     </circle>
                     {point.label ? (
                       <text
-                        x={labelX(point.date)}
-                        y={y(point.value) - 12}
-                        textAnchor={labelAnchor(point.date)}
+                        x={x(point.date)}
+                        y={chartValueLabelY.get(pointId) ?? y(point.value) - 12}
+                        textAnchor="middle"
                         className="chart-value"
                         fontSize="6.6"
                         fontWeight="700"
@@ -667,9 +691,9 @@ export function SharedWeightChart({
                 </circle>
                 {point.label ? (
                   <text
-                    x={labelX(point.date)}
-                    y={y(point.value) - 12}
-                    textAnchor={labelAnchor(point.date)}
+                    x={x(point.date)}
+                    y={chartValueLabelY.get(pointId) ?? y(point.value) - 12}
+                    textAnchor="middle"
                     className="chart-value"
                     fontSize="6.6"
                     fontWeight="700"
