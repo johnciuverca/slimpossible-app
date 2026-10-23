@@ -104,10 +104,7 @@ export function PersonalProgressChart({
       <p className="mt-2 text-xs text-ink-muted sm:hidden">
         Scroll sideways to see every recorded date.
       </p>
-      <figcaption
-        id={`${id}-caption`}
-        className="mt-3 text-sm leading-6 text-ink-muted"
-      >
+      <figcaption id={`${id}-caption`} className="sr-only">
         {points.length === 1
           ? 'One saved weigh-in is shown. Add another entry to compare your trend.'
           : `${points.length} saved weigh-ins from ${first.date} to ${latest.date}. No missing weights are estimated.`}

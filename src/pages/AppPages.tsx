@@ -2591,7 +2591,7 @@ export function ProgressPage({
                 >
                   Your saved trend
                 </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
+                <p className="sr-only">
                   Your personal history is independent of the selected
                   challenge. Missing dates have no estimated weights.
                 </p>

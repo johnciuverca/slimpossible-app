@@ -733,6 +733,9 @@ describe('personal Dashboard and My Progress', () => {
     expect(
       screen.getByRole('img', { name: /1 saved weigh-ins/ }),
     ).toBeInTheDocument()
+    expect(
+      screen.getByText(/Every plotted point is a saved personal entry/),
+    ).toHaveClass('sr-only')
     fireEvent.click(screen.getByRole('button', { name: 'Delete 2026-01-01' }))
     let deletion = await screen.findByRole('dialog', { name: 'Delete weight?' })
     expect(deletion).toHaveTextContent('ALL shared groups')

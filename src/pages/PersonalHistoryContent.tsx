@@ -80,7 +80,7 @@ export function PersonalHistoryContent({
         <>
           <Card className="min-w-0 p-6">
             <h2 className="text-xl font-bold">Your personal trend</h2>
-            <p className="mt-2 text-sm text-ink-muted">
+            <p className="sr-only">
               Every plotted point is a saved personal entry. No missing dates
               are filled in. This is not a group ranking or a challenge
               baseline.
