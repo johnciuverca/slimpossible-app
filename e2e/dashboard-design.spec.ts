@@ -15,7 +15,7 @@ for (const width of [1280, 390]) {
             id: `synthetic-visual-${index}`,
             userId: 'user-alex',
             date: ago(days),
-            weightKg: [87.4, 87.8, 88.2, 88.8, 90][index],
+            weightKg: [105.2, 104.1, 103.2, 102.1, 80.3][index],
             sharedChallengeIds: [],
             note: 'Synthetic design test',
           })),
@@ -53,6 +53,19 @@ for (const width of [1280, 390]) {
     await expect(chart.locator('.chart-legend')).toHaveCount(0)
     await expect(chart).toHaveAccessibleDescription(/least-squares fit/)
     await expect(chart.locator('.chart-value')).toHaveCount(5)
+    const firstPoint = chart.locator('circle[data-chart-point]').first()
+    await firstPoint.hover()
+    const pointTooltip = page.getByRole('tooltip')
+    await expect(pointTooltip).toBeVisible()
+    await expect(pointTooltip).toContainText(/\d{4}-\d{2}-\d{2}: 80\.3 kg/)
+    await expect(pointTooltip).toHaveClass(/bg-panel/)
+    await firstPoint.focus()
+    await expect(firstPoint).toHaveAttribute(
+      'aria-describedby',
+      await pointTooltip.getAttribute('id'),
+    )
+    await page.keyboard.press('Escape')
+    await expect(pointTooltip).toHaveCount(0)
     for (const label of await chart.locator('.chart-value').all())
       await expect(label).toHaveAttribute('font-size', '6.6')
     const yTicks = await chart
@@ -60,13 +73,8 @@ for (const width of [1280, 390]) {
       .evaluateAll((ticks) =>
         ticks.map((tick) => Number(tick.getAttribute('data-chart-tick'))),
       )
-    expect(
-      yTicks.every(
-        (tick, index) =>
-          Number.isInteger(tick * 2) &&
-          (index === 0 || tick - yTicks[index - 1] === 1),
-      ),
-    ).toBe(true)
+    expect(yTicks.every((tick) => tick % 5 === 0)).toBe(true)
+    await expect(chart.locator('[data-chart-minor-tick]')).not.toHaveCount(0)
     await expect(
       chart.locator('[data-chart-date-tick]').first(),
     ).toHaveAttribute('font-size', '6.5')
@@ -97,6 +105,13 @@ for (const width of [1280, 390]) {
       .getByRole('button', { name: 'Show last 1 month' })
       .click()
     await expect(chart.locator('circle[data-date]')).toHaveCount(4)
+    const recentTicks = await chart
+      .locator('[data-chart-tick]')
+      .evaluateAll((ticks) =>
+        ticks.map((tick) => Number(tick.getAttribute('data-chart-tick'))),
+      )
+    expect(recentTicks.every((tick) => tick % 5 === 0)).toBe(false)
+    await expect(chart.locator('[data-chart-minor-tick]')).toHaveCount(0)
     const startSlider = sliderTrack.getByRole('slider', {
       name: 'Visible range start',
     })

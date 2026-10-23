@@ -278,7 +278,7 @@ for (const width of [1280, 390]) {
         ).toBeVisible()
         await expect(chart.locator('[data-chart-reference]')).toHaveCount(1)
         await expect(chart).toHaveAccessibleDescription(
-          /Synthetic personal goal target at .* kilograms/,
+          /Synthetic personal goal target is .* kilograms\. Its reference line is shown only when it fits within the data-scaled chart range/,
         )
         await expect(chart.locator('.chart-legend')).toHaveCount(0)
         await expect(

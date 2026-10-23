@@ -1283,6 +1283,14 @@ for (const viewport of [
       name: 'Weight (kg) — shared group history',
     })
     await expect(chart).toBeVisible()
+    const firstChartPoint = chart.locator('circle[data-chart-point]').first()
+    await firstChartPoint.hover()
+    const pointTooltip = page.getByRole('tooltip')
+    await expect(pointTooltip).toContainText(
+      /Ava \(member 1\).*2026-09-20.*90 kg/,
+    )
+    await page.mouse.move(8, 8)
+    await expect(pointTooltip).toHaveCount(0)
     const groupLegend = page.getByRole('list', {
       name: 'Group chart legend',
     })
@@ -1419,6 +1427,10 @@ for (const viewport of [
     const individualChart = page.getByRole('img', {
       name: /Change from first shared weight \(kg\)/,
     })
+    await individualChart.locator('circle[data-chart-point]').first().hover()
+    await expect(page.getByRole('tooltip')).toContainText(
+      /Ava \(member 2\).*2026-09-20.*70 kg/,
+    )
     await expect(groupLegend.locator('li')).toHaveText(['Ava (member 2)'])
     await expectLegendCentered()
     await expect(individualChart.locator('circle[data-date]')).toHaveCount(2)
@@ -1748,13 +1760,19 @@ for (const viewport of [
     expect(contrast.opacity).toBe(1)
     expect(contrast.label).toBeGreaterThanOrEqual(4.5)
     expect(contrast.body).toBeGreaterThanOrEqual(4.5)
-    await expect(historyPanel.getByRole('img')).toHaveCount(1)
+    const chart = historyPanel.getByRole('img')
+    await expect(chart).toHaveCount(1)
     await expect(historyPanel.getByRole('table')).toHaveCount(1)
     const quickRanges = historyPanel.getByRole('group', {
       name: 'Quick date ranges',
     })
     await expect(quickRanges.getByRole('button')).toHaveCount(3)
-    await expect(historyPanel.getByRole('button')).toHaveCount(3)
+    const chartPointCount = await chart
+      .locator('circle[data-chart-point]')
+      .count()
+    await expect(historyPanel.getByRole('button')).toHaveCount(
+      3 + chartPointCount,
+    )
 
     await expect(
       page.getByText('fixture private note must never render'),
@@ -2082,6 +2100,19 @@ test('the shared chart range handles respond to mobile touch dragging', async ({
     })
     const points = chart.locator('circle[data-date]')
     await expect(points).toHaveCount(4)
+    const firstPoint = chart.locator('circle[data-chart-point]').first()
+    await firstPoint.scrollIntoViewIfNeeded()
+    const firstPointBounds = await firstPoint.boundingBox()
+    expect(firstPointBounds).not.toBeNull()
+    await page.touchscreen.tap(
+      firstPointBounds!.x + firstPointBounds!.width / 2,
+      firstPointBounds!.y + firstPointBounds!.height / 2,
+    )
+    await expect(page.getByRole('tooltip')).toContainText(
+      /Ava \(member 1\).*2026-09-20.*90 kg/,
+    )
+    await page.touchscreen.tap(5, 5)
+    await expect(page.getByRole('tooltip')).toHaveCount(0)
     const controls = page.getByRole('group', {
       name: 'Chart date range controls',
     })

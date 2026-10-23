@@ -79,6 +79,55 @@ it('anchors a one-point member label to the shared chart edge, not its local ser
   expect(Number(label?.getAttribute('x'))).toBe(688)
 })
 
+it('shows an accessible themed point tooltip on hover, keyboard focus, and touch', () => {
+  render(
+    <SharedWeightChart
+      title="Point detail chart"
+      description="Saved entries only."
+      yLabel="Weight (kg)"
+      min={80}
+      max={90}
+      points={[
+        {
+          date: '2026-10-01',
+          value: 86.25,
+          title: 'native title only',
+          markerLabel: 'Recorded weight point',
+          tooltip: '2026-10-01: 86.25 kg',
+        },
+      ]}
+    />,
+  )
+  const chart = screen.getByRole('img', { name: 'Point detail chart' })
+  const point = chart.querySelector('circle[data-chart-point]')!
+  const expectTooltip = () => {
+    const tooltip = screen.getByRole('tooltip')
+    expect(tooltip).toHaveTextContent('2026-10-01: 86.25 kg')
+    expect(tooltip).toHaveClass('bg-panel', 'border-line', 'shadow-panel')
+    expect(point).toHaveAttribute('aria-describedby', tooltip.id)
+  }
+
+  fireEvent.pointerEnter(point, { pointerType: 'mouse' })
+  expectTooltip()
+  fireEvent.pointerLeave(chart.parentElement!, { pointerType: 'mouse' })
+  expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+
+  fireEvent.focus(point)
+  expectTooltip()
+  fireEvent.keyDown(point, { key: 'Escape' })
+  expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+
+  fireEvent.pointerDown(point, { pointerType: 'touch' })
+  expectTooltip()
+  fireEvent.pointerDown(
+    screen.getByRole('group', { name: 'Quick date ranges' }),
+    {
+      pointerType: 'touch',
+    },
+  )
+  expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+})
+
 it('applies quick ranges, adjustable date endpoints, clipped trend/reference lines, and restores all records', () => {
   const dates = [
     '2026-01-01',
