@@ -10,7 +10,7 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
         { date: '2026-10-01', weightKg: 100, participantId: 'own' },
         { date: '2026-10-11', weightKg: 90, participantId: 'own' },
       ]}
-      referenceWeightKg={80}
+      referenceWeightKg={95}
       referenceLabel="Own selected goal"
     />,
   )
@@ -31,7 +31,7 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
   )
   expect(screen.getByText('Weight (kg)')).toBeInTheDocument()
   expect(chart.querySelector('.chart-legend')).toBeNull()
-  expect(chart).toHaveAccessibleDescription(/Own selected goal at 80 kilograms/)
+  expect(chart).toHaveAccessibleDescription(/Own selected goal is 95 kilograms/)
   const labels = Array.from(chart.querySelectorAll('.chart-value'))
   expect(labels.map((label) => label.textContent)).toEqual(['100', '90'])
   expect(labels.map((label) => label.getAttribute('font-size'))).toEqual([
@@ -162,31 +162,35 @@ it('recalculates axis labels when an edited weigh-in widens or narrows the visib
   expect(chart().querySelectorAll('[data-chart-minor-tick]')).toHaveLength(0)
 })
 
-it('uses five-kilogram labels when an owner goal reference widens the visible axis', () => {
-  const weighIns = [
-    { date: '2026-10-15', weightKg: 99.7, participantId: 'owner' },
-  ]
-  const { rerender } = render(
-    <PersonalProgressChart weighIns={weighIns} referenceWeightKg={83} />,
-  )
-  const chart = () =>
-    screen.getByRole('img', { name: /Personal weight history/ })
-  const majorTicks = () =>
-    Array.from(chart().querySelectorAll('[data-chart-tick]'), (tick) =>
-      Number(tick.getAttribute('data-chart-tick')),
+it.each([83, 120])(
+  'keeps an owner goal at %s kg outside the data-driven axis',
+  (referenceWeightKg) => {
+    const weighIns = [
+      { date: '2026-10-15', weightKg: 99.7, participantId: 'owner' },
+    ]
+    render(
+      <PersonalProgressChart
+        weighIns={weighIns}
+        referenceWeightKg={referenceWeightKg}
+      />,
     )
+    const chart = () =>
+      screen.getByRole('img', { name: /Personal weight history/ })
+    const majorTicks = () =>
+      Array.from(chart().querySelectorAll('[data-chart-tick]'), (tick) =>
+        Number(tick.getAttribute('data-chart-tick')),
+      )
 
-  expect(majorTicks().every((tick) => tick % 5 === 0)).toBe(true)
-  expect(chart().querySelectorAll('[data-chart-minor-tick]')).not.toHaveLength(
-    0,
-  )
-  expect(chart().querySelector('[data-chart-reference]')).toBeInTheDocument()
-
-  rerender(<PersonalProgressChart weighIns={weighIns} />)
-  expect(majorTicks().some((tick) => tick % 5 !== 0)).toBe(true)
-  expect(chart().querySelectorAll('[data-chart-minor-tick]')).toHaveLength(0)
-  expect(chart().querySelector('[data-chart-reference]')).toBeNull()
-})
+    expect(majorTicks().some((tick) => tick % 5 !== 0)).toBe(true)
+    expect(Math.min(...majorTicks())).toBeGreaterThanOrEqual(99)
+    expect(Math.max(...majorTicks())).toBeLessThanOrEqual(100.5)
+    expect(chart().querySelectorAll('[data-chart-minor-tick]')).toHaveLength(0)
+    expect(chart().querySelector('[data-chart-reference]')).toBeNull()
+    expect(screen.getByRole('note')).toHaveTextContent(
+      `outside the data-scaled chart range: The selected goal target at ${referenceWeightKg} kilograms`,
+    )
+  },
+)
 
 it('keeps five-kilogram ticks aligned around low and negative generic ranges', () => {
   render(

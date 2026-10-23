@@ -30,8 +30,6 @@ export function PersonalProgressChart({
       ? referenceWeightKg
       : null
   const weights = chronological.map((point) => point.weightKg)
-  if (reference !== null) weights.push(reference)
-  if (trend) weights.push(trend.firstWeightKg, trend.lastWeightKg)
   const padding = Math.max(
     (Math.max(...weights) - Math.min(...weights)) * 0.14,
     0.5,
@@ -78,7 +76,7 @@ export function PersonalProgressChart({
   const referenceDescription =
     reference === null
       ? ''
-      : ` The dashed reference line marks ${referenceLabel ?? 'the selected goal target'} at ${formatWeight(reference)} kilograms.`
+      : ` ${referenceLabel ?? 'The selected goal target'} is ${formatWeight(reference)} kilograms. Its reference line is shown only when it fits within the data-scaled chart range; otherwise its value is noted below the chart.`
   return (
     <figure
       className="personal-weight-chart mt-5"

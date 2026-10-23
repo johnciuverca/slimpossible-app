@@ -195,7 +195,9 @@ export function SharedWeightChart({
       ...visibleSeries.flatMap((item) =>
         item.points.map((point) => point.value),
       ),
-      ...visibleLines.flatMap((line) => [line.from.value, line.to.value]),
+      ...(!adaptiveWeightTicks
+        ? visibleLines.flatMap((line) => [line.from.value, line.to.value])
+        : []),
       ...(includeZero ? [0] : []),
     ]
     if (viewValues.length) {
@@ -211,9 +213,6 @@ export function SharedWeightChart({
   const visibleWeightValues = [
     ...visiblePoints.map((point) => point.value),
     ...visibleSeries.flatMap((item) => item.points.map((point) => point.value)),
-    ...visibleLines
-      .filter((line) => line.kind === 'reference')
-      .flatMap((line) => [line.from.value, line.to.value]),
   ]
   const useFiveKgTicks =
     adaptiveWeightTicks &&
@@ -226,6 +225,19 @@ export function SharedWeightChart({
   }
   const y = (value: number) =>
     bottom - ((value - yMinimum) / (yMaximum - yMinimum)) * (bottom - top)
+  const referenceLinesOutsideRange = adaptiveWeightTicks
+    ? visibleLines.filter(
+        (line) =>
+          line.kind === 'reference' &&
+          (line.from.value < yMinimum ||
+            line.from.value > yMaximum ||
+            line.to.value < yMinimum ||
+            line.to.value > yMaximum),
+      )
+    : []
+  const renderedLines = visibleLines.filter(
+    (line) => !referenceLinesOutsideRange.includes(line),
+  )
   const tickStep = useFiveKgTicks
     ? 5
     : Math.max(1, Math.ceil((yMaximum - yMinimum) / maxTicks))
@@ -478,7 +490,7 @@ export function SharedWeightChart({
               </text>
             </g>
           ))}
-          {visibleLines.map((line) => {
+          {renderedLines.map((line) => {
             const yy =
               line.kind === 'reference' ? y(line.from.value) : undefined
             return (
@@ -706,6 +718,18 @@ export function SharedWeightChart({
             {visibleActivePoint.point.tooltip ?? visibleActivePoint.point.title}
           </div>
         ) : null}
+        {referenceLinesOutsideRange.map((line) => (
+          <p
+            key={line.id}
+            data-chart-reference-outside
+            role="note"
+            className="mt-2 text-xs text-ink-muted"
+          >
+            Goal reference is outside the data-scaled chart range:{' '}
+            {line.title ?? `${format(line.from.value)} kg`}. The chart scale
+            follows the visible recorded weights.
+          </p>
+        ))}
       </div>
       <div
         className="mt-2 px-2"
