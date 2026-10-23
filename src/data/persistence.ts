@@ -627,6 +627,15 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
   }
 
   const profiles: ProfileRepository = {
+    async saveName() {
+      return {
+        state: 'error',
+        error: {
+          kind: 'request',
+          message: 'Editing your username requires a signed-in server session.',
+        },
+      }
+    },
     async ensure(input) {
       const displayName = input.displayName?.trim()
       if (!displayName) return { data: null, state: 'empty' }

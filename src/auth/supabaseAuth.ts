@@ -71,6 +71,22 @@ export function createSupabaseAuthGateway(): AuthGateway {
   }
 
   return {
+    async saveProfileName(user, name) {
+      const displayName = normalizeProfileName(name)
+      if (!displayName)
+        throw new Error('Enter a username between 1 and 80 characters.')
+      const client = getConfiguredClient()
+      const { data, error } = await client.auth.getUser()
+      if (error || !user.id || data.user?.id !== user.id)
+        throw new Error('Your account changed. Open Profile and try again.')
+      const result = await createRepositories(client).profiles.saveName({
+        id: user.id,
+        displayName,
+      })
+      if (result.state !== 'success')
+        throw new Error('We could not save your username. Try again.')
+      return result.data.displayName
+    },
     async ensureProfile(user) {
       const profile = await createRepositories(
         getConfiguredClient(),

@@ -219,6 +219,7 @@ function renderDashboard(
 
 function authContextValue(userId: string): AuthContextValue {
   return {
+    saveProfileName: async () => false,
     requestPasswordRecovery: vi.fn(),
     resetPassword: vi.fn().mockResolvedValue(false),
     retrySession: vi.fn(),
@@ -388,6 +389,7 @@ describe('HomePage', () => {
 
   it('shows a session-loading state while authentication is being restored', () => {
     const contextValue: AuthContextValue = {
+      saveProfileName: async () => false,
       requestPasswordRecovery: vi.fn(),
       resetPassword: vi.fn().mockResolvedValue(false),
       retrySession: vi.fn(),

@@ -78,6 +78,7 @@ function participantRow(
 
 function authValue(userId: string): AuthContextValue {
   return {
+    saveProfileName: async () => false,
     requestPasswordRecovery: async () => undefined,
     resetPassword: async () => false,
     retrySession: () => undefined,

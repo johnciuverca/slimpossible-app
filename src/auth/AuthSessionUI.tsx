@@ -2,9 +2,11 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 
 import { Button, FeedbackPanel } from '../components/ui'
+import { UnsavedChangesDialog } from '../components/UnsavedChangesDialog'
 import { safeProfileDisplayName } from './profileName'
 import { useAuth } from './useAuth'
 import { trapDialogFocus } from '../components/dialogFocus'
+import { ProfileNameForm } from './ProfileNameForm'
 
 export function AuthSessionUI() {
   const { retrySession, signOut, state } = useAuth()
@@ -52,6 +54,9 @@ export function AuthSessionUI() {
           'Your account'
         }
         email={state.user.email}
+        displayName={
+          safeProfileDisplayName(state.user.displayName, state.user.email) ?? ''
+        }
         profileError={state.profileError}
         onLogout={handleLogout}
       />
@@ -70,16 +75,21 @@ export function AuthSessionUI() {
 
 function AccountControl({
   name,
+  displayName,
   email,
   profileError,
   onLogout,
 }: {
   name: string
+  displayName: string
   email: string
   profileError?: string
   onLogout: () => Promise<void>
 }) {
   const [profile, setProfile] = useState(false)
+  const [usernameDirty, setUsernameDirty] = useState(false)
+  const [usernameSaving, setUsernameSaving] = useState(false)
+  const [confirmProfileDismiss, setConfirmProfileDismiss] = useState(false)
   const menu = useRef<HTMLDetailsElement>(null)
   const dialog = useRef<HTMLDialogElement>(null)
   useEffect(() => {
@@ -100,13 +110,27 @@ function AccountControl({
     if (!profile) return
     const element = dialog.current
     element?.showModal()
-    element?.querySelector<HTMLButtonElement>('button')?.focus()
+    element?.querySelector<HTMLButtonElement>('[data-profile-close]')?.focus()
     return () => element?.close()
   }, [profile])
+  useEffect(() => {
+    if (confirmProfileDismiss && !usernameDirty && !usernameSaving)
+      setConfirmProfileDismiss(false)
+  }, [confirmProfileDismiss, usernameDirty, usernameSaving])
   const close = () => {
+    setConfirmProfileDismiss(false)
+    setUsernameDirty(false)
+    setUsernameSaving(false)
     dialog.current?.close()
     setProfile(false)
     menu.current?.querySelector('summary')?.focus()
+  }
+  const requestClose = () => {
+    if (usernameDirty || usernameSaving) {
+      setConfirmProfileDismiss(true)
+      return
+    }
+    close()
   }
   return (
     <>
@@ -170,9 +194,19 @@ function AccountControl({
           aria-labelledby="account-profile-title"
           className="m-auto w-[calc(100%_-_2rem)] max-w-md rounded-2xl border border-line bg-panel p-6 text-ink shadow-panel backdrop:bg-black/60"
           onKeyDown={trapDialogFocus}
+          onClick={(event) => {
+            if (event.target !== event.currentTarget) return
+            const bounds = event.currentTarget.getBoundingClientRect()
+            const outside =
+              event.clientX < bounds.left ||
+              event.clientX > bounds.right ||
+              event.clientY < bounds.top ||
+              event.clientY > bounds.bottom
+            if (outside) requestClose()
+          }}
           onCancel={(event) => {
             event.preventDefault()
-            close()
+            requestClose()
           }}
         >
           <h2 id="account-profile-title" className="text-2xl font-bold">
@@ -183,18 +217,28 @@ function AccountControl({
               {profileError}
             </p>
           ) : null}
+          <ProfileNameForm
+            displayName={displayName}
+            onDirtyChange={setUsernameDirty}
+            onSavingChange={setUsernameSaving}
+          />
           <dl className="my-6 space-y-4">
-            <div>
-              <dt className="text-sm text-ink-muted">Name</dt>
-              <dd className="break-words font-semibold">{name}</dd>
-            </div>
             <div>
               <dt className="text-sm text-ink-muted">Email</dt>
               <dd className="break-all font-semibold">{email}</dd>
             </div>
           </dl>
-          <Button onClick={close}>Close Profile</Button>
+          <Button data-profile-close onClick={requestClose}>
+            Close Profile
+          </Button>
         </dialog>
+      ) : null}
+      {confirmProfileDismiss ? (
+        <UnsavedChangesDialog
+          saving={usernameSaving}
+          onStay={() => setConfirmProfileDismiss(false)}
+          onDiscard={close}
+        />
       ) : null}
     </>
   )
