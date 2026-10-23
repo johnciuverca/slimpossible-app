@@ -39,6 +39,9 @@ it('shares axis, weekly date ticks, numeric labels and exact tooltips without br
   expect(chart.querySelectorAll('.chart-value')).toHaveLength(2)
   expect(chart.querySelectorAll('[data-chart-tick]')).toHaveLength(11)
   expect(chart.querySelectorAll('[data-chart-date-tick]')).toHaveLength(1)
+  expect(chart.querySelector('[data-chart-date-tick]')).toHaveTextContent(
+    '01.10.2026',
+  )
   expect(chart.querySelector('[data-series="recorded-connection"]')).toBeNull()
   expect(chart.querySelector('circle title')).toHaveTextContent('Member: 90 kg')
 })
@@ -227,7 +230,7 @@ it('applies quick ranges, adjustable date endpoints, clipped trend/reference lin
     '64',
   )
   expect(screen.getByLabelText('Visible date range')).toHaveTextContent(
-    '2026-04-01 – 2026-05-01',
+    '01.04.2026 – 01.05.2026',
   )
   expect(points).toHaveLength(5)
 
@@ -242,12 +245,12 @@ it('applies quick ranges, adjustable date endpoints, clipped trend/reference lin
   const end = screen.getByRole('slider', { name: 'Visible range end' })
   fireEvent.keyDown(start, { key: 'ArrowRight' })
   expect(range).toBeInTheDocument()
-  expect(start).toHaveAttribute('aria-valuetext', '2026-01-02')
+  expect(start).toHaveAttribute('aria-valuetext', '02.01.2026')
   expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(4)
   fireEvent.keyDown(end, { key: 'ArrowLeft' })
-  expect(end).toHaveAttribute('aria-valuetext', '2026-04-30')
+  expect(end).toHaveAttribute('aria-valuetext', '30.04.2026')
   expect(screen.getByLabelText('Visible date range')).toHaveTextContent(
-    '2026-01-02 – 2026-04-30',
+    '02.01.2026 – 30.04.2026',
   )
   expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(3)
 })

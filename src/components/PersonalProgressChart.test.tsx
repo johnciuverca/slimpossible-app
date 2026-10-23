@@ -19,7 +19,7 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
     /The dashed trend is a least-squares fit/,
   )
   expect(
-    screen.getByText(/saved weigh-ins from 2026-10-01 to 2026-10-11/),
+    screen.getByText(/saved weigh-ins from 01\.10\.2026 to 11\.10\.2026/),
   ).toHaveClass('sr-only')
   expect(chart.querySelectorAll('circle[data-date]')).toHaveLength(2)
   expect(chart.querySelector('[data-chart-trend]')).toBeInTheDocument()
@@ -79,7 +79,13 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
     ),
   ).toEqual([64, 696])
   expect(chart.querySelectorAll('circle title')[0]).toHaveTextContent(
-    '2026-10-01: 100 kg recorded',
+    '01.10.2026: 100 kg recorded',
+  )
+  expect(chart.querySelectorAll('[data-chart-date-tick]')[0]).toHaveTextContent(
+    '01.10.2026',
+  )
+  expect(screen.getByText(/saved weigh-ins from/)).toHaveTextContent(
+    '01.10.2026 to 11.10.2026',
   )
   expect(chart.querySelectorAll('[data-chart-date-tick]')).toHaveLength(2)
 })

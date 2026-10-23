@@ -71,6 +71,12 @@ describe('Group chart history', () => {
       chart.querySelector('[data-series="derived-trend"]'),
     ).toHaveAttribute('stroke-dasharray', '3 6')
     expect(chart.querySelectorAll('circle')).toHaveLength(3)
+    expect(
+      chart.querySelectorAll('[data-chart-date-tick]')[0],
+    ).toHaveTextContent('01.09.2026')
+    const firstPoint = chart.querySelector('circle[data-chart-point]')!
+    fireEvent.focus(firstPoint)
+    expect(screen.getByRole('tooltip')).toHaveTextContent('01.09.2026')
     const legend = screen.getByRole('list', { name: 'Group chart legend' })
     expect(legend).toHaveClass('w-full', 'justify-center')
     expect(
@@ -202,10 +208,10 @@ describe('Group chart history', () => {
     expect(chart).toHaveTextContent('Weight (kg)')
     const circles = Array.from(chart.querySelectorAll('circle'))
     const eighty = circles.find(
-      (circle) => circle.textContent === 'Member 0: 2026-09-01, 80 kg',
+      (circle) => circle.textContent === 'Member 0: 01.09.2026, 80 kg',
     )!
     const hundred = circles.find(
-      (circle) => circle.textContent === 'Member 1: 2026-09-01, 100 kg',
+      (circle) => circle.textContent === 'Member 1: 01.09.2026, 100 kg',
     )!
     expect(Number(hundred.getAttribute('cy'))).toBeLessThan(
       Number(eighty.getAttribute('cy')),
@@ -223,7 +229,7 @@ describe('Group chart history', () => {
       name: 'Change from first shared weight (kg)',
     })
     expect(individual.querySelector('circle title')).toHaveTextContent(
-      'Member 0: 2026-09-01, 0 kg',
+      'Member 0: 01.09.2026, 0 kg',
     )
     expect(individual).toHaveTextContent('-1 kg')
   })
