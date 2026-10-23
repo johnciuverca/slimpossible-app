@@ -211,6 +211,9 @@ export function SharedWeightChart({
   const visibleWeightValues = [
     ...visiblePoints.map((point) => point.value),
     ...visibleSeries.flatMap((item) => item.points.map((point) => point.value)),
+    ...visibleLines
+      .filter((line) => line.kind === 'reference')
+      .flatMap((line) => [line.from.value, line.to.value]),
   ]
   const useFiveKgTicks =
     adaptiveWeightTicks &&

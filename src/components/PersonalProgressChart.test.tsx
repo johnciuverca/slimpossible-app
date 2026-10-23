@@ -162,6 +162,32 @@ it('recalculates axis labels when an edited weigh-in widens or narrows the visib
   expect(chart().querySelectorAll('[data-chart-minor-tick]')).toHaveLength(0)
 })
 
+it('uses five-kilogram labels when an owner goal reference widens the visible axis', () => {
+  const weighIns = [
+    { date: '2026-10-15', weightKg: 99.7, participantId: 'owner' },
+  ]
+  const { rerender } = render(
+    <PersonalProgressChart weighIns={weighIns} referenceWeightKg={83} />,
+  )
+  const chart = () =>
+    screen.getByRole('img', { name: /Personal weight history/ })
+  const majorTicks = () =>
+    Array.from(chart().querySelectorAll('[data-chart-tick]'), (tick) =>
+      Number(tick.getAttribute('data-chart-tick')),
+    )
+
+  expect(majorTicks().every((tick) => tick % 5 === 0)).toBe(true)
+  expect(chart().querySelectorAll('[data-chart-minor-tick]')).not.toHaveLength(
+    0,
+  )
+  expect(chart().querySelector('[data-chart-reference]')).toBeInTheDocument()
+
+  rerender(<PersonalProgressChart weighIns={weighIns} />)
+  expect(majorTicks().some((tick) => tick % 5 !== 0)).toBe(true)
+  expect(chart().querySelectorAll('[data-chart-minor-tick]')).toHaveLength(0)
+  expect(chart().querySelector('[data-chart-reference]')).toBeNull()
+})
+
 it('keeps five-kilogram ticks aligned around low and negative generic ranges', () => {
   render(
     <SharedWeightChart
