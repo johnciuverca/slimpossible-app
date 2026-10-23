@@ -1,6 +1,21 @@
 @import 'tailwindcss';
 
 @theme {
+  /* Keep utility hierarchy while tightening the app-wide type scale. The
+     smallest preset stays at 12px; text zoom remains browser-controlled. */
+  --text-xs: 0.75rem;
+  --text-sm: 0.7875rem;
+  --text-base: 0.9rem;
+  --text-lg: 1.0125rem;
+  --text-xl: 1.125rem;
+  --text-2xl: 1.35rem;
+  --text-3xl: 1.6875rem;
+  --text-4xl: 2.025rem;
+  --text-5xl: 2.7rem;
+  --text-6xl: 3.375rem;
+  --text-7xl: 4.05rem;
+  --text-8xl: 5.4rem;
+  --text-9xl: 7.2rem;
   --color-page: #f3f6f1;
   --color-panel: #fffefa;
   --color-ink: #1b2a20;
@@ -422,12 +437,12 @@ body {
   color: #072b22;
 }
 .auth-page h1 {
-  font-size: clamp(1.75rem, 3vw, 2.25rem);
+  font-size: clamp(1.575rem, 2.7vw, 2.025rem);
   margin-top: 1rem;
 }
 .auth-page h1 + p {
   margin-top: 1rem;
-  font-size: 1rem;
+  font-size: 0.9rem;
   line-height: 1.6;
 }
 .auth-page a:focus-visible {
@@ -437,11 +452,11 @@ body {
 }
 .dashboard-shell .dashboard-workspace > header h1 {
   margin-top: 0.5rem;
-  font-size: clamp(2rem, 3.5vw, 3rem);
+  font-size: clamp(1.8rem, 3.15vw, 2.7rem);
 }
 .dashboard-shell .dashboard-workspace > header p:last-child {
   margin-top: 0.5rem;
-  font-size: 1rem;
+  font-size: 0.9rem;
   line-height: 1.6;
 }
 .dashboard-shell .dashboard-workspace > header > div > p:first-child {
@@ -475,7 +490,7 @@ body {
   min-width: 0;
   overflow-wrap: anywhere;
   color: var(--color-forest-800);
-  font-size: 0.875rem;
+  font-size: 0.7875rem;
   font-weight: 700;
 }
 .dashboard-save-confirmation-dismiss {
@@ -529,7 +544,7 @@ body {
   background: color-mix(in srgb, var(--action-color) 9%, #101b28);
   color: #f1f6fa;
   text-align: left;
-  font-size: 0.95rem;
+  font-size: 0.855rem;
   font-weight: 700;
   text-decoration: none;
 }
@@ -568,7 +583,7 @@ body {
   display: block;
   margin-top: 0.25rem;
   color: #bcc9d8;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 400;
 }
 .dashboard-action-chevron {
@@ -607,6 +622,7 @@ body {
 }
 .chart-axis {
   fill: var(--color-ink-muted);
+  font-size: 12px;
 }
 .chart-value {
   fill: var(--color-ink);
@@ -678,7 +694,7 @@ body {
   }
   .public-auth-shell .app-shell-brand {
     padding-inline: 2px;
-    font-size: 15px;
+    font-size: 13.5px;
   }
   .public-auth-shell .app-shell-header nav ul {
     gap: 0;
@@ -774,7 +790,7 @@ body {
   }
   .signed-in-shell .app-shell-brand {
     padding-inline: 4px;
-    font-size: 16px;
+    font-size: 14.4px;
   }
   .signed-in-shell .app-shell-header-actions {
     gap: 8px;

@@ -1486,11 +1486,15 @@ for (const viewport of [
     await navigation.evaluate((element) =>
       element.scrollIntoView({ block: 'start' }),
     )
-    await expect
-      .poll(() =>
-        navigation.evaluate((el) => Math.round(el.getBoundingClientRect().top)),
-      )
-      .toBeLessThanOrEqual(1)
+    const navigationPosition = await navigation.evaluate((element) => ({
+      top: Math.round(element.getBoundingClientRect().top),
+      atDocumentEnd:
+        window.scrollY + window.innerHeight >=
+        document.documentElement.scrollHeight - 1,
+    }))
+    expect(navigationPosition.top).toBeLessThanOrEqual(
+      navigationPosition.atDocumentEnd ? 12 : 1,
+    )
     const navBounds = await navigation.boundingBox()
     expect(navBounds!.height).toBeLessThan(450)
     const focusBounds = await weights.boundingBox()
