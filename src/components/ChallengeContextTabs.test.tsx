@@ -33,6 +33,7 @@ function Route() {
 }
 function auth(id: string): AuthContextValue {
   return {
+    requestEmailChange: async () => false,
     state: {
       status: 'signed-in',
       user: { id, email: `${id}@example.invalid` },
