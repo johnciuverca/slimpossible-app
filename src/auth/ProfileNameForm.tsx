@@ -4,7 +4,15 @@ import { Button, TextInput } from '../components/ui'
 import { PROFILE_NAME_MAX_LENGTH, profileNameError } from './profileName'
 import { useAuth } from './useAuth'
 
-export function ProfileNameForm({ displayName }: { displayName: string }) {
+export function ProfileNameForm({
+  displayName,
+  onDirtyChange,
+  onSavingChange,
+}: {
+  displayName: string
+  onDirtyChange: (dirty: boolean) => void
+  onSavingChange: (saving: boolean) => void
+}) {
   const { saveProfileName } = useAuth()
   const [name, setName] = useState(displayName)
   const [editing, setEditing] = useState(false)
@@ -46,13 +54,17 @@ export function ProfileNameForm({ displayName }: { displayName: string }) {
       if (!mounted.current || !success) return
       setName(name.trim())
       setDirty(false)
+      onDirtyChange(false)
       setSaved(true)
       setEditing(false)
     } catch {
       if (mounted.current)
         setError('We could not save your username. Try again.')
     } finally {
-      if (mounted.current) setSaving(false)
+      if (mounted.current) {
+        setSaving(false)
+        onSavingChange(false)
+      }
     }
   }
 
@@ -82,6 +94,7 @@ export function ProfileNameForm({ displayName }: { displayName: string }) {
                 if (!editing) return
                 setName(event.target.value)
                 setDirty(true)
+                onDirtyChange(true)
                 setValidation(undefined)
                 setError(undefined)
                 setSaved(false)
@@ -136,6 +149,7 @@ export function ProfileNameForm({ displayName }: { displayName: string }) {
             onClick={() => {
               setName(displayName)
               setDirty(false)
+              onDirtyChange(false)
               setValidation(undefined)
               setError(undefined)
               setSaved(false)
