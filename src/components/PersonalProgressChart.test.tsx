@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it } from 'vitest'
 import { PersonalProgressChart } from './PersonalProgressChart'
+import { SharedWeightChart } from './SharedWeightChart'
 afterEach(cleanup)
 it('keeps derived trend and goal lines separate from exact saved points', () => {
   render(
@@ -41,13 +42,7 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
     chart.querySelectorAll('[data-chart-tick]'),
     (tick) => Number(tick.getAttribute('data-chart-tick')),
   )
-  expect(
-    weights.every(
-      (weight, index) =>
-        Number.isInteger(weight * 2) &&
-        (index === 0 || [1, 2].includes(weight - weights[index - 1])),
-    ),
-  ).toBe(true)
+  expect(weights.every((weight) => weight % 5 === 0)).toBe(true)
   const dates = Array.from(
     chart.querySelectorAll('[data-chart-date-tick]'),
     (tick) => tick.getAttribute('data-chart-date-tick'),
@@ -94,6 +89,71 @@ it('shows one saved entry without a derived trend or invented target', () => {
     screen.getByRole('img').querySelector('[data-chart-reference]'),
   ).toBeNull()
   expect(screen.getByRole('img').querySelector('.chart-legend')).toBeNull()
+})
+
+it('uses aligned five-kilogram labels for wide visible spans and finer ticks after narrowing the date range', () => {
+  render(
+    <PersonalProgressChart
+      weighIns={[
+        { date: '2026-01-01', weightKg: 80.3, participantId: 'own' },
+        { date: '2026-02-01', weightKg: 105.2, participantId: 'own' },
+        { date: '2026-02-15', weightKg: 100.1, participantId: 'own' },
+        { date: '2026-03-01', weightKg: 101.2, participantId: 'own' },
+      ]}
+    />,
+  )
+  const chart = () =>
+    screen.getByRole('img', { name: /Personal weight history/ })
+  const majorTicks = () =>
+    Array.from(chart().querySelectorAll('[data-chart-tick]'), (tick) =>
+      Number(tick.getAttribute('data-chart-tick')),
+    )
+  expect(majorTicks().length).toBeGreaterThan(2)
+  expect(majorTicks().every((tick) => tick % 5 === 0)).toBe(true)
+  expect(Math.min(...majorTicks())).toBeLessThanOrEqual(80.3)
+  expect(Math.max(...majorTicks())).toBeGreaterThanOrEqual(105.2)
+  expect(chart().querySelectorAll('[data-chart-minor-tick]')).toHaveLength(
+    majorTicks().length > 2
+      ? ((Math.max(...majorTicks()) - Math.min(...majorTicks())) / 5) * 4
+      : 0,
+  )
+  expect(chart().querySelectorAll('.chart-value')).toHaveLength(4)
+  expect(chart()).toHaveAttribute('viewBox', '0 0 760 266')
+
+  fireEvent.click(screen.getByRole('button', { name: 'Show last 1 month' }))
+  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(3)
+  const narrowTicks = majorTicks()
+  expect(narrowTicks.length).toBeGreaterThan(2)
+  expect(narrowTicks.every((tick) => tick % 5 === 0)).toBe(false)
+  expect(chart().querySelectorAll('[data-chart-minor-tick]')).toHaveLength(0)
+  fireEvent.click(screen.getByRole('button', { name: 'Show all dates' }))
+  expect(majorTicks().every((tick) => tick % 5 === 0)).toBe(true)
+})
+
+it('keeps five-kilogram ticks aligned around low and negative generic ranges', () => {
+  render(
+    <SharedWeightChart
+      title="Low weight range"
+      description="Test range."
+      yLabel="Weight (kg)"
+      min={-14}
+      max={-1}
+      adaptiveWeightTicks
+      points={[
+        { date: '2026-10-01', value: -12.5, title: 'Low' },
+        { date: '2026-10-08', value: -2.2, title: 'High' },
+      ]}
+    />,
+  )
+  const ticks = Array.from(
+    screen
+      .getByRole('img', { name: 'Low weight range' })
+      .querySelectorAll('[data-chart-tick]'),
+    (tick) => Number(tick.getAttribute('data-chart-tick')),
+  )
+  expect(ticks.every((tick) => tick % 5 === 0)).toBe(true)
+  expect(Math.min(...ticks)).toBeLessThanOrEqual(-12.5)
+  expect(Math.max(...ticks)).toBeGreaterThanOrEqual(-2.2)
 })
 
 it('labels every saved weigh-in with only its numeric value', () => {

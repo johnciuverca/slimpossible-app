@@ -19,6 +19,8 @@ const trendColor = '#ffbf69'
 const referenceColor = '#c49cff'
 const day = (date: string) => Date.parse(`${date}T00:00:00Z`) / 86400000
 const signed = (value: number) => `${value > 0 ? '+' : ''}${value} kg`
+const formatWeight = (value: number) =>
+  new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value)
 
 export function GroupChartHistory({
   challengeId,
@@ -334,7 +336,8 @@ export function GroupChartHistory({
                           ? String(point.weightKg)
                           : `${point.changeKg > 0 ? '+' : ''}${point.changeKg}`,
                         title: `${member.label}: ${point.date}, ${absolute ? `${point.weightKg} kg` : signed(point.changeKg)}`,
-                        markerLabel: `${member.label}: ${point.date}, ${absolute ? `${point.weightKg} kg` : signed(point.changeKg)}`,
+                        markerLabel: `Recorded weight for ${member.label}`,
+                        tooltip: `${member.label} — ${point.date}: ${formatWeight(point.weightKg)} kg`,
                       })),
                     }))}
                     lines={[

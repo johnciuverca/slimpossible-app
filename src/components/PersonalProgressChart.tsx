@@ -42,6 +42,8 @@ export function PersonalProgressChart({
     date: point.date,
     value: point.weightKg,
     label: formatWeight(point.weightKg),
+    markerLabel: `Recorded weight on ${point.date}`,
+    tooltip: `${point.date}: ${formatWeight(point.weightKg)} kg`,
     title: `${point.date}: ${formatWeight(point.weightKg)} kg recorded`,
   }))
   const lines = [
@@ -94,6 +96,7 @@ export function PersonalProgressChart({
           points={points}
           lines={lines}
           yLabel="Weight (kg)"
+          adaptiveWeightTicks
           min={minimum}
           max={maximum}
           paddingRatio={0.14}
