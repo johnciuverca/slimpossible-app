@@ -541,8 +541,53 @@ export function AuthProvider({
     [authGateway, state],
   )
 
+  const requestEmailChange = useCallback(
+    async (email: string) => {
+      const normalizedEmail = email.trim()
+      if (!/^\S+@\S+\.\S+$/.test(normalizedEmail))
+        throw new Error('Enter a valid email address.')
+      if (
+        state.status !== 'signed-in' ||
+        !state.user.id ||
+        currentUserKey.current !== userKey(state.user)
+      )
+        throw new Error('Sign in again to change your email.')
+      if (normalizedEmail.toLowerCase() === state.user.email.toLowerCase())
+        throw new Error(
+          'Enter an email address different from your current one.',
+        )
+      const user = state.user
+      const key = userKey(user)
+      const generation = operationGeneration.current
+      const account = accountGeneration.current
+      try {
+        await authGateway.requestEmailChange(user, normalizedEmail)
+        return (
+          generation === operationGeneration.current &&
+          account === accountGeneration.current &&
+          currentUserKey.current === key
+        )
+      } catch (error) {
+        if (
+          generation !== operationGeneration.current ||
+          account !== accountGeneration.current ||
+          currentUserKey.current !== key
+        )
+          return false
+        throw new Error(
+          errorMessage(
+            error,
+            'We could not request the email change. Try again.',
+          ),
+        )
+      }
+    },
+    [authGateway, state],
+  )
+
   const value = useMemo(
     () => ({
+      requestEmailChange,
       requestPasswordRecovery,
       saveProfileName,
       resetPassword,
@@ -553,6 +598,7 @@ export function AuthProvider({
       state,
     }),
     [
+      requestEmailChange,
       requestPasswordRecovery,
       saveProfileName,
       resetPassword,

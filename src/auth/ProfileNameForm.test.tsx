@@ -28,6 +28,7 @@ function deferred<T>() {
 
 function gateway(overrides: Partial<AuthGateway> = {}): AuthGateway {
   return {
+    requestEmailChange: async () => undefined,
     ensureProfile: async (user) => user.displayName,
     getSession: async () => alex,
     onAuthStateChange: () => () => undefined,

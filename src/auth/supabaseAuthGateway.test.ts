@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   ensureProfile: vi.fn(),
   resetPasswordForEmail: vi.fn(),
   signUp: vi.fn(),
+  updateUser: vi.fn(),
 }))
 
 vi.mock('../data/supabase/client', () => ({
@@ -15,6 +16,7 @@ vi.mock('../data/supabase/client', () => ({
         getUser: mocks.getUser,
         resetPasswordForEmail: mocks.resetPasswordForEmail,
         signUp: mocks.signUp,
+        updateUser: mocks.updateUser,
       },
     },
     state: 'configured',
@@ -35,6 +37,7 @@ describe('Supabase auth redirect configuration', () => {
     mocks.signUp.mockReset()
     mocks.ensureProfile.mockReset()
     mocks.getUser.mockReset()
+    mocks.updateUser.mockReset()
     mocks.saveName.mockReset()
   })
 
@@ -67,6 +70,34 @@ describe('Supabase auth redirect configuration', () => {
       'person@example.com',
       { redirectTo: `${window.location.origin}/reset-password` },
     )
+  })
+
+  it('requests an email change only for the currently authenticated account', async () => {
+    mocks.getUser
+      .mockResolvedValueOnce({
+        data: { user: { id: 'user-1' } },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { user: { id: 'other-user' } },
+        error: null,
+      })
+    mocks.updateUser.mockResolvedValue({ error: null })
+    const gateway = createSupabaseAuthGateway()
+
+    await gateway.requestEmailChange(
+      { email: 'old@example.com', id: 'user-1' },
+      'new@example.com',
+    )
+    expect(mocks.updateUser).toHaveBeenCalledWith({ email: 'new@example.com' })
+
+    await expect(
+      gateway.requestEmailChange(
+        { email: 'old@example.com', id: 'user-1' },
+        'other@example.com',
+      ),
+    ).rejects.toThrow('Your account changed.')
+    expect(mocks.updateUser).toHaveBeenCalledTimes(1)
   })
 
   it('keeps the confirmed signup name as a seed for later profile initialization', async () => {

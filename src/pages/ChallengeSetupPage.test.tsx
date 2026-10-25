@@ -451,6 +451,7 @@ describe('ChallengeSetupPage', () => {
 
     let resolveSession!: (user: { email: string; id: string }) => void
     const gateway: AuthGateway = {
+      requestEmailChange: async () => undefined,
       saveProfileName: async (_user, name) => name,
       ensureProfile: async () => undefined,
       getSession: () =>
@@ -996,6 +997,7 @@ describe('ChallengeSetupPage', () => {
     let emitAuthStateChange:
       ((nextUser: typeof user | null) => void) | undefined
     const gateway: AuthGateway = {
+      requestEmailChange: async () => undefined,
       saveProfileName: async (_user, name) => name,
       ensureProfile: async () => undefined,
       getSession: async () => user,
