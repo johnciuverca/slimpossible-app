@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   isProfileAvatarPresetId,
   PROFILE_AVATAR_SETS,
+  profileAvatarSpriteStyle,
   validateProfileAvatarFile,
 } from './profileAvatar'
 
@@ -18,6 +19,28 @@ describe('profile avatar presets', () => {
     expect(isProfileAvatarPresetId('female-01')).toBe(true)
     expect(isProfileAvatarPresetId('female-16')).toBe(false)
     expect(isProfileAvatarPresetId('other-01')).toBe(false)
+  })
+
+  it('maps every built-in choice to its own crop in the approved contact sheets', () => {
+    const maleStyles = PROFILE_AVATAR_SETS.male.map(({ id }) =>
+      profileAvatarSpriteStyle(id),
+    )
+    const femaleStyles = PROFILE_AVATAR_SETS.female.map(({ id }) =>
+      profileAvatarSpriteStyle(id),
+    )
+    expect(
+      new Set(maleStyles.map((style) => style.backgroundPosition)).size,
+    ).toBe(15)
+    expect(
+      new Set(femaleStyles.map((style) => style.backgroundPosition)).size,
+    ).toBe(15)
+    expect(maleStyles[0].backgroundImage).toContain(
+      'male-challenge-avatars.png',
+    )
+    expect(femaleStyles[14].backgroundImage).toContain(
+      'female-challenge-avatars.png',
+    )
+    expect(maleStyles[0].backgroundSize).toBe('529% auto')
   })
 })
 

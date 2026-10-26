@@ -26,6 +26,31 @@ export const PROFILE_AVATAR_SETS: Record<
   })),
 }
 
+const AVATAR_SPRITE_WIDTH = 1619
+const AVATAR_SPRITE_COLUMN_STARTS = [10, 334, 657, 980, 1303]
+const AVATAR_SPRITE_ROW_STARTS = [10, 332, 652]
+
+export function profileAvatarSpriteStyle(avatarId: ProfileAvatarPresetId): {
+  backgroundImage: string
+  backgroundPosition: string
+  backgroundSize: string
+} {
+  const [set, rawNumber] = avatarId.split('-')
+  const index = Number(rawNumber) - 1
+  const column = index % 5
+  const row = Math.floor(index / 5)
+  const xPercent =
+    (AVATAR_SPRITE_COLUMN_STARTS[column] * 529 * 100) /
+    (AVATAR_SPRITE_WIDTH * (529 - 100))
+  const yPercent =
+    (AVATAR_SPRITE_ROW_STARTS[row] * 317.1 * 100) / (971 * (317.1 - 100))
+  return {
+    backgroundImage: `url(/avatars/${set}-challenge-avatars.png)`,
+    backgroundPosition: `${xPercent}% ${yPercent}%`,
+    backgroundSize: '529% auto',
+  }
+}
+
 export function isProfileAvatarPresetId(
   value: string | null,
 ): value is ProfileAvatarPresetId {

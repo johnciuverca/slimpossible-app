@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { Button } from '../components/ui'
+import { ProfileAvatarImage } from './ProfileAvatarImage'
 import {
   PROFILE_AVATAR_SETS,
   type ProfileAvatarPresetId,
@@ -90,7 +91,10 @@ export function ProfileAvatarForm({
               className="h-full w-full rounded-full object-cover"
             />
           ) : selected ? (
-            selected.slice(-2)
+            <ProfileAvatarImage
+              avatarId={selected}
+              className="h-full w-full rounded-full"
+            />
           ) : (
             '🙂'
           )}
@@ -158,13 +162,16 @@ export function ProfileAvatarForm({
             aria-label={`Choose ${set} avatar ${number}`}
             aria-pressed={selected === id}
             disabled={busy}
-            className={`aspect-square rounded-xl border text-sm font-bold focus-visible:outline-2 focus-visible:outline-forest-700 ${selected === id ? 'border-forest-700 bg-forest-50 text-forest-800' : 'border-line bg-panel text-ink'}`}
+            className={`aspect-square overflow-hidden rounded-xl border p-0 focus-visible:outline-2 focus-visible:outline-forest-700 ${selected === id ? 'border-forest-700 ring-2 ring-forest-700' : 'border-line'}`}
             onClick={() =>
               chooseProfileAvatar &&
               void save(() => chooseProfileAvatar(id), 'Avatar updated.')
             }
           >
-            {number}
+            <ProfileAvatarImage
+              avatarId={id}
+              className="h-full w-full rounded-[inherit]"
+            />
           </button>
         ))}
       </div>

@@ -10,6 +10,8 @@ import { ProfileNameForm } from './ProfileNameForm'
 import { ProfileEmailForm } from './ProfileEmailForm'
 import { ProfilePasswordForm } from './ProfilePasswordForm'
 import { ProfileAvatarForm } from './ProfileAvatarForm'
+import { ProfileAvatarImage } from './ProfileAvatarImage'
+import type { ProfileAvatarPresetId } from './profileAvatar'
 
 export function AuthSessionUI() {
   const { retrySession, signOut, state } = useAuth()
@@ -91,7 +93,8 @@ function AccountControl({
 }) {
   const { getProfileAvatar } = useAuth()
   const [avatarUrl, setAvatarUrl] = useState<string>()
-  const [avatarPreset, setAvatarPreset] = useState<string | null>(null)
+  const [avatarPreset, setAvatarPreset] =
+    useState<ProfileAvatarPresetId | null>(null)
   const avatarRetry = useRef(false)
   const [avatarDirty, setAvatarDirty] = useState(false)
   const [avatarSaving, setAvatarSaving] = useState(false)
@@ -233,7 +236,10 @@ function AccountControl({
                 }}
               />
             ) : avatarPreset ? (
-              avatarPreset.slice(-2)
+              <ProfileAvatarImage
+                avatarId={avatarPreset}
+                className="h-full w-full rounded-full"
+              />
             ) : (
               name.charAt(0).toUpperCase()
             )}
