@@ -129,4 +129,29 @@ describe('ProfileAvatarForm', () => {
       screen.getByRole('button', { name: 'Choose female avatar 15' }),
     ).toBeInTheDocument()
   })
+
+  it('returns to Profile with the saved selection after choosing an avatar', async () => {
+    auth.getProfileAvatar
+      .mockResolvedValueOnce({ avatarPath: null, presetId: null })
+      .mockResolvedValue({ avatarPath: null, presetId: 'male-01' })
+    renderInsideProfile()
+    const profileDialog = screen.getByRole('dialog', { name: 'Profile' })
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Change profile picture' }),
+    )
+    const picker = screen.getByRole('dialog', {
+      name: 'Choose a profile picture',
+    })
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Choose male avatar 1' }),
+    )
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Avatar updated.',
+    )
+    await waitFor(() => expect(picker).not.toHaveAttribute('open'))
+    expect(profileDialog).toHaveAttribute('open')
+    expect(screen.getByLabelText('Selected avatar male-01')).toBeInTheDocument()
+  })
 })
