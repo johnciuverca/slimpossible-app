@@ -15,7 +15,7 @@ test('Profile closes on outside click, stays open on inside click, and guards di
   }
 
   let profile = await openProfile()
-  await profile.getByRole('heading', { name: 'Profile' }).click()
+  await profile.getByRole('heading', { name: 'Profile', exact: true }).click()
   await expect(profile).toBeVisible()
   const profileBounds = await profile.boundingBox()
   expect(profileBounds).not.toBeNull()
