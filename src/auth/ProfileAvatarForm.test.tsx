@@ -113,6 +113,46 @@ describe('ProfileAvatarForm', () => {
     expect(screen.getByLabelText('Default profile picture')).toBeInTheDocument()
   })
 
+  it('explains when the avatar migration has not been applied', async () => {
+    auth.getProfileAvatar.mockRejectedValue(
+      new Error(
+        'Profile pictures are not enabled in this environment yet. The reviewed avatar database migration must be applied first.',
+      ),
+    )
+    renderInsideProfile()
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The reviewed avatar database migration must be applied first.',
+    )
+  })
+
+  it('displays a saved built-in avatar in the profile view', async () => {
+    auth.getProfileAvatar.mockResolvedValue({
+      avatarPath: null,
+      presetId: 'male-01',
+    })
+    renderInsideProfile()
+    const avatar = await screen.findByLabelText('Selected avatar male-01')
+    expect(avatar.querySelector('span')).toHaveStyle({
+      backgroundImage: 'url(/avatars/male-challenge-avatars.png)',
+    })
+  })
+
+  it('displays a signed uploaded avatar in the profile view', async () => {
+    auth.getProfileAvatar.mockResolvedValue({
+      avatarPath: 'user-1/photo.png',
+      presetId: null,
+      signedUrl: 'https://example.invalid/signed-photo',
+    })
+    renderInsideProfile()
+    const avatar = await screen.findByLabelText(
+      'Current uploaded profile picture',
+    )
+    expect(avatar.querySelector('img')).toHaveAttribute(
+      'src',
+      'https://example.invalid/signed-photo',
+    )
+  })
+
   it('keeps the Profile view compact and opens both avatar sets in the nested picker', () => {
     renderInsideProfile()
     expect(screen.getByLabelText('Default profile picture')).toBeInTheDocument()

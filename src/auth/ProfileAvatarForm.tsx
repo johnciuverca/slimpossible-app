@@ -38,8 +38,12 @@ export function ProfileAvatarForm({
       setSelected(avatar?.presetId ?? null)
       setPhotoUrl(avatar?.signedUrl)
       setError(undefined)
-    } catch {
-      setError('We could not load your profile picture. Try again.')
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : 'We could not load your profile picture. Try again.',
+      )
     }
   }, [getProfileAvatar])
   useEffect(() => {

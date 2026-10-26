@@ -320,4 +320,32 @@ describe('Supabase auth redirect configuration', () => {
       presetId: 'male-01',
     })
   })
+
+  it('identifies an unapplied avatar schema migration when loading a profile picture', async () => {
+    mocks.getUser.mockResolvedValue({
+      data: { user: { id: 'user-1' } },
+      error: null,
+    })
+    mocks.createRepositories.mockReturnValue({
+      profiles: {
+        getAvatarSelection: vi.fn().mockResolvedValue({
+          error: {
+            code: '42703',
+            kind: 'request',
+            message: 'Unable to load your profile picture.',
+          },
+          state: 'error',
+        }),
+      },
+    })
+
+    await expect(
+      createSupabaseAuthGateway().getProfileAvatar!({
+        email: 'person@example.com',
+        id: 'user-1',
+      }),
+    ).rejects.toThrow(
+      'Profile pictures are not enabled in this environment yet. The reviewed avatar database migration must be applied first.',
+    )
+  })
 })

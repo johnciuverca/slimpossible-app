@@ -23,6 +23,15 @@ function mapUser(user: {
   }
 }
 
+function profileAvatarLoadError(code?: string) {
+  if (code === '42703' || code === 'PGRST204') {
+    return new Error(
+      'Profile pictures are not enabled in this environment yet. The reviewed avatar database migration must be applied first.',
+    )
+  }
+  return new Error('We could not load your profile picture. Try again.')
+}
+
 export function mapSupabaseAuthError(
   error: unknown,
   operation:
@@ -107,7 +116,7 @@ export function createSupabaseAuthGateway(): AuthGateway {
     const current = await profiles.getAvatarSelection(userId)
     if (current.state === 'success') return current.data
     if (current.state === 'error')
-      throw new Error('We could not load your current avatar. Try again.')
+      throw profileAvatarLoadError(current.error.code)
 
     // Some older accounts have no profile row until they first save a name.
     // Create an owner row with a neutral label before storing avatar metadata.
@@ -144,7 +153,7 @@ export function createSupabaseAuthGateway(): AuthGateway {
         client,
       ).profiles.getAvatarSelection(user.id)
       if (result.state === 'error')
-        throw new Error('We could not load your profile picture. Try again.')
+        throw profileAvatarLoadError(result.error.code)
       if (result.state === 'empty')
         return { avatarPath: null, presetId: null, signedUrl: undefined }
       let signedUrl: string | undefined
