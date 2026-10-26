@@ -100,6 +100,28 @@ export function createSupabaseAuthGateway(): AuthGateway {
     return clientResult.client
   }
 
+  async function getOrInitializeAvatarSelection(
+    profiles: ReturnType<typeof createRepositories>['profiles'],
+    userId: string,
+  ) {
+    const current = await profiles.getAvatarSelection(userId)
+    if (current.state === 'success') return current.data
+    if (current.state === 'error')
+      throw new Error('We could not load your current avatar. Try again.')
+
+    // Some older accounts have no profile row until they first save a name.
+    // Create an owner row with a neutral label before storing avatar metadata.
+    const initialized = await profiles.ensure({
+      id: userId,
+      displayName: 'Member',
+    })
+    if (initialized.state !== 'success')
+      throw new Error(
+        'We could not initialize your profile picture. Try again.',
+      )
+    return { avatarPath: null, presetId: null }
+  }
+
   return {
     async getProfileAvatarUrl(user) {
       const client = getConfiguredClient()
@@ -121,13 +143,18 @@ export function createSupabaseAuthGateway(): AuthGateway {
       const result = await createRepositories(
         client,
       ).profiles.getAvatarSelection(user.id)
-      if (result.state !== 'success') return
+      if (result.state === 'error')
+        throw new Error('We could not load your profile picture. Try again.')
+      if (result.state === 'empty')
+        return { avatarPath: null, presetId: null, signedUrl: undefined }
       let signedUrl: string | undefined
       if (result.data.avatarPath) {
         const { data, error } = await client.storage
           .from('profile-avatars')
           .createSignedUrl(result.data.avatarPath, 300)
-        if (!error) signedUrl = data.signedUrl
+        if (error)
+          throw new Error('We could not load your profile picture. Try again.')
+        signedUrl = data.signedUrl
       }
       return {
         avatarPath: result.data.avatarPath,
@@ -145,13 +172,11 @@ export function createSupabaseAuthGateway(): AuthGateway {
       if (authError || !user.id || authData.user?.id !== user.id)
         throw new Error('Your account changed. Open Profile and try again.')
       const profiles = createRepositories(client).profiles
-      const current = await profiles.getAvatarSelection(user.id)
-      if (current.state !== 'success')
-        throw new Error('We could not load your current avatar.')
+      const current = await getOrInitializeAvatarSelection(profiles, user.id)
       const saved = await profiles.setAvatarSelection({
         id: user.id,
-        expectedAvatarPath: current.data.avatarPath,
-        expectedPresetId: current.data.presetId,
+        expectedAvatarPath: current.avatarPath,
+        expectedPresetId: current.presetId,
         avatarPath: null,
         presetId,
       })
@@ -159,10 +184,10 @@ export function createSupabaseAuthGateway(): AuthGateway {
         throw new Error(
           'Your avatar changed elsewhere. Refresh Profile and try again.',
         )
-      if (current.data.avatarPath?.startsWith(`${user.id}/`))
+      if (current.avatarPath?.startsWith(`${user.id}/`))
         await client.storage
           .from('profile-avatars')
-          .remove([current.data.avatarPath])
+          .remove([current.avatarPath])
     },
     async saveProfileAvatar(user, file) {
       if (!user.id)
@@ -176,9 +201,7 @@ export function createSupabaseAuthGateway(): AuthGateway {
       if (!(await accountIsCurrent()))
         throw new Error('Your account changed. Open Profile and try again.')
       const profiles = createRepositories(client).profiles
-      const current = await profiles.getAvatarSelection(user.id)
-      if (current.state !== 'success')
-        throw new Error('We could not load your current avatar.')
+      const current = await getOrInitializeAvatarSelection(profiles, user.id)
       const path = `${user.id}/${crypto.randomUUID()}.${type.extension}`
       const { error: uploadError } = await client.storage
         .from('profile-avatars')
@@ -191,8 +214,8 @@ export function createSupabaseAuthGateway(): AuthGateway {
       }
       const saved = await profiles.setAvatarSelection({
         id: user.id,
-        expectedAvatarPath: current.data.avatarPath,
-        expectedPresetId: current.data.presetId,
+        expectedAvatarPath: current.avatarPath,
+        expectedPresetId: current.presetId,
         avatarPath: path,
         presetId: null,
       })
@@ -202,10 +225,10 @@ export function createSupabaseAuthGateway(): AuthGateway {
           await client.storage.from('profile-avatars').remove([path])
         throw new Error('We could not save your picture. Try again.')
       }
-      if (current.data.avatarPath?.startsWith(`${user.id}/`))
+      if (current.avatarPath?.startsWith(`${user.id}/`))
         await client.storage
           .from('profile-avatars')
-          .remove([current.data.avatarPath])
+          .remove([current.avatarPath])
     },
     async clearProfileAvatar(user) {
       if (!user.id)
@@ -215,13 +238,11 @@ export function createSupabaseAuthGateway(): AuthGateway {
       if (authError || authData.user?.id !== user.id)
         throw new Error('Your account changed. Open Profile and try again.')
       const profiles = createRepositories(client).profiles
-      const current = await profiles.getAvatarSelection(user.id)
-      if (current.state !== 'success')
-        throw new Error('We could not load your current avatar.')
+      const current = await getOrInitializeAvatarSelection(profiles, user.id)
       const saved = await profiles.setAvatarSelection({
         id: user.id,
-        expectedAvatarPath: current.data.avatarPath,
-        expectedPresetId: current.data.presetId,
+        expectedAvatarPath: current.avatarPath,
+        expectedPresetId: current.presetId,
         avatarPath: null,
         presetId: null,
       })
@@ -229,10 +250,10 @@ export function createSupabaseAuthGateway(): AuthGateway {
         throw new Error(
           'Your avatar changed elsewhere. Refresh Profile and try again.',
         )
-      if (current.data.avatarPath?.startsWith(`${user.id}/`))
+      if (current.avatarPath?.startsWith(`${user.id}/`))
         await client.storage
           .from('profile-avatars')
-          .remove([current.data.avatarPath])
+          .remove([current.avatarPath])
     },
     async changePassword(user, currentPassword, password, nonce) {
       const client = getConfiguredClient()

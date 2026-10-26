@@ -110,11 +110,16 @@ function AccountControl({
   const dialog = useRef<HTMLDialogElement>(null)
   useEffect(() => {
     const refresh = () => {
-      void getProfileAvatar?.().then((avatar) => {
-        setAvatarUrl(avatar?.signedUrl)
-        setAvatarPreset(avatar?.presetId ?? null)
-        avatarRetry.current = false
-      })
+      void getProfileAvatar?.()
+        .then((avatar) => {
+          setAvatarUrl(avatar?.signedUrl)
+          setAvatarPreset(avatar?.presetId ?? null)
+          avatarRetry.current = false
+        })
+        .catch(() => {
+          setAvatarUrl(undefined)
+          setAvatarPreset(null)
+        })
     }
     refresh()
     const timer = window.setInterval(refresh, 4 * 60 * 1000)
@@ -228,10 +233,15 @@ function AccountControl({
                   avatarRetry.current = true
                   setAvatarUrl(undefined)
                   window.setTimeout(() => {
-                    void getProfileAvatar?.().then((avatar) => {
-                      setAvatarUrl(avatar?.signedUrl)
-                      setAvatarPreset(avatar?.presetId ?? null)
-                    })
+                    void getProfileAvatar?.()
+                      .then((avatar) => {
+                        setAvatarUrl(avatar?.signedUrl)
+                        setAvatarPreset(avatar?.presetId ?? null)
+                      })
+                      .catch(() => {
+                        setAvatarUrl(undefined)
+                        setAvatarPreset(null)
+                      })
                   }, 0)
                 }}
               />
@@ -296,6 +306,7 @@ function AccountControl({
             if (outside) requestClose()
           }}
           onCancel={(event) => {
+            if (event.target !== event.currentTarget) return
             event.preventDefault()
             requestClose()
           }}

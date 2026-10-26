@@ -671,11 +671,7 @@ export function AuthProvider({
       !authGateway.getProfileAvatar
     )
       return undefined
-    try {
-      return await authGateway.getProfileAvatar(state.user)
-    } catch {
-      return undefined
-    }
+    return await authGateway.getProfileAvatar(state.user)
   }, [authGateway, state])
 
   const chooseProfileAvatar = useCallback(
