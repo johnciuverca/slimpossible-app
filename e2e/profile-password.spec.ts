@@ -10,8 +10,15 @@ test('Profile changes password with accessible reveal controls and keeps secrets
 
   const currentPassword = page.getByLabel('Current password', { exact: true })
   await currentPassword.fill('Fixture-current-8')
-  await page.getByRole('button', { name: 'Show current password' }).click()
+  const revealButton = page.getByRole('button', {
+    name: 'Show current password',
+  })
+  await revealButton.focus()
+  await revealButton.press('Enter')
   await expect(currentPassword).toHaveAttribute('type', 'text')
+  await expect(
+    page.getByRole('button', { name: 'Hide current password' }),
+  ).toHaveAttribute('aria-pressed', 'true')
   await page
     .getByLabel('New password', { exact: true })
     .fill('Fixture-new-password-8')

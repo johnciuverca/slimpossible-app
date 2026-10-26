@@ -119,9 +119,10 @@ export function ProfilePasswordForm({
     setValue: (value: string) => void,
     autoComplete: 'current-password' | 'new-password',
   ) => (
-    <div className="space-y-2">
+    <div className="relative">
       <TextInput
         autoComplete={autoComplete}
+        className="pr-12"
         disabled={saving}
         id={id}
         label={label}
@@ -135,17 +136,50 @@ export function ProfilePasswordForm({
           setError(undefined)
         }}
       />
-      <Button
+      <button
+        className="absolute right-2 top-9 flex h-8 w-8 items-center justify-center rounded-md text-ink-muted hover:bg-page focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700 disabled:cursor-not-allowed disabled:opacity-60"
         aria-label={`${visible[id] ? 'Hide' : 'Show'} ${label.toLowerCase()}`}
+        aria-pressed={visible[id] ?? false}
         disabled={saving}
         type="button"
-        variant="ghost"
         onClick={() =>
           setVisible((current) => ({ ...current, [id]: !current[id] }))
         }
       >
-        {visible[id] ? 'Hide' : 'Show'} {label.toLowerCase()}
-      </Button>
+        {visible[id] ? (
+          <svg
+            aria-hidden="true"
+            focusable="false"
+            viewBox="0 0 24 24"
+            width="20"
+            height="20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="m3 3 18 18M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+            <path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c5.1 0 8.7 4.4 9.8 6.4a1.2 1.2 0 0 1 0 1.2 14.4 14.4 0 0 1-3.2 3.8M6.2 6.2A14.4 14.4 0 0 0 2.2 11.4a1.2 1.2 0 0 0 0 1.2C3.3 14.6 6.9 19 12 19c1.1 0 2.1-.2 3-.6" />
+          </svg>
+        ) : (
+          <svg
+            aria-hidden="true"
+            focusable="false"
+            viewBox="0 0 24 24"
+            width="20"
+            height="20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M2.2 11.4C3.3 9.4 6.9 5 12 5s8.7 4.4 9.8 6.4a1.2 1.2 0 0 1 0 1.2C20.7 14.6 17.1 19 12 19s-8.7-4.4-9.8-6.4a1.2 1.2 0 0 1 0-1.2Z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        )}
+      </button>
     </div>
   )
 

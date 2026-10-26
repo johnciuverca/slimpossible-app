@@ -71,11 +71,18 @@ describe('ProfilePasswordForm', () => {
     fireEvent.change(screen.getByLabelText('Confirm new password'), {
       target: { value: 'different-secret' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Show new password' }))
+    const revealButton = screen.getByRole('button', {
+      name: 'Show new password',
+    })
+    expect(revealButton).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(revealButton)
     expect(screen.getByLabelText('New password')).toHaveAttribute(
       'type',
       'text',
     )
+    expect(
+      screen.getByRole('button', { name: 'Hide new password' }),
+    ).toHaveAttribute('aria-pressed', 'true')
     fireEvent.click(screen.getByRole('button', { name: 'Update password' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Your passwords do not match.',
