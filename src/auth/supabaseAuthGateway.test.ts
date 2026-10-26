@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
+  createRepositories: vi.fn(),
   getUser: vi.fn(),
   reauthenticate: vi.fn(),
   saveName: vi.fn(),
@@ -26,15 +27,16 @@ vi.mock('../data/supabase/client', () => ({
 }))
 
 vi.mock('../data/supabase/repositories', () => ({
-  createRepositories: vi.fn(() => ({
-    profiles: { ensure: mocks.ensureProfile, saveName: mocks.saveName },
-  })),
+  createRepositories: mocks.createRepositories,
 }))
 
 import { createSupabaseAuthGateway } from './supabaseAuth'
 
 describe('Supabase auth redirect configuration', () => {
   beforeEach(() => {
+    mocks.createRepositories.mockReset().mockReturnValue({
+      profiles: { ensure: mocks.ensureProfile, saveName: mocks.saveName },
+    })
     mocks.resetPasswordForEmail.mockReset()
     mocks.signUp.mockReset()
     mocks.ensureProfile.mockReset()
@@ -279,5 +281,71 @@ describe('Supabase auth redirect configuration', () => {
       ),
     ).rejects.toThrow('Your account changed')
     expect(mocks.saveName).not.toHaveBeenCalled()
+  })
+
+  it('initializes a missing profile row before saving a built-in avatar', async () => {
+    const profiles = {
+      ensure: vi.fn().mockResolvedValue({
+        data: { displayName: 'Member', id: 'user-1' },
+        state: 'success',
+      }),
+      getAvatarSelection: vi
+        .fn()
+        .mockResolvedValue({ data: null, state: 'empty' }),
+      setAvatarSelection: vi.fn().mockResolvedValue({
+        data: { avatarPath: null, presetId: 'male-01' },
+        state: 'success',
+      }),
+    }
+    mocks.getUser.mockResolvedValue({
+      data: { user: { id: 'user-1' } },
+      error: null,
+    })
+    mocks.createRepositories.mockReturnValue({ profiles })
+
+    await createSupabaseAuthGateway().chooseProfileAvatar!(
+      { email: 'person@example.com', id: 'user-1' },
+      'male-01',
+    )
+
+    expect(profiles.ensure).toHaveBeenCalledWith({
+      displayName: 'Member',
+      id: 'user-1',
+    })
+    expect(profiles.setAvatarSelection).toHaveBeenCalledWith({
+      expectedAvatarPath: null,
+      expectedPresetId: null,
+      id: 'user-1',
+      avatarPath: null,
+      presetId: 'male-01',
+    })
+  })
+
+  it('identifies an unapplied avatar schema migration when loading a profile picture', async () => {
+    mocks.getUser.mockResolvedValue({
+      data: { user: { id: 'user-1' } },
+      error: null,
+    })
+    mocks.createRepositories.mockReturnValue({
+      profiles: {
+        getAvatarSelection: vi.fn().mockResolvedValue({
+          error: {
+            code: '42703',
+            kind: 'request',
+            message: 'Unable to load your profile picture.',
+          },
+          state: 'error',
+        }),
+      },
+    })
+
+    await expect(
+      createSupabaseAuthGateway().getProfileAvatar!({
+        email: 'person@example.com',
+        id: 'user-1',
+      }),
+    ).rejects.toThrow(
+      'Profile pictures are not enabled in this environment yet. The reviewed avatar database migration must be applied first.',
+    )
   })
 })
