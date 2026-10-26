@@ -9,6 +9,7 @@ import { trapDialogFocus } from '../components/dialogFocus'
 import { ProfileNameForm } from './ProfileNameForm'
 import { ProfileEmailForm } from './ProfileEmailForm'
 import { ProfilePasswordForm } from './ProfilePasswordForm'
+import { ProfileAvatarForm } from './ProfileAvatarForm'
 
 export function AuthSessionUI() {
   const { retrySession, signOut, state } = useAuth()
@@ -88,6 +89,12 @@ function AccountControl({
   profileError?: string
   onLogout: () => Promise<void>
 }) {
+  const { getProfileAvatar } = useAuth()
+  const [avatarUrl, setAvatarUrl] = useState<string>()
+  const [avatarPreset, setAvatarPreset] = useState<string | null>(null)
+  const avatarRetry = useRef(false)
+  const [avatarDirty, setAvatarDirty] = useState(false)
+  const [avatarSaving, setAvatarSaving] = useState(false)
   const [profile, setProfile] = useState(false)
   const [usernameDirty, setUsernameDirty] = useState(false)
   const [usernameSaving, setUsernameSaving] = useState(false)
@@ -98,6 +105,22 @@ function AccountControl({
   const [confirmProfileDismiss, setConfirmProfileDismiss] = useState(false)
   const menu = useRef<HTMLDetailsElement>(null)
   const dialog = useRef<HTMLDialogElement>(null)
+  useEffect(() => {
+    const refresh = () => {
+      void getProfileAvatar?.().then((avatar) => {
+        setAvatarUrl(avatar?.signedUrl)
+        setAvatarPreset(avatar?.presetId ?? null)
+        avatarRetry.current = false
+      })
+    }
+    refresh()
+    const timer = window.setInterval(refresh, 4 * 60 * 1000)
+    window.addEventListener('profile-avatar-updated', refresh)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('profile-avatar-updated', refresh)
+    }
+  }, [getProfileAvatar])
   useEffect(() => {
     const closeOnOutsidePointer = (event: PointerEvent) => {
       if (
@@ -127,7 +150,9 @@ function AccountControl({
       !emailDirty &&
       !emailSaving &&
       !passwordDirty &&
-      !passwordSaving
+      !passwordSaving &&
+      !avatarDirty &&
+      !avatarSaving
     )
       setConfirmProfileDismiss(false)
   }, [
@@ -136,6 +161,8 @@ function AccountControl({
     emailSaving,
     passwordDirty,
     passwordSaving,
+    avatarDirty,
+    avatarSaving,
     usernameDirty,
     usernameSaving,
   ])
@@ -147,6 +174,8 @@ function AccountControl({
     setEmailSaving(false)
     setPasswordDirty(false)
     setPasswordSaving(false)
+    setAvatarDirty(false)
+    setAvatarSaving(false)
     dialog.current?.close()
     setProfile(false)
     menu.current?.querySelector('summary')?.focus()
@@ -158,7 +187,9 @@ function AccountControl({
       emailDirty ||
       emailSaving ||
       passwordDirty ||
-      passwordSaving
+      passwordSaving ||
+      avatarDirty ||
+      avatarSaving
     ) {
       setConfirmProfileDismiss(true)
       return
@@ -184,7 +215,28 @@ function AccountControl({
           className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-line px-3 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-forest-700"
         >
           <span className="account-avatar" aria-hidden="true">
-            {name.charAt(0).toUpperCase()}
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt=""
+                className="h-full w-full rounded-full object-cover"
+                onError={() => {
+                  if (avatarRetry.current) return
+                  avatarRetry.current = true
+                  setAvatarUrl(undefined)
+                  window.setTimeout(() => {
+                    void getProfileAvatar?.().then((avatar) => {
+                      setAvatarUrl(avatar?.signedUrl)
+                      setAvatarPreset(avatar?.presetId ?? null)
+                    })
+                  }, 0)
+                }}
+              />
+            ) : avatarPreset ? (
+              avatarPreset.slice(-2)
+            ) : (
+              name.charAt(0).toUpperCase()
+            )}
           </span>
           <span className="account-name min-w-0 truncate">{name}</span>
           <span className="account-chevron" aria-hidden="true">
@@ -264,6 +316,10 @@ function AccountControl({
             onDirtyChange={setPasswordDirty}
             onSavingChange={setPasswordSaving}
           />
+          <ProfileAvatarForm
+            onDirtyChange={setAvatarDirty}
+            onSavingChange={setAvatarSaving}
+          />
           <Button data-profile-close onClick={requestClose}>
             Close Profile
           </Button>
@@ -271,7 +327,9 @@ function AccountControl({
       ) : null}
       {confirmProfileDismiss ? (
         <UnsavedChangesDialog
-          saving={usernameSaving || emailSaving || passwordSaving}
+          saving={
+            usernameSaving || emailSaving || passwordSaving || avatarSaving
+          }
           onStay={() => setConfirmProfileDismiss(false)}
           onDiscard={close}
         />

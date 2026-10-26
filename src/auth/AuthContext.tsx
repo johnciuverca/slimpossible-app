@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { getRecoveryRedirectUrl, isRecoveryCallback } from './authRedirects'
 import { AuthContext, type AuthProviderProps, type AuthState } from './context'
+import type { ProfileAvatarPresetId } from './profileAvatar'
 import { createSupabaseAuthGateway } from './supabaseAuth'
 import { profileNameError } from './profileName'
 
@@ -624,9 +625,95 @@ export function AuthProvider({
     [authGateway, state],
   )
 
+  const runAvatarOperation = useCallback(
+    async (
+      operation: (
+        user: Extract<AuthState, { status: 'signed-in' }>['user'],
+      ) => Promise<void>,
+    ) => {
+      if (
+        state.status !== 'signed-in' ||
+        !state.user.id ||
+        currentUserKey.current !== userKey(state.user)
+      )
+        throw new Error('Sign in again to change your profile picture.')
+      const key = userKey(state.user)
+      const generation = operationGeneration.current
+      const account = accountGeneration.current
+      await operation(state.user)
+      return (
+        generation === operationGeneration.current &&
+        account === accountGeneration.current &&
+        currentUserKey.current === key
+      )
+    },
+    [state],
+  )
+
+  const getProfileAvatarUrl = useCallback(async () => {
+    if (
+      state.status !== 'signed-in' ||
+      !state.user.id ||
+      !authGateway.getProfileAvatarUrl
+    )
+      return undefined
+    try {
+      return await authGateway.getProfileAvatarUrl(state.user)
+    } catch {
+      return undefined
+    }
+  }, [authGateway, state])
+
+  const getProfileAvatar = useCallback(async () => {
+    if (
+      state.status !== 'signed-in' ||
+      !state.user.id ||
+      !authGateway.getProfileAvatar
+    )
+      return undefined
+    try {
+      return await authGateway.getProfileAvatar(state.user)
+    } catch {
+      return undefined
+    }
+  }, [authGateway, state])
+
+  const chooseProfileAvatar = useCallback(
+    async (presetId: ProfileAvatarPresetId) => {
+      if (!authGateway.chooseProfileAvatar)
+        throw new Error('Avatar selection is not available right now.')
+      return runAvatarOperation((user) =>
+        authGateway.chooseProfileAvatar!(user, presetId),
+      )
+    },
+    [authGateway, runAvatarOperation],
+  )
+
+  const saveProfileAvatar = useCallback(
+    async (file: File) => {
+      if (!authGateway.saveProfileAvatar)
+        throw new Error('Profile picture uploads are not available right now.')
+      return runAvatarOperation((user) =>
+        authGateway.saveProfileAvatar!(user, file),
+      )
+    },
+    [authGateway, runAvatarOperation],
+  )
+
+  const clearProfileAvatar = useCallback(async () => {
+    if (!authGateway.clearProfileAvatar)
+      throw new Error('Avatar removal is not available right now.')
+    return runAvatarOperation((user) => authGateway.clearProfileAvatar!(user))
+  }, [authGateway, runAvatarOperation])
+
   const value = useMemo(
     () => ({
       changePassword,
+      getProfileAvatarUrl,
+      getProfileAvatar,
+      chooseProfileAvatar,
+      saveProfileAvatar,
+      clearProfileAvatar,
       requestEmailChange,
       requestPasswordRecovery,
       saveProfileName,
@@ -639,6 +726,11 @@ export function AuthProvider({
     }),
     [
       changePassword,
+      getProfileAvatarUrl,
+      getProfileAvatar,
+      chooseProfileAvatar,
+      saveProfileAvatar,
+      clearProfileAvatar,
       requestEmailChange,
       requestPasswordRecovery,
       saveProfileName,

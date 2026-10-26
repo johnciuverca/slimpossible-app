@@ -124,6 +124,20 @@ export type Profile = {
 }
 
 export type ProfileRepository = {
+  getAvatarSelection: (
+    id: string,
+  ) => Promise<
+    RepositoryResult<{ avatarPath: string | null; presetId: string | null }>
+  >
+  setAvatarSelection: (input: {
+    expectedAvatarPath: string | null
+    expectedPresetId: string | null
+    id: string
+    avatarPath: string | null
+    presetId: string | null
+  }) => Promise<
+    RepositoryResult<{ avatarPath: string | null; presetId: string | null }>
+  >
   saveName: (input: {
     id: string
     displayName: string
@@ -1001,6 +1015,59 @@ export function createRepositories(client: DatabaseClient): Repositories {
       },
     },
     profiles: {
+      async getAvatarSelection(id) {
+        const { data, error } = await client
+          .from('profiles')
+          .select('avatar_path, avatar_preset_id')
+          .eq('id', id)
+          .maybeSingle()
+        if (error)
+          return {
+            state: 'error',
+            error: requestError('load your profile picture', error),
+          }
+        if (!data) return { data: null, state: 'empty' }
+        return {
+          data: {
+            avatarPath: data.avatar_path,
+            presetId: data.avatar_preset_id,
+          },
+          state: 'success',
+        }
+      },
+      async setAvatarSelection(input) {
+        let update = client
+          .from('profiles')
+          .update({
+            avatar_path: input.avatarPath,
+            avatar_preset_id: input.presetId,
+          })
+          .eq('id', input.id)
+        update =
+          input.expectedAvatarPath === null
+            ? update.is('avatar_path', null)
+            : update.eq('avatar_path', input.expectedAvatarPath)
+        update =
+          input.expectedPresetId === null
+            ? update.is('avatar_preset_id', null)
+            : update.eq('avatar_preset_id', input.expectedPresetId)
+        const { data, error } = await update
+          .select('avatar_path, avatar_preset_id')
+          .maybeSingle()
+        if (error)
+          return {
+            state: 'error',
+            error: requestError('save your profile picture', error),
+          }
+        if (!data) return { data: null, state: 'empty' }
+        return {
+          data: {
+            avatarPath: data.avatar_path,
+            presetId: data.avatar_preset_id,
+          },
+          state: 'success',
+        }
+      },
       async saveName(input) {
         const { data, error } = await client
           .from('profiles')

@@ -3,6 +3,10 @@ import { createRepositories } from '../data/supabase/repositories'
 import { getVerificationRedirectUrl } from './authRedirects'
 import { normalizeProfileName, safeProfileDisplayName } from './profileName'
 import type { AuthGateway, AuthUser } from './context'
+import {
+  isProfileAvatarPresetId,
+  validateProfileAvatarFile,
+} from './profileAvatar'
 
 function mapUser(user: {
   id: string
@@ -97,6 +101,139 @@ export function createSupabaseAuthGateway(): AuthGateway {
   }
 
   return {
+    async getProfileAvatarUrl(user) {
+      const client = getConfiguredClient()
+      const { data: authData, error: authError } = await client.auth.getUser()
+      if (authError || !user.id || authData.user?.id !== user.id) return
+      const result = await createRepositories(
+        client,
+      ).profiles.getAvatarSelection(user.id)
+      if (result.state !== 'success' || !result.data.avatarPath) return
+      const { data, error } = await client.storage
+        .from('profile-avatars')
+        .createSignedUrl(result.data.avatarPath, 300)
+      return error ? undefined : data.signedUrl
+    },
+    async getProfileAvatar(user) {
+      const client = getConfiguredClient()
+      const { data: authData, error: authError } = await client.auth.getUser()
+      if (authError || !user.id || authData.user?.id !== user.id) return
+      const result = await createRepositories(
+        client,
+      ).profiles.getAvatarSelection(user.id)
+      if (result.state !== 'success') return
+      let signedUrl: string | undefined
+      if (result.data.avatarPath) {
+        const { data, error } = await client.storage
+          .from('profile-avatars')
+          .createSignedUrl(result.data.avatarPath, 300)
+        if (!error) signedUrl = data.signedUrl
+      }
+      return {
+        avatarPath: result.data.avatarPath,
+        presetId: isProfileAvatarPresetId(result.data.presetId)
+          ? result.data.presetId
+          : null,
+        signedUrl,
+      }
+    },
+    async chooseProfileAvatar(user, presetId) {
+      if (!isProfileAvatarPresetId(presetId))
+        throw new Error('Choose an available avatar.')
+      const client = getConfiguredClient()
+      const { data: authData, error: authError } = await client.auth.getUser()
+      if (authError || !user.id || authData.user?.id !== user.id)
+        throw new Error('Your account changed. Open Profile and try again.')
+      const profiles = createRepositories(client).profiles
+      const current = await profiles.getAvatarSelection(user.id)
+      if (current.state !== 'success')
+        throw new Error('We could not load your current avatar.')
+      const saved = await profiles.setAvatarSelection({
+        id: user.id,
+        expectedAvatarPath: current.data.avatarPath,
+        expectedPresetId: current.data.presetId,
+        avatarPath: null,
+        presetId,
+      })
+      if (saved.state !== 'success')
+        throw new Error(
+          'Your avatar changed elsewhere. Refresh Profile and try again.',
+        )
+      if (current.data.avatarPath?.startsWith(`${user.id}/`))
+        await client.storage
+          .from('profile-avatars')
+          .remove([current.data.avatarPath])
+    },
+    async saveProfileAvatar(user, file) {
+      if (!user.id)
+        throw new Error('Sign in again to change your profile picture.')
+      const type = await validateProfileAvatarFile(file)
+      const client = getConfiguredClient()
+      const accountIsCurrent = async () => {
+        const { data, error } = await client.auth.getUser()
+        return !error && data.user?.id === user.id
+      }
+      if (!(await accountIsCurrent()))
+        throw new Error('Your account changed. Open Profile and try again.')
+      const profiles = createRepositories(client).profiles
+      const current = await profiles.getAvatarSelection(user.id)
+      if (current.state !== 'success')
+        throw new Error('We could not load your current avatar.')
+      const path = `${user.id}/${crypto.randomUUID()}.${type.extension}`
+      const { error: uploadError } = await client.storage
+        .from('profile-avatars')
+        .upload(path, file, { contentType: type.contentType, upsert: false })
+      if (uploadError)
+        throw new Error('We could not upload that picture. Try again.')
+      if (!(await accountIsCurrent())) {
+        await client.storage.from('profile-avatars').remove([path])
+        throw new Error('Your account changed. Open Profile and try again.')
+      }
+      const saved = await profiles.setAvatarSelection({
+        id: user.id,
+        expectedAvatarPath: current.data.avatarPath,
+        expectedPresetId: current.data.presetId,
+        avatarPath: path,
+        presetId: null,
+      })
+      if (saved.state !== 'success') {
+        const latest = await profiles.getAvatarSelection(user.id)
+        if (latest.state === 'success' && latest.data.avatarPath !== path)
+          await client.storage.from('profile-avatars').remove([path])
+        throw new Error('We could not save your picture. Try again.')
+      }
+      if (current.data.avatarPath?.startsWith(`${user.id}/`))
+        await client.storage
+          .from('profile-avatars')
+          .remove([current.data.avatarPath])
+    },
+    async clearProfileAvatar(user) {
+      if (!user.id)
+        throw new Error('Sign in again to change your profile picture.')
+      const client = getConfiguredClient()
+      const { data: authData, error: authError } = await client.auth.getUser()
+      if (authError || authData.user?.id !== user.id)
+        throw new Error('Your account changed. Open Profile and try again.')
+      const profiles = createRepositories(client).profiles
+      const current = await profiles.getAvatarSelection(user.id)
+      if (current.state !== 'success')
+        throw new Error('We could not load your current avatar.')
+      const saved = await profiles.setAvatarSelection({
+        id: user.id,
+        expectedAvatarPath: current.data.avatarPath,
+        expectedPresetId: current.data.presetId,
+        avatarPath: null,
+        presetId: null,
+      })
+      if (saved.state !== 'success')
+        throw new Error(
+          'Your avatar changed elsewhere. Refresh Profile and try again.',
+        )
+      if (current.data.avatarPath?.startsWith(`${user.id}/`))
+        await client.storage
+          .from('profile-avatars')
+          .remove([current.data.avatarPath])
+    },
     async changePassword(user, currentPassword, password, nonce) {
       const client = getConfiguredClient()
       const accountIsCurrent = async () => {

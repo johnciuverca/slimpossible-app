@@ -627,6 +627,18 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
   }
 
   const profiles: ProfileRepository = {
+    async getAvatarSelection() {
+      return { data: null, state: 'empty' }
+    },
+    async setAvatarSelection() {
+      return {
+        state: 'error',
+        error: {
+          kind: 'request',
+          message: 'Profile pictures require a signed-in server session.',
+        },
+      }
+    },
     async saveName() {
       return {
         state: 'error',
