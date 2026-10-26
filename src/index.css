@@ -606,6 +606,16 @@ body {
   background: var(--color-forest-50);
   color: var(--color-forest-800);
 }
+.profile-avatar-image {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-forest-50);
+  color: var(--color-forest-800);
+}
 .account-control {
   max-width: 100%;
 }

@@ -314,6 +314,10 @@ function AccountControl({
           <h2 id="account-profile-title" className="text-2xl font-bold">
             Profile
           </h2>
+          <ProfileAvatarForm
+            onDirtyChange={setAvatarDirty}
+            onSavingChange={setAvatarSaving}
+          />
           {profileError ? (
             <p className="mt-4 text-sm text-danger-800" role="status">
               {profileError}
@@ -332,10 +336,6 @@ function AccountControl({
           <ProfilePasswordForm
             onDirtyChange={setPasswordDirty}
             onSavingChange={setPasswordSaving}
-          />
-          <ProfileAvatarForm
-            onDirtyChange={setAvatarDirty}
-            onSavingChange={setAvatarSaving}
           />
           <Button data-profile-close onClick={requestClose}>
             Close Profile

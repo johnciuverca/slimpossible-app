@@ -98,13 +98,13 @@ export function ProfileAvatarForm({
   }
 
   return (
-    <section aria-labelledby="profile-avatar-title" className="my-6 space-y-3">
+    <section aria-labelledby="profile-avatar-title" className="mt-4 space-y-3">
       <h3 id="profile-avatar-title" className="font-semibold">
         Profile picture
       </h3>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-4">
         <div
-          className="account-avatar h-14 w-14 overflow-hidden text-2xl"
+          className="profile-avatar-image shrink-0 overflow-hidden text-4xl"
           aria-label={
             photoUrl
               ? 'Current uploaded profile picture'
@@ -128,31 +128,48 @@ export function ProfileAvatarForm({
             <span aria-hidden="true">🙂</span>
           )}
         </div>
-        <button
-          type="button"
-          ref={changeButton}
-          aria-label="Change profile picture"
-          disabled={busy}
-          className="inline-flex items-center justify-center rounded-full bg-forest-100 px-4 py-2 text-sm font-semibold text-forest-800 transition hover:bg-forest-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700 disabled:cursor-not-allowed disabled:opacity-60"
-          onClick={() => {
-            setError(undefined)
-            setNotice(undefined)
-            setPickerOpen(true)
-          }}
-        >
-          Change picture
-        </button>
-        {(photoUrl || selected) && clearProfileAvatar ? (
-          <Button
+        <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+          <button
+            type="button"
+            ref={changeButton}
+            aria-label="Change profile picture"
             disabled={busy}
-            onClick={() =>
-              void save(clearProfileAvatar, 'Profile picture removed.')
-            }
-            variant="ghost"
+            className="inline-flex min-h-11 items-center justify-center rounded-full bg-forest-100 px-4 py-2 text-sm font-semibold text-forest-800 transition hover:bg-forest-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700 disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={() => {
+              setError(undefined)
+              setNotice(undefined)
+              setPickerOpen(true)
+            }}
           >
-            Remove
-          </Button>
-        ) : null}
+            Change picture
+          </button>
+          {(photoUrl || selected) && clearProfileAvatar ? (
+            <Button
+              aria-label="Remove profile picture"
+              className="min-h-11 min-w-11"
+              disabled={busy}
+              onClick={() =>
+                void save(clearProfileAvatar, 'Profile picture removed.')
+              }
+              title="Remove profile picture"
+              variant="ghost"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                width="20"
+                height="20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M4 7h16M10 11v6m4-6v6M5 7l1 13h12l1-13M9 7V4h6v3" />
+              </svg>
+            </Button>
+          ) : null}
+        </div>
       </div>
       {error ? (
         <p role="alert" className="text-sm text-danger-800">
