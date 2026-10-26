@@ -18,7 +18,7 @@ export function ProfileEmailForm({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string>()
   const [pendingEmail, setPendingEmail] = useState<string>()
-  const form = useRef<HTMLFormElement>(null)
+  const container = useRef<HTMLElement>(null)
   const mounted = useRef(true)
 
   useEffect(() => {
@@ -28,7 +28,12 @@ export function ProfileEmailForm({
     }
   }, [])
   useEffect(() => {
-    if (editing) form.current?.querySelector<HTMLInputElement>('input')?.focus()
+    if (editing)
+      container.current?.querySelector<HTMLInputElement>('input')?.focus()
+    else
+      container.current
+        ?.querySelector<HTMLButtonElement>('[aria-label="Edit email address"]')
+        ?.focus()
   }, [editing])
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -59,14 +64,13 @@ export function ProfileEmailForm({
   }
 
   return (
-    <section className="my-6 space-y-3" aria-label="Change account email">
-      <dl>
-        <dt className="text-sm text-ink-muted">Current email</dt>
-        <dd className="break-all font-semibold">{email}</dd>
-      </dl>
+    <section
+      ref={container}
+      className="my-6 space-y-3"
+      aria-label="Change account email"
+    >
       {editing ? (
         <form
-          ref={form}
           aria-label="Change email address"
           aria-busy={saving}
           noValidate
@@ -118,19 +122,40 @@ export function ProfileEmailForm({
           {saving ? <p role="status">Requesting email confirmation…</p> : null}
         </form>
       ) : (
-        <Button
-          className="min-h-11"
-          type="button"
-          variant="secondary"
-          aria-label="Change email address"
-          onClick={() => {
-            setDraft('')
-            setError(undefined)
-            setEditing(true)
-          }}
-        >
-          Change email
-        </Button>
+        <div className="flex items-end gap-2">
+          <div className="min-w-0 flex-1">
+            <dl>
+              <dt className="text-sm text-ink-muted">Current email</dt>
+              <dd className="break-all font-semibold">{email}</dd>
+            </dl>
+          </div>
+          <Button
+            className="min-h-11 min-w-11"
+            type="button"
+            aria-label="Edit email address"
+            title="Edit email address"
+            variant="ghost"
+            onClick={() => {
+              setDraft('')
+              setError(undefined)
+              setEditing(true)
+            }}
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              width="20"
+              height="20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="m16 4 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15l-1 6Z" />
+            </svg>
+          </Button>
+        </div>
       )}
       {pendingEmail ? (
         <p role="status" className="text-sm text-forest-800">

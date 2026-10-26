@@ -1,5 +1,34 @@
 import { expect, test } from '@playwright/test'
 
+test('Profile email stays plain text beside the matching pencil until edited', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/e2e/fixtures/profile-harness.html')
+  await page.getByText('Fixture Alex', { exact: true }).click()
+  await page.getByRole('button', { name: 'Profile', exact: true }).click()
+
+  const email = page.getByText('fixture@example.invalid', { exact: true })
+  const usernameEdit = page.getByRole('button', {
+    name: 'Edit username',
+    exact: true,
+  })
+  const emailEdit = page.getByRole('button', {
+    name: 'Edit email address',
+    exact: true,
+  })
+  const emailInput = page.getByLabel('New email address', { exact: true })
+
+  await expect(email).toBeVisible()
+  await expect(emailInput).toHaveCount(0)
+  await expect(emailEdit).toHaveClass(await usernameEdit.getAttribute('class'))
+  await emailEdit.click()
+  await expect(emailInput).toBeFocused()
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(email).toBeVisible()
+  await expect(emailInput).toHaveCount(0)
+})
+
 test('edits the Profile username and restores it on reload using a synthetic gateway', async ({
   page,
 }) => {
