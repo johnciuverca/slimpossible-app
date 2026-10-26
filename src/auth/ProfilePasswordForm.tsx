@@ -1,0 +1,251 @@
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+
+import { Button, TextInput } from '../components/ui'
+import { useAuth } from './useAuth'
+
+export function ProfilePasswordForm({
+  onDirtyChange,
+  onSavingChange,
+}: {
+  onDirtyChange: (dirty: boolean) => void
+  onSavingChange: (saving: boolean) => void
+}) {
+  const { changePassword } = useAuth()
+  const [editing, setEditing] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmation, setConfirmation] = useState('')
+  const [nonce, setNonce] = useState('')
+  const [needsNonce, setNeedsNonce] = useState(false)
+  const [visible, setVisible] = useState<Record<string, boolean>>({})
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string>()
+  const [saved, setSaved] = useState(false)
+  const container = useRef<HTMLElement>(null)
+  const mounted = useRef(true)
+
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
+  useEffect(() => {
+    if (editing)
+      container.current?.querySelector<HTMLInputElement>('input')?.focus()
+    else
+      container.current
+        ?.querySelector<HTMLButtonElement>('[aria-label="Change password"]')
+        ?.focus()
+  }, [editing])
+
+  const clearDraft = () => {
+    setCurrentPassword('')
+    setPassword('')
+    setConfirmation('')
+    setNonce('')
+    setNeedsNonce(false)
+    setVisible({})
+    setError(undefined)
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!editing || saving) return
+    setError(undefined)
+    if (!currentPassword) {
+      setError('Enter your current password.')
+      return
+    }
+    if (!password) {
+      setError('Enter a new password.')
+      return
+    }
+    if (password.length < 8) {
+      setError('Use at least 8 characters.')
+      return
+    }
+    if (confirmation !== password) {
+      setError('Your passwords do not match.')
+      return
+    }
+    if (needsNonce && !nonce.trim()) {
+      setError('Enter the verification code we sent you.')
+      return
+    }
+    if (!changePassword) {
+      setError('Password changes are not available right now.')
+      return
+    }
+
+    setSaving(true)
+    onSavingChange(true)
+    try {
+      const result = await changePassword(
+        currentPassword,
+        password,
+        needsNonce ? nonce.trim() : undefined,
+      )
+      if (!mounted.current || result === false) return
+      if (result === 'reauthentication-required') {
+        setNeedsNonce(true)
+        setNonce('')
+        setError(undefined)
+        return
+      }
+      clearDraft()
+      onDirtyChange(false)
+      setSaved(true)
+      setEditing(false)
+    } catch (changeError) {
+      if (mounted.current)
+        setError(
+          changeError instanceof Error
+            ? changeError.message
+            : 'We could not change your password. Try again.',
+        )
+    } finally {
+      if (mounted.current) {
+        setSaving(false)
+        onSavingChange(false)
+      }
+    }
+  }
+
+  const passwordInput = (
+    id: string,
+    label: string,
+    value: string,
+    setValue: (value: string) => void,
+    autoComplete: 'current-password' | 'new-password',
+  ) => (
+    <div className="space-y-2">
+      <TextInput
+        autoComplete={autoComplete}
+        disabled={saving}
+        id={id}
+        label={label}
+        required
+        type={visible[id] ? 'text' : 'password'}
+        value={value}
+        onChange={(event) => {
+          setValue(event.target.value)
+          onDirtyChange(true)
+          setSaved(false)
+          setError(undefined)
+        }}
+      />
+      <Button
+        aria-label={`${visible[id] ? 'Hide' : 'Show'} ${label.toLowerCase()}`}
+        disabled={saving}
+        type="button"
+        variant="ghost"
+        onClick={() =>
+          setVisible((current) => ({ ...current, [id]: !current[id] }))
+        }
+      >
+        {visible[id] ? 'Hide' : 'Show'} {label.toLowerCase()}
+      </Button>
+    </div>
+  )
+
+  return (
+    <section
+      ref={container}
+      className="my-6 space-y-3"
+      aria-label="Change account password"
+    >
+      {editing ? (
+        <form
+          aria-label="Change password"
+          aria-busy={saving}
+          noValidate
+          onSubmit={submit}
+          className="space-y-4"
+        >
+          {passwordInput(
+            'profile-current-password',
+            'Current password',
+            currentPassword,
+            setCurrentPassword,
+            'current-password',
+          )}
+          {passwordInput(
+            'profile-new-password',
+            'New password',
+            password,
+            setPassword,
+            'new-password',
+          )}
+          {passwordInput(
+            'profile-confirm-password',
+            'Confirm new password',
+            confirmation,
+            setConfirmation,
+            'new-password',
+          )}
+          {needsNonce ? (
+            <>
+              <p className="text-sm text-ink-muted" role="status">
+                Supabase requires a recent verification. Enter the code sent to
+                your confirmed email address or phone.
+              </p>
+              <TextInput
+                autoComplete="one-time-code"
+                disabled={saving}
+                id="profile-password-verification-code"
+                inputMode="numeric"
+                label="Verification code"
+                required
+                value={nonce}
+                onChange={(event) => {
+                  setNonce(event.target.value)
+                  setError(undefined)
+                }}
+              />
+            </>
+          ) : null}
+          <div className="flex gap-3">
+            <Button type="submit" disabled={saving}>
+              {saving ? 'Updating…' : 'Update password'}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={saving}
+              onClick={() => {
+                clearDraft()
+                onDirtyChange(false)
+                setEditing(false)
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+          {error ? (
+            <p role="alert" className="text-sm text-danger-800">
+              {error}
+            </p>
+          ) : null}
+          {saving ? <p role="status">Updating your account password…</p> : null}
+        </form>
+      ) : (
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-ink-muted">Password</p>
+          <Button
+            aria-label="Change password"
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              setEditing(true)
+              setSaved(false)
+            }}
+          >
+            Change password
+          </Button>
+        </div>
+      )}
+      {saved ? <p role="status">Password updated.</p> : null}
+    </section>
+  )
+}

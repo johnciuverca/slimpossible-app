@@ -23,6 +23,7 @@ import { PersonalEntryActions } from '../components/WeightEntryActions'
 
 function authValue(id = 'user-alex'): AuthContextValue {
   return {
+    changePassword: async () => 'updated',
     requestEmailChange: async () => false,
     state: {
       status: 'signed-in',

@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { AuthGateway } from './context'
@@ -387,5 +388,61 @@ describe('AuthContext', () => {
 
     expect(screen.getByText('signed-out')).toBeInTheDocument()
     expect(screen.queryByText('person@example.com')).not.toBeInTheDocument()
+  })
+
+  it('ignores a password change that finishes after the signed-in account changes', async () => {
+    let resolveChange!: (result: 'updated') => void
+    const changeRequest = new Promise<'updated'>((resolve) => {
+      resolveChange = resolve
+    })
+    function PasswordChangeHarness() {
+      const { changePassword, signOut, state } = useAuth()
+      const [result, setResult] = useState<string>('pending')
+      return (
+        <>
+          <output>{state.status}</output>
+          <output aria-label="Password change result">{result}</output>
+          <button
+            onClick={() => {
+              if (!changePassword) return
+              void changePassword('current-secret', 'new-secret-password').then(
+                (value) => setResult(String(value)),
+              )
+            }}
+          >
+            Change password
+          </button>
+          <button onClick={() => void signOut()}>Switch account</button>
+        </>
+      )
+    }
+
+    render(
+      <AuthProvider
+        authGateway={createGateway({
+          changePassword: async () => changeRequest,
+        })}
+        initialState={{
+          error: null,
+          status: 'signed-in',
+          user: { email: 'person@example.com', id: 'user-1' },
+        }}
+      >
+        <PasswordChangeHarness />
+      </AuthProvider>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Change password' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Switch account' }))
+    expect(screen.getByText('signed-out')).toBeInTheDocument()
+    resolveChange('updated')
+
+    await act(async () => {
+      await changeRequest
+    })
+    expect(screen.getByLabelText('Password change result')).toHaveTextContent(
+      'false',
+    )
+    expect(screen.queryByText('updated')).not.toBeInTheDocument()
   })
 })

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   getUser: vi.fn(),
+  reauthenticate: vi.fn(),
   saveName: vi.fn(),
   ensureProfile: vi.fn(),
   resetPasswordForEmail: vi.fn(),
@@ -14,6 +15,7 @@ vi.mock('../data/supabase/client', () => ({
     client: {
       auth: {
         getUser: mocks.getUser,
+        reauthenticate: mocks.reauthenticate,
         resetPasswordForEmail: mocks.resetPasswordForEmail,
         signUp: mocks.signUp,
         updateUser: mocks.updateUser,
@@ -37,6 +39,7 @@ describe('Supabase auth redirect configuration', () => {
     mocks.signUp.mockReset()
     mocks.ensureProfile.mockReset()
     mocks.getUser.mockReset()
+    mocks.reauthenticate.mockReset()
     mocks.updateUser.mockReset()
     mocks.saveName.mockReset()
   })
@@ -98,6 +101,78 @@ describe('Supabase auth redirect configuration', () => {
       ),
     ).rejects.toThrow('Your account changed.')
     expect(mocks.updateUser).toHaveBeenCalledTimes(1)
+  })
+
+  it('changes the password only for the current account and supplies the current password', async () => {
+    mocks.getUser.mockResolvedValue({
+      data: { user: { id: 'user-1' } },
+      error: null,
+    })
+    mocks.updateUser.mockResolvedValue({ error: null })
+    const gateway = createSupabaseAuthGateway()
+
+    await expect(
+      gateway.changePassword!(
+        { email: 'person@example.com', id: 'user-1' },
+        'current-secret',
+        'new-secret-password',
+      ),
+    ).resolves.toBe('updated')
+    expect(mocks.updateUser).toHaveBeenCalledWith({
+      current_password: 'current-secret',
+      nonce: undefined,
+      password: 'new-secret-password',
+    })
+
+    mocks.getUser.mockResolvedValueOnce({
+      data: { user: { id: 'user-2' } },
+      error: null,
+    })
+    await expect(
+      gateway.changePassword!(
+        { email: 'person@example.com', id: 'user-1' },
+        'current-secret',
+        'other-new-password',
+      ),
+    ).rejects.toThrow('Your account changed.')
+    expect(mocks.updateUser).toHaveBeenCalledTimes(1)
+  })
+
+  it('requests Supabase reauthentication when configured and submits its nonce', async () => {
+    mocks.getUser.mockResolvedValue({
+      data: { user: { id: 'user-1' } },
+      error: null,
+    })
+    mocks.updateUser
+      .mockResolvedValueOnce({
+        error: {
+          code: 'reauthentication_needed',
+          message: 'Reauthentication required',
+        },
+      })
+      .mockResolvedValueOnce({ error: null })
+    mocks.reauthenticate.mockResolvedValue({ error: null })
+    const gateway = createSupabaseAuthGateway()
+    const user = { email: 'person@example.com', id: 'user-1' }
+
+    await expect(
+      gateway.changePassword!(user, 'current-secret', 'new-secret-password'),
+    ).resolves.toBe('reauthentication-required')
+    expect(mocks.reauthenticate).toHaveBeenCalledOnce()
+
+    await expect(
+      gateway.changePassword!(
+        user,
+        'current-secret',
+        'new-secret-password',
+        '654321',
+      ),
+    ).resolves.toBe('updated')
+    expect(mocks.updateUser).toHaveBeenLastCalledWith({
+      current_password: 'current-secret',
+      nonce: '654321',
+      password: 'new-secret-password',
+    })
   })
 
   it('keeps the confirmed signup name as a seed for later profile initialization', async () => {

@@ -22,6 +22,11 @@ export type AuthState =
   | { error: string; status: 'error'; user: null }
 
 export type AuthContextValue = {
+  changePassword: (
+    currentPassword: string,
+    password: string,
+    nonce?: string,
+  ) => Promise<'updated' | 'reauthentication-required' | false>
   requestEmailChange: (email: string) => Promise<boolean>
   saveProfileName: (name: string) => Promise<boolean>
   requestPasswordRecovery: (email: string) => Promise<void>
@@ -40,6 +45,12 @@ export type AuthProviderProps = {
 }
 
 export type AuthGateway = {
+  changePassword?: (
+    user: AuthUser,
+    currentPassword: string,
+    password: string,
+    nonce?: string,
+  ) => Promise<'updated' | 'reauthentication-required'>
   requestEmailChange: (user: AuthUser, email: string) => Promise<void>
   saveProfileName: (user: AuthUser, name: string) => Promise<string>
   ensureProfile: (user: AuthUser) => Promise<string | undefined>

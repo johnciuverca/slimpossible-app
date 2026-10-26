@@ -20,12 +20,38 @@ function mapUser(user: {
 }
 
 export function mapSupabaseAuthError(
-  error: { message?: string; status?: number } | null,
-  operation: 'password-recovery' | 'password-update' | 'sign-in' | 'sign-up',
+  error: unknown,
+  operation:
+    | 'password-change'
+    | 'password-recovery'
+    | 'password-update'
+    | 'sign-in'
+    | 'sign-up',
 ) {
-  const message = error?.message?.toLowerCase() ?? ''
+  const authError =
+    error && typeof error === 'object'
+      ? (error as { code?: string; message?: string; status?: number })
+      : null
+  const message = authError?.message?.toLowerCase() ?? ''
 
-  if (error?.status === 429 || message.includes('rate')) {
+  if (operation === 'password-change') {
+    if (authError?.code === 'reauthentication_not_valid')
+      return 'That verification code did not work. Check it and try again.'
+    if (authError?.status === 429 || message.includes('rate'))
+      return 'Too many attempts. Wait a moment and try again.'
+    if (message.includes('current password'))
+      return 'Your current password could not be verified. Check it and try again.'
+    if (
+      authError?.code === 'weak_password' ||
+      message.includes('weak password')
+    )
+      return 'Choose a stronger password that meets your account requirements.'
+    if (authError?.status === undefined && message.includes('fetch'))
+      return 'We could not reach authentication. Check your connection and try again.'
+    return 'We could not change your password. Check your details and try again.'
+  }
+
+  if (authError?.status === 429 || message.includes('rate')) {
     return 'Too many attempts. Wait a moment and try again.'
   }
   if (operation === 'sign-in' && message.includes('invalid login')) {
@@ -46,7 +72,7 @@ export function mapSupabaseAuthError(
   ) {
     return 'An account with this email already exists. Try signing in instead.'
   }
-  if (error?.status === undefined && message.includes('fetch')) {
+  if (authError?.status === undefined && message.includes('fetch')) {
     return 'We could not reach authentication. Check your connection and try again.'
   }
   if (operation === 'sign-in') {
@@ -71,6 +97,54 @@ export function createSupabaseAuthGateway(): AuthGateway {
   }
 
   return {
+    async changePassword(user, currentPassword, password, nonce) {
+      const client = getConfiguredClient()
+      const accountIsCurrent = async () => {
+        try {
+          const { data, error } = await client.auth.getUser()
+          return !error && Boolean(user.id) && data.user?.id === user.id
+        } catch {
+          return false
+        }
+      }
+      if (!(await accountIsCurrent()))
+        throw new Error('Your account changed. Open Profile and try again.')
+
+      let error: { code?: string; message?: string; status?: number } | null
+      try {
+        ;({ error } = await client.auth.updateUser({
+          current_password: currentPassword,
+          nonce,
+          password,
+        }))
+      } catch (updateError) {
+        throw new Error(mapSupabaseAuthError(updateError, 'password-change'))
+      }
+      if (error?.code === 'reauthentication_needed' && !nonce) {
+        if (!(await accountIsCurrent()))
+          throw new Error('Your account changed. Open Profile and try again.')
+        let reauthenticationError: {
+          code?: string
+          message?: string
+          status?: number
+        } | null
+        try {
+          ;({ error: reauthenticationError } =
+            await client.auth.reauthenticate())
+        } catch (reauthenticationFailure) {
+          throw new Error(
+            mapSupabaseAuthError(reauthenticationFailure, 'password-change'),
+          )
+        }
+        if (reauthenticationError)
+          throw new Error(
+            mapSupabaseAuthError(reauthenticationError, 'password-change'),
+          )
+        return 'reauthentication-required'
+      }
+      if (error) throw new Error(mapSupabaseAuthError(error, 'password-change'))
+      return 'updated'
+    },
     async requestEmailChange(user, email) {
       const client = getConfiguredClient()
       const { data, error: sessionError } = await client.auth.getUser()
