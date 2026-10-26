@@ -35,11 +35,35 @@ async function openEmailEditor() {
   await screen.findByText('Alex')
   fireEvent.click(screen.getByText('Alex'))
   fireEvent.click(screen.getByRole('button', { name: 'Profile' }))
-  fireEvent.click(screen.getByRole('button', { name: 'Change email address' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Edit email address' }))
 }
 
 describe('Profile email change', () => {
   afterEach(cleanup)
+
+  it('shows the plain current email beside a username-matching pencil until activated', async () => {
+    renderProfile(vi.fn(async () => undefined))
+    await screen.findByText('Alex')
+    fireEvent.click(screen.getByText('Alex'))
+    fireEvent.click(screen.getByRole('button', { name: 'Profile' }))
+
+    const currentEmail = screen.getByText('alex@example.com')
+    const editButton = screen.getByRole('button', {
+      name: 'Edit email address',
+    })
+    expect(currentEmail).toBeInTheDocument()
+    expect(editButton).toHaveClass('min-h-11', 'min-w-11')
+    expect(editButton.className).toBe(
+      screen.getByRole('button', { name: 'Edit username' }).className,
+    )
+    expect(screen.queryByLabelText('New email address')).not.toBeInTheDocument()
+
+    fireEvent.click(editButton)
+    expect(screen.getByLabelText('New email address')).toHaveFocus()
+    expect(
+      screen.queryByRole('button', { name: 'Edit email address' }),
+    ).not.toBeInTheDocument()
+  })
 
   it('keeps the current address until confirmation and shows the requested address as pending', async () => {
     const request = vi.fn(async () => undefined)
