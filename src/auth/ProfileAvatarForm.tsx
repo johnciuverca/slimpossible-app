@@ -104,7 +104,7 @@ export function ProfileAvatarForm({
       </h3>
       <div className="flex items-center justify-between gap-4">
         <div
-          className="account-avatar h-24 w-24 shrink-0 overflow-hidden text-4xl"
+          className="profile-avatar-image shrink-0 overflow-hidden text-4xl"
           aria-label={
             photoUrl
               ? 'Current uploaded profile picture'
