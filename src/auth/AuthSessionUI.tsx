@@ -8,6 +8,7 @@ import { useAuth } from './useAuth'
 import { trapDialogFocus } from '../components/dialogFocus'
 import { ProfileNameForm } from './ProfileNameForm'
 import { ProfileEmailForm } from './ProfileEmailForm'
+import { ProfilePasswordForm } from './ProfilePasswordForm'
 
 export function AuthSessionUI() {
   const { retrySession, signOut, state } = useAuth()
@@ -92,6 +93,8 @@ function AccountControl({
   const [usernameSaving, setUsernameSaving] = useState(false)
   const [emailDirty, setEmailDirty] = useState(false)
   const [emailSaving, setEmailSaving] = useState(false)
+  const [passwordDirty, setPasswordDirty] = useState(false)
+  const [passwordSaving, setPasswordSaving] = useState(false)
   const [confirmProfileDismiss, setConfirmProfileDismiss] = useState(false)
   const menu = useRef<HTMLDetailsElement>(null)
   const dialog = useRef<HTMLDialogElement>(null)
@@ -122,13 +125,17 @@ function AccountControl({
       !usernameDirty &&
       !usernameSaving &&
       !emailDirty &&
-      !emailSaving
+      !emailSaving &&
+      !passwordDirty &&
+      !passwordSaving
     )
       setConfirmProfileDismiss(false)
   }, [
     confirmProfileDismiss,
     emailDirty,
     emailSaving,
+    passwordDirty,
+    passwordSaving,
     usernameDirty,
     usernameSaving,
   ])
@@ -138,12 +145,21 @@ function AccountControl({
     setUsernameSaving(false)
     setEmailDirty(false)
     setEmailSaving(false)
+    setPasswordDirty(false)
+    setPasswordSaving(false)
     dialog.current?.close()
     setProfile(false)
     menu.current?.querySelector('summary')?.focus()
   }
   const requestClose = () => {
-    if (usernameDirty || usernameSaving || emailDirty || emailSaving) {
+    if (
+      usernameDirty ||
+      usernameSaving ||
+      emailDirty ||
+      emailSaving ||
+      passwordDirty ||
+      passwordSaving
+    ) {
       setConfirmProfileDismiss(true)
       return
     }
@@ -244,6 +260,10 @@ function AccountControl({
             onDirtyChange={setEmailDirty}
             onSavingChange={setEmailSaving}
           />
+          <ProfilePasswordForm
+            onDirtyChange={setPasswordDirty}
+            onSavingChange={setPasswordSaving}
+          />
           <Button data-profile-close onClick={requestClose}>
             Close Profile
           </Button>
@@ -251,7 +271,7 @@ function AccountControl({
       ) : null}
       {confirmProfileDismiss ? (
         <UnsavedChangesDialog
-          saving={usernameSaving || emailSaving}
+          saving={usernameSaving || emailSaving || passwordSaving}
           onStay={() => setConfirmProfileDismiss(false)}
           onDiscard={close}
         />

@@ -219,6 +219,7 @@ function renderDashboard(
 
 function authContextValue(userId: string): AuthContextValue {
   return {
+    changePassword: async () => 'updated',
     requestEmailChange: async () => false,
     saveProfileName: async () => false,
     requestPasswordRecovery: vi.fn(),
@@ -390,6 +391,7 @@ describe('HomePage', () => {
 
   it('shows a session-loading state while authentication is being restored', () => {
     const contextValue: AuthContextValue = {
+      changePassword: async () => 'updated',
       requestEmailChange: async () => false,
       saveProfileName: async () => false,
       requestPasswordRecovery: vi.fn(),

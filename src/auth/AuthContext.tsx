@@ -585,8 +585,48 @@ export function AuthProvider({
     [authGateway, state],
   )
 
+  const changePassword = useCallback(
+    async (currentPassword: string, password: string, nonce?: string) => {
+      if (
+        state.status !== 'signed-in' ||
+        !state.user.id ||
+        currentUserKey.current !== userKey(state.user)
+      )
+        throw new Error('Sign in again to change your password.')
+      if (!currentPassword) throw new Error('Enter your current password.')
+      if (!password || password.length < 8)
+        throw new Error('Use a password with at least 8 characters.')
+      if (nonce !== undefined && !nonce.trim())
+        throw new Error('Enter the verification code we sent you.')
+
+      const user = state.user
+      const key = userKey(user)
+      const generation = operationGeneration.current
+      const account = accountGeneration.current
+      const request = authGateway.changePassword
+      if (!request)
+        throw new Error('Password changes are not available right now.')
+      const isCurrent = () =>
+        generation === operationGeneration.current &&
+        account === accountGeneration.current &&
+        currentUserKey.current === key
+      try {
+        const result = await request(user, currentPassword, password, nonce)
+        if (!isCurrent()) return false
+        return result
+      } catch (error) {
+        if (!isCurrent()) return false
+        throw new Error(
+          errorMessage(error, 'We could not change your password. Try again.'),
+        )
+      }
+    },
+    [authGateway, state],
+  )
+
   const value = useMemo(
     () => ({
+      changePassword,
       requestEmailChange,
       requestPasswordRecovery,
       saveProfileName,
@@ -598,6 +638,7 @@ export function AuthProvider({
       state,
     }),
     [
+      changePassword,
       requestEmailChange,
       requestPasswordRecovery,
       saveProfileName,

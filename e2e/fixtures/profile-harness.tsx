@@ -11,6 +11,7 @@ const user = {
   displayName: 'Fixture Alex',
 }
 const authGateway: AuthGateway = {
+  changePassword: async () => 'updated',
   requestEmailChange: async () => undefined,
   ensureProfile: async () =>
     localStorage.getItem('fixture.profile.name') ?? user.displayName,
