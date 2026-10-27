@@ -11,9 +11,17 @@ describe('workspace navigation', () => {
     ['dashboard', '/weigh-ins', '?challenge=group', '', 'weigh-ins'],
     ['dashboard', '/dashboard', '', '#goals', 'progress'],
     ['dashboard', '/dashboard', '', '#personal-history', 'weigh-ins'],
+    [
+      'dashboard',
+      '/dashboard',
+      '?tab=overview',
+      '#personal-history',
+      'weigh-ins',
+    ],
     ['group', '/group', '?tab=progress', '', 'charts'],
     ['group', '/group', '', '#group-progress', 'members'],
     ['group', '/group', '', '#group-history', 'charts'],
+    ['group', '/group', '?tab=overview', '#group-history', 'charts'],
     ['group', '/group', '', '#weekly-winners-heading', 'weekly-results'],
     ['group', '/group', '?tab=unknown', '', 'overview'],
   ] as const)(

@@ -66,7 +66,7 @@ for (const width of [1280, 320]) {
     await expect(
       page.getByText('Other member private note must never render'),
     ).toHaveCount(0)
-    await page.goto(fixture('/dashboard#personal-history'))
+    await page.goto(fixture('/dashboard?tab=overview#personal-history'))
     await expect(page.getByTestId('fixture-route')).toHaveText('/weigh-ins')
     await expect(
       sections.getByRole('link', { name: 'Weigh-ins' }),

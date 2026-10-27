@@ -27,7 +27,7 @@ function challengeTabDestination(
       : path
   const params = new URLSearchParams(path === '/group' ? search : '')
   params.set('challenge', challenge.id)
-  if (path === '/group' && hash && !params.has('tab'))
+  if (path === '/group' && hash)
     params.set('tab', workspaceSection('group', path, search, hash))
   return `${destination}?${params}`
 }

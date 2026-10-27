@@ -54,7 +54,9 @@ describe('Challenge context navigation', () => {
   it('retains the selected legacy Group section and useful query state on challenge changes', () => {
     render(
       <MemoryRouter
-        initialEntries={['/group?challenge=old&source=invite#group-progress']}
+        initialEntries={[
+          '/group?challenge=old&source=invite&tab=overview#group-progress',
+        ]}
       >
         <ChallengeTabs challenges={[group]} showPersonalTracking={false} />
       </MemoryRouter>,

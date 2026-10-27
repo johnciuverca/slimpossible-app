@@ -40,10 +40,11 @@ export function workspaceSection(
 ): WorkspaceSection {
   if (area === 'dashboard' && pathname === '/weigh-ins') return 'weigh-ins'
   const tab = new URLSearchParams(search).get('tab')
-  if (workspaceSections[area].some(({ id }) => id === tab))
-    return tab as WorkspaceSection
+  // Old combined pages appended anchors while retaining their current tab.
+  // Honor those destinations; new section links deliberately clear the hash.
   if (area === 'group') {
-    if (tab === 'progress') return 'charts'
+    if (['#group-summary', '#group-progress-heading'].includes(hash))
+      return 'overview'
     if (['#group-progress', '#members'].includes(hash)) return 'members'
     if (['#group-history', '#group-chart', '#charts'].includes(hash))
       return 'charts'
@@ -63,6 +64,9 @@ export function workspaceSection(
     )
       return 'progress'
   }
+  if (workspaceSections[area].some(({ id }) => id === tab))
+    return tab as WorkspaceSection
+  if (area === 'group' && tab === 'progress') return 'charts'
   return 'overview'
 }
 
