@@ -997,7 +997,7 @@ for (const viewport of [
   { label: 'desktop', width: 1280 },
   { label: 'mobile', width: 390 },
 ]) {
-  test(`Progress keeps author controls and links group history on ${viewport.label}`, async ({
+  test(`Weigh-ins keeps author controls and links Group history on ${viewport.label}`, async ({
     page,
   }) => {
     await page.setViewportSize({ width: viewport.width, height: 900 })
@@ -1005,8 +1005,12 @@ for (const viewport of [
     await page.goto(
       `http://127.0.0.1:4174/e2e/fixtures/today-harness.html?scenario=progress&selected=${ownGroupId}&user=${viewerId}`,
     )
-    const personal = page.getByRole('table', {
-      name: 'Your saved personal weigh-ins',
+    await page
+      .getByRole('navigation', { name: 'Dashboard sections' })
+      .getByRole('link', { name: 'Weigh-ins', exact: true })
+      .click()
+    const personal = page.getByRole('list', {
+      name: 'Personal weigh-in history',
     })
     const edit = personal.getByRole('button', {
       name: 'Edit weight 2026-09-22',
@@ -1017,7 +1021,7 @@ for (const viewport of [
       exact: true,
     })
     await expect(edit).toBeVisible()
-    await expect(personal.locator('tbody tr')).toHaveCount(1)
+    await expect(personal.locator('li')).toHaveCount(1)
     await expect(
       page.getByRole('table', { name: 'Shared group weigh-ins' }),
     ).toHaveCount(0)
@@ -1026,19 +1030,27 @@ for (const viewport of [
     ).toHaveCount(0)
     await expect(personal).toContainText('Author-only disposable private note')
     await edit.click()
-    const editor = page.getByRole('dialog', { name: 'Edit weight' })
+    const editor = page.getByRole('form', { name: 'Personal weigh-in form' })
     await expect(editor.getByLabel('Private note')).toHaveValue(
       'Author-only disposable private note',
     )
     await editor.getByLabel('Weight in kg').fill('87')
     await editor.getByRole('button', { name: 'Update weight' }).click()
     await expect(personal).toContainText('87 kg')
+    await expect(edit).toBeVisible()
+    await expect(personal).toContainText('87 kg')
+    await page
+      .getByRole('navigation', { name: 'Dashboard sections' })
+      .getByRole('link', { name: 'Progress', exact: true })
+      .click()
     await expect(page.getByText(/No personal goal yet/)).toBeVisible()
     await expect(
       page.getByRole('link', { name: /Open this group’s shared history/ }),
     ).toHaveCount(0)
-    await expect(edit).toBeVisible()
-    await expect(personal).toContainText('87 kg')
+    await page
+      .getByRole('navigation', { name: 'Dashboard sections' })
+      .getByRole('link', { name: 'Weigh-ins', exact: true })
+      .click()
     await remove.click()
     const deletion = page.getByRole('dialog', { name: 'Delete weight?' })
     await expect(deletion).toContainText('ALL shared groups')

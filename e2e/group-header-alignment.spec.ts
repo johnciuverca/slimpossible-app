@@ -33,8 +33,12 @@ for (const viewport of [
         path.startsWith('/goals') || path.startsWith('/progress')
       if (personalWorkspace) {
         await expect(contexts).toHaveCount(0)
+        await page
+          .getByRole('navigation', { name: 'Dashboard sections' })
+          .getByRole('link', { name: 'Weigh-ins', exact: true })
+          .click()
         await expect(
-          page.getByRole('table', { name: 'Your saved personal weigh-ins' }),
+          page.getByRole('list', { name: 'Personal weigh-in history' }),
         ).toBeVisible()
         await page
           .getByRole('navigation', { name: 'Dashboard sections' })
@@ -45,7 +49,7 @@ for (const viewport of [
         ).toBeEnabled()
         await expect(
           page
-            .locator('.dashboard-action-grid')
+            .locator('.dashboard-latest')
             .getByRole('button', { name: 'Record weight', exact: true }),
         ).toBeVisible()
         continue
