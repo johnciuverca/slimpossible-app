@@ -38,12 +38,14 @@ export function ChallengeTabs({
   loading = false,
   error = '',
   showPersonalTracking = true,
+  compact = false,
 }: {
   challenges: Challenge[]
   selectedId?: string | null
   loading?: boolean
   error?: string
   showPersonalTracking?: boolean
+  compact?: boolean
 }) {
   const { pathname, search, hash } = useLocation()
   const querySelection = new URLSearchParams(search).get('challenge') || null
@@ -76,15 +78,23 @@ export function ChallengeTabs({
       row.current.scrollLeft += item.right - container.right
   }, [selected, challenges])
   return (
-    <nav aria-label="Challenge contexts" className="min-w-0 space-y-2">
-      <p className="text-xs font-semibold text-ink-muted">
-        {!showPersonalTracking
-          ? 'Choose an authorized group to view its shared progress. Navigation never changes who can see your weights.'
-          : pathname === '/weigh-ins'
-            ? 'Context navigation only. Recording stays personal; choose group shares explicitly in the form.'
-            : 'Personal tracking is separate from challenge views. Choosing a context never changes sharing.'}
-      </p>
-      <div ref={row} className="app-nav-scroll max-w-full overflow-x-auto py-2">
+    <nav
+      aria-label="Challenge contexts"
+      className={`min-w-0 ${compact ? '' : 'space-y-2'}`}
+    >
+      {!compact ? (
+        <p className="text-xs font-semibold text-ink-muted">
+          {!showPersonalTracking
+            ? 'Choose an authorized group to view its shared progress. Navigation never changes who can see your weights.'
+            : pathname === '/weigh-ins'
+              ? 'Context navigation only. Recording stays personal; choose group shares explicitly in the form.'
+              : 'Personal tracking is separate from challenge views. Choosing a context never changes sharing.'}
+        </p>
+      ) : null}
+      <div
+        ref={row}
+        className={`app-nav-scroll max-w-full overflow-x-auto ${compact ? 'py-1' : 'py-2'}`}
+      >
         <ul className="flex w-max min-w-full gap-2">
           {[
             ...(showPersonalTracking

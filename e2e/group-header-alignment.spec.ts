@@ -73,7 +73,7 @@ for (const viewport of [
       if (path !== '/group' && !path.startsWith('/challenges')) {
         expect(headerBox.y - navBox.y - navBox.height).toBeCloseTo(24, 0)
       } else {
-        expect(navBox.y - headerBox.y - headerBox.height).toBeCloseTo(24, 0)
+        expect(navBox.y - headerBox.y - headerBox.height).toBeCloseTo(8, 0)
       }
       if (viewport.width >= 1280) {
         const actionsBox = (await header

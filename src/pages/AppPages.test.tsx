@@ -1388,12 +1388,12 @@ describe('GroupDashboardPage', () => {
     const challengePayload = [
       {
         created_at: '2026-09-17T10:00:00.000Z',
-        created_by: 'owner-1',
+        created_by: 'member-1',
         description: null,
         end_date: '2026-10-01',
         id: 'challenge-1',
         name: 'Autumn challenge',
-        owner_id: 'owner-1',
+        owner_id: 'member-1',
         start_date: '2026-09-17',
         status: 'active',
         target_weight_kg: null,
@@ -1500,6 +1500,19 @@ describe('GroupDashboardPage', () => {
     )
 
     expect(await screen.findByText('48.5%')).toBeInTheDocument()
+    expect(
+      await screen.findByRole('region', { name: 'Group weight chart' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('table', { name: 'Shared group weight history' }),
+    ).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('Manage', { selector: 'summary' }))
+    expect(
+      screen.getByRole('navigation', { name: 'Selected group management' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: 'Manage invitations' }),
+    ).toBeInTheDocument()
     fireEvent.click(screen.getByRole('link', { name: 'Weekly results' }))
     expect(
       await screen.findByRole('heading', { name: 'Weekly result' }),
@@ -2002,12 +2015,13 @@ describe('GroupDashboardPage', () => {
       '/group?challenge=challenge-1',
     )
 
-    const activeMembers = (await screen.findByText('Active members'))
-      .parentElement
-    expect(activeMembers).toHaveTextContent('0')
-    const averageProgress = screen.getByText(
-      'Average goal progress',
+    const activeMembers = (
+      await screen.findByText('Members', { selector: 'dt' })
     ).parentElement
+    expect(activeMembers).toHaveTextContent('0')
+    const averageProgress = screen.getByText('Avg. goal progress', {
+      selector: 'dt',
+    }).parentElement
     expect(averageProgress).toHaveTextContent('—')
     fireEvent.click(screen.getByRole('link', { name: 'Weekly results' }))
     expect(

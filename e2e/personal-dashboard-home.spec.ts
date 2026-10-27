@@ -59,7 +59,10 @@ for (const width of [1280, 390]) {
       '/group?challenge=dashboard-active&source=legacy#group-history',
     )
     await expect(
-      page.getByRole('heading', { name: 'Group', exact: true }),
+      page.getByRole('heading', {
+        name: 'Synthetic active group',
+        exact: true,
+      }),
     ).toBeVisible()
     await expect(
       page.getByText('Synthetic first-account private note', { exact: true }),

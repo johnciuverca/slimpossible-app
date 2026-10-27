@@ -868,7 +868,9 @@ for (const width of [1280, 390]) {
     await expect(panel.getByLabel('Invitation link or token')).toHaveValue(
       'draft-invitation',
     )
-    await page.getByRole('heading', { name: 'Group', exact: true }).click()
+    await page
+      .getByRole('heading', { name: 'E2E authorized group', exact: true })
+      .click()
     await expect(panel).toHaveCount(0)
     await create.click()
     await expect(panel.getByLabel('Invitation link or token')).toHaveValue(
@@ -881,7 +883,7 @@ for (const width of [1280, 390]) {
     await expect(discard).toBeVisible()
     await discard.getByRole('button', { name: 'Stay', exact: true }).click()
     await expect(
-      page.getByRole('heading', { name: 'Group', exact: true }),
+      page.getByRole('heading', { name: 'E2E authorized group', exact: true }),
     ).toBeVisible()
     if (!(await panel.isVisible())) await create.click()
     await expect(panel.getByLabel('Invitation link or token')).toHaveValue(
@@ -1639,7 +1641,7 @@ for (const viewport of [
     await expect(contexts).toHaveCount(1)
     const row = (await contexts.boundingBox())!
     const heading = (await page
-      .getByRole('heading', { name: 'Group', exact: true })
+      .getByRole('heading', { name: 'E2E authorized group', exact: true })
       .boundingBox())!
     expect(heading.y + heading.height).toBeLessThan(row.y)
     const second = contexts.getByRole('link', {
@@ -1698,7 +1700,7 @@ for (const viewport of [
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
 
     await expect(
-      page.getByRole('heading', { name: 'Group', exact: true }),
+      page.getByRole('heading', { name: 'E2E authorized group', exact: true }),
     ).toBeVisible()
     await expect(page.getByText('42.5%', { exact: true })).toBeVisible()
     await page
@@ -2141,8 +2143,13 @@ test('the shared chart range handles respond to mobile touch dragging', async ({
     })
     const points = chart.locator('circle[data-date]')
     await expect(points).toHaveCount(4)
+    await page.evaluate(() =>
+      document.querySelector('[data-chart-point]')?.scrollIntoView({
+        block: 'center',
+      }),
+    )
     const firstPoint = chart.locator('circle[data-chart-point]').first()
-    await firstPoint.scrollIntoViewIfNeeded()
+    await expect(firstPoint).toBeAttached()
     const firstPointBounds = await firstPoint.boundingBox()
     expect(firstPointBounds).not.toBeNull()
     await page.touchscreen.tap(

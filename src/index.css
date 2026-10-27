@@ -984,3 +984,14 @@ body {
     justify-self: end;
   }
 }
+
+.group-workspace .group-overview-card.group-overview-compact {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.group-workspace .group-overview-compact .group-overview-metric {
+  border-top-width: 0;
+  box-shadow: none;
+}
