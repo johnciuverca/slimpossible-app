@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom'
+import { Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import {
   usePersonalWorkspace,
   type PersonalWorkspace,
@@ -19,6 +19,7 @@ import { personalWeighInToday } from '../models/personalWeighIn'
 import { PersonalHistoryContent } from './PersonalHistoryContent'
 import { DashboardGoals } from '../components/DashboardGoals'
 import { personalGoalChoices } from '../models/personalGoalChoices'
+import { formatChartDate } from '../models/chartDate'
 
 type LegacyTab = 'overview' | 'progress'
 export function PersonalDashboardPage({
@@ -140,17 +141,30 @@ export function PersonalDashboardWorkspace({
       member.targetWeightKg <= member.startingWeightKg)
       ? member.targetWeightKg
       : undefined
+  const recordAction = (
+    <RecordWeightAction
+      workspace={workspace}
+      showSavedFeedback={false}
+      onOpen={() => setSaveConfirmation(null)}
+      onRecorded={() =>
+        setSaveConfirmation((current) => ({
+          ownerKey: workspace.ownerKey,
+          count:
+            current?.ownerKey === workspace.ownerKey ? current.count + 1 : 1,
+        }))
+      }
+    />
+  )
   return (
     <section
       data-weight-page-header
       aria-labelledby="dashboard-title"
-      className="dashboard-workspace mx-auto w-full max-w-6xl space-y-6"
+      className="dashboard-workspace mx-auto w-full max-w-6xl space-y-4"
     >
       <header>
         <PageHeader
           title="Dashboard"
           titleId="dashboard-title"
-          description="Your personal home. Track weight and progress with or without a challenge."
           titleTrailing={
             <div className="dashboard-save-confirmation-slot">
               {saveConfirmation?.ownerKey === workspace.ownerKey &&
@@ -181,76 +195,50 @@ export function PersonalDashboardWorkspace({
       </header>
       {section === 'overview' ? (
         <div id="dashboard-overview-panel" className="dashboard-top-grid">
-          <Card className="dashboard-latest p-5">
-            {workspace.personal.state === 'loading' ? (
-              <FeedbackPanel tone="loading">
-                Loading your personal Dashboard…
-              </FeedbackPanel>
-            ) : workspace.personal.state === 'error' ? (
-              <FeedbackPanel tone="error">
-                {workspace.personal.error}
-              </FeedbackPanel>
-            ) : (
-              <>
-                <div className="flex items-start justify-between gap-4">
-                  <h2 className="text-sm font-semibold text-ink-muted">
-                    Latest personal weight
-                  </h2>
-                  <StatusPill>
-                    {todayEntry ? 'Logged today' : 'Not logged today'}
-                  </StatusPill>
-                </div>
-                <p className="my-3 text-4xl font-extrabold tracking-tight">
-                  {latest
-                    ? formatPersonalWeight(latest.weightKg)
-                    : 'No record yet'}
-                </p>
-                {latest ? (
-                  <time
-                    className="block text-sm text-ink-muted"
-                    dateTime={latest.date}
-                  >
-                    Recorded {latest.date}
-                  </time>
+          <Card className="dashboard-latest p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                {workspace.personal.state === 'loading' ? (
+                  <FeedbackPanel tone="loading">
+                    Loading your personal Dashboard…
+                  </FeedbackPanel>
+                ) : workspace.personal.state === 'error' ? (
+                  <FeedbackPanel tone="error">
+                    {workspace.personal.error}
+                  </FeedbackPanel>
                 ) : (
-                  <p className="text-sm text-ink-muted">
-                    Your first personal entry can be saved without creating or
-                    joining a challenge.
-                  </p>
+                  <>
+                    <h2 className="text-sm font-semibold text-ink-muted">
+                      Latest weight
+                    </h2>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                      <p className="text-3xl font-extrabold tracking-tight">
+                        {latest
+                          ? formatPersonalWeight(latest.weightKg)
+                          : 'No record yet'}
+                      </p>
+                      {latest ? (
+                        <time
+                          className="text-sm text-ink-muted"
+                          dateTime={latest.date}
+                        >
+                          {formatChartDate(latest.date)}
+                        </time>
+                      ) : null}
+                      <StatusPill>
+                        {todayEntry ? 'Logged today' : 'Not logged today'}
+                      </StatusPill>
+                    </div>
+                  </>
                 )}
-                <p className="mt-2 text-xs text-ink-muted">
-                  {todayEntry
-                    ? 'Today’s entry is already saved. Corrections update that same entry.'
-                    : 'No entry for today yet. Your last saved weight is not a check-in for today.'}
-                </p>
-                <Link
-                  className="mt-3 inline-flex min-h-11 items-center text-sm font-bold text-forest-800 underline"
-                  to={workspaceSectionLink('dashboard', 'progress', search)}
-                >
-                  My Progress and private history
-                </Link>
-              </>
-            )}
+              </div>
+              {recordAction}
+            </div>
           </Card>
           <DashboardChallengeActions
             workspace={workspace}
-            recordAction={
-              <RecordWeightAction
-                workspace={workspace}
-                presentation="card"
-                showSavedFeedback={false}
-                onOpen={() => setSaveConfirmation(null)}
-                onRecorded={() =>
-                  setSaveConfirmation((current) => ({
-                    ownerKey: workspace.ownerKey,
-                    count:
-                      current?.ownerKey === workspace.ownerKey
-                        ? current.count + 1
-                        : 1,
-                  }))
-                }
-              />
-            }
+            compact
+            progressTo={workspaceSectionLink('dashboard', 'progress', search)}
           />
         </div>
       ) : null}

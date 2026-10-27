@@ -309,7 +309,7 @@ export function PersonalWeighInsPage() {
   return (
     <section
       aria-labelledby="personal-weigh-ins-title"
-      className="mx-auto w-full max-w-6xl space-y-6"
+      className="mx-auto w-full max-w-6xl space-y-4"
     >
       <WeightPageHeader
         action={
@@ -322,12 +322,7 @@ export function PersonalWeighInsPage() {
           </Button>
         }
       >
-        <PageHeader
-          eyebrow="PERSONAL CHECK-IN"
-          description="Your weigh-ins belong to you. A group is optional, and sharing is always explicit."
-          title={editingId ? 'Edit weight' : 'Record weight'}
-          titleId="personal-weigh-ins-title"
-        >
+        <PageHeader title="Weigh-ins" titleId="personal-weigh-ins-title">
           <StatusPill>
             {persistence.mode === 'remote'
               ? 'Remote data'
@@ -338,10 +333,12 @@ export function PersonalWeighInsPage() {
         </PageHeader>
       </WeightPageHeader>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
         <div ref={editorRegion} className="min-w-0 scroll-mt-6">
-          <Card className="p-6 sm:p-8">
-            <h2 className="mb-5 text-xl font-bold text-ink">Weight details</h2>
+          <Card className="p-4">
+            <h2 className="mb-4 text-lg font-bold text-ink">
+              {editingId ? 'Edit weigh-in' : 'Record weight'}
+            </h2>
             {groupsError ? (
               <p className="mb-4 text-sm text-amber-800" role="status">
                 {groupsError}
@@ -395,9 +392,9 @@ export function PersonalWeighInsPage() {
           </Card>
         </div>
 
-        <Card aria-labelledby="personal-history-title" className="p-6 sm:p-8">
+        <Card aria-labelledby="personal-history-title" className="p-4">
           <h2
-            className="text-xl font-bold text-ink"
+            className="text-lg font-bold text-ink"
             id="personal-history-title"
           >
             Your saved weigh-ins
@@ -411,14 +408,13 @@ export function PersonalWeighInsPage() {
               Loading saved weigh-ins…
             </p>
           ) : entries.length === 0 ? (
-            <p className="mt-5 text-sm leading-6 text-ink-muted">
-              No personal weigh-ins saved yet. You can record one without
-              joining a challenge.
+            <p className="mt-4 text-sm text-ink-muted">
+              No saved weigh-ins yet.
             </p>
           ) : (
             <ul
               aria-label="Personal weigh-in history"
-              className="mt-5 space-y-3"
+              className="mt-4 space-y-2"
             >
               {[...entries]
                 .sort((a, b) => b.date.localeCompare(a.date))
@@ -439,18 +435,14 @@ export function PersonalWeighInsPage() {
                 ))}
             </ul>
           )}
-          <p className="mt-5 text-xs leading-5 text-ink-muted">
-            Entries are one per calendar date. Editing a date already in use is
-            rejected instead of overwriting another entry. Notes remain private.
-          </p>
         </Card>
       </div>
 
       <Link
         className="inline-flex min-h-11 items-center text-sm font-semibold text-forest-800 underline"
-        to="/today"
+        to="/dashboard"
       >
-        Back to today
+        Dashboard overview
       </Link>
       {deleteTarget?.key === workspace.ownerKey ? (
         <DeleteWeightDialog

@@ -17,7 +17,7 @@ import {
 } from '../models/fixtures'
 import { personalWeighInToday } from '../models/personalWeighIn'
 import { PersonalDashboardPage } from './PersonalDashboardPage'
-import { MyProgressPage } from './MyProgressPage'
+import { PersonalWeighInsPage } from './PersonalWeighInsPage'
 import { GoalsPage, GroupDashboardPage } from './AppPages'
 import { PersonalEntryActions } from '../components/WeightEntryActions'
 import { ContextualSubnav } from '../components/ContextualSubnav'
@@ -120,7 +120,7 @@ describe('personal Dashboard and My Progress', () => {
       new Error('Unavailable'),
     )
     vi.spyOn(persistenceModule, 'createPersistence').mockReturnValue(storage)
-    render(page(<MyProgressPage />, 'user-alex', '/progress'))
+    render(page(<PersonalWeighInsPage />, 'user-alex', '/weigh-ins'))
     fireEvent.click(
       await screen.findByRole('button', { name: 'Delete 2026-01-01' }),
     )
@@ -229,7 +229,7 @@ describe('personal Dashboard and My Progress', () => {
       render(
         path === 'group'
           ? page(<PersonalEntryActions challengeId="challenge-1" />)
-          : page(<MyProgressPage />, 'user-alex', '/progress'),
+          : page(<PersonalWeighInsPage />, 'user-alex', '/weigh-ins'),
       )
       fireEvent.click(
         await screen.findByRole('button', {
@@ -237,9 +237,10 @@ describe('personal Dashboard and My Progress', () => {
         }),
       )
 
-      const editor = within(
-        await screen.findByRole('dialog', { name: 'Edit weight' }),
-      )
+      const editor =
+        path === 'group'
+          ? within(await screen.findByRole('dialog', { name: 'Edit weight' }))
+          : within(screen.getByRole('form', { name: 'Personal weigh-in form' }))
       const weight = editor.getByLabelText('Weight in kg')
       expect(weight).toHaveValue(88.85)
       expect(weight).toHaveAttribute('step', '0.01')
@@ -252,9 +253,10 @@ describe('personal Dashboard and My Progress', () => {
       ).toBeChecked()
 
       fireEvent.click(editor.getByRole('button', { name: 'Update weight' }))
-      await waitFor(() =>
-        expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
-      )
+      if (path === 'group')
+        await waitFor(() =>
+          expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+        )
 
       const saved =
         await storage.repositories.personalWeighIns.listForUser('user-alex')
@@ -466,17 +468,10 @@ describe('personal Dashboard and My Progress', () => {
     fireEvent.click(invite)
     await screen.findByRole('combobox', { name: 'Choose a group you own' })
     fireEvent.click(screen.getByRole('link', { name: 'Progress' }))
-    expect(
-      screen.getByText('Shared with Group One, an unavailable group'),
-    ).toBeInTheDocument()
+    await screen.findByRole('img', { name: /Personal weight history chart/ })
     fireEvent.click(screen.getByRole('button', { name: 'Refresh Dashboard' }))
     expect(
       await screen.findByText(
-        'Shared with 2 groups (names could not be loaded)',
-      ),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByText(
         'Your goal choices could not be loaded. Refresh to try again.',
       ),
     ).toBeInTheDocument()
@@ -486,10 +481,8 @@ describe('personal Dashboard and My Progress', () => {
     ).toBeInTheDocument()
     fireEvent.click(screen.getByRole('link', { name: 'Progress' }))
     fireEvent.click(screen.getByRole('button', { name: 'Refresh Dashboard' }))
-    expect(
-      await screen.findByText('Shared with Group One, an unavailable group'),
-    ).toBeInTheDocument()
     fireEvent.click(screen.getByRole('link', { name: 'Overview' }))
+    await waitFor(() => expect(invite).toBeEnabled())
     fireEvent.click(screen.getByRole('button', { name: 'Invite people' }))
     expect(
       await screen.findByRole('combobox', { name: 'Choose a group you own' }),
@@ -737,28 +730,22 @@ describe('personal Dashboard and My Progress', () => {
       note: 'Private history',
       sharedChallengeIds: [],
     })
-    render(page(<MyProgressPage />, 'user-alex', '/progress'))
-    const table = await screen.findByRole('table', {
-      name: 'Your saved personal weigh-ins',
+    render(page(<PersonalWeighInsPage />, 'user-alex', '/weigh-ins'))
+    const history = await screen.findByRole('list', {
+      name: 'Personal weigh-in history',
     })
-    expect(within(table).getByText('Private history')).toBeInTheDocument()
-    expect(
-      screen.getByRole('img', { name: /1 saved weigh-ins/ }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByText(/Every plotted point is a saved personal entry/),
-    ).toHaveClass('sr-only')
+    expect(within(history).getByText('Private history')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Delete 2026-01-01' }))
     let deletion = await screen.findByRole('dialog', { name: 'Delete weight?' })
     expect(deletion).toHaveTextContent('ALL shared groups')
     fireEvent.click(within(deletion).getByRole('button', { name: 'Cancel' }))
-    expect(within(table).getByText('90 kg')).toBeInTheDocument()
+    expect(within(history).getByText('90 kg')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Delete 2026-01-01' }))
     deletion = await screen.findByRole('dialog', { name: 'Delete weight?' })
     fireEvent.click(
       within(deletion).getByRole('button', { name: 'Delete weight' }),
     )
-    await screen.findByText(/No personal entries yet/)
+    await screen.findByText('No saved weigh-ins yet.')
     expect(
       await storage.repositories.personalWeighIns.listForUser('user-alex'),
     ).toMatchObject({ state: 'empty' })
@@ -830,21 +817,25 @@ describe('personal Dashboard and My Progress', () => {
           })
         : original(id),
     )
-    const rendered = render(page(<MyProgressPage />, 'user-alex', '/progress'))
+    const rendered = render(
+      page(<PersonalWeighInsPage />, 'user-alex', '/weigh-ins'),
+    )
     await screen.findByText('Old account secret')
     fireEvent.click(
       screen.getByRole('button', {
         name: `Edit weight ${personalWeighInToday()}`,
       }),
     )
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
-    rendered.rerender(page(<MyProgressPage />, 'second-user', '/progress'))
+    expect(screen.getByLabelText('Weight in kg')).toHaveValue(85)
+    rendered.rerender(
+      page(<PersonalWeighInsPage />, 'second-user', '/weigh-ins'),
+    )
     expect(screen.queryByText('Old account secret')).not.toBeInTheDocument()
     expect(
       screen.queryByDisplayValue('Old account secret'),
     ).not.toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     finish({ state: 'empty', data: [] })
-    await screen.findByText(/No personal entries yet/)
+    await screen.findByText('No saved weigh-ins yet.')
   })
 })

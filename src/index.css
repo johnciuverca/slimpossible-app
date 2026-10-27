@@ -531,6 +531,24 @@ body {
   display: grid;
   gap: 0.8rem;
 }
+.dashboard-action-grid-compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.dashboard-actions-compact h2 {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.dashboard-actions-compact .dashboard-action-grid > a,
+.dashboard-actions-compact .dashboard-action-grid > button {
+  min-height: 44px;
+  width: auto;
+  border-radius: 0.65rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+}
 .dashboard-action {
   display: flex;
   align-items: center;

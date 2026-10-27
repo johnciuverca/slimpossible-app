@@ -68,22 +68,18 @@ export function DashboardGoals({
       ref={section}
       id="goals"
       aria-labelledby="dashboard-goals-title"
-      className="space-y-5 scroll-mt-6"
+      className="space-y-4 scroll-mt-6"
     >
       <h2
         id="dashboard-goals-title"
         tabIndex={-1}
-        className="text-2xl font-extrabold"
+        className="text-xl font-extrabold"
       >
         Goals
       </h2>
       {notice && (!requested || requested === notice.challengeId) ? (
         <p role="status">{notice.message}</p>
       ) : null}
-      <p className="text-sm text-ink-muted">
-        Your personal targets and milestones. Personal recording never requires
-        a challenge.
-      </p>
       {workspace.contexts.state === 'loading' ? (
         <FeedbackPanel tone="loading">Loading your goals…</FeedbackPanel>
       ) : workspace.contexts.state === 'error' ? (
