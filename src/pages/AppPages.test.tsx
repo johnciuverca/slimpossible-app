@@ -1494,7 +1494,15 @@ describe('GroupDashboardPage', () => {
         String(url).includes('/rpc/get_group_chart_history') ||
         String(url).includes('/rpc/get_group_member_progress')
           ? Promise.resolve(response([]))
-          : fetchMock(url, init),
+          : String(url).includes('/rpc/get_group_weekly_win_counts')
+            ? Promise.resolve(
+                response([
+                  { member_key: 'a', display_name: 'Ava', win_count: 2 },
+                  { member_key: 'b', display_name: 'Ben', win_count: 2 },
+                  { member_key: 'c', display_name: 'Casey', win_count: 0 },
+                ]),
+              )
+            : fetchMock(url, init),
       ),
       '/group?challenge=',
     )
@@ -1518,8 +1526,14 @@ describe('GroupDashboardPage', () => {
     expect(
       screen.getByText(/based on 2 of 3 active members/),
     ).toBeInTheDocument()
-    expect(screen.getAllByText('Ava')).toHaveLength(2)
-    expect(screen.getAllByText('Ben')).toHaveLength(2)
+    expect(
+      await screen.findByRole('heading', { name: 'Weeks won' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('list', { name: 'Challenge weeks won' }),
+    ).toHaveTextContent('Ava2 weeksBen2 weeksCasey0 weeks')
+    expect(screen.getAllByText('Ava')).toHaveLength(3)
+    expect(screen.getAllByText('Ben')).toHaveLength(3)
     expect(
       screen.getByRole('heading', { name: 'Provisional leader' }),
     ).toBeInTheDocument()
@@ -1588,7 +1602,11 @@ describe('GroupDashboardPage', () => {
       screen.getByRole('button', { name: 'Refresh shared progress' }),
     )
     expect(await screen.findByText('Casey')).toBeInTheDocument()
-    expect(screen.queryByText('Ava')).not.toBeInTheDocument()
+    expect(
+      within(screen.getByRole('region', { name: 'Weekly result' })).queryByText(
+        'Ava',
+      ),
+    ).not.toBeInTheDocument()
     await waitFor(() =>
       expect(
         screen.getByRole('region', { name: 'Provisional leader' }),

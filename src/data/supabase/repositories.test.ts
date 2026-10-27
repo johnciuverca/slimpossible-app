@@ -26,6 +26,29 @@ afterEach(() => {
 })
 
 describe('Supabase repositories', () => {
+  it('maps per-challenge weekly win counts without exposing user identities', async () => {
+    stubResponse([
+      { member_key: 'opaque-a', display_name: 'Ava', win_count: 3 },
+      { member_key: 'opaque-b', display_name: 'Ben', win_count: 0 },
+    ])
+
+    const result =
+      await createRepositories(client).groupProgress.getWeeklyWinCounts(
+        'challenge-1',
+      )
+
+    expect(result).toEqual({
+      data: [
+        { displayName: 'Ava', memberKey: 'opaque-a', winCount: 3 },
+        { displayName: 'Ben', memberKey: 'opaque-b', winCount: 0 },
+      ],
+      state: 'success',
+    })
+    expect(String(vi.mocked(fetch).mock.calls[0]?.[0])).toContain(
+      '/rpc/get_group_weekly_win_counts',
+    )
+  })
+
   it('maps chart identity and exact shared values without notes, emails or raw identities', async () => {
     stubResponse([
       {

@@ -53,6 +53,7 @@ import type { WeighIn } from '../models/weighIn'
 import type { PersonalWeighIn } from '../models/personalWeighIn'
 import {
   mostRecentSunday,
+  type GroupWeeklyWinCount,
   type GroupProgressSummary,
   type GroupWeighInHistoryEntry,
 } from '../models/groupProgress'
@@ -134,6 +135,8 @@ type GroupDashboardData = {
   provisionalLeader: ProvisionalGroupLeaderSummary | null
   provisionalLeaderState: 'error' | 'loading' | 'ready'
   summary: GroupProgressSummary
+  weeklyWinCounts: GroupWeeklyWinCount[]
+  weeklyWinCountsState: 'error' | 'loading' | 'ready'
 }
 
 type PersonalDashboardSnapshot = {
@@ -1558,6 +1561,53 @@ export function GroupDashboardPage() {
     }
   }, [data?.challenge.id, memberProgressKey, persistence])
 
+  useEffect(() => {
+    let current = true
+    const challengeId = data?.challenge.id
+    if (!challengeId || persistence.mode !== 'remote') return
+    setData((currentData) =>
+      currentData?.challenge.id === challengeId
+        ? {
+            ...currentData,
+            weeklyWinCounts: [],
+            weeklyWinCountsState: 'loading',
+          }
+        : currentData,
+    )
+    void persistence.repositories.groupProgress
+      .getWeeklyWinCounts(challengeId)
+      .then((result) => {
+        if (!current) return
+        setData((currentData) =>
+          currentData?.challenge.id === challengeId
+            ? {
+                ...currentData,
+                weeklyWinCounts: result.state === 'success' ? result.data : [],
+                weeklyWinCountsState:
+                  result.state === 'success' || result.state === 'empty'
+                    ? 'ready'
+                    : 'error',
+              }
+            : currentData,
+        )
+      })
+      .catch(() => {
+        if (!current) return
+        setData((currentData) =>
+          currentData?.challenge.id === challengeId
+            ? {
+                ...currentData,
+                weeklyWinCounts: [],
+                weeklyWinCountsState: 'error',
+              }
+            : currentData,
+        )
+      })
+    return () => {
+      current = false
+    }
+  }, [data?.challenge.id, persistence])
+
   const ownMemberKey =
     data && ownerId ? ownGroupMemberKey(data.challenge.id, ownerId) : null
   const ownParticipant =
@@ -1734,6 +1784,8 @@ export function GroupDashboardPage() {
           provisionalLeader: null,
           provisionalLeaderState: 'loading',
           summary: result.data,
+          weeklyWinCounts: [],
+          weeklyWinCountsState: 'loading',
         })
         setWeeklyAnnouncement(
           reconcileWeeklyWinCelebration(ownerId, weeklyCelebration),
@@ -2154,6 +2206,61 @@ export function GroupDashboardPage() {
                         </dd>
                       </div>
                     </dl>
+                  </section>
+                ) : null}
+                {section === 'weekly-results' ? (
+                  <section
+                    aria-labelledby="weeks-won-heading"
+                    className="group-overview-result min-w-0 rounded-2xl border border-stone-200 bg-white p-5 sm:p-7"
+                  >
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-800">
+                      Challenge standings
+                    </p>
+                    <h2
+                      className="mt-2 text-xl font-bold text-slate-950"
+                      id="weeks-won-heading"
+                    >
+                      Weeks won
+                    </h2>
+                    <p className="mt-2 text-sm text-slate-600">
+                      Completed weekly results for {data.challenge.name}.
+                    </p>
+                    {data.weeklyWinCountsState === 'loading' ? (
+                      <p
+                        aria-live="polite"
+                        className="mt-4 text-sm text-slate-600"
+                      >
+                        Loading weekly wins…
+                      </p>
+                    ) : data.weeklyWinCountsState === 'error' ? (
+                      <p className="mt-4 text-sm text-red-700" role="status">
+                        Weekly wins are unavailable right now. Try refreshing.
+                      </p>
+                    ) : data.weeklyWinCounts.length === 0 ? (
+                      <p className="mt-4 text-sm text-slate-600">
+                        No active members or completed weekly results yet.
+                      </p>
+                    ) : (
+                      <ul
+                        aria-label="Challenge weeks won"
+                        className="mt-4 space-y-2"
+                      >
+                        {data.weeklyWinCounts.map((member) => (
+                          <li
+                            className="flex items-baseline justify-between gap-4 rounded-xl bg-stone-50 px-4 py-3"
+                            key={member.memberKey}
+                          >
+                            <span className="font-semibold text-slate-950">
+                              {member.displayName}
+                            </span>
+                            <span className="text-sm text-slate-700">
+                              {member.winCount}{' '}
+                              {member.winCount === 1 ? 'week' : 'weeks'}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </section>
                 ) : null}
               </div>

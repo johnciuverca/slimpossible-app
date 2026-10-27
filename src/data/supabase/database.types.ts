@@ -287,6 +287,14 @@ export type Database = {
           weekly_winner_names: string[]
         }[]
       }
+      get_group_weekly_win_counts: {
+        Args: { target_challenge_id: string }
+        Returns: {
+          display_name: string
+          member_key: string
+          win_count: number
+        }[]
+      }
       get_group_weigh_in_history: {
         Args: { target_challenge_id: string }
         Returns: {
