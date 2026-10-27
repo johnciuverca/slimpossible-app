@@ -4,13 +4,7 @@ import {
   usePersonalWorkspace,
   type PersonalWorkspace,
 } from '../data/usePersonalWorkspace'
-import {
-  Button,
-  Card,
-  FeedbackPanel,
-  PageHeader,
-  StatusPill,
-} from '../components/ui'
+import { Card, FeedbackPanel, PageHeader, StatusPill } from '../components/ui'
 import {
   workspaceSection,
   workspaceSectionLink,
@@ -281,11 +275,6 @@ export function PersonalDashboardWorkspace({
             />
           </PersonalHistoryContent>
         </div>
-      ) : null}
-      {section === 'overview' ? (
-        <Button variant="secondary" onClick={workspace.refresh}>
-          Refresh Dashboard
-        </Button>
       ) : null}
     </section>
   )

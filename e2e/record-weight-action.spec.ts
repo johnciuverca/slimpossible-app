@@ -21,6 +21,11 @@ for (const width of [1280, 390]) {
       '/weigh-ins',
     ]) {
       await page.goto(fixture(path))
+      if (path.startsWith('/progress') || path.startsWith('/goals'))
+        await page
+          .getByRole('navigation', { name: 'Dashboard sections' })
+          .getByRole('link', { name: 'Overview', exact: true })
+          .click()
       await action.click()
       const emptyEditor =
         path === '/weigh-ins'
@@ -68,6 +73,11 @@ for (const width of [1280, 390]) {
       '/weigh-ins',
     ]) {
       await page.goto(fixture(path))
+      if (path.startsWith('/progress') || path.startsWith('/goals'))
+        await page
+          .getByRole('navigation', { name: 'Dashboard sections' })
+          .getByRole('link', { name: 'Overview', exact: true })
+          .click()
       await expect(action).toHaveCount(1)
       await expect(action).toBeEnabled()
       const header = page.locator('[data-weight-page-header]')
