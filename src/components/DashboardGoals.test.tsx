@@ -233,8 +233,8 @@ describe('personal-only Dashboard goals', () => {
         rendered.container.querySelector('[data-chart-reference]'),
       ).toBeNull()
       expect(
-        screen.getByRole('table', { name: 'Your saved personal weigh-ins' }),
-      ).toBeInTheDocument()
+        screen.queryByRole('table', { name: 'Your saved personal weigh-ins' }),
+      ).not.toBeInTheDocument()
     },
   )
   it('does not display another owner personal goal or a withdrawn enrollment', () => {

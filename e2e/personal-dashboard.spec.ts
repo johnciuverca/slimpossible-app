@@ -86,29 +86,28 @@ for (const viewport of [
     ).toBeVisible()
     await page
       .getByRole('navigation', { name: 'Dashboard sections' })
-      .getByRole('link', { name: 'Progress', exact: true })
+      .getByRole('link', { name: 'Weigh-ins', exact: true })
       .click()
-    const table = page.getByRole('table', {
-      name: 'Your saved personal weigh-ins',
+    const history = page.getByRole('list', {
+      name: 'Personal weigh-in history',
     })
     await expect(
-      table.getByText('Synthetic Dashboard private note', { exact: true }),
+      history.getByText('Synthetic Dashboard private note', { exact: true }),
     ).toBeVisible()
-    await expect(table.getByText('Private', { exact: true })).toBeVisible()
+    await expect(history.getByText('Private', { exact: true })).toBeVisible()
+    await expect(
+      page.getByRole('img', { name: /Personal weight history chart/ }),
+    ).toHaveCount(0)
+    await page
+      .getByRole('navigation', { name: 'Dashboard sections' })
+      .getByRole('link', { name: 'Progress', exact: true })
+      .click()
     await expect(
       page.getByRole('img', { name: /Personal weight history chart/ }),
     ).toBeVisible()
     await expect
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
       .toBe(viewport.width)
-    await page
-      .getByRole('link', { name: 'Full weigh-in page', exact: true })
-      .click()
-    await expect(
-      page
-        .getByRole('list', { name: 'Personal weigh-in history' })
-        .getByText(/82.4 kg/),
-    ).toBeVisible()
   })
 
   test(`Dashboard/My Progress edit/delete reflect canonical trend and keep explicit sharing on ${viewport.label}`, async ({
@@ -168,30 +167,38 @@ for (const viewport of [
 
     await page
       .getByRole('navigation', { name: 'Dashboard sections' })
-      .getByRole('link', { name: 'Progress', exact: true })
+      .getByRole('link', { name: 'Weigh-ins', exact: true })
       .click()
-    const table = page.getByRole('table', {
-      name: 'Your saved personal weigh-ins',
+    const history = page.getByRole('list', {
+      name: 'Personal weigh-in history',
+    })
+    const editDraft = page.getByRole('checkbox', {
+      name: 'Synthetic draft group',
+      exact: true,
     })
     await expect(
-      table.getByText(
+      history.getByText(
         'Shared with Synthetic draft group, Synthetic active group',
         { exact: true },
       ),
     ).toBeVisible()
     const date = rows[0].date as string
-    await table
+    await history
       .getByRole('button', { name: `Edit weight ${date}`, exact: true })
       .click()
-    await expect(draft).toBeChecked()
-    await dialog.getByLabel('Weight in kg').fill('84')
-    await dialog
+    await expect(editDraft).toBeChecked()
+    await page.getByLabel('Weight in kg').fill('84')
+    await page
       .getByLabel('Private note (optional)')
       .fill('Synthetic My Progress private correction')
-    await dialog
+    await page
       .getByRole('button', { name: 'Update weight', exact: true })
       .click()
-    await expect(table.getByText('84 kg', { exact: true })).toBeVisible()
+    await expect(history.getByText('84 kg', { exact: true })).toBeVisible()
+    await page
+      .getByRole('navigation', { name: 'Dashboard sections' })
+      .getByRole('link', { name: 'Progress', exact: true })
+      .click()
     await expect(page.getByRole('img', { name: /84 kilograms/ })).toBeVisible()
     await page
       .getByRole('link', {
@@ -202,21 +209,29 @@ for (const viewport of [
     await expect(
       page.getByRole('heading', { name: 'Goals', exact: true }),
     ).toBeVisible()
-    await expect(table.getByText('84 kg', { exact: true })).toBeVisible()
-    await table
+    await expect(page.getByRole('img', { name: /84 kilograms/ })).toBeVisible()
+    await page
+      .getByRole('navigation', { name: 'Dashboard sections' })
+      .getByRole('link', { name: 'Weigh-ins', exact: true })
+      .click()
+    await history
       .getByRole('button', { name: `Delete ${date}`, exact: true })
       .click()
     const deletion = page.getByRole('dialog', { name: 'Delete weight?' })
     await expect(deletion).toContainText('ALL shared groups')
     await deletion.getByRole('button', { name: 'Cancel', exact: true }).click()
-    await expect(table.getByText('84 kg', { exact: true })).toBeVisible()
-    await table
+    await expect(history.getByText('84 kg', { exact: true })).toBeVisible()
+    await history
       .getByRole('button', { name: `Delete ${date}`, exact: true })
       .click()
     await deletion
       .getByRole('button', { name: 'Delete weight', exact: true })
       .click()
-    await expect(page.getByText(/No personal entries yet/)).toBeVisible()
+    await expect(page.getByText('No saved weigh-ins yet.')).toBeVisible()
+    await page
+      .getByRole('navigation', { name: 'Dashboard sections' })
+      .getByRole('link', { name: 'Progress', exact: true })
+      .click()
     await expect(
       page.getByRole('img', { name: /Personal weight history chart/ }),
     ).toHaveCount(0)
@@ -242,11 +257,17 @@ for (const viewport of [
   }) => {
     await page.setViewportSize({ width: viewport.width, height: 900 })
     await page.goto(fixture('accounts', '/progress'))
-    const table = page.getByRole('table', {
-      name: 'Your saved personal weigh-ins',
+    await page
+      .getByRole('navigation', { name: 'Dashboard sections' })
+      .getByRole('link', { name: 'Weigh-ins', exact: true })
+      .click()
+    const history = page.getByRole('list', {
+      name: 'Personal weigh-in history',
     })
     await expect(
-      table.getByText('Synthetic first-account private note', { exact: true }),
+      history.getByText('Synthetic first-account private note', {
+        exact: true,
+      }),
     ).toBeVisible()
     await expect(
       page.getByText('Synthetic second-account private note', { exact: true }),
@@ -255,12 +276,14 @@ for (const viewport of [
       .getByRole('button', { name: 'Switch synthetic account', exact: true })
       .click()
     await expect(
-      table.getByText('Synthetic second-account private note', { exact: true }),
+      history.getByText('Synthetic second-account private note', {
+        exact: true,
+      }),
     ).toBeVisible()
     await expect(
       page.getByText('Synthetic first-account private note', { exact: true }),
     ).toHaveCount(0)
-    await expect(table.getByText('75 kg', { exact: true })).toBeVisible()
+    await expect(history.getByText('75 kg', { exact: true })).toBeVisible()
 
     await expect(page.getByText('75 kg', { exact: true }).first()).toBeVisible()
     await expect(

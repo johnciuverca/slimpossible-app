@@ -1,5 +1,6 @@
 import type { PersonalWeighIn } from '../models/personalWeighIn'
 import { formatPersonalWeight } from '../models/personalHistory'
+import { formatChartDate } from '../models/chartDate'
 
 export function PersonalWeightRecordCard({
   entry,
@@ -17,17 +18,17 @@ export function PersonalWeightRecordCard({
   disabled?: boolean
 }) {
   return (
-    <li className="min-w-0 rounded-2xl border border-line bg-page p-5">
+    <li className="min-w-0 rounded-xl border border-line bg-page p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-3xl font-extrabold tracking-tight text-ink">
+          <p className="text-xl font-bold tracking-tight text-ink">
             {formatPersonalWeight(entry.weightKg)}
           </p>
           <time
             className="mt-1 block text-sm text-ink-muted"
             dateTime={entry.date}
           >
-            {entry.date}
+            {formatChartDate(entry.date)}
           </time>
         </div>
         <PersonalWeightRecordActions

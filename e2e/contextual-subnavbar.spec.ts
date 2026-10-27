@@ -12,7 +12,7 @@ for (const width of [1280, 320]) {
     const sections = page.getByRole('navigation', {
       name: 'Dashboard sections',
     })
-    await expect(page.getByText('Latest personal weight')).toBeVisible()
+    await expect(page.getByText('Latest weight')).toBeVisible()
     await expect(
       page.getByRole('heading', { name: 'Your personal trend' }),
     ).toHaveCount(0)
@@ -26,7 +26,7 @@ for (const width of [1280, 320]) {
     await expect(
       page.getByRole('heading', { name: 'Your personal trend' }),
     ).toBeVisible()
-    await expect(page.getByText('Latest personal weight')).toHaveCount(0)
+    await expect(page.getByText('Latest weight')).toHaveCount(0)
     await page.getByRole('button', { name: 'Fixture back' }).click()
     await expect(
       sections.getByRole('link', { name: 'Overview' }),

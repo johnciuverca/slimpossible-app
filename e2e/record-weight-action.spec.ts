@@ -88,7 +88,7 @@ for (const width of [1280, 390]) {
       if (await page.locator('.dashboard-workspace').count()) {
         await expect(
           page
-            .locator('.dashboard-action-grid')
+            .locator('.dashboard-latest')
             .getByRole('button', { name: 'Record weight', exact: true }),
         ).toBeVisible()
         expect(actionBox.y).toBeGreaterThan(headingBox.y + headingBox.height)

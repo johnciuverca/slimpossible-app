@@ -29,21 +29,34 @@ for (const width of [1280, 390]) {
       page.getByRole('button', { name: 'Record weight', exact: true }),
     ).toBeEnabled()
     await expect(page.getByRole('region', { name: 'About you' })).toHaveCount(0)
-    for (const action of [
-      'Record weight',
-      'Invite people',
-      'Join with invitation',
-    ])
+    for (const action of ['Record weight', 'Invite people', 'Join challenge'])
       await expect(
         page.getByRole('button', { name: action, exact: true }),
       ).toBeVisible()
     await expect(
       page.getByRole('link', { name: 'Create challenge', exact: true }),
     ).toBeVisible()
+    await page.screenshot({
+      path: test.info().outputPath(`dashboard-overview-${width}.png`),
+      fullPage: true,
+    })
+    await page
+      .getByRole('navigation', { name: 'Dashboard sections' })
+      .getByRole('link', { name: 'Weigh-ins', exact: true })
+      .click()
+    await expect(
+      page.getByRole('list', { name: 'Personal weigh-in history' }),
+    ).toBeVisible()
+    await expect(
+      page.getByRole('img', { name: /^Personal weight history chart/ }),
+    ).toHaveCount(0)
     await page
       .getByRole('navigation', { name: 'Dashboard sections' })
       .getByRole('link', { name: 'Progress', exact: true })
       .click()
+    await expect(
+      page.getByRole('table', { name: 'Your saved personal weigh-ins' }),
+    ).toHaveCount(0)
     const chart = page.getByRole('img', {
       name: /^Personal weight history chart/,
     })
@@ -173,7 +186,7 @@ for (const width of [1280, 390]) {
       ),
     ).toBe(true)
     await page.screenshot({
-      path: test.info().outputPath(`dashboard-overview-${width}.png`),
+      path: test.info().outputPath(`dashboard-progress-${width}.png`),
       fullPage: true,
     })
     const account = page.getByLabel(
