@@ -8,7 +8,7 @@ for (const width of [1280, 390]) {
     page,
   }) => {
     await page.setViewportSize({ width, height: 900 })
-    await page.goto(fixture('/dashboard?challenge=unavailable'))
+    await page.goto(fixture('/dashboard?challenge=unavailable&tab=progress'))
     const contexts = page.getByRole('navigation', {
       name: 'Challenge contexts',
     })
@@ -45,7 +45,10 @@ for (const width of [1280, 390]) {
     ).toBeVisible()
     await expect(
       page.getByText('Synthetic first-account private note', { exact: true }),
-    ).toBeVisible()
+    ).toHaveCount(0)
+    await expect(
+      page.getByText('Synthetic first-account private note', { exact: true }),
+    ).toHaveCount(0)
     const bounds = await goals.evaluate((nav) => {
       const outer = nav.getBoundingClientRect()
       const active = nav
@@ -60,12 +63,23 @@ for (const width of [1280, 390]) {
     })
     expect(bounds.activeLeft).toBeGreaterThanOrEqual(bounds.left - 1)
     expect(bounds.activeRight).toBeLessThanOrEqual(bounds.right + 1)
+    await page
+      .getByRole('navigation', { name: 'Dashboard sections' })
+      .getByRole('link', { name: 'Weigh-ins', exact: true })
+      .click()
+    await expect(
+      page.getByText('Synthetic first-account private note', { exact: true }),
+    ).toBeVisible()
     await primary.getByRole('link', { name: 'Group', exact: true }).click()
     await expect(
       page.getByRole('heading', { name: 'Group', exact: true }),
     ).toBeVisible()
     await primary.getByRole('link', { name: 'Dashboard', exact: true }).click()
     await expect(page.getByTestId('fixture-route')).toHaveText('/dashboard')
+    await page
+      .getByRole('navigation', { name: 'Dashboard sections' })
+      .getByRole('link', { name: 'Progress', exact: true })
+      .click()
 
     await goals
       .getByRole('link', { name: 'Synthetic personal goal', exact: true })
@@ -184,6 +198,10 @@ for (const width of [1280, 390]) {
         exact: true,
       }),
     ).toBeVisible()
+    await page
+      .getByRole('navigation', { name: 'Dashboard sections' })
+      .getByRole('link', { name: 'Weigh-ins', exact: true })
+      .click()
     await expect(
       page.getByText('Synthetic first-account private note', { exact: true }),
     ).toHaveCount(0)

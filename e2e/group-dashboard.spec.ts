@@ -485,6 +485,10 @@ for (const layout of [
       await page.goto(
         `http://127.0.0.1:4174/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
       )
+      await page
+        .getByRole('navigation', { name: 'Group sections' })
+        .getByRole('link', { name: 'Charts', exact: true })
+        .click()
       const matrix = page.getByRole('table', {
         name: 'Shared group weight history',
       })
@@ -698,120 +702,55 @@ for (const layout of [
   })
 }
 
-test('Group Overview and history retain readable contrast in both color schemes', async ({
+test('selected Group sections retain readable contrast in both color schemes', async ({
   page,
 }) => {
   await installGroupFixtures(page, true)
-  await page.emulateMedia({ colorScheme: 'light' })
   await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
-  await page.addStyleTag({
-    content: '* { animation: none !important; transition: none !important; }',
-  })
-  const workspace = page.locator('.group-workspace')
-  await expect(
-    workspace.locator('.group-overview-metric').first(),
-  ).toBeVisible()
-  await expect(
-    workspace.locator('.group-overview-leader li').first(),
-  ).toBeVisible()
-  function luminance(color: string) {
-    const channels = color
-      .match(/[\d.]+/g)!
-      .slice(0, 3)
-      .map(Number)
-    const linear = channels.map((channel) => {
-      const value = channel / 255
-      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
-    })
-    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
-  }
-  function contrast(foreground: string, background: string) {
-    const values = [luminance(foreground), luminance(background)].sort(
-      (a, b) => b - a,
-    )
-    return (values[0] + 0.05) / (values[1] + 0.05)
-  }
-
   for (const colorScheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme })
-    await expect(workspace).toHaveCSS('color-scheme', 'dark')
-    const sample = await page.evaluate(() => {
-      const active = document.querySelector<HTMLElement>(
-        '[aria-label="Shared group members"] .group-member-tab-active',
-      )!
-      const overview = document.querySelector<HTMLElement>(
-        '.group-overview-card',
-      )!
-      const metricCard = document.querySelector<HTMLElement>(
-        '.group-overview-metric',
-      )!
-      const metric = metricCard.querySelector<HTMLElement>('dd')!
-      const metricLabel = metricCard.querySelector<HTMLElement>('dt')!
-      const leaderRow = document.querySelector<HTMLElement>(
-        '.group-overview-leader li',
-      )!
-      const leaderName = leaderRow.querySelector<HTMLElement>('span')!
-      const style = (element: HTMLElement) => getComputedStyle(element)
-      const groupLink = document.querySelector<HTMLElement>('a.bg-forest-800')!
-      return {
-        groupLinkBackground: style(groupLink).backgroundColor,
-        groupLinkColor: style(groupLink).color,
-        activeBackground: style(active).backgroundColor,
-        activeColor: style(active).color,
-        overviewBackground: style(overview).backgroundColor,
-        overviewColor: style(overview).color,
-        metricBackground: style(metricCard).backgroundColor,
-        metricColor: style(metric).color,
-        metricLabelColor: style(metricLabel).color,
-        leaderRowBackground: style(leaderRow).backgroundColor,
-        leaderNameColor: style(leaderName).color,
-      }
-    })
-    expect(
-      contrast(sample.activeColor, sample.activeBackground),
-      `${colorScheme} active-tab colors: ${JSON.stringify(sample)}`,
-    ).toBeGreaterThanOrEqual(4.5)
-    expect(
-      contrast(sample.groupLinkColor, sample.groupLinkBackground),
-    ).toBeGreaterThanOrEqual(4.5)
-    expect(
-      contrast(sample.overviewColor, sample.overviewBackground),
-    ).toBeGreaterThanOrEqual(4.5)
-    expect(
-      contrast(sample.metricColor, sample.metricBackground),
-    ).toBeGreaterThanOrEqual(4.5)
-    expect(
-      contrast(sample.metricLabelColor, sample.metricBackground),
-    ).toBeGreaterThanOrEqual(4.5)
-    expect(
-      contrast(sample.leaderNameColor, sample.leaderRowBackground),
-      `${colorScheme} provisional leader colors: ${JSON.stringify(sample)}`,
-    ).toBeGreaterThanOrEqual(4.5)
-    await expect(
-      page.getByRole('tab', { name: 'All members', exact: true }),
-    ).toBeVisible()
-    await page.screenshot({
-      path: test.info().outputPath(`group-overview-${colorScheme}.png`),
-      fullPage: true,
-    })
+    for (const [section, selector] of [
+      ['Overview', '.group-overview-metric dd'],
+      ['Weekly results', '.group-overview-leader li span'],
+      ['Charts', '.group-member-tab-active'],
+    ]) {
+      await page
+        .getByRole('navigation', { name: 'Group sections' })
+        .getByRole('link', { name: section, exact: true })
+        .click()
+      const target = page.locator(selector).first()
+      await expect(target).toBeVisible()
+      const ratio = await target.evaluate((element) => {
+        const canvas = document.createElement('canvas')
+        const context = canvas.getContext('2d')!
+        const luminance = (color: string) => {
+          context.fillStyle = color
+          context.fillRect(0, 0, 1, 1)
+          const [r, g, b] = [...context.getImageData(0, 0, 1, 1).data].map(
+            (channel) => {
+              const value = channel / 255
+              return value <= 0.04045
+                ? value / 12.92
+                : ((value + 0.055) / 1.055) ** 2.4
+            },
+          )
+          return 0.2126 * r + 0.7152 * g + 0.0722 * b
+        }
+        let background = element as Element | null
+        while (
+          background &&
+          getComputedStyle(background).backgroundColor === 'rgba(0, 0, 0, 0)'
+        )
+          background = background.parentElement
+        const values = [
+          luminance(getComputedStyle(element).color),
+          luminance(getComputedStyle(background!).backgroundColor),
+        ].sort((a, b) => b - a)
+        return (values[0] + 0.05) / (values[1] + 0.05)
+      })
+      expect(ratio, `${colorScheme} ${section}`).toBeGreaterThanOrEqual(4.5)
+    }
   }
-  const matrix = page.getByRole('table', {
-    name: 'Shared group weight history',
-  })
-  await expect(matrix).toBeVisible()
-  const dateCell = matrix.getByRole('rowheader').first()
-  for (const colorScheme of ['light', 'dark'] as const) {
-    await page.emulateMedia({ colorScheme })
-    const dateColors = await dateCell.evaluate((element) => {
-      const style = getComputedStyle(element)
-      return { color: style.color, background: style.backgroundColor }
-    })
-    expect(
-      contrast(dateColors.color, dateColors.background),
-      `${colorScheme} date-cell colors: ${JSON.stringify(dateColors)}`,
-    ).toBeGreaterThanOrEqual(4.5)
-  }
-  await expect(dateCell).toBeVisible()
 })
 
 for (const width of [1280, 390]) {
@@ -866,7 +805,7 @@ for (const width of [1280, 390]) {
     }
     await create.focus()
     const historyBefore = await page
-      .getByRole('table', { name: 'Shared group weight history' })
+      .getByRole('heading', { name: 'Group progress', exact: true })
       .boundingBox()
     await page.keyboard.press('Enter')
     await expect(create).toHaveAttribute('aria-expanded', 'true')
@@ -886,7 +825,7 @@ for (const width of [1280, 390]) {
     expect(panelBox.y).toBeCloseTo(boxes[1]!.y + boxes[1]!.height + 8, 0)
     expect(panelBox.y + panelBox.height).toBeLessThanOrEqual(900 - 16)
     const historyAfter = await page
-      .getByRole('table', { name: 'Shared group weight history' })
+      .getByRole('heading', { name: 'Group progress', exact: true })
       .boundingBox()
     expect(historyAfter!.y).toBeCloseTo(historyBefore!.y, 0)
     await expect(
@@ -962,10 +901,10 @@ for (const width of [1280, 390]) {
           ).length,
       )
       .toBeGreaterThan(before)
-    await expect(
-      page.getByRole('table', { name: 'Shared group weight history' }),
-    ).toBeVisible()
     await expect(refresh).toBeFocused()
+    await expect(
+      page.getByRole('heading', { name: 'Group progress', exact: true }),
+    ).toBeVisible()
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
@@ -977,7 +916,7 @@ for (const width of [1280, 390]) {
     })
   })
 
-  test(`combined Group retains legacy links without duplicate views at ${width}px`, async ({
+  test(`contextual Group restores legacy sections and keeps each destination distinct at ${width}px`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 900 })
@@ -991,42 +930,53 @@ for (const width of [1280, 390]) {
       await page.goto(
         `/e2e/fixtures/today-harness.html?${new URLSearchParams({ scenario: 'group', user: viewerId, route: `/group?challenge=${ownGroupId}${suffix}` })}`,
       )
+      await page.reload()
+      const sections = page.getByRole('navigation', { name: 'Group sections' })
+      const charts = suffix === '&tab=progress' || suffix === '#group-history'
       await expect(
-        page.getByRole('navigation', { name: 'Group sections' }),
-      ).toHaveCount(0)
-      await expect(
-        page.getByRole('button', { name: 'Overview', exact: true }),
-      ).toHaveCount(0)
-      await expect(
-        page.getByRole('button', { name: 'Progress & history', exact: true }),
-      ).toHaveCount(0)
-      await expect(
-        page.getByRole('heading', { name: 'Weekly result', exact: true }),
-      ).toHaveCount(1)
-      await expect(
-        page.getByRole('heading', { name: 'Member progress', exact: true }),
-      ).toHaveCount(1)
-      await expect(
-        page.getByRole('table', { name: 'Shared group weight history' }),
-      ).toHaveCount(1)
-      await expect(
-        page.getByRole('img', {
-          name: 'Weight (kg) — shared group history',
+        sections.getByRole('link', {
+          name: charts ? 'Charts' : 'Overview',
           exact: true,
         }),
-      ).toHaveCount(1)
+      ).toHaveAttribute('aria-current', 'page')
       await expect(
-        page.getByRole('button', { name: 'Record weight', exact: true }),
-      ).toHaveCount(1)
+        page.getByRole('table', { name: 'Shared group weight history' }),
+      ).toHaveCount(charts ? 1 : 0)
+      await expect(
+        page.getByRole('heading', { name: 'Weekly result', exact: true }),
+      ).toHaveCount(0)
+      const members = sections.getByRole('link', {
+        name: 'Members',
+        exact: true,
+      })
+      await members.focus()
+      await page.keyboard.press('Enter')
+      await expect(
+        page.getByRole('heading', { name: 'Member progress', exact: true }),
+      ).toBeVisible()
+      await expect(
+        page.getByRole('table', { name: 'Shared group weight history' }),
+      ).toHaveCount(0)
       await expect(
         page.getByRole('button', { name: 'Change target', exact: true }),
       ).toHaveCount(1)
+      await sections.getByRole('link', { name: 'Weekly results' }).click()
       await expect(
-        page.getByRole('button', { name: 'Edit starting weight', exact: true }),
-      ).toHaveCount(1)
+        page.getByRole('heading', { name: 'Weekly result', exact: true }),
+      ).toBeVisible()
+      await expect(
+        page.getByRole('heading', { name: 'Member progress', exact: true }),
+      ).toHaveCount(0)
+      await sections.getByRole('link', { name: 'Charts' }).click()
       await expect(
         page.getByRole('tab', { name: 'All members', exact: true }),
       ).toHaveAttribute('aria-selected', 'true')
+      await expect(
+        sections.getByRole('link', { name: 'Members' }),
+      ).toHaveAttribute(
+        'href',
+        new RegExp(`challenge=${ownGroupId}.*tab=members`),
+      )
       await expect(
         page.getByText('Other member private note must never render'),
       ).toHaveCount(0)
@@ -1037,7 +987,7 @@ for (const width of [1280, 390]) {
       ).toBe(true)
     }
     await page.screenshot({
-      path: test.info().outputPath(`combined-group-${width}.png`),
+      path: test.info().outputPath(`contextual-group-${width}.png`),
       fullPage: true,
     })
   })
@@ -1047,7 +997,7 @@ for (const viewport of [
   { label: 'desktop', width: 1280 },
   { label: 'mobile', width: 390 },
 ]) {
-  test(`Progress keeps author controls and links group history on ${viewport.label}`, async ({
+  test(`Weigh-ins keeps author controls and links Group history on ${viewport.label}`, async ({
     page,
   }) => {
     await page.setViewportSize({ width: viewport.width, height: 900 })
@@ -1055,8 +1005,12 @@ for (const viewport of [
     await page.goto(
       `http://127.0.0.1:4174/e2e/fixtures/today-harness.html?scenario=progress&selected=${ownGroupId}&user=${viewerId}`,
     )
-    const personal = page.getByRole('table', {
-      name: 'Your saved personal weigh-ins',
+    await page
+      .getByRole('navigation', { name: 'Dashboard sections' })
+      .getByRole('link', { name: 'Weigh-ins', exact: true })
+      .click()
+    const personal = page.getByRole('list', {
+      name: 'Personal weigh-in history',
     })
     const edit = personal.getByRole('button', {
       name: 'Edit weight 2026-09-22',
@@ -1067,7 +1021,7 @@ for (const viewport of [
       exact: true,
     })
     await expect(edit).toBeVisible()
-    await expect(personal.locator('tbody tr')).toHaveCount(1)
+    await expect(personal.locator('li')).toHaveCount(1)
     await expect(
       page.getByRole('table', { name: 'Shared group weigh-ins' }),
     ).toHaveCount(0)
@@ -1076,19 +1030,27 @@ for (const viewport of [
     ).toHaveCount(0)
     await expect(personal).toContainText('Author-only disposable private note')
     await edit.click()
-    const editor = page.getByRole('dialog', { name: 'Edit weight' })
+    const editor = page.getByRole('form', { name: 'Personal weigh-in form' })
     await expect(editor.getByLabel('Private note')).toHaveValue(
       'Author-only disposable private note',
     )
     await editor.getByLabel('Weight in kg').fill('87')
     await editor.getByRole('button', { name: 'Update weight' }).click()
     await expect(personal).toContainText('87 kg')
+    await expect(edit).toBeVisible()
+    await expect(personal).toContainText('87 kg')
+    await page
+      .getByRole('navigation', { name: 'Dashboard sections' })
+      .getByRole('link', { name: 'Progress', exact: true })
+      .click()
     await expect(page.getByText(/No personal goal yet/)).toBeVisible()
     await expect(
       page.getByRole('link', { name: /Open this group’s shared history/ }),
     ).toHaveCount(0)
-    await expect(edit).toBeVisible()
-    await expect(personal).toContainText('87 kg')
+    await page
+      .getByRole('navigation', { name: 'Dashboard sections' })
+      .getByRole('link', { name: 'Weigh-ins', exact: true })
+      .click()
     await remove.click()
     const deletion = page.getByRole('dialog', { name: 'Delete weight?' })
     await expect(deletion).toContainText('ALL shared groups')
@@ -1106,6 +1068,10 @@ for (const viewport of [
       .getByRole('navigation', { name: 'Primary navigation' })
       .getByRole('link', { name: 'Group', exact: true })
       .click()
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Charts', exact: true })
+      .click()
     await expect(
       page.getByRole('table', { name: 'Shared group weight history' }),
     ).toBeVisible()
@@ -1121,6 +1087,10 @@ for (const viewport of [
     await page.goto(
       `/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
     )
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Charts', exact: true })
+      .click()
     const matrix = page.getByRole('table', {
       name: 'Shared group weight history',
     })
@@ -1255,7 +1225,15 @@ for (const viewport of [
         exact: true,
       })
       .click()
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Overview', exact: true })
+      .click()
     await expect(page.getByText('73.2%', { exact: true })).toBeVisible()
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Charts', exact: true })
+      .click()
     await expect(matrix.getByRole('button')).toHaveCount(0)
     await expect(matrix.getByText('87.00 kg', { exact: true })).toHaveCount(0)
     await expect(matrix.getByText('88.50 kg', { exact: true })).toBeVisible()
@@ -1267,15 +1245,19 @@ for (const viewport of [
     await page.emulateMedia({ colorScheme: 'dark' })
     const requests = await installGroupFixtures(page, true)
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Charts', exact: true })
+      .click()
     await expect(
       page.getByRole('navigation', { name: 'Group sections' }),
-    ).toHaveCount(0)
+    ).toHaveCount(1)
     await expect(
       page.getByRole('heading', { name: 'Weekly result', exact: true }),
-    ).toHaveCount(1)
+    ).toHaveCount(0)
     await expect(
       page.getByRole('heading', { name: 'Member progress', exact: true }),
-    ).toHaveCount(1)
+    ).toHaveCount(0)
     const table = page.getByRole('table', {
       name: 'Shared group weight history',
     })
@@ -1596,6 +1578,10 @@ for (const viewport of [
       },
     )
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Charts', exact: true })
+      .click()
     await expect(page.getByText('Loading shared group history…')).toBeVisible()
     phase = 'rows'
     release()
@@ -1640,6 +1626,10 @@ for (const viewport of [
     await installGroupFixtures(page, true)
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
     await expect(page.getByText('42.5%', { exact: true })).toBeVisible()
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Charts', exact: true })
+      .click()
     await expect(
       page.getByRole('table', { name: 'Shared group weight history' }),
     ).toContainText('Ava')
@@ -1658,7 +1648,15 @@ for (const viewport of [
     })
     await second.focus()
     await page.keyboard.press('Enter')
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Overview', exact: true })
+      .click()
     await expect(page.getByText('73.2%', { exact: true })).toBeVisible()
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Charts', exact: true })
+      .click()
     await expect(
       page.getByRole('table', { name: 'Shared group weight history' }),
     ).toContainText('Jo')
@@ -1669,6 +1667,10 @@ for (const viewport of [
     await expect(
       contexts.getByRole('link', { name: /Second authorized group/ }),
     ).toHaveAttribute('aria-current', 'page')
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Weekly results' })
+      .click()
     await expect(
       page.getByRole('list', { name: 'Weekly winners' }),
     ).toContainText('Jo')
@@ -1699,6 +1701,10 @@ for (const viewport of [
       page.getByRole('heading', { name: 'Group', exact: true }),
     ).toBeVisible()
     await expect(page.getByText('42.5%', { exact: true })).toBeVisible()
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Weekly results' })
+      .click()
     await expect(page.getByText('Shared provisional leaders')).toBeVisible()
     await expect(
       page.getByRole('list', { name: 'Weekly winners' }),
@@ -1707,6 +1713,10 @@ for (const viewport of [
       page.getByRole('list', { name: 'Weekly winners' }),
     ).toContainText('Ben')
 
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Charts', exact: true })
+      .click()
     const historyPanel = page.getByRole('region', {
       name: 'Group chart and weigh-in history',
     })
@@ -1804,6 +1814,10 @@ for (const viewport of [
       `/e2e/fixtures/today-harness.html?scenario=group&user=${viewerId}`,
     )
     await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Members', exact: true })
+      .click()
+    await page
       .getByRole('link', { name: 'Group · E2E authorized group' })
       .click()
 
@@ -1839,7 +1853,7 @@ for (const viewport of [
     ).toBe(true)
     await expect(
       page.getByRole('navigation', { name: 'Group sections' }),
-    ).toHaveCount(0)
+    ).toHaveCount(1)
     await expect(
       page.getByRole('heading', { name: 'Member progress' }),
     ).toHaveCount(1)
@@ -1863,6 +1877,10 @@ for (const viewport of [
     await page.goto(
       `/e2e/fixtures/today-harness.html?scenario=group&user=${viewerId}`,
     )
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Members', exact: true })
+      .click()
     await page
       .getByRole('link', { name: 'Group · E2E authorized group' })
       .click()
@@ -1953,6 +1971,10 @@ for (const viewport of [
       `/e2e/fixtures/today-harness.html?scenario=group&user=${viewerId}`,
     )
     await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Members', exact: true })
+      .click()
+    await page
       .getByRole('link', { name: 'Group · E2E authorized group' })
       .click()
     await expect(
@@ -1998,6 +2020,10 @@ for (const viewport of [
       `/e2e/fixtures/today-harness.html?scenario=group&user=${viewerId}`,
     )
     await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Members', exact: true })
+      .click()
+    await page
       .getByRole('link', { name: 'Group · E2E authorized group' })
       .click()
     const oldMember = page.getByRole('heading', {
@@ -2035,6 +2061,10 @@ for (const viewport of [
     await page.goto(
       `/e2e/fixtures/today-harness.html?scenario=group&user=${viewerId}`,
     )
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Members', exact: true })
+      .click()
     await page
       .getByRole('link', { name: 'Group · E2E authorized group' })
       .click()
@@ -2102,6 +2132,10 @@ test('the shared chart range handles respond to mobile touch dragging', async ({
     const page = await context.newPage()
     await installGroupFixtures(page, true)
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Charts', exact: true })
+      .click()
     const chart = page.getByRole('img', {
       name: 'Weight (kg) — shared group history',
     })

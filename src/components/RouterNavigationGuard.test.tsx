@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -73,6 +74,53 @@ function Editor() {
     </>
   )
 }
+
+it('guards contextual section switches and Back while keeping the weigh-in draft on Stay', async () => {
+  const router = createMemoryRouter(
+    [
+      {
+        path: '*',
+        element: (
+          <AppLayout>
+            <Editor />
+          </AppLayout>
+        ),
+      },
+    ],
+    {
+      initialEntries: ['/dashboard', '/weigh-ins?challenge=group-one'],
+      initialIndex: 1,
+    },
+  )
+  render(
+    <AuthProvider
+      initialState={{
+        status: 'signed-in',
+        error: null,
+        user: { id: 'owner-1', email: 'owner@example.invalid' },
+      }}
+    >
+      <RouterProvider router={router} />
+    </AuthProvider>,
+  )
+  fireEvent.change(screen.getByLabelText('Unsaved weight'), {
+    target: { value: '83.2' },
+  })
+  fireEvent.click(screen.getByRole('link', { name: 'Progress' }))
+  expect(
+    await screen.findByRole('dialog', { name: 'Discard unsaved input?' }),
+  ).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Stay' }))
+  expect(screen.getByLabelText('Unsaved weight')).toHaveValue('83.2')
+  expect(router.state.location.pathname).toBe('/weigh-ins')
+  await act(async () => {
+    await router.navigate(-1)
+  })
+  expect(await screen.findByRole('dialog')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Discard and leave' }))
+  await waitFor(() => expect(router.state.location.pathname).toBe('/dashboard'))
+  router.dispose()
+})
 
 function groupActionsRouter() {
   const workspace = {

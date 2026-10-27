@@ -33,15 +33,23 @@ for (const viewport of [
         path.startsWith('/goals') || path.startsWith('/progress')
       if (personalWorkspace) {
         await expect(contexts).toHaveCount(0)
+        await page
+          .getByRole('navigation', { name: 'Dashboard sections' })
+          .getByRole('link', { name: 'Weigh-ins', exact: true })
+          .click()
         await expect(
-          page.getByRole('table', { name: 'Your saved personal weigh-ins' }),
+          page.getByRole('list', { name: 'Personal weigh-in history' }),
         ).toBeVisible()
+        await page
+          .getByRole('navigation', { name: 'Dashboard sections' })
+          .getByRole('link', { name: 'Overview', exact: true })
+          .click()
         await expect(
           page.getByRole('button', { name: 'Record weight', exact: true }),
         ).toBeEnabled()
         await expect(
           page
-            .locator('.dashboard-action-grid')
+            .locator('.dashboard-latest')
             .getByRole('button', { name: 'Record weight', exact: true }),
         ).toBeVisible()
         continue
@@ -94,6 +102,10 @@ for (const viewport of [
             element.closest('.group-history-workspace'),
           ),
         ).toBeNull()
+        await page
+          .getByRole('navigation', { name: 'Group sections' })
+          .getByRole('link', { name: 'Charts', exact: true })
+          .click()
         const memberNavigation = page.locator(
           '.group-history-workspace > .sticky',
         )
@@ -143,7 +155,7 @@ for (const viewport of [
     await expect(active).toBeFocused()
     await page.keyboard.press('Enter')
     await expect(page.getByTestId('fixture-route')).toHaveText(
-      '/group?challenge=dashboard-active',
+      '/group?tab=charts&challenge=dashboard-active',
     )
     await expect(active).toHaveAttribute('aria-current', 'page')
     await expect(draft).not.toHaveAttribute('aria-current', 'page')

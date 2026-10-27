@@ -18,27 +18,31 @@ for (const width of [1280, 390]) {
           }
         })
         const scenario = mode === 'create' ? 'groups' : 'accounts'
-        const path =
-          surface === 'page'
-            ? '/weigh-ins'
-            : mode === 'create'
-              ? '/dashboard'
-              : '/progress'
+        const path = surface === 'page' ? '/weigh-ins' : '/dashboard'
         await page.goto(
           `${personalFixture}?${new URLSearchParams({ scenario, path })}`,
         )
 
         if (surface === 'dialog' && mode === 'create') {
           await page.getByRole('button', { name: 'Record weight' }).click()
+        } else if (surface === 'dialog' && mode === 'edit') {
+          await page.evaluate(() => {
+            const entries = JSON.parse(
+              localStorage.getItem('slimpossible.local.personal-weigh-ins') ??
+                '[]',
+            )
+            const today = new Date()
+            entries[0].date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+            localStorage.setItem(
+              'slimpossible.local.personal-weigh-ins',
+              JSON.stringify(entries),
+            )
+          })
+          await page.reload()
+          await page.getByRole('button', { name: 'Record weight' }).click()
         } else if (mode === 'edit') {
-          const historyName =
-            surface === 'dialog'
-              ? 'Your saved personal weigh-ins'
-              : 'Personal weigh-in history'
           const date = await page
-            .getByRole(surface === 'dialog' ? 'table' : 'list', {
-              name: historyName,
-            })
+            .getByRole('list', { name: 'Personal weigh-in history' })
             .locator('time')
             .first()
             .getAttribute('datetime')

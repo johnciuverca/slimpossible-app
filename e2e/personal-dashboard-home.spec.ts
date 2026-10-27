@@ -28,11 +28,22 @@ for (const width of [1280, 390]) {
     ).toHaveCount(2)
     await expect(
       page.getByText('Synthetic first-account private note', { exact: true }),
-    ).toBeVisible()
+    ).toHaveCount(0)
     await expect(
       page.getByText('Synthetic second-account private note', { exact: true }),
     ).toHaveCount(0)
 
+    await page
+      .getByRole('navigation', { name: 'Dashboard sections' })
+      .getByRole('link', { name: 'Weigh-ins', exact: true })
+      .click()
+    await expect(
+      page.getByText('Synthetic first-account private note', { exact: true }),
+    ).toBeVisible()
+    await page
+      .getByRole('navigation', { name: 'Dashboard sections' })
+      .getByRole('link', { name: 'Progress', exact: true })
+      .click()
     await page.reload()
     await expect(
       page.getByRole('heading', { name: 'Goals', exact: true }),
@@ -105,8 +116,8 @@ for (const width of [1280, 390]) {
       )
       await page.getByRole('button', { name: 'Close Profile' }).click()
       await expect(
-        page.getByRole('link', { name: 'My Progress and private history' }),
-      ).toHaveAttribute('href', /#personal-history$/)
+        page.getByRole('link', { name: 'My progress' }),
+      ).toHaveAttribute('href', /tab=progress$/)
       await expect(
         page.getByRole('button', { name: 'Record weight', exact: true }),
       ).toBeEnabled()

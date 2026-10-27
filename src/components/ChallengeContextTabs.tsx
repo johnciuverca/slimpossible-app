@@ -3,11 +3,13 @@ import { Link, useLocation } from 'react-router-dom'
 import { useOptionalAuth } from '../auth/useAuth'
 import { createPersistence } from '../data/persistence'
 import type { Challenge } from '../models/challenge'
+import { workspaceSection } from '../models/workspaceNavigation'
 
 function challengeTabDestination(
   path: string,
   challenge?: Challenge,
   search = '',
+  hash = '',
 ) {
   if (!challenge) {
     return ['/dashboard', '/today', '/', '/weigh-ins', '/progress'].includes(
@@ -23,11 +25,10 @@ function challengeTabDestination(
     (path === '/group' && challenge.kind === 'personal')
       ? '/progress'
       : path
-  const params = new URLSearchParams({ challenge: challenge.id })
-  if (path === '/group') {
-    const selectedTab = new URLSearchParams(search).get('tab')
-    if (selectedTab) params.set('tab', selectedTab)
-  }
+  const params = new URLSearchParams(path === '/group' ? search : '')
+  params.set('challenge', challenge.id)
+  if (path === '/group' && hash)
+    params.set('tab', workspaceSection('group', path, search, hash))
   return `${destination}?${params}`
 }
 
@@ -44,7 +45,7 @@ export function ChallengeTabs({
   error?: string
   showPersonalTracking?: boolean
 }) {
-  const { pathname, search } = useLocation()
+  const { pathname, search, hash } = useLocation()
   const querySelection = new URLSearchParams(search).get('challenge') || null
   const selected = ['/dashboard', '/today'].includes(pathname)
     ? null
@@ -98,7 +99,7 @@ export function ChallengeTabs({
             ...challenges.map((challenge) => ({
               id: challenge.id,
               label: `${challenge.kind === 'personal' ? 'Personal' : 'Group'} · ${challenge.name}`,
-              to: challengeTabDestination(pathname, challenge, search),
+              to: challengeTabDestination(pathname, challenge, search, hash),
             })),
           ].map(({ id, label, to }) => {
             const active = id ? selected === id : personalPage && !selected
@@ -211,7 +212,9 @@ export function ChallengeContextTabs() {
     : current.challenges
   return (
     <ChallengeTabs
-      {...current}
+      key={key}
+      loading={current.loading}
+      error={current.error}
       challenges={challenges}
       showPersonalTracking={!groupPage}
     />

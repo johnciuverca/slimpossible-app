@@ -6,16 +6,17 @@ for (const viewport of [
   { label: 'desktop', width: 1280 },
   { label: 'narrow', width: 390 },
 ]) {
-  test(`latest-weight card aligns with dashboard actions on ${viewport.label}`, async ({
+  test(`compact latest-weight summary and dashboard actions fit on ${viewport.label}`, async ({
     page,
   }) => {
     await page.setViewportSize({ width: viewport.width, height: 900 })
     await page.goto(fixture())
-    await expect(page.getByText('Latest personal weight')).toBeVisible()
+    await expect(page.getByText('Latest weight')).toBeVisible()
     const latestCard = page.locator('.dashboard-latest')
-    const actionGrid = page.locator('.dashboard-action-grid')
+    const actionCard = page.locator('.dashboard-actions-compact')
+    const actionGrid = actionCard.locator('.dashboard-action-grid')
     await expect(
-      actionGrid.getByRole('button', { name: 'Record weight', exact: true }),
+      latestCard.getByRole('button', { name: 'Record weight', exact: true }),
     ).toBeVisible()
     await expect(
       actionGrid.getByRole('link', { name: 'Create challenge' }),
@@ -24,11 +25,14 @@ for (const viewport of [
       actionGrid.getByRole('button', { name: 'Invite people' }),
     ).toBeVisible()
     await expect(
-      actionGrid.getByRole('button', { name: 'Join with invitation' }),
+      actionGrid.getByRole('button', { name: 'Join challenge' }),
+    ).toBeVisible()
+    await expect(
+      actionGrid.getByRole('link', { name: 'My progress', exact: true }),
     ).toBeVisible()
     const [cardBox, gridBox] = await Promise.all([
       latestCard.boundingBox(),
-      actionGrid.boundingBox(),
+      actionCard.boundingBox(),
     ])
     expect(cardBox).not.toBeNull()
     expect(gridBox).not.toBeNull()
@@ -45,43 +49,49 @@ for (const viewport of [
   })
 }
 
-test('Combined Dashboard has one chart/table and keyboard history access at 390px', async ({
+test('Dashboard selects one progress view with keyboard history access at 390px', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto(fixture())
-  await expect(page.getByText('Latest personal weight')).toBeVisible()
+  await expect(page.getByText('Latest weight')).toBeVisible()
   await expect(page.getByText('60 kg', { exact: true }).first()).toBeVisible()
   await expect(
     page.getByRole('tablist', { name: 'Dashboard views' }),
   ).toHaveCount(0)
   await expect(
     page.getByRole('img', { name: /^Personal weight history chart/ }),
-  ).toHaveCount(1)
+  ).toHaveCount(0)
   await expect(
     page.getByRole('table', { name: 'Your saved personal weigh-ins' }),
-  ).toHaveCount(1)
-  await page
-    .getByRole('link', { name: 'My Progress and private history' })
-    .focus()
+  ).toHaveCount(0)
+  await page.getByRole('link', { name: 'My progress' }).focus()
   await page.keyboard.press('Enter')
   await expect(page.getByTestId('fixture-route')).toHaveText(
-    '/dashboard#personal-history',
+    '/dashboard?tab=progress',
   )
   await expect(
     page.getByRole('heading', { name: 'Goals', exact: true }),
   ).toBeVisible()
   await expect(
+    page.getByRole('img', { name: /^Personal weight history chart/ }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('table', { name: 'Your saved personal weigh-ins' }),
+  ).toHaveCount(0)
+  await page
+    .getByRole('navigation', { name: 'Dashboard sections' })
+    .getByRole('link', { name: 'Weigh-ins', exact: true })
+    .click()
+  await expect(
     page
-      .getByRole('table', { name: 'Your saved personal weigh-ins' })
+      .getByRole('list', { name: 'Personal weigh-in history' })
       .getByText('94.8 kg', { exact: true }),
   ).toBeVisible()
   await expect(page.getByText('Synthetic private latest note')).toBeVisible()
   await expect(page.getByText('Peer secret must stay hidden')).toHaveCount(0)
   await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1)
-  await expect(
-    page.getByRole('button', { name: 'Record weight', exact: true }),
-  ).toHaveCount(1)
+  await expect(page.getByText('Latest weight')).toHaveCount(0)
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -122,22 +132,25 @@ test('Legacy Progress direct-loads and refreshes; Back/Forward preserves history
   await page.goto(fixture('/dashboard?tab=progress&challenge=personal-goal'))
   await page.reload()
   await expect(
-    page.getByRole('table', { name: 'Your saved personal weigh-ins' }),
+    page.getByRole('img', { name: /^Personal weight history chart/ }),
   ).toBeVisible()
   await expect(
-    page
-      .getByRole('table', { name: 'Your saved personal weigh-ins' })
-      .getByText('94.8 kg', { exact: true }),
+    page.getByRole('table', { name: 'Your saved personal weigh-ins' }),
+  ).toHaveCount(0)
+  await page
+    .getByRole('navigation', { name: 'Dashboard sections' })
+    .getByRole('link', { name: 'Weigh-ins', exact: true })
+    .click()
+  await expect(
+    page.getByRole('list', { name: 'Personal weigh-in history' }),
   ).toBeVisible()
   await page.goto(fixture('/dashboard', true))
-  await page
-    .getByRole('link', { name: 'My Progress and private history' })
-    .click()
+  await page.getByRole('link', { name: 'My progress' }).click()
   await page.evaluate(() => history.back())
   await expect(page.getByTestId('fixture-route')).toHaveText('/dashboard')
   await page.evaluate(() => history.forward())
   await expect(
-    page.getByRole('table', { name: 'Your saved personal weigh-ins' }),
+    page.getByRole('img', { name: /^Personal weight history chart/ }),
   ).toBeVisible()
 })
 
@@ -168,9 +181,7 @@ test('browser Back keeps dirty target input until an explicit discard', async ({
   page,
 }) => {
   await page.goto(fixture('/dashboard', true))
-  await page
-    .getByRole('link', { name: 'My Progress and private history' })
-    .click()
+  await page.getByRole('link', { name: 'My progress' }).click()
   await page
     .getByRole('button', { name: 'Edit starting weight', exact: true })
     .click()
@@ -184,9 +195,9 @@ test('browser Back keeps dirty target input until an explicit discard', async ({
     '110',
   )
   await expect(page.getByTestId('fixture-route')).toHaveText(
-    '/dashboard#personal-history',
+    '/dashboard?tab=progress',
   )
-  await expect(page).toHaveURL(/\/dashboard#personal-history$/)
+  await expect(page).toHaveURL(/\/dashboard\?tab=progress$/)
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()
   await expect(
     page.getByRole('dialog', { name: 'Discard unsaved input?' }),
@@ -201,9 +212,7 @@ test('discarding the browser Back warning completes the requested navigation', a
   page,
 }) => {
   await page.goto(fixture('/dashboard', true))
-  await page
-    .getByRole('link', { name: 'My Progress and private history' })
-    .click()
+  await page.getByRole('link', { name: 'My progress' }).click()
   await page
     .getByRole('button', { name: 'Edit starting weight', exact: true })
     .click()
@@ -217,7 +226,6 @@ test('account and goal switching keep personal history separate and use the invi
   page,
 }) => {
   await page.goto(fixture('/dashboard?tab=progress&challenge=goal-two'))
-  await expect(page.getByText('Synthetic private latest note')).toBeVisible()
   await expect(
     page.getByText(/This personal goal is unavailable/),
   ).toBeVisible()
@@ -225,17 +233,24 @@ test('account and goal switching keep personal history separate and use the invi
     .getByRole('link', { name: 'Synthetic personal goal', exact: true })
     .click()
   await expect(
-    page
-      .getByRole('table', { name: 'Your saved personal weigh-ins' })
-      .getByText('94.8 kg', { exact: true }),
+    page.getByRole('img', { name: /^Personal weight history chart/ }),
   ).toBeVisible()
+  await page
+    .getByRole('navigation', { name: 'Dashboard sections' })
+    .getByRole('link', { name: 'Weigh-ins', exact: true })
+    .click()
+  await expect(page.getByText('Synthetic private latest note')).toBeVisible()
   await page.getByRole('button', { name: 'Switch synthetic account' }).click()
   await expect(page.getByText('Synthetic second account note')).toBeVisible()
   await expect(page.getByText('Synthetic private latest note')).toHaveCount(0)
   await expect(
     page.getByRole('button', { name: 'Edit starting weight', exact: true }),
   ).toHaveCount(0)
-  await page.getByRole('button', { name: 'Join with invitation' }).click()
+  await page
+    .getByRole('navigation', { name: 'Dashboard sections' })
+    .getByRole('link', { name: 'Overview' })
+    .click()
+  await page.getByRole('button', { name: 'Join challenge' }).click()
   await page
     .getByLabel('Invitation link or token')
     .fill('https://example.invalid/invite/synthetic-token')
@@ -257,6 +272,10 @@ for (const width of [1280, 390]) {
             : '/dashboard',
         ) + (scenario === 'group-only' ? '&groupOnly=1' : ''),
       )
+      await page
+        .getByRole('navigation', { name: 'Dashboard sections' })
+        .getByRole('link', { name: 'Progress', exact: true })
+        .click()
       const goals = page.locator('#goals')
       await expect(
         goals.getByRole('link', { name: /Synthetic (first|second) group/ }),
@@ -297,6 +316,10 @@ for (const width of [1280, 390]) {
           ),
         ).toBeVisible()
       }
+      await page
+        .getByRole('navigation', { name: 'Dashboard sections' })
+        .getByRole('link', { name: 'Overview', exact: true })
+        .click()
       await page
         .getByRole('button', { name: 'Record weight', exact: true })
         .click()

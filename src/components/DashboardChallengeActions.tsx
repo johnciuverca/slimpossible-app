@@ -13,10 +13,14 @@ export function DashboardChallengeActions({
   workspace,
   recordAction,
   protectDraft = false,
+  compact = false,
+  progressTo,
 }: {
   workspace: PersonalWorkspace
   recordAction?: ReactNode
   protectDraft?: boolean
+  compact?: boolean
+  progressTo?: string
 }) {
   // Remount owner-specific chooser state immediately when the account changes.
   return (
@@ -25,6 +29,8 @@ export function DashboardChallengeActions({
       workspace={workspace}
       recordAction={recordAction}
       protectDraft={protectDraft}
+      compact={compact}
+      progressTo={progressTo}
     />
   )
 }
@@ -33,10 +39,14 @@ function OwnedGroupActions({
   workspace,
   recordAction,
   protectDraft,
+  compact,
+  progressTo,
 }: {
   workspace: PersonalWorkspace
   recordAction?: ReactNode
   protectDraft: boolean
+  compact: boolean
+  progressTo?: string
 }) {
   const navigate = useNavigate()
   const [joining, setJoining] = useState(false)
@@ -71,25 +81,43 @@ function OwnedGroupActions({
     `/challenge/invites?${new URLSearchParams({ challenge: id })}`
   return (
     <Card
-      className={recordAction ? 'dashboard-actions-region' : 'space-y-4 p-6'}
+      className={
+        compact
+          ? 'dashboard-actions-compact space-y-3 p-3'
+          : recordAction
+            ? 'dashboard-actions-region'
+            : 'space-y-4 p-6'
+      }
       role="region"
       aria-labelledby="dashboard-connect-title"
     >
       <h2
         id="dashboard-connect-title"
-        className={recordAction ? 'sr-only' : 'text-lg font-bold'}
+        className={compact || recordAction ? 'sr-only' : 'text-lg font-bold'}
       >
         Create and connect
       </h2>
-      <p className={recordAction ? 'sr-only' : 'text-sm text-ink-muted'}>
-        Challenges are optional. Create one or invite people to a group you own.
-      </p>
+      {!compact ? (
+        <p className={recordAction ? 'sr-only' : 'text-sm text-ink-muted'}>
+          Challenges are optional. Create one or invite people to a group you
+          own.
+        </p>
+      ) : null}
       <div
         className={
-          recordAction ? 'dashboard-action-grid' : 'flex flex-wrap gap-3'
+          compact
+            ? 'dashboard-action-grid dashboard-action-grid-compact'
+            : recordAction
+              ? 'dashboard-action-grid'
+              : 'flex flex-wrap gap-3'
         }
       >
         {recordAction}
+        {compact && progressTo ? (
+          <Link className={actionClass} to={progressTo}>
+            My progress
+          </Link>
+        ) : null}
         <Link
           aria-label="Create challenge"
           className={
@@ -99,16 +127,18 @@ function OwnedGroupActions({
           }
           to="/challenge/setup"
         >
-          {recordAction ? <DashboardActionIcon kind="create" /> : null}
+          {recordAction && !compact ? (
+            <DashboardActionIcon kind="create" />
+          ) : null}
           <span>
             Create challenge
-            {recordAction ? (
+            {recordAction && !compact ? (
               <span className="dashboard-action-description">
                 Start a new challenge
               </span>
             ) : null}
           </span>
-          {recordAction ? (
+          {recordAction && !compact ? (
             <span className="dashboard-action-chevron" aria-hidden="true">
               ›
             </span>
@@ -124,16 +154,18 @@ function OwnedGroupActions({
             }
             to={inviteDestination(groups[0].id)}
           >
-            {recordAction ? <DashboardActionIcon kind="invite" /> : null}
+            {recordAction && !compact ? (
+              <DashboardActionIcon kind="invite" />
+            ) : null}
             <span>
               Invite people
-              {recordAction ? (
+              {recordAction && !compact ? (
                 <span className="dashboard-action-description">
                   Bring your group together
                 </span>
               ) : null}
             </span>
-            {recordAction ? (
+            {recordAction && !compact ? (
               <span className="dashboard-action-chevron" aria-hidden="true">
                 ›
               </span>
@@ -151,16 +183,18 @@ function OwnedGroupActions({
             aria-controls="dashboard-invite-chooser"
             onClick={() => setChoosing((value) => !value)}
           >
-            {recordAction ? <DashboardActionIcon kind="invite" /> : null}
+            {recordAction && !compact ? (
+              <DashboardActionIcon kind="invite" />
+            ) : null}
             <span>
               Invite people
-              {recordAction ? (
+              {recordAction && !compact ? (
                 <span className="dashboard-action-description">
                   Bring your group together
                 </span>
               ) : null}
             </span>
-            {recordAction ? (
+            {recordAction && !compact ? (
               <span className="dashboard-action-chevron" aria-hidden="true">
                 ›
               </span>
@@ -168,25 +202,31 @@ function OwnedGroupActions({
           </Button>
         )}
         <Button
-          aria-label="Join with invitation"
+          aria-label={compact ? 'Join challenge' : 'Join with invitation'}
           className={
-            recordAction ? 'dashboard-action dashboard-action-join' : 'min-h-11'
+            compact
+              ? 'min-h-11'
+              : recordAction
+                ? 'dashboard-action dashboard-action-join'
+                : 'min-h-11'
           }
           variant="secondary"
           aria-expanded={joining}
           aria-controls="dashboard-join"
           onClick={() => setJoining((value) => !value)}
         >
-          {recordAction ? <DashboardActionIcon kind="join" /> : null}
+          {recordAction && !compact ? (
+            <DashboardActionIcon kind="join" />
+          ) : null}
           <span>
-            Join with invitation
-            {recordAction ? (
+            {compact ? 'Join challenge' : 'Join with invitation'}
+            {recordAction && !compact ? (
               <span className="dashboard-action-description">
                 Use an invitation link
               </span>
             ) : null}
           </span>
-          {recordAction ? (
+          {recordAction && !compact ? (
             <span className="dashboard-action-chevron" aria-hidden="true">
               ›
             </span>

@@ -531,6 +531,24 @@ body {
   display: grid;
   gap: 0.8rem;
 }
+.dashboard-action-grid-compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.dashboard-actions-compact h2 {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.dashboard-actions-compact .dashboard-action-grid > a,
+.dashboard-actions-compact .dashboard-action-grid > button {
+  min-height: 44px;
+  width: auto;
+  border-radius: 0.65rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+}
 .dashboard-action {
   display: flex;
   align-items: center;
@@ -792,6 +810,51 @@ body {
 }
 .signed-in-shell .account-options {
   background: #242824;
+}
+.signed-in-shell .contextual-subnav {
+  border-top: 1px solid var(--color-line);
+}
+.contextual-subnav-scroll {
+  max-width: 1280px;
+  margin-inline: auto;
+  padding-inline: 16px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+}
+.signed-in-shell .app-shell-header .contextual-subnav ul {
+  display: flex;
+  width: max-content;
+  gap: 8px;
+}
+.contextual-subnav li {
+  flex-shrink: 0;
+}
+.app-shell.signed-in-shell .app-shell-header .contextual-subnav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  white-space: nowrap;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+}
+.app-shell.signed-in-shell
+  .app-shell-header
+  .contextual-subnav
+  a[aria-current='page'] {
+  border-bottom-color: var(--color-forest-800);
+  background: var(--color-forest-50);
+}
+.contextual-subnav a:focus-visible {
+  outline: 2px solid var(--color-forest-800);
+  outline-offset: -4px;
+}
+@media (min-width: 640px) {
+  .contextual-subnav-scroll {
+    padding-inline: 32px;
+  }
 }
 @media (max-width: 640px) {
   .signed-in-shell .app-shell-header-inner {
