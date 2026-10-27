@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import {
   usePersonalWorkspace,
   type PersonalWorkspace,
 } from '../data/usePersonalWorkspace'
 import { Card, FeedbackPanel, PageHeader, StatusPill } from '../components/ui'
+import {
+  workspaceSection,
+  workspaceSectionLink,
+} from '../models/workspaceNavigation'
 import { RecordWeightAction } from '../components/WeightPageHeader'
 import { DashboardChallengeActions } from '../components/DashboardChallengeActions'
 import {
@@ -23,6 +27,21 @@ export function PersonalDashboardPage({
   initialTab?: LegacyTab
 }) {
   const workspace = usePersonalWorkspace()
+  const location = useLocation()
+  if (
+    workspaceSection(
+      'dashboard',
+      location.pathname,
+      location.search,
+      location.hash,
+    ) === 'weigh-ins'
+  )
+    return (
+      <Navigate
+        replace
+        to={workspaceSectionLink('dashboard', 'weigh-ins', location.search)}
+      />
+    )
   return (
     <PersonalDashboardWorkspace workspace={workspace} initialTab={initialTab} />
   )
@@ -37,6 +56,10 @@ export function PersonalDashboardWorkspace({
 }) {
   const [params] = useSearchParams()
   const { hash, pathname, search } = useLocation()
+  const section =
+    !params.has('tab') && !hash && initialTab === 'progress'
+      ? 'progress'
+      : workspaceSection('dashboard', pathname, search, hash)
   const scrolled = useRef('')
   const [saveConfirmation, setSaveConfirmation] = useState<{
     ownerKey: string
@@ -64,13 +87,12 @@ export function PersonalDashboardWorkspace({
     )
       return
     scrolled.current = navigation
-    // Legacy tab links still reach their section of the combined Dashboard.
+    // Resolve supported anchors only after their selected panel is mounted.
     const target = hash
       ? hash.slice(1)
       : pathname === '/goals'
         ? 'goals'
-        : params.get('tab') === 'progress' ||
-            (initialTab === 'progress' && !params.has('tab'))
+        : section === 'progress'
           ? 'dashboard-progress-panel'
           : null
     if (target)
@@ -81,6 +103,7 @@ export function PersonalDashboardWorkspace({
     search,
     params,
     initialTab,
+    section,
     workspace.ownerKey,
     workspace.personal.state,
     workspace.contexts.state,
@@ -156,79 +179,81 @@ export function PersonalDashboardWorkspace({
           }
         />
       </header>
-      <div id="dashboard-overview-panel" className="dashboard-top-grid">
-        <Card className="dashboard-latest p-5">
-          {workspace.personal.state === 'loading' ? (
-            <FeedbackPanel tone="loading">
-              Loading your personal Dashboard…
-            </FeedbackPanel>
-          ) : workspace.personal.state === 'error' ? (
-            <FeedbackPanel tone="error">
-              {workspace.personal.error}
-            </FeedbackPanel>
-          ) : (
-            <>
-              <div className="flex items-start justify-between gap-4">
-                <h2 className="text-sm font-semibold text-ink-muted">
-                  Latest personal weight
-                </h2>
-                <StatusPill>
-                  {todayEntry ? 'Logged today' : 'Not logged today'}
-                </StatusPill>
-              </div>
-              <p className="my-3 text-4xl font-extrabold tracking-tight">
-                {latest
-                  ? formatPersonalWeight(latest.weightKg)
-                  : 'No record yet'}
-              </p>
-              {latest ? (
-                <time
-                  className="block text-sm text-ink-muted"
-                  dateTime={latest.date}
-                >
-                  Recorded {latest.date}
-                </time>
-              ) : (
-                <p className="text-sm text-ink-muted">
-                  Your first personal entry can be saved without creating or
-                  joining a challenge.
+      {section === 'overview' ? (
+        <div id="dashboard-overview-panel" className="dashboard-top-grid">
+          <Card className="dashboard-latest p-5">
+            {workspace.personal.state === 'loading' ? (
+              <FeedbackPanel tone="loading">
+                Loading your personal Dashboard…
+              </FeedbackPanel>
+            ) : workspace.personal.state === 'error' ? (
+              <FeedbackPanel tone="error">
+                {workspace.personal.error}
+              </FeedbackPanel>
+            ) : (
+              <>
+                <div className="flex items-start justify-between gap-4">
+                  <h2 className="text-sm font-semibold text-ink-muted">
+                    Latest personal weight
+                  </h2>
+                  <StatusPill>
+                    {todayEntry ? 'Logged today' : 'Not logged today'}
+                  </StatusPill>
+                </div>
+                <p className="my-3 text-4xl font-extrabold tracking-tight">
+                  {latest
+                    ? formatPersonalWeight(latest.weightKg)
+                    : 'No record yet'}
                 </p>
-              )}
-              <p className="mt-2 text-xs text-ink-muted">
-                {todayEntry
-                  ? 'Today’s entry is already saved. Corrections update that same entry.'
-                  : 'No entry for today yet. Your last saved weight is not a check-in for today.'}
-              </p>
-              <Link
-                className="mt-3 inline-flex min-h-11 items-center text-sm font-bold text-forest-800 underline"
-                to={{ pathname, search, hash: '#personal-history' }}
-              >
-                My Progress and private history
-              </Link>
-            </>
-          )}
-        </Card>
-        <DashboardChallengeActions
-          workspace={workspace}
-          recordAction={
-            <RecordWeightAction
-              workspace={workspace}
-              presentation="card"
-              showSavedFeedback={false}
-              onOpen={() => setSaveConfirmation(null)}
-              onRecorded={() =>
-                setSaveConfirmation((current) => ({
-                  ownerKey: workspace.ownerKey,
-                  count:
-                    current?.ownerKey === workspace.ownerKey
-                      ? current.count + 1
-                      : 1,
-                }))
-              }
-            />
-          }
-        />
-      </div>
+                {latest ? (
+                  <time
+                    className="block text-sm text-ink-muted"
+                    dateTime={latest.date}
+                  >
+                    Recorded {latest.date}
+                  </time>
+                ) : (
+                  <p className="text-sm text-ink-muted">
+                    Your first personal entry can be saved without creating or
+                    joining a challenge.
+                  </p>
+                )}
+                <p className="mt-2 text-xs text-ink-muted">
+                  {todayEntry
+                    ? 'Today’s entry is already saved. Corrections update that same entry.'
+                    : 'No entry for today yet. Your last saved weight is not a check-in for today.'}
+                </p>
+                <Link
+                  className="mt-3 inline-flex min-h-11 items-center text-sm font-bold text-forest-800 underline"
+                  to={workspaceSectionLink('dashboard', 'progress', search)}
+                >
+                  My Progress and private history
+                </Link>
+              </>
+            )}
+          </Card>
+          <DashboardChallengeActions
+            workspace={workspace}
+            recordAction={
+              <RecordWeightAction
+                workspace={workspace}
+                presentation="card"
+                showSavedFeedback={false}
+                onOpen={() => setSaveConfirmation(null)}
+                onRecorded={() =>
+                  setSaveConfirmation((current) => ({
+                    ownerKey: workspace.ownerKey,
+                    count:
+                      current?.ownerKey === workspace.ownerKey
+                        ? current.count + 1
+                        : 1,
+                  }))
+                }
+              />
+            }
+          />
+        </div>
+      ) : null}
       {params.get('navigation') === 'challenge-unavailable' ? (
         <FeedbackPanel tone="info">
           That challenge is not available to this account. You are viewing your
@@ -236,19 +261,21 @@ export function PersonalDashboardWorkspace({
           workspace if needed.
         </FeedbackPanel>
       ) : null}
-      <div id="dashboard-progress-panel">
-        <PersonalHistoryContent
-          key={`history:${workspace.ownerKey}`}
-          workspace={workspace}
-          referenceWeightKg={referenceWeightKg}
-          referenceLabel={selected ? `${selected.name} target` : undefined}
-        >
-          <DashboardGoals
-            key={`goals:${workspace.ownerKey}`}
+      {section === 'progress' ? (
+        <div id="dashboard-progress-panel">
+          <PersonalHistoryContent
+            key={`history:${workspace.ownerKey}`}
             workspace={workspace}
-          />
-        </PersonalHistoryContent>
-      </div>
+            referenceWeightKg={referenceWeightKg}
+            referenceLabel={selected ? `${selected.name} target` : undefined}
+          >
+            <DashboardGoals
+              key={`goals:${workspace.ownerKey}`}
+              workspace={workspace}
+            />
+          </PersonalHistoryContent>
+        </div>
+      ) : null}
     </section>
   )
 }

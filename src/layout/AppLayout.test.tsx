@@ -1,5 +1,17 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { MemoryRouter, useLocation } from 'react-router-dom'
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react'
+import {
+  createMemoryRouter,
+  MemoryRouter,
+  RouterProvider,
+  useLocation,
+} from 'react-router-dom'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { AuthProvider } from '../auth/AuthContext'
@@ -45,6 +57,71 @@ const signedIn: AuthState = {
 afterEach(() => cleanup())
 
 describe('AppLayout', () => {
+  it('restores the selected section with Back/Forward and keeps group query state', async () => {
+    const router = createMemoryRouter(
+      [
+        {
+          path: '*',
+          element: (
+            <AppLayout>
+              <CurrentRoute />
+            </AppLayout>
+          ),
+        },
+      ],
+      { initialEntries: ['/group?challenge=private%2Fplan&source=invite'] },
+    )
+    render(
+      <AuthProvider initialState={signedIn}>
+        <RouterProvider router={router} />
+      </AuthProvider>,
+    )
+    const sections = within(
+      screen.getByRole('navigation', { name: 'Group sections' }),
+    )
+    fireEvent.click(sections.getByRole('link', { name: 'Charts' }))
+    expect(screen.getByTestId('current-route')).toHaveTextContent(
+      '/group?challenge=private%2Fplan&source=invite&tab=charts',
+    )
+    expect(sections.getByRole('link', { name: 'Charts' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    await act(async () => {
+      await router.navigate(-1)
+    })
+    expect(sections.getByRole('link', { name: 'Overview' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    await act(async () => {
+      await router.navigate(1)
+    })
+    expect(sections.getByRole('link', { name: 'Charts' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    router.dispose()
+  })
+
+  it('identifies Weigh-ins as part of Dashboard while retaining the existing editor route', () => {
+    renderLayout('/weigh-ins?source=old', signedIn)
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    const sections = within(
+      screen.getByRole('navigation', { name: 'Dashboard sections' }),
+    )
+    expect(sections.getByRole('link', { name: 'Weigh-ins' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    expect(sections.getByRole('link', { name: 'Progress' })).toHaveAttribute(
+      'href',
+      '/dashboard?source=old&tab=progress',
+    )
+  })
   it.each([
     [
       'signed-in',

@@ -8,7 +8,7 @@ for (const width of [1280, 390]) {
     page,
   }) => {
     await page.setViewportSize({ width, height: 900 })
-    await page.goto(fixture('/dashboard?challenge=unavailable'))
+    await page.goto(fixture('/dashboard?challenge=unavailable&tab=progress'))
     const contexts = page.getByRole('navigation', {
       name: 'Challenge contexts',
     })
@@ -66,6 +66,10 @@ for (const width of [1280, 390]) {
     ).toBeVisible()
     await primary.getByRole('link', { name: 'Dashboard', exact: true }).click()
     await expect(page.getByTestId('fixture-route')).toHaveText('/dashboard')
+    await page
+      .getByRole('navigation', { name: 'Dashboard sections' })
+      .getByRole('link', { name: 'Progress', exact: true })
+      .click()
 
     await goals
       .getByRole('link', { name: 'Synthetic personal goal', exact: true })
