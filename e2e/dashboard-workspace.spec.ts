@@ -45,7 +45,7 @@ for (const viewport of [
   })
 }
 
-test('Combined Dashboard has one chart/table and keyboard history access at 390px', async ({
+test('Dashboard selects one progress view with keyboard history access at 390px', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
@@ -57,16 +57,16 @@ test('Combined Dashboard has one chart/table and keyboard history access at 390p
   ).toHaveCount(0)
   await expect(
     page.getByRole('img', { name: /^Personal weight history chart/ }),
-  ).toHaveCount(1)
+  ).toHaveCount(0)
   await expect(
     page.getByRole('table', { name: 'Your saved personal weigh-ins' }),
-  ).toHaveCount(1)
+  ).toHaveCount(0)
   await page
     .getByRole('link', { name: 'My Progress and private history' })
     .focus()
   await page.keyboard.press('Enter')
   await expect(page.getByTestId('fixture-route')).toHaveText(
-    '/dashboard#personal-history',
+    '/dashboard?tab=progress',
   )
   await expect(
     page.getByRole('heading', { name: 'Goals', exact: true }),
@@ -79,9 +79,7 @@ test('Combined Dashboard has one chart/table and keyboard history access at 390p
   await expect(page.getByText('Synthetic private latest note')).toBeVisible()
   await expect(page.getByText('Peer secret must stay hidden')).toHaveCount(0)
   await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1)
-  await expect(
-    page.getByRole('button', { name: 'Record weight', exact: true }),
-  ).toHaveCount(1)
+  await expect(page.getByText('Latest personal weight')).toHaveCount(0)
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -184,9 +182,9 @@ test('browser Back keeps dirty target input until an explicit discard', async ({
     '110',
   )
   await expect(page.getByTestId('fixture-route')).toHaveText(
-    '/dashboard#personal-history',
+    '/dashboard?tab=progress',
   )
-  await expect(page).toHaveURL(/\/dashboard#personal-history$/)
+  await expect(page).toHaveURL(/\/dashboard\?tab=progress$/)
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()
   await expect(
     page.getByRole('dialog', { name: 'Discard unsaved input?' }),
@@ -235,6 +233,10 @@ test('account and goal switching keep personal history separate and use the invi
   await expect(
     page.getByRole('button', { name: 'Edit starting weight', exact: true }),
   ).toHaveCount(0)
+  await page
+    .getByRole('navigation', { name: 'Dashboard sections' })
+    .getByRole('link', { name: 'Overview' })
+    .click()
   await page.getByRole('button', { name: 'Join with invitation' }).click()
   await page
     .getByLabel('Invitation link or token')
@@ -257,6 +259,10 @@ for (const width of [1280, 390]) {
             : '/dashboard',
         ) + (scenario === 'group-only' ? '&groupOnly=1' : ''),
       )
+      await page
+        .getByRole('navigation', { name: 'Dashboard sections' })
+        .getByRole('link', { name: 'Progress', exact: true })
+        .click()
       const goals = page.locator('#goals')
       await expect(
         goals.getByRole('link', { name: /Synthetic (first|second) group/ }),
@@ -297,6 +303,10 @@ for (const width of [1280, 390]) {
           ),
         ).toBeVisible()
       }
+      await page
+        .getByRole('navigation', { name: 'Dashboard sections' })
+        .getByRole('link', { name: 'Overview', exact: true })
+        .click()
       await page
         .getByRole('button', { name: 'Record weight', exact: true })
         .click()

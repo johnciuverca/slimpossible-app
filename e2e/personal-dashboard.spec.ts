@@ -74,7 +74,7 @@ for (const viewport of [
     ).toBeVisible()
     await expect(
       page.getByText('Synthetic Dashboard private note', { exact: true }),
-    ).toBeVisible()
+    ).toHaveCount(0)
     await page.reload()
     await expect(page.getByText('Logged today', { exact: true })).toBeVisible()
     await expect(
@@ -84,6 +84,10 @@ for (const viewport of [
     await expect(
       page.getByRole('heading', { name: 'Dashboard', exact: true }),
     ).toBeVisible()
+    await page
+      .getByRole('navigation', { name: 'Dashboard sections' })
+      .getByRole('link', { name: 'Progress', exact: true })
+      .click()
     const table = page.getByRole('table', {
       name: 'Your saved personal weigh-ins',
     })
@@ -162,6 +166,10 @@ for (const viewport of [
       'dashboard-active',
     ])
 
+    await page
+      .getByRole('navigation', { name: 'Dashboard sections' })
+      .getByRole('link', { name: 'Progress', exact: true })
+      .click()
     const table = page.getByRole('table', {
       name: 'Your saved personal weigh-ins',
     })
@@ -213,6 +221,10 @@ for (const viewport of [
       page.getByRole('img', { name: /Personal weight history chart/ }),
     ).toHaveCount(0)
 
+    await page
+      .getByRole('navigation', { name: 'Dashboard sections' })
+      .getByRole('link', { name: 'Overview', exact: true })
+      .click()
     await expect(
       page.getByText('Not logged today', { exact: true }),
     ).toBeVisible()
@@ -254,6 +266,10 @@ for (const viewport of [
     await expect(
       page.getByText('Synthetic second-account private note', { exact: true }),
     ).toBeVisible()
+    await page
+      .getByRole('navigation', { name: 'Dashboard sections' })
+      .getByRole('link', { name: 'Overview', exact: true })
+      .click()
     await expect(
       page.getByText('Not logged today', { exact: true }),
     ).toBeVisible()

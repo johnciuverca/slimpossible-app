@@ -18,6 +18,8 @@ import { useOptionalAuth } from '../auth/useAuth'
 import { ChallengeContextTabs } from '../components/ChallengeContextTabs'
 import { UnsavedChangesDialog } from '../components/UnsavedChangesDialog'
 import { RouterNavigationGuard } from '../components/RouterNavigationGuard'
+import { ContextualSubnav } from '../components/ContextualSubnav'
+import { workspaceArea } from '../models/workspaceNavigation'
 import {
   NavigationSafetyContext,
   type NavigationBlock,
@@ -60,17 +62,23 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { state } = useOptionalAuth()
   const signedIn = state.status === 'signed-in'
   const personalHome =
-    ['/today', '/progress', '/goals', '/challenges'].includes(pathname) ||
+    ['/today', '/weigh-ins', '/progress', '/goals', '/challenges'].includes(
+      pathname,
+    ) ||
     (pathname === '/' &&
       !new URLSearchParams(search).has('challenge') &&
       signedIn)
   const sharedLayout =
-    ['/dashboard', '/group', '/login', '/register'].includes(pathname) ||
+    ['/dashboard', '/weigh-ins', '/group', '/login', '/register'].includes(
+      pathname,
+    ) ||
     (pathname === '/' && personalHome)
   const publicAuthShell =
     !signedIn && ['/login', '/register'].includes(pathname)
   const dashboardShell =
-    pathname === '/dashboard' || (pathname === '/' && personalHome)
+    ['/dashboard', '/weigh-ins'].includes(pathname) ||
+    (pathname === '/' && personalHome)
+  const area = workspaceArea(pathname)
   const navigate = useNavigate()
   const blockers = useRef(new Map<symbol, NavigationBlock>())
   const safety = useMemo(
@@ -207,6 +215,9 @@ export function AppLayout({ children }: AppLayoutProps) {
               ) : null}
             </div>
           </div>
+          {signedIn && area && !(pathname === '/' && !personalHome) ? (
+            <ContextualSubnav area={area} />
+          ) : null}
         </header>
 
         <main className="app-shell-main mx-auto flex w-full max-w-7xl min-w-0 flex-1 flex-col gap-6 px-4 py-7 sm:px-8 sm:py-10">

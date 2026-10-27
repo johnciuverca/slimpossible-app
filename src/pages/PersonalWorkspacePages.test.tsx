@@ -20,6 +20,7 @@ import { PersonalDashboardPage } from './PersonalDashboardPage'
 import { MyProgressPage } from './MyProgressPage'
 import { GoalsPage, GroupDashboardPage } from './AppPages'
 import { PersonalEntryActions } from '../components/WeightEntryActions'
+import { ContextualSubnav } from '../components/ContextualSubnav'
 
 function authValue(id = 'user-alex'): AuthContextValue {
   return {
@@ -452,35 +453,44 @@ describe('personal Dashboard and My Progress', () => {
       ]),
     )
     vi.spyOn(persistenceModule, 'createPersistence').mockReturnValue(storage)
-    render(page(<PersonalDashboardPage />))
+    render(
+      page(
+        <>
+          <ContextualSubnav area="dashboard" />
+          <PersonalDashboardPage />
+        </>,
+      ),
+    )
     const invite = await screen.findByRole('button', { name: 'Invite people' })
     await waitFor(() => expect(invite).toBeEnabled())
     fireEvent.click(invite)
     await screen.findByRole('combobox', { name: 'Choose a group you own' })
+    fireEvent.click(screen.getByRole('link', { name: 'Progress' }))
     expect(
       screen.getByText('Shared with Group One, an unavailable group'),
     ).toBeInTheDocument()
-
     fireEvent.click(screen.getByRole('button', { name: 'Refresh Dashboard' }))
     expect(
       await screen.findByText(
         'Shared with 2 groups (names could not be loaded)',
       ),
     ).toBeInTheDocument()
-    expect(screen.queryByText(/an unavailable group/)).not.toBeInTheDocument()
-    expect(
-      await screen.findByText(/Invitation choices could not be loaded/),
-    ).toBeInTheDocument()
     expect(
       screen.getByText(
         'Your goal choices could not be loaded. Refresh to try again.',
       ),
     ).toBeInTheDocument()
-
+    fireEvent.click(screen.getByRole('link', { name: 'Overview' }))
+    expect(
+      await screen.findByText(/Invitation choices could not be loaded/),
+    ).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('link', { name: 'Progress' }))
     fireEvent.click(screen.getByRole('button', { name: 'Refresh Dashboard' }))
     expect(
       await screen.findByText('Shared with Group One, an unavailable group'),
     ).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('link', { name: 'Overview' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Invite people' }))
     expect(
       await screen.findByRole('combobox', { name: 'Choose a group you own' }),
     ).toBeInTheDocument()
@@ -556,7 +566,7 @@ describe('personal Dashboard and My Progress', () => {
     expect(
       screen.queryByRole('button', { name: 'Edit weight' }),
     ).not.toBeInTheDocument()
-    expect(screen.getByText('Only my note')).toBeInTheDocument()
+    expect(screen.queryByText('Only my note')).not.toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     const entries =
       await local().repositories.personalWeighIns.listForUser('user-alex')

@@ -40,6 +40,10 @@ for (const width of [1280, 390]) {
     await expect(
       page.getByRole('link', { name: 'Create challenge', exact: true }),
     ).toBeVisible()
+    await page
+      .getByRole('navigation', { name: 'Dashboard sections' })
+      .getByRole('link', { name: 'Progress', exact: true })
+      .click()
     const chart = page.getByRole('img', {
       name: /^Personal weight history chart/,
     })

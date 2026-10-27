@@ -23,7 +23,7 @@ for (const width of [1280, 390]) {
       )
     })
     await page.goto(
-      '/e2e/fixtures/dashboard-workspace-harness.html?path=%2Fdashboard',
+      '/e2e/fixtures/dashboard-workspace-harness.html?path=%2Fdashboard%3Ftab%3Dprogress',
     )
 
     const chart = page.getByRole('img', {
