@@ -19,6 +19,7 @@ import type { GroupChartEntry } from '../../models/groupChartHistory'
 import type { GroupMemberProgress } from '../../models/groupMemberProgress'
 import type {
   GroupProgressSummary,
+  GroupWeeklyWinCount,
   GroupWeighInHistoryEntry,
 } from '../../models/groupProgress'
 import type { ProvisionalGroupLeaderSummary } from '../../models/provisionalGroupLeader'
@@ -172,6 +173,9 @@ export type PersonalWeighInRepository = {
 }
 
 export type GroupProgressRepository = {
+  getWeeklyWinCounts: (
+    challengeId: string,
+  ) => Promise<RepositoryListResult<GroupWeeklyWinCount>>
   getMemberProgress: (
     challengeId: string,
   ) => Promise<RepositoryListResult<GroupMemberProgress>>
@@ -698,6 +702,38 @@ export function createRepositories(client: DatabaseClient): Repositories {
       },
     },
     groupProgress: {
+      async getWeeklyWinCounts(challengeId) {
+        const { data, error } = await client.rpc(
+          'get_group_weekly_win_counts',
+          { target_challenge_id: challengeId },
+        )
+        if (error)
+          return {
+            error: requestError('load weekly win counts', error),
+            state: 'error',
+          }
+        return mapList(
+          data,
+          (row) => {
+            if (
+              typeof row.member_key !== 'string' ||
+              !row.member_key ||
+              typeof row.display_name !== 'string' ||
+              !row.display_name ||
+              !Number.isInteger(row.win_count) ||
+              row.win_count < 0
+            ) {
+              throw new Error('Invalid group weekly win count')
+            }
+            return {
+              displayName: row.display_name,
+              memberKey: row.member_key,
+              winCount: row.win_count,
+            }
+          },
+          'group weekly win counts',
+        )
+      },
       async getMemberProgress(challengeId) {
         const { data, error } = await client.rpc('get_group_member_progress', {
           target_challenge_id: challengeId,

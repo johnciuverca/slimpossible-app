@@ -19,6 +19,12 @@ export type GroupWeighInHistoryEntry = {
   weightKg: number
 }
 
+export type GroupWeeklyWinCount = {
+  displayName: string
+  memberKey: string
+  winCount: number
+}
+
 export function mostRecentSunday(date = new Date()) {
   const sunday = new Date(date)
   sunday.setHours(0, 0, 0, 0)
