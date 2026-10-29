@@ -219,7 +219,7 @@ describe('personal-only Dashboard goals', () => {
       const rendered = render(
         <MemoryRouter
           initialEntries={[
-            '/dashboard?tab=progress&challenge=' + requested + '#goals',
+            '/dashboard?tab=overview&challenge=' + requested + '#goals',
           ]}
         >
           <PersonalDashboardWorkspace workspace={workspace} />

@@ -100,7 +100,7 @@ export function DashboardGoals({
                   aria-current={
                     selected?.id === challenge.id ? 'page' : undefined
                   }
-                  to={`/dashboard?${new URLSearchParams({ tab: 'progress', challenge: challenge.id })}#goals`}
+                  to={`/dashboard?${new URLSearchParams({ tab: 'overview', challenge: challenge.id })}#goals`}
                   className={`inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 py-2 text-sm font-semibold ${selected?.id === challenge.id ? 'border-forest-800 bg-forest-800 text-white' : 'border-line bg-panel text-forest-800'}`}
                 >
                   {challenge.name}

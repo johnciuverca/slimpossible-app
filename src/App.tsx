@@ -120,7 +120,7 @@ export function WorkspaceCompatibilityRoute({
       if (destination === 'today') params.set('tab', 'overview')
       if (destination === 'progress' || destination === 'goals') {
         path = '/dashboard'
-        params.set('tab', 'progress')
+        params.set('tab', 'overview')
       } else if (
         destination === 'challenge' &&
         eligibleChallenge?.kind === 'group'
@@ -156,7 +156,7 @@ export function WorkspaceCompatibilityRoute({
       }
       if (destination === 'today') params.set('tab', 'overview')
       if (destination === 'progress' || destination === 'goals')
-        params.set('tab', 'progress')
+        params.set('tab', 'overview')
       const query = params.toString()
       navigate(
         `/dashboard${query ? `?${query}` : ''}${destination === 'goals' && !location.hash ? '#goals' : location.hash}`,

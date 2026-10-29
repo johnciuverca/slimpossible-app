@@ -7,9 +7,9 @@ import {
 
 describe('workspace navigation', () => {
   it.each([
-    ['dashboard', '/dashboard', '?tab=progress', '', 'progress'],
+    ['dashboard', '/dashboard', '?tab=progress', '', 'overview'],
     ['dashboard', '/weigh-ins', '?challenge=group', '', 'weigh-ins'],
-    ['dashboard', '/dashboard', '', '#goals', 'progress'],
+    ['dashboard', '/dashboard', '', '#goals', 'overview'],
     ['dashboard', '/dashboard', '', '#personal-history', 'weigh-ins'],
     [
       'dashboard',

@@ -95,7 +95,7 @@ describe('legacy workspace navigation', () => {
     )
   })
 
-  it('opens eligible personal challenges in personal Progress, not Group', async () => {
+  it('opens eligible personal challenges in Dashboard Overview, not Group', async () => {
     mockEligibleContexts()
     renderRoute(
       '/challenges?challenge=personal-one&view=old#goals',
@@ -103,17 +103,17 @@ describe('legacy workspace navigation', () => {
     )
     await waitFor(() =>
       expect(screen.getByTestId('location')).toHaveTextContent(
-        '/dashboard?challenge=personal-one&view=old&tab=progress#goals',
+        '/dashboard?challenge=personal-one&view=old&tab=overview#goals',
       ),
     )
   })
 
-  it('aliases Progress and Goals to Dashboard Progress with Goals addressable', async () => {
+  it('aliases Progress and Goals to Dashboard Overview with Goals addressable', async () => {
     mockEligibleContexts()
     renderRoute('/goals?challenge=group-one&filter=recent', 'goals')
     await waitFor(() =>
       expect(screen.getByTestId('location')).toHaveTextContent(
-        '/dashboard?challenge=group-one&filter=recent&tab=progress#goals',
+        '/dashboard?challenge=group-one&filter=recent&tab=overview#goals',
       ),
     )
   })
@@ -161,12 +161,12 @@ describe('legacy workspace navigation', () => {
     )
   })
 
-  it('does not expose owner-only challenge context in personal Progress', async () => {
+  it('does not expose owner-only challenge context in personal Overview', async () => {
     mockEligibleContexts()
     renderRoute('/progress?challenge=owned-personal', 'progress')
     await waitFor(() =>
       expect(screen.getByTestId('location')).toHaveTextContent(
-        '/dashboard?tab=progress&navigation=challenge-unavailable',
+        '/dashboard?tab=overview&navigation=challenge-unavailable',
       ),
     )
   })

@@ -117,9 +117,9 @@ describe('AppLayout', () => {
       'aria-current',
       'page',
     )
-    expect(sections.getByRole('link', { name: 'Progress' })).toHaveAttribute(
+    expect(sections.getByRole('link', { name: 'Overview' })).toHaveAttribute(
       'href',
-      '/dashboard?source=old&tab=progress',
+      '/dashboard?source=old&tab=overview',
     )
   })
   it.each([
