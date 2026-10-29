@@ -134,7 +134,7 @@ export function WorkspaceCompatibilityRoute({
           path = '/challenge/participants/enroll'
           params.set('self', 'owner')
         } else {
-          params.set('tab', 'progress')
+          params.set('tab', 'overview')
         }
       }
 
