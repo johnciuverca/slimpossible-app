@@ -1899,10 +1899,10 @@ export function GroupDashboardPage() {
 
   return (
     <section
-      className="group-workspace mx-auto w-full max-w-6xl space-y-6"
+      className="group-workspace mx-auto w-full max-w-7xl space-y-4"
       aria-labelledby="group-title"
     >
-      <div className="space-y-6">
+      <div className="space-y-2">
         <WeightPageHeader
           onRecorded={() => setReloadKey((value) => value + 1)}
           additionalActions={
@@ -1926,55 +1926,58 @@ export function GroupDashboardPage() {
             </>
           }
         >
-          <PageHeader
-            description="Your shared home. Track weight and progress with other challenge members."
-            title="Group"
-            titleId="group-title"
-          />
+          <h1
+            id="group-title"
+            className="text-2xl font-bold tracking-tight text-ink"
+          >
+            {selectedChallenge?.name ?? 'Group'}
+          </h1>
         </WeightPageHeader>
         <ChallengeTabs
           challenges={challenges}
           selectedId={selectedChallengeId}
           loading={isLoading}
           showPersonalTracking={false}
+          compact
         />
-        <div>
-          <p className="mt-4 text-ink-muted">
-            Shared summary, this week’s provisional leader, and Sunday-based
-            results for the selected challenge. History includes only explicitly
-            shared weights; notes stay private.
-          </p>
-        </div>
       </div>
       {selectedChallenge && selectedChallenge.ownerId === ownerId ? (
-        <nav
-          aria-label="Selected group management"
-          className="flex flex-wrap gap-3"
-        >
-          <Link
-            className="min-h-11 rounded-xl border border-stone-300 px-4 py-3 font-semibold"
-            to={`/challenge/setup?challenge=${encodeURIComponent(selectedChallenge.id)}`}
+        <details className="group-manage-menu relative w-fit">
+          <summary className="flex min-h-10 cursor-pointer list-none items-center rounded-lg border border-stone-300 bg-white px-3 text-sm font-semibold">
+            Manage{' '}
+            <span aria-hidden="true" className="ml-2">
+              ⌄
+            </span>
+          </summary>
+          <nav
+            aria-label="Selected group management"
+            className="absolute left-0 top-full z-30 mt-2 grid min-w-52 gap-1 rounded-xl border border-stone-200 bg-white p-2 shadow-lg"
           >
-            Manage group
-          </Link>
-          <Link
-            className="min-h-11 rounded-xl border border-stone-300 px-4 py-3 font-semibold"
-            to={`/challenge/participants/enroll?${new URLSearchParams({ challenge: selectedChallenge.id, self: 'owner' })}`}
-          >
-            Manage members
-          </Link>
-          <Link
-            className="min-h-11 rounded-xl border border-stone-300 px-4 py-3 font-semibold"
-            to={`/challenge/invites?challenge=${encodeURIComponent(selectedChallenge.id)}`}
-          >
-            Manage invitations
-          </Link>
-        </nav>
+            <Link
+              className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-emerald-50"
+              to={`/challenge/setup?challenge=${encodeURIComponent(selectedChallenge.id)}`}
+            >
+              Manage group
+            </Link>
+            <Link
+              className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-emerald-50"
+              to={`/challenge/participants/enroll?${new URLSearchParams({ challenge: selectedChallenge.id, self: 'owner' })}`}
+            >
+              Manage members
+            </Link>
+            <Link
+              className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-emerald-50"
+              to={`/challenge/invites?challenge=${encodeURIComponent(selectedChallenge.id)}`}
+            >
+              Manage invitations
+            </Link>
+          </nav>
+        </details>
       ) : null}
       {!summary || section === 'overview' || section === 'weekly-results' ? (
         <Card
           id="group-summary"
-          className="group-overview-card p-5 sm:p-8 lg:p-10"
+          className={`group-overview-card ${section === 'overview' ? 'group-overview-compact p-3 sm:p-4' : 'p-5 sm:p-8'}`}
         >
           <DashboardState
             isLoading={isLoading}
@@ -1982,7 +1985,11 @@ export function GroupDashboardPage() {
             messageTone={messageTone}
           >
             {summary ? (
-              <div className="mt-8 space-y-6">
+              <div
+                className={
+                  section === 'overview' ? 'space-y-3' : 'mt-8 space-y-6'
+                }
+              >
                 {section === 'weekly-results' ? (
                   <div className="grid gap-5 lg:grid-cols-2">
                     <section
@@ -2155,57 +2162,61 @@ export function GroupDashboardPage() {
 
                 {section === 'overview' ? (
                   <section aria-labelledby="group-progress-heading">
-                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-800">
-                      Selected challenge
-                    </p>
                     <h2
-                      className="mt-2 text-xl font-bold text-slate-950"
+                      className="text-sm font-semibold text-slate-700"
                       id="group-progress-heading"
                     >
                       Group progress
                     </h2>
-
-                    <dl className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                      <div className="group-overview-metric min-w-0 rounded-2xl border border-stone-200 bg-white p-5">
-                        <dt className="text-sm font-semibold text-slate-600">
-                          Active members
+                    <dl className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+                      <div className="group-overview-metric min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2">
+                        <dt className="text-xs font-semibold text-slate-600">
+                          Members
                         </dt>
-                        <dd className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
+                        <dd className="mt-1 text-xl font-bold tracking-tight text-slate-950">
                           {summary.activeParticipantCount}
                         </dd>
                       </div>
-                      <div className="group-overview-metric min-w-0 rounded-2xl border border-stone-200 bg-white p-5">
-                        <dt className="text-sm font-semibold text-slate-600">
-                          Average goal progress
+                      <div className="group-overview-metric min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2">
+                        <dt className="text-xs font-semibold text-slate-600">
+                          Avg. goal progress
                         </dt>
-                        <dd className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
+                        <dd className="mt-1 text-xl font-bold tracking-tight text-slate-950">
                           {summary.averageCompletionPercentage === null
                             ? '—'
                             : `${summary.averageCompletionPercentage}%`}
                         </dd>
-                        <dd className="mt-1 text-sm text-slate-600">
-                          {summary.averageCompletionPercentage === null
-                            ? 'Available after goal progress is recorded'
-                            : `Across ${summary.participantsWithProgressCount} members`}
-                        </dd>
                       </div>
-                      <div className="group-overview-metric min-w-0 rounded-2xl border border-stone-200 bg-white p-5">
-                        <dt className="text-sm font-semibold text-slate-600">
-                          Members with a saved weigh-in
+                      <div className="group-overview-metric min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2">
+                        <dt className="text-xs font-semibold text-slate-600">
+                          Checked in
                         </dt>
-                        <dd className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
+                        <dd className="mt-1 text-xl font-bold tracking-tight text-slate-950">
                           {summary.participantsWithRecordedWeightCount}
                         </dd>
                       </div>
-                      <div className="group-overview-metric min-w-0 rounded-2xl border border-stone-200 bg-white p-5">
-                        <dt className="text-sm font-semibold text-slate-600">
+                      <div className="group-overview-metric min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2">
+                        <dt className="text-xs font-semibold text-slate-600">
                           Goals reached
                         </dt>
-                        <dd className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
+                        <dd className="mt-1 text-xl font-bold tracking-tight text-slate-950">
                           {summary.reachedTargetCount}
                         </dd>
                       </div>
                     </dl>
+                    <div
+                      role="group"
+                      className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-sm"
+                      aria-label="This week’s winners"
+                    >
+                      <span className="font-semibold">This week’s winners</span>
+                      <span className="text-ink-muted">
+                        {weeklyCelebration?.state === 'no-eligible-candidates'
+                          ? 'No result yet'
+                          : weeklyCelebration?.winnerNames.join(', ') ||
+                            'No result yet'}
+                      </span>
+                    </div>
                   </section>
                 ) : null}
                 {section === 'weekly-results' ? (
@@ -2268,13 +2279,23 @@ export function GroupDashboardPage() {
           </DashboardState>
         </Card>
       ) : null}
+      {summary && section === 'overview' ? (
+        <GroupChartHistory
+          challengeId={data.challenge.id}
+          viewerId={ownerId ?? ''}
+          persistence={persistence}
+          refreshVersion={reloadKey + weightRevision}
+          enabled
+          compactOverview
+          memberProgress={memberProgressState === 'ready' ? memberProgress : []}
+        />
+      ) : null}
       {summary && section === 'members' ? (
         <Card id="group-progress" className="space-y-5 p-5 sm:p-8">
           <div>
             <h2 className="text-xl font-bold">Member progress</h2>
             <p className="mt-2 text-sm text-ink-muted">
-              Progress uses the original enrolled start and current target.
-              Current weigh-in values remain private unless explicitly shared.
+              Progress and goal actions for active members.
             </p>
           </div>
           {memberProgressState === 'loading' ? (
@@ -2424,6 +2445,7 @@ export function GroupDashboardPage() {
           persistence={persistence}
           refreshVersion={reloadKey + weightRevision}
           enabled={Boolean(summary)}
+          compactOverview={false}
           memberProgress={memberProgressState === 'ready' ? memberProgress : []}
         />
       ) : null}
