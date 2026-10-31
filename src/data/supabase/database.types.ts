@@ -324,6 +324,8 @@ export type Database = {
           completion_percentage: number | null
           progress_state: string
           reached_target_milestones: Json
+          signed_display_percentage: number | null
+          negative_progress_capped: boolean
         }[]
       }
       change_my_group_target: {

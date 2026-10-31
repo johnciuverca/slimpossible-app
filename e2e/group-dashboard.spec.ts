@@ -365,6 +365,17 @@ async function installGroupFixtures(
       const body = request.postDataJSON() as { target_challenge_id: string }
       const ownKey = memberKey(body.target_challenge_id, viewerId)
       const otherKey = memberKey(body.target_challenge_id, otherViewerId)
+      const ownCurrentWeight = ownWeight
+      const ownRawSignedPercentage =
+        ownCurrentWeight === null
+          ? null
+          : ownTarget === ownStartingWeight
+            ? 100
+            : ownCurrentWeight <= ownTarget
+              ? 100
+              : ((ownStartingWeight - ownCurrentWeight) /
+                  (ownStartingWeight - ownTarget)) *
+                100
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify([
@@ -388,6 +399,19 @@ async function installGroupFixtures(
                       1000,
                   ) / 10
                 : 50,
+            signed_display_percentage:
+              body.target_challenge_id === challengeId
+                ? ownRawSignedPercentage === null
+                  ? null
+                  : Math.round(
+                      Math.max(-100, Math.min(100, ownRawSignedPercentage)) *
+                        10,
+                    ) / 10
+                : 50,
+            negative_progress_capped:
+              body.target_challenge_id === challengeId &&
+              ownRawSignedPercentage !== null &&
+              ownRawSignedPercentage < -100,
             progress_state: 'in_progress',
             reached_target_milestones: [
               {
@@ -407,6 +431,8 @@ async function installGroupFixtures(
             target_weight_kg: ownTarget,
             latest_recorded_date: '2026-09-22',
             completion_percentage: 50,
+            signed_display_percentage: 50,
+            negative_progress_capped: false,
             progress_state: 'in_progress',
             reached_target_milestones: [],
             private_note: 'hidden projection sentinel',
@@ -2120,6 +2146,49 @@ for (const viewport of [
     expect(
       requests.filter((url) => url.includes('/rpc/change_my_group_target')),
     ).toHaveLength(1)
+  })
+
+  test(`shows above-start weight as signed red progress without rendering its raw value on ${viewport.label}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ height: 900, width: viewport.width })
+    await installGroupFixtures(page, true, true, false, 105)
+    await page.goto(
+      `/e2e/fixtures/today-harness.html?scenario=group&user=${viewerId}`,
+    )
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Members', exact: true })
+      .click()
+    await page
+      .getByRole('link', { name: 'Group · E2E authorized group' })
+      .click()
+
+    const negativeCard = page.locator('article').filter({ hasText: '-25%' })
+    await expect(negativeCard).toHaveCount(1)
+    const bar = negativeCard.getByRole('progressbar', {
+      name: 'Same display name goal progress',
+    })
+    await expect(bar).toHaveAttribute('aria-valuenow', '-25')
+    await expect(bar).toHaveAttribute('aria-valuetext', '-25%')
+    const fill = bar.locator('[data-progress-fill]')
+    await expect(fill).toHaveClass(/bg-red-600/)
+    expect(
+      await fill.evaluate((element) => {
+        const style = (element as HTMLElement).style
+        return {
+          left: style.left,
+          transform: style.transform,
+          width: style.width,
+        }
+      }),
+    ).toEqual({
+      left: '50%',
+      transform: 'translateX(-100%)',
+      width: '12.5%',
+    })
+    await expect(page.getByText('105 kg')).toHaveCount(0)
+    await expect(page.getByText('hidden projection sentinel')).toHaveCount(0)
   })
 }
 
