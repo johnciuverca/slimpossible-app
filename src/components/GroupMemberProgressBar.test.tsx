@@ -66,9 +66,7 @@ describe('GroupMemberProgressBar', () => {
     })
     expect(bar).not.toHaveAttribute('aria-valuenow')
     expect(bar).toHaveAttribute('aria-valuetext', 'Unavailable')
-    expect(
-      bar.querySelector('[data-progress-fill]'),
-    ).not.toBeInTheDocument()
+    expect(bar.querySelector('[data-progress-fill]')).not.toBeInTheDocument()
     expect(
       bar.querySelector('[data-progress-baseline]'),
     ).not.toBeInTheDocument()
