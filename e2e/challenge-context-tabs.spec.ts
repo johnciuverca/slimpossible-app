@@ -37,7 +37,7 @@ for (const width of [1280, 390]) {
     await last.focus()
     await page.keyboard.press('Enter')
     await expect(page.getByTestId('fixture-route')).toHaveText(
-      '/dashboard?tab=progress&challenge=extra-11#goals',
+      '/dashboard?tab=overview&challenge=extra-11#goals',
     )
     await expect(last).toHaveAttribute('aria-current', 'page')
     await expect(
@@ -78,14 +78,14 @@ for (const width of [1280, 390]) {
     await expect(page.getByTestId('fixture-route')).toHaveText('/dashboard')
     await page
       .getByRole('navigation', { name: 'Dashboard sections' })
-      .getByRole('link', { name: 'Progress', exact: true })
+      .getByRole('link', { name: 'Overview', exact: true })
       .click()
 
     await goals
       .getByRole('link', { name: 'Synthetic personal goal', exact: true })
       .click()
     await expect(page.getByTestId('fixture-route')).toHaveText(
-      '/dashboard?tab=progress&challenge=dashboard-personal#goals',
+      '/dashboard?tab=overview&challenge=dashboard-personal#goals',
     )
     for (const retired of ['Challenges', 'My progress', 'Goals'])
       await expect(

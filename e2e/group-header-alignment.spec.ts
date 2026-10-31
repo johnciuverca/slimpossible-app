@@ -176,7 +176,7 @@ for (const viewport of [
       })
       .click()
     await expect(page.getByTestId('fixture-route')).toHaveText(
-      '/dashboard?tab=progress&challenge=dashboard-personal#goals',
+      '/dashboard?tab=overview&challenge=dashboard-personal#goals',
     )
     await page.goto(fixture('/group?challenge=missing'))
     await expect(
