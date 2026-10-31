@@ -6,36 +6,33 @@ import { GroupMemberProgressBar } from './GroupMemberProgressBar'
 afterEach(cleanup)
 
 describe('GroupMemberProgressBar', () => {
-  it('anchors positive green progress at the zero baseline', () => {
+  it('fills green from the left for weight loss toward the target', () => {
     const { getByRole } = render(
-      <GroupMemberProgressBar label="Ava goal progress" percentage={48.5} />,
+      <GroupMemberProgressBar label="Ava goal progress" percentage={10} />,
     )
 
     const bar = getByRole('progressbar', { name: 'Ava goal progress' })
     const fill = bar.querySelector('[data-progress-fill]')
-    expect(bar).toHaveAttribute('aria-valuenow', '48.5')
-    expect(bar).toHaveAttribute('aria-valuetext', '48.5%')
+    expect(bar).toHaveAttribute('aria-valuenow', '10')
+    expect(bar).toHaveAttribute('aria-valuetext', '10%')
     expect(bar).toHaveAttribute('aria-valuemin', '-100')
-    expect(fill).toHaveStyle({ left: '50%', width: '24.25%' })
+    expect(fill).toHaveStyle({ left: '0px', width: '10%' })
     expect(fill).toHaveClass('bg-emerald-600')
-    expect(bar.querySelector('[data-progress-baseline]')).toBeInTheDocument()
+    expect(bar.querySelector('[data-progress-baseline]')).not.toBeInTheDocument()
   })
 
-  it('anchors negative red progress to the left of zero', () => {
+  it('fills red from the left for weight gain above the starting point', () => {
     const { getByRole } = render(
-      <GroupMemberProgressBar label="Member goal progress" percentage={-25} />,
+      <GroupMemberProgressBar label="Member goal progress" percentage={-10} />,
     )
 
     const bar = getByRole('progressbar', { name: 'Member goal progress' })
     const fill = bar.querySelector('[data-progress-fill]')
-    expect(bar).toHaveAttribute('aria-valuenow', '-25')
-    expect(bar).toHaveAttribute('aria-valuetext', '-25%')
-    expect(fill).toHaveStyle({
-      left: '50%',
-      transform: 'translateX(-100%)',
-      width: '12.5%',
-    })
+    expect(bar).toHaveAttribute('aria-valuenow', '-10')
+    expect(bar).toHaveAttribute('aria-valuetext', '-10%')
+    expect(fill).toHaveStyle({ left: '0px', width: '10%' })
     expect(fill).toHaveClass('bg-red-600')
+    expect(bar.querySelector('[data-progress-baseline]')).not.toBeInTheDocument()
   })
 
   it('labels gains beyond the negative scale cap while keeping the bar bounded', () => {
@@ -51,7 +48,7 @@ describe('GroupMemberProgressBar', () => {
     expect(bar).toHaveAttribute('aria-valuenow', '-100')
     expect(bar).toHaveAttribute('aria-valuetext', '≤ -100%')
     expect(bar.querySelector('[data-progress-fill]')).toHaveStyle({
-      width: '50%',
+      width: '100%',
     })
   })
 
@@ -66,6 +63,6 @@ describe('GroupMemberProgressBar', () => {
     expect(bar).not.toHaveAttribute('aria-valuenow')
     expect(bar).toHaveAttribute('aria-valuetext', 'Unavailable')
     expect(bar.querySelector('[data-progress-fill]')).not.toBeInTheDocument()
-    expect(bar.querySelector('[data-progress-baseline]')).toBeInTheDocument()
+    expect(bar.querySelector('[data-progress-baseline]')).not.toBeInTheDocument()
   })
 })
