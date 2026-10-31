@@ -35,20 +35,11 @@ export function GroupMemberProgressBar({
       {value !== null ? (
         <span
           aria-hidden="true"
-          className={`absolute inset-y-0 transition-[width] duration-300 ${value < 0 ? 'bg-red-600' : 'bg-emerald-600'}`}
+          className={`absolute inset-y-0 left-0 transition-[width] duration-300 ${value < 0 ? 'bg-red-600' : 'bg-emerald-600'}`}
           data-progress-fill
-          style={{
-            left: '50%',
-            transform: value < 0 ? 'translateX(-100%)' : undefined,
-            width: `${Math.abs(value) / 2}%`,
-          }}
+          style={{ width: `${Math.abs(value)}%` }}
         />
       ) : null}
-      <span
-        aria-hidden="true"
-        className="absolute inset-y-0 left-1/2 z-10 w-px bg-slate-700"
-        data-progress-baseline
-      />
     </div>
   )
 }
