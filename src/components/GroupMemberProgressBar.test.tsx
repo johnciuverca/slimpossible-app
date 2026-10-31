@@ -16,8 +16,8 @@ describe('GroupMemberProgressBar', () => {
     expect(bar).toHaveAttribute('aria-valuenow', '10')
     expect(bar).toHaveAttribute('aria-valuetext', '10%')
     expect(bar).toHaveAttribute('aria-valuemin', '-100')
-    expect(fill).toHaveStyle({ left: '0px', width: '10%' })
-    expect(fill).toHaveClass('bg-emerald-600')
+    expect(fill).toHaveStyle({ width: '10%' })
+    expect(fill).toHaveClass('left-0', 'bg-emerald-600')
     expect(
       bar.querySelector('[data-progress-baseline]'),
     ).not.toBeInTheDocument()
@@ -32,8 +32,8 @@ describe('GroupMemberProgressBar', () => {
     const fill = bar.querySelector('[data-progress-fill]')
     expect(bar).toHaveAttribute('aria-valuenow', '-10')
     expect(bar).toHaveAttribute('aria-valuetext', '-10%')
-    expect(fill).toHaveStyle({ left: '0px', width: '10%' })
-    expect(fill).toHaveClass('bg-red-600')
+    expect(fill).toHaveStyle({ width: '10%' })
+    expect(fill).toHaveClass('left-0', 'bg-red-600')
     expect(
       bar.querySelector('[data-progress-baseline]'),
     ).not.toBeInTheDocument()
