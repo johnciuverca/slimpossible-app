@@ -12,42 +12,39 @@ for (const width of [1280, 320]) {
     const sections = page.getByRole('navigation', {
       name: 'Dashboard sections',
     })
+    const overview = sections.getByRole('link', {
+      name: 'Overview',
+      exact: true,
+    })
+    await overview.focus()
+    await page.keyboard.press('Enter')
+    await expect(overview).toHaveAttribute('aria-current', 'page')
     await expect(page.getByText('Latest weight')).toBeVisible()
     await expect(
       page.getByRole('heading', { name: 'Your personal trend' }),
-    ).toHaveCount(0)
-    const progress = sections.getByRole('link', {
-      name: 'Progress',
-      exact: true,
-    })
-    await progress.focus()
-    await page.keyboard.press('Enter')
-    await expect(progress).toHaveAttribute('aria-current', 'page')
-    await expect(
-      page.getByRole('heading', { name: 'Your personal trend' }),
     ).toBeVisible()
-    await expect(page.getByText('Latest weight')).toHaveCount(0)
-    await page.getByRole('button', { name: 'Fixture back' }).click()
     await expect(
-      sections.getByRole('link', { name: 'Overview' }),
-    ).toHaveAttribute('aria-current', 'page')
+      page.getByRole('img', { name: /^Personal weight history chart/ }),
+    ).toBeVisible()
+    await page.getByRole('button', { name: 'Fixture back' }).click()
+    await expect(overview).toHaveAttribute('aria-current', 'page')
     await page.getByRole('button', { name: 'Fixture forward' }).click()
-    await expect(progress).toHaveAttribute('aria-current', 'page')
+    await expect(overview).toHaveAttribute('aria-current', 'page')
     await sections.getByRole('link', { name: 'Weigh-ins' }).click()
     await expect(
       page.getByRole('link', { name: 'Dashboard', exact: true }),
     ).toHaveAttribute('aria-current', 'page')
     const input = page.getByLabel('Weight in kg', { exact: true }).first()
     await input.fill('83.2')
-    await progress.click()
+    await overview.click()
     await expect(
       page.getByRole('dialog', { name: 'Discard unsaved input?' }),
     ).toBeVisible()
     await page.getByRole('button', { name: 'Stay', exact: true }).click()
     await expect(input).toHaveValue('83.2')
-    await progress.click()
+    await overview.click()
     await page.getByRole('button', { name: 'Discard and leave' }).click()
-    await expect(progress).toHaveAttribute('aria-current', 'page')
+    await expect(overview).toHaveAttribute('aria-current', 'page')
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
@@ -59,7 +56,10 @@ for (const width of [1280, 320]) {
     })
     await page.goto(fixture('/dashboard?tab=progress&source=direct'))
     await page.reload()
-    await expect(progress).toHaveAttribute('aria-current', 'page')
+    await expect(overview).toHaveAttribute('aria-current', 'page')
+    await expect(
+      page.getByRole('img', { name: /^Personal weight history chart/ }),
+    ).toBeVisible()
     await expect(page.getByTestId('fixture-route')).toHaveText(
       '/dashboard?tab=progress&source=direct',
     )

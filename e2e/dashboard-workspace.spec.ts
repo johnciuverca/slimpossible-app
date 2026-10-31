@@ -49,7 +49,7 @@ for (const viewport of [
   })
 }
 
-test('Dashboard selects one progress view with keyboard history access at 390px', async ({
+test('Dashboard Overview combines progress with latest weight at 390px', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
@@ -61,24 +61,23 @@ test('Dashboard selects one progress view with keyboard history access at 390px'
   ).toHaveCount(0)
   await expect(
     page.getByRole('img', { name: /^Personal weight history chart/ }),
-  ).toHaveCount(0)
+  ).toBeVisible()
   await expect(
     page.getByRole('table', { name: 'Your saved personal weigh-ins' }),
   ).toHaveCount(0)
-  await page.getByRole('link', { name: 'My progress' }).focus()
-  await page.keyboard.press('Enter')
-  await expect(page.getByTestId('fixture-route')).toHaveText(
-    '/dashboard?tab=progress',
-  )
   await expect(
     page.getByRole('heading', { name: 'Goals', exact: true }),
   ).toBeVisible()
+  const myProgress = page.getByRole('link', { name: 'My progress' })
+  await myProgress.focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByTestId('fixture-route')).toHaveText(
+    '/dashboard?tab=overview#dashboard-progress-panel',
+  )
   await expect(
     page.getByRole('img', { name: /^Personal weight history chart/ }),
   ).toBeVisible()
-  await expect(
-    page.getByRole('table', { name: 'Your saved personal weigh-ins' }),
-  ).toHaveCount(0)
+  await expect(page.getByText('Latest weight')).toBeVisible()
   await page
     .getByRole('navigation', { name: 'Dashboard sections' })
     .getByRole('link', { name: 'Weigh-ins', exact: true })
@@ -195,9 +194,11 @@ test('browser Back keeps dirty target input until an explicit discard', async ({
     '110',
   )
   await expect(page.getByTestId('fixture-route')).toHaveText(
-    '/dashboard?tab=progress',
+    '/dashboard?tab=overview#dashboard-progress-panel',
   )
-  await expect(page).toHaveURL(/\/dashboard\?tab=progress$/)
+  await expect(page).toHaveURL(
+    /\/dashboard\?tab=overview#dashboard-progress-panel$/,
+  )
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()
   await expect(
     page.getByRole('dialog', { name: 'Discard unsaved input?' }),
@@ -268,13 +269,13 @@ for (const width of [1280, 390]) {
       await page.goto(
         fixture(
           scenario === 'legacy-group'
-            ? '/dashboard?tab=progress&challenge=goal-one#goals'
+            ? '/dashboard?tab=overview&challenge=goal-one#goals'
             : '/dashboard',
         ) + (scenario === 'group-only' ? '&groupOnly=1' : ''),
       )
       await page
         .getByRole('navigation', { name: 'Dashboard sections' })
-        .getByRole('link', { name: 'Progress', exact: true })
+        .getByRole('link', { name: 'Overview', exact: true })
         .click()
       const goals = page.locator('#goals')
       await expect(

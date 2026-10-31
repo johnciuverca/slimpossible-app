@@ -106,7 +106,7 @@ it('guards contextual section switches and Back while keeping the weigh-in draft
   fireEvent.change(screen.getByLabelText('Unsaved weight'), {
     target: { value: '83.2' },
   })
-  fireEvent.click(screen.getByRole('link', { name: 'Progress' }))
+  fireEvent.click(screen.getByRole('link', { name: 'Overview' }))
   expect(
     await screen.findByRole('dialog', { name: 'Discard unsaved input?' }),
   ).toBeInTheDocument()

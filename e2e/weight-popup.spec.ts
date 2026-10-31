@@ -23,7 +23,7 @@ for (const width of [1280, 390]) {
     await weight.fill('89')
     await page
       .getByRole('navigation', { name: 'Dashboard sections' })
-      .getByRole('link', { name: 'Progress', exact: true })
+      .getByRole('link', { name: 'Overview', exact: true })
       .click()
     const discard = page.getByRole('dialog', {
       name: 'Discard unsaved input?',
@@ -33,7 +33,7 @@ for (const width of [1280, 390]) {
     await expect(weight).toHaveValue('89')
     await page
       .getByRole('navigation', { name: 'Dashboard sections' })
-      .getByRole('link', { name: 'Progress', exact: true })
+      .getByRole('link', { name: 'Overview', exact: true })
       .click()
     await page.getByRole('button', { name: 'Discard and leave' }).click()
     await expect(

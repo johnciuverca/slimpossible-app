@@ -1,17 +1,11 @@
 export type WorkspaceArea = 'dashboard' | 'group'
 export type WorkspaceSection =
-  | 'overview'
-  | 'weigh-ins'
-  | 'progress'
-  | 'members'
-  | 'weekly-results'
-  | 'charts'
+  'overview' | 'weigh-ins' | 'members' | 'weekly-results' | 'charts'
 
 export const workspaceSections = {
   dashboard: [
     { id: 'overview', label: 'Overview' },
     { id: 'weigh-ins', label: 'Weigh-ins' },
-    { id: 'progress', label: 'Progress' },
   ],
   group: [
     { id: 'overview', label: 'Overview' },
@@ -58,14 +52,13 @@ export function workspaceSection(
       return 'weekly-results'
   } else {
     if (hash === '#personal-history') return 'weigh-ins'
-    if (
-      ['/progress', '/goals'].includes(pathname) ||
-      ['#goals', '#dashboard-progress-panel'].includes(hash)
-    )
-      return 'progress'
+    if (['/progress', '/goals'].includes(pathname)) return 'overview'
+    if (['#goals', '#dashboard-progress-panel'].includes(hash))
+      return 'overview'
   }
   if (workspaceSections[area].some(({ id }) => id === tab))
     return tab as WorkspaceSection
+  if (area === 'dashboard' && tab === 'progress') return 'overview'
   if (area === 'group' && tab === 'progress') return 'charts'
   return 'overview'
 }

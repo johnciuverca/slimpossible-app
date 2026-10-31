@@ -467,22 +467,29 @@ describe('personal Dashboard and My Progress', () => {
     await waitFor(() => expect(invite).toBeEnabled())
     fireEvent.click(invite)
     await screen.findByRole('combobox', { name: 'Choose a group you own' })
-    fireEvent.click(screen.getByRole('link', { name: 'Progress' }))
     await screen.findByRole('img', { name: /Personal weight history chart/ })
+    expect(
+      screen.queryByRole('link', { name: 'Progress' }),
+    ).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Refresh Dashboard' }))
     expect(
       await screen.findByText(
         'Your goal choices could not be loaded. Refresh to try again.',
       ),
     ).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('link', { name: 'Weigh-ins' }))
     fireEvent.click(screen.getByRole('link', { name: 'Overview' }))
     expect(
       await screen.findByText(/Invitation choices could not be loaded/),
     ).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('link', { name: 'Progress' }))
     fireEvent.click(screen.getByRole('button', { name: 'Refresh Dashboard' }))
+    fireEvent.click(screen.getByRole('link', { name: 'Weigh-ins' }))
     fireEvent.click(screen.getByRole('link', { name: 'Overview' }))
-    await waitFor(() => expect(invite).toBeEnabled())
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Invite people' }),
+      ).toBeEnabled(),
+    )
     fireEvent.click(screen.getByRole('button', { name: 'Invite people' }))
     expect(
       await screen.findByRole('combobox', { name: 'Choose a group you own' }),

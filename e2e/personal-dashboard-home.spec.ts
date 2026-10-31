@@ -16,7 +16,7 @@ for (const width of [1280, 390]) {
     )
     const route = page.getByTestId('fixture-route')
     await expect(route).toHaveText(
-      '/dashboard?challenge=dashboard-active&source=legacy&tab=progress#goals',
+      '/dashboard?challenge=dashboard-active&source=legacy&tab=overview#goals',
     )
     await expect(
       page.getByRole('tablist', { name: 'Dashboard views' }),
@@ -42,7 +42,7 @@ for (const width of [1280, 390]) {
     ).toBeVisible()
     await page
       .getByRole('navigation', { name: 'Dashboard sections' })
-      .getByRole('link', { name: 'Progress', exact: true })
+      .getByRole('link', { name: 'Overview', exact: true })
       .click()
     await page.reload()
     await expect(
@@ -120,7 +120,7 @@ for (const width of [1280, 390]) {
       await page.getByRole('button', { name: 'Close Profile' }).click()
       await expect(
         page.getByRole('link', { name: 'My progress' }),
-      ).toHaveAttribute('href', /tab=progress$/)
+      ).toHaveAttribute('href', /tab=overview#dashboard-progress-panel$/)
       await expect(
         page.getByRole('button', { name: 'Record weight', exact: true }),
       ).toBeEnabled()

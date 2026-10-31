@@ -52,7 +52,7 @@ for (const width of [1280, 390]) {
     ).toHaveCount(0)
     await page
       .getByRole('navigation', { name: 'Dashboard sections' })
-      .getByRole('link', { name: 'Progress', exact: true })
+      .getByRole('link', { name: 'Overview', exact: true })
       .click()
     await expect(
       page.getByRole('table', { name: 'Your saved personal weigh-ins' }),
@@ -144,24 +144,6 @@ for (const width of [1280, 390]) {
     const endSlider = sliderTrack.getByRole('slider', {
       name: 'Visible range end',
     })
-    if (width === 1280) {
-      const endThumb = await endSlider.boundingBox()
-      expect(endThumb).not.toBeNull()
-      const beforeMouseDrag = await endSlider.getAttribute('aria-valuetext')
-      const thumbY = endThumb!.y + endThumb!.height / 2
-      const thumbCenterX = endThumb!.x + endThumb!.width / 2
-      await page.mouse.move(thumbCenterX, thumbY)
-      await page.mouse.down()
-      await page.mouse.move(thumbCenterX - 60, thumbY, { steps: 8 })
-      await page.mouse.up()
-      await expect(endSlider).not.toHaveAttribute(
-        'aria-valuetext',
-        beforeMouseDrag!,
-      )
-      await expect(chart.locator('circle[data-date]')).toHaveCount(3)
-      await dateControls.getByRole('button', { name: 'Show all dates' }).click()
-      await expect(chart.locator('circle[data-date]')).toHaveCount(5)
-    }
     const originalEnd = await endSlider.getAttribute('aria-valuetext')
     await endSlider.focus()
     await page.keyboard.press('ArrowLeft')

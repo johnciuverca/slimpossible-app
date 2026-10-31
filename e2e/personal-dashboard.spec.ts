@@ -100,7 +100,7 @@ for (const viewport of [
     ).toHaveCount(0)
     await page
       .getByRole('navigation', { name: 'Dashboard sections' })
-      .getByRole('link', { name: 'Progress', exact: true })
+      .getByRole('link', { name: 'Overview', exact: true })
       .click()
     await expect(
       page.getByRole('img', { name: /Personal weight history chart/ }),
@@ -197,7 +197,7 @@ for (const viewport of [
     await expect(history.getByText('84 kg', { exact: true })).toBeVisible()
     await page
       .getByRole('navigation', { name: 'Dashboard sections' })
-      .getByRole('link', { name: 'Progress', exact: true })
+      .getByRole('link', { name: 'Overview', exact: true })
       .click()
     await expect(page.getByRole('img', { name: /84 kilograms/ })).toBeVisible()
     await page
@@ -230,7 +230,7 @@ for (const viewport of [
     await expect(page.getByText('No saved weigh-ins yet.')).toBeVisible()
     await page
       .getByRole('navigation', { name: 'Dashboard sections' })
-      .getByRole('link', { name: 'Progress', exact: true })
+      .getByRole('link', { name: 'Overview', exact: true })
       .click()
     await expect(
       page.getByRole('img', { name: /Personal weight history chart/ }),
