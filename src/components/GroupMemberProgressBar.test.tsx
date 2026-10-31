@@ -18,7 +18,9 @@ describe('GroupMemberProgressBar', () => {
     expect(bar).toHaveAttribute('aria-valuemin', '-100')
     expect(fill).toHaveStyle({ left: '0px', width: '10%' })
     expect(fill).toHaveClass('bg-emerald-600')
-    expect(bar.querySelector('[data-progress-baseline]')).not.toBeInTheDocument()
+    expect(
+      bar.querySelector('[data-progress-baseline]'),
+    ).not.toBeInTheDocument()
   })
 
   it('fills red from the left for weight gain above the starting point', () => {
@@ -32,7 +34,9 @@ describe('GroupMemberProgressBar', () => {
     expect(bar).toHaveAttribute('aria-valuetext', '-10%')
     expect(fill).toHaveStyle({ left: '0px', width: '10%' })
     expect(fill).toHaveClass('bg-red-600')
-    expect(bar.querySelector('[data-progress-baseline]')).not.toBeInTheDocument()
+    expect(
+      bar.querySelector('[data-progress-baseline]'),
+    ).not.toBeInTheDocument()
   })
 
   it('labels gains beyond the negative scale cap while keeping the bar bounded', () => {
@@ -62,7 +66,11 @@ describe('GroupMemberProgressBar', () => {
     })
     expect(bar).not.toHaveAttribute('aria-valuenow')
     expect(bar).toHaveAttribute('aria-valuetext', 'Unavailable')
-    expect(bar.querySelector('[data-progress-fill]')).not.toBeInTheDocument()
-    expect(bar.querySelector('[data-progress-baseline]')).not.toBeInTheDocument()
+    expect(
+      bar.querySelector('[data-progress-fill]'),
+    ).not.toBeInTheDocument()
+    expect(
+      bar.querySelector('[data-progress-baseline]'),
+    ).not.toBeInTheDocument()
   })
 })
