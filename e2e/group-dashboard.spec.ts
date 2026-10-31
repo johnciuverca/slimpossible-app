@@ -1043,7 +1043,7 @@ for (const viewport of [
     await expect(personal).toContainText('87 kg')
     await page
       .getByRole('navigation', { name: 'Dashboard sections' })
-      .getByRole('link', { name: 'Progress', exact: true })
+      .getByRole('link', { name: 'Overview', exact: true })
       .click()
     await expect(page.getByText(/No personal goal yet/)).toBeVisible()
     await expect(
