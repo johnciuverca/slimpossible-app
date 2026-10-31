@@ -14,6 +14,7 @@ import { PersonalProgressChart } from '../components/PersonalProgressChart'
 import { ChallengeTabs } from '../components/ChallengeContextTabs'
 import { WeightPageHeader } from '../components/WeightPageHeader'
 import { GroupChartHistory } from '../components/GroupChartHistory'
+import { GroupMemberProgressBar } from '../components/GroupMemberProgressBar'
 import { ChangeTargetDialog } from '../components/ChangeTargetDialog'
 import { ChangeStartingWeightDialog } from '../components/ChangeStartingWeightDialog'
 import { DashboardChallengeActions } from '../components/DashboardChallengeActions'
@@ -25,7 +26,6 @@ import { usePersonalWorkspace } from '../data/usePersonalWorkspace'
 import { ownGroupMemberKey } from '../models/ownGroupMemberKey'
 import {
   groupMemberProgressForKey,
-  progressBlocks,
   type GroupMemberProgress,
 } from '../models/groupMemberProgress'
 import { valueForContext } from '../models/groupMemberProgress'
@@ -2343,19 +2343,10 @@ export function GroupDashboardPage() {
                     ? '—'
                     : `${member.targetWeightKg} kg`}
                 </p>
-                <div
-                  aria-label={`${member.displayName} goal progress`}
-                  className="mt-3 flex gap-1"
-                  role="img"
-                >
-                  {Array.from({ length: 10 }, (_, index) => (
-                    <span
-                      aria-hidden="true"
-                      className={`h-3 flex-1 rounded-sm ${index < progressBlocks(percentage) ? 'bg-emerald-600' : 'bg-stone-200'}`}
-                      key={index}
-                    />
-                  ))}
-                </div>
+                <GroupMemberProgressBar
+                  label={`${member.displayName} goal progress`}
+                  percentage={percentage}
+                />
                 {member.reachedTargetMilestones.map((milestone) => (
                   <p
                     className="mt-2 text-sm text-emerald-800"
