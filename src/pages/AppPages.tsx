@@ -12,7 +12,12 @@ import {
 import { MilestoneProgress } from '../components/MilestoneProgress'
 import { PersonalProgressChart } from '../components/PersonalProgressChart'
 import { ChallengeTabs } from '../components/ChallengeContextTabs'
-import { WeightPageHeader } from '../components/WeightPageHeader'
+import { GroupSubnavActions } from '../components/GroupSubnavActions'
+import { ChallengeSettingsLink } from '../components/ChallengeSettingsLink'
+import {
+  WeightPageHeader,
+  StandaloneRecordWeightAction,
+} from '../components/WeightPageHeader'
 import { GroupChartHistory } from '../components/GroupChartHistory'
 import { GroupMemberProgressBar } from '../components/GroupMemberProgressBar'
 import { ChangeTargetDialog } from '../components/ChangeTargetDialog'
@@ -1930,38 +1935,55 @@ export function GroupDashboardPage() {
       aria-labelledby="group-title"
     >
       <div className="space-y-2">
-        <WeightPageHeader
-          onRecorded={() => setReloadKey((value) => value + 1)}
-          additionalActions={
-            <>
-              {!archivedHistory ? (
-                <GroupActionsPopover
-                  key={personalWorkspace.ownerKey}
-                  onOpen={() => setHasOpenedCreateJoinActions(true)}
-                >
-                  <DashboardChallengeActions
-                    workspace={personalWorkspace}
-                    protectDraft
-                  />
-                </GroupActionsPopover>
-              ) : null}
-              <Button
-                variant="secondary"
-                className="min-h-11"
-                onClick={() => setReloadKey((value) => value + 1)}
-              >
-                Refresh shared progress
-              </Button>
-            </>
-          }
-        >
-          <h1
-            id="group-title"
-            className="text-2xl font-bold tracking-tight text-ink"
+        <GroupSubnavActions>
+          <StandaloneRecordWeightAction
+            onRecorded={() => setReloadKey((value) => value + 1)}
+          />
+          {!archivedHistory ? (
+            <GroupActionsPopover
+              compact
+              key={personalWorkspace.ownerKey}
+              onOpen={() => setHasOpenedCreateJoinActions(true)}
+            >
+              <DashboardChallengeActions
+                workspace={personalWorkspace}
+                protectDraft
+              />
+            </GroupActionsPopover>
+          ) : null}
+          <Button
+            variant="secondary"
+            className="group-refresh-action"
+            aria-label="Refresh shared progress"
+            title="Refresh shared progress"
+            onClick={() => setReloadKey((value) => value + 1)}
           >
+            <svg
+              aria-hidden="true"
+              width="19"
+              height="19"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M20 7v5h-5M4 17v-5h5" />
+              <path d="M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1" />
+            </svg>
+          </Button>
+        </GroupSubnavActions>
+        <div
+          className={archivedHistory ? 'flex items-center gap-2' : 'sr-only'}
+        >
+          <h1 id="group-title" className="text-xl font-bold">
             {selectedChallenge?.name ?? 'Group'}
           </h1>
-        </WeightPageHeader>
+          {archivedHistory && selectedChallenge?.ownerId === ownerId ? (
+            <ChallengeSettingsLink />
+          ) : null}
+        </div>
         {archivedHistory ? (
           <div
             className="rounded-xl border border-line bg-page p-4"
@@ -1986,6 +2008,7 @@ export function GroupDashboardPage() {
             loading={isLoading}
             showPersonalTracking={false}
             compact
+            managementOwnerId={ownerId}
           />
         )}
       </div>
@@ -1997,58 +2020,10 @@ export function GroupDashboardPage() {
           Manage challenges and archived history
         </Link>
       ) : null}
-      {selectedChallenge && selectedChallenge.ownerId === ownerId ? (
-        <details className="group-manage-menu relative w-fit">
-          <summary className="flex min-h-10 cursor-pointer list-none items-center rounded-lg border border-stone-300 bg-white px-3 text-sm font-semibold">
-            Manage{' '}
-            <span aria-hidden="true" className="ml-2">
-              ⌄
-            </span>
-          </summary>
-          <nav
-            aria-label="Selected group management"
-            className="absolute left-0 top-full z-30 mt-2 grid min-w-52 gap-1 rounded-xl border border-stone-200 bg-white p-2 shadow-lg"
-          >
-            <Link
-              className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-emerald-50"
-              to="/challenge/manage"
-            >
-              Manage challenges
-            </Link>
-            {selectedChallenge.status !== 'archived' ? (
-              <>
-                <Link
-                  className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-emerald-50"
-                  to={`/challenge/setup?challenge=${encodeURIComponent(selectedChallenge.id)}`}
-                >
-                  Manage group
-                </Link>
-                <Link
-                  className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-emerald-50"
-                  to={`/challenge/participants/enroll?${new URLSearchParams({ challenge: selectedChallenge.id, self: 'owner' })}`}
-                >
-                  Manage members
-                </Link>
-                <Link
-                  className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-emerald-50"
-                  to={`/challenge/invites?challenge=${encodeURIComponent(selectedChallenge.id)}`}
-                >
-                  Manage invitations
-                </Link>
-              </>
-            ) : (
-              <p className="px-3 py-2 text-xs leading-5 text-slate-600">
-                This challenge is archived. Restore it before changing group
-                details or members.
-              </p>
-            )}
-          </nav>
-        </details>
-      ) : null}
       {!summary || section === 'overview' || section === 'weekly-results' ? (
         <Card
           id="group-summary"
-          className={`group-overview-card ${section === 'overview' ? 'group-overview-compact p-3 sm:p-4' : 'p-5 sm:p-8'}`}
+          className={`group-overview-card ${section === 'overview' ? 'group-overview-compact p-0' : 'p-5 sm:p-8'}`}
         >
           <DashboardState
             isLoading={isLoading}

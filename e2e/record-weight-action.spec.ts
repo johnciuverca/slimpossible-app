@@ -80,46 +80,74 @@ for (const width of [1280, 390]) {
           .click()
       await expect(action).toHaveCount(1)
       await expect(action).toBeEnabled()
-      const header = page.locator('[data-weight-page-header]')
-      const heading = header.getByRole('heading', { level: 1 })
-      const headerBox = (await header.boundingBox())!
-      const actionBox = (await action.boundingBox())!
-      const headingBox = (await heading.boundingBox())!
-      if (await page.locator('.dashboard-workspace').count()) {
+      if (await page.locator('.group-workspace').count()) {
+        const subnav = page.getByRole('navigation', { name: 'Group sections' })
         await expect(
-          page
-            .locator('.dashboard-latest')
-            .getByRole('button', { name: 'Record weight', exact: true }),
-        ).toBeVisible()
-        expect(actionBox.y).toBeGreaterThan(headingBox.y + headingBox.height)
-        expect(actionBox.x).toBeGreaterThanOrEqual(headerBox.x)
-        expect(actionBox.x + actionBox.width).toBeLessThanOrEqual(
-          headerBox.x + headerBox.width + 1,
-        )
-      } else if (
-        await header.getByRole('group', { name: 'Group actions' }).count()
-      ) {
-        const actionsBox = (await header
+          subnav.getByRole('button', { name: 'Record weight', exact: true }),
+        ).toHaveCount(1)
+        const actions = (await subnav
           .getByRole('group', { name: 'Group actions' })
           .boundingBox())!
-        expect(actionBox.x).toBeGreaterThanOrEqual(actionsBox.x)
+        const actionBox = (await action.boundingBox())!
+        const content = await page
+          .locator('.app-shell-main')
+          .evaluate((element) => {
+            const rect = element.getBoundingClientRect(),
+              style = getComputedStyle(element)
+            return {
+              left: rect.left + parseFloat(style.paddingLeft),
+              right: rect.right - parseFloat(style.paddingRight),
+            }
+          })
+        expect(actionBox.x).toBeGreaterThanOrEqual(content.left)
         expect(actionBox.x + actionBox.width).toBeLessThanOrEqual(
-          actionsBox.x + actionsBox.width,
+          content.right + 1,
         )
-        if (width >= 1280)
-          expect(Math.abs(actionBox.y - headerBox.y)).toBeLessThan(2)
-        else
-          expect(actionBox.y).toBeGreaterThan(headingBox.y + headingBox.height)
-      } else if (width > 600) {
-        expect(
-          Math.abs(
-            actionBox.x + actionBox.width - headerBox.x - headerBox.width,
-          ),
-        ).toBeLessThan(2)
-        expect(Math.abs(actionBox.y - headerBox.y)).toBeLessThan(2)
+        expect(actions.x + actions.width).toBeCloseTo(content.right, 0)
       } else {
-        expect(actionBox.y).toBeGreaterThan(headingBox.y + headingBox.height)
-        expect(Math.abs(actionBox.x - headerBox.x)).toBeLessThan(2)
+        const header = page.locator('[data-weight-page-header]')
+        const heading = header.getByRole('heading', { level: 1 })
+        const headerBox = (await header.boundingBox())!
+        const actionBox = (await action.boundingBox())!
+        const headingBox = (await heading.boundingBox())!
+        if (await page.locator('.dashboard-workspace').count()) {
+          await expect(
+            page
+              .locator('.dashboard-latest')
+              .getByRole('button', { name: 'Record weight', exact: true }),
+          ).toBeVisible()
+          expect(actionBox.y).toBeGreaterThan(headingBox.y + headingBox.height)
+          expect(actionBox.x).toBeGreaterThanOrEqual(headerBox.x)
+          expect(actionBox.x + actionBox.width).toBeLessThanOrEqual(
+            headerBox.x + headerBox.width + 1,
+          )
+        } else if (
+          await header.getByRole('group', { name: 'Group actions' }).count()
+        ) {
+          const actionsBox = (await header
+            .getByRole('group', { name: 'Group actions' })
+            .boundingBox())!
+          expect(actionBox.x).toBeGreaterThanOrEqual(actionsBox.x)
+          expect(actionBox.x + actionBox.width).toBeLessThanOrEqual(
+            actionsBox.x + actionsBox.width,
+          )
+          if (width >= 1280)
+            expect(Math.abs(actionBox.y - headerBox.y)).toBeLessThan(2)
+          else
+            expect(actionBox.y).toBeGreaterThan(
+              headingBox.y + headingBox.height,
+            )
+        } else if (width > 600) {
+          expect(
+            Math.abs(
+              actionBox.x + actionBox.width - headerBox.x - headerBox.width,
+            ),
+          ).toBeLessThan(2)
+          expect(Math.abs(actionBox.y - headerBox.y)).toBeLessThan(2)
+        } else {
+          expect(actionBox.y).toBeGreaterThan(headingBox.y + headingBox.height)
+          expect(Math.abs(actionBox.x - headerBox.x)).toBeLessThan(2)
+        }
       }
       await action.click()
       editor =

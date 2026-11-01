@@ -25,9 +25,15 @@ export function focusAfterWeightMutation(
   trigger: HTMLElement | null,
   changed: () => void = () => undefined,
 ) {
-  const button = trigger
-    ?.closest('main')
-    ?.querySelector<HTMLButtonElement>('[data-weight-page-header] button')
+  const button =
+    trigger
+      ?.closest('main')
+      ?.querySelector<HTMLButtonElement>('[data-weight-page-header] button') ??
+    trigger
+      ?.closest('.app-shell')
+      ?.querySelector<HTMLButtonElement>(
+        '.group-subnav-actions button[data-weight-owner]',
+      )
   // Resolve the stable action before refresh can detach the originating row.
   changed()
   if (!button) {
