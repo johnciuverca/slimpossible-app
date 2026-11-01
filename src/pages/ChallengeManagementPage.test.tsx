@@ -241,6 +241,41 @@ describe('ChallengeManagementPage', () => {
     },
   )
 
+  it.each(['missing-rpc', 'rejected-request'] as const)(
+    'announces and focuses %s failure feedback, keeping Archive available for retry',
+    async (failure) => {
+      const { repository } = installPersistence([
+        createChallengeFixture({ name: 'Retry group' }),
+      ])
+      if (failure === 'missing-rpc')
+        repository.archive.mockResolvedValueOnce({
+          state: 'error',
+          error: { kind: 'request', message: 'PGRST202: function absent' },
+        } as never)
+      else
+        repository.archive.mockRejectedValueOnce(
+          new Error('Network unavailable'),
+        )
+      renderPage()
+      const archive = await screen.findByRole('button', { name: 'Archive' })
+      // The live region exists before its text changes for reliable announcements.
+      const feedback = screen
+        .getAllByRole('status')
+        .find((node) => node.getAttribute('aria-live') === 'polite')!
+      expect(feedback).toHaveTextContent('')
+      fireEvent.click(archive)
+      await waitFor(() =>
+        expect(feedback).toHaveTextContent(
+          'This challenge could not be archived. Refresh and check its current status.',
+        ),
+      )
+      expect(feedback).toHaveAttribute('aria-atomic', 'true')
+      expect(feedback).toHaveFocus()
+      expect(archive).toBeEnabled()
+      expect(screen.getByText('Retry group')).toBeInTheDocument()
+    },
+  )
+
   it('uses the established day.month.year date contract', async () => {
     installPersistence([
       createChallengeFixture({

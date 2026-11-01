@@ -2290,3 +2290,64 @@ test('the shared chart range handles respond to mobile touch dragging', async ({
     await context.close()
   }
 })
+
+test('archive missing-RPC feedback stays visible and announced', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.route(`${supabaseRestUrl}/challenges*`, (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify(
+        Array.from({ length: 6 }, (_, index) => ({
+          id: `feedback-group-${index}`,
+          challenge_kind: 'group',
+          owner_id: viewerId,
+          created_by: viewerId,
+          name: `Feedback group ${index}`,
+          start_date: '2026-01-01',
+          end_date: '2099-01-01',
+          status: 'active',
+          created_at: '2026-01-01T00:00:00Z',
+          updated_at: '2026-01-01T00:00:00Z',
+        })),
+      ),
+    }),
+  )
+  let release!: () => void
+  const pending = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await page.route(
+    `${supabaseRestUrl}/rpc/archive_group_challenge`,
+    async (route) => {
+      await pending
+      await route.fulfill({
+        status: 404,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 'PGRST202',
+          message:
+            'Could not find the function public.archive_group_challenge in the schema cache',
+        }),
+      })
+    },
+  )
+  await page.goto(
+    `/e2e/fixtures/today-harness.html?scenario=group&user=${viewerId}&route=/challenge/manage`,
+  )
+  const archive = page
+    .getByRole('button', { name: 'Archive', exact: true })
+    .first()
+  await archive.click()
+  await expect(page.getByRole('button', { name: 'Archiving…' })).toBeDisabled()
+  release()
+  const feedback = page
+    .getByRole('status')
+    .filter({ hasText: 'This challenge could not be archived.' })
+  await expect(feedback).toBeVisible()
+  await expect(feedback).toHaveAttribute('aria-live', 'polite')
+  await expect(feedback).toBeInViewport()
+  await expect(feedback).toBeFocused()
+  await expect(archive).toBeEnabled()
+})

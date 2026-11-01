@@ -76,6 +76,12 @@ export function ChallengeManagementPage() {
       message,
     }))
 
+  const feedbackRef = useRef<HTMLParagraphElement>(null)
+  useEffect(() => {
+    // Feedback follows the list and may be below the viewport after a card action.
+    if (actionMessage) feedbackRef.current?.focus()
+  }, [actionMessage])
+
   useEffect(() => {
     let current = true
     const controller = new AbortController()
@@ -447,15 +453,20 @@ export function ChallengeManagementPage() {
           )}
         </div>
 
-        {actionMessage ? (
-          <p
-            aria-live="polite"
-            className="mt-5 text-sm text-ink-muted"
-            role="status"
-          >
-            {actionMessage}
-          </p>
-        ) : null}
+        <p
+          aria-atomic="true"
+          aria-live="polite"
+          className={
+            actionMessage
+              ? 'mt-5 rounded-xl text-sm text-ink-muted focus:outline-2 focus:outline-offset-4 focus:outline-forest-700'
+              : ''
+          }
+          ref={feedbackRef}
+          role="status"
+          tabIndex={-1}
+        >
+          {actionMessage}
+        </p>
 
         <aside className="mt-8 rounded-2xl border border-line bg-page p-4 sm:p-5">
           <p className="font-semibold text-ink">
