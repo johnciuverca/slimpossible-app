@@ -11,9 +11,11 @@ import { Button } from './ui'
 export function GroupActionsPopover({
   children,
   onOpen,
+  compact = false,
 }: {
   children: ReactNode
   onOpen: () => void
+  compact?: boolean
 }) {
   const id = useId()
   const root = useRef<HTMLDivElement>(null)
@@ -59,8 +61,9 @@ export function GroupActionsPopover({
         aria-expanded={open}
         aria-controls={id}
         aria-haspopup="dialog"
+        aria-label="Create or join a group"
       >
-        Create or join a group
+        {compact ? 'Create / join' : 'Create or join a group'}
       </Button>
       <div
         id={id}

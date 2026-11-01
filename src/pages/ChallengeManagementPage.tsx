@@ -440,6 +440,18 @@ export function ChallengeManagementPage() {
                           >
                             Edit challenge
                           </Link>
+                          <Link
+                            className="inline-flex min-h-11 items-center justify-center rounded-full border border-line px-4 py-2 text-sm font-semibold text-forest-800 hover:bg-page"
+                            to={`/challenge/participants/enroll?${new URLSearchParams({ challenge: challenge.id, self: 'owner' })}`}
+                          >
+                            Manage members
+                          </Link>
+                          <Link
+                            className="inline-flex min-h-11 items-center justify-center rounded-full border border-line px-4 py-2 text-sm font-semibold text-forest-800 hover:bg-page"
+                            to={`/challenge/invites?challenge=${encodeURIComponent(challenge.id)}`}
+                          >
+                            Manage invitations
+                          </Link>
                           <Button
                             disabled={Boolean(savingId)}
                             onClick={() => void transitionChallenge(challenge)}

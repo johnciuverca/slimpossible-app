@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { useOptionalAuth } from '../auth/useAuth'
 import { createPersistence } from '../data/persistence'
 import type { Challenge } from '../models/challenge'
+import { ChallengeSettingsLink } from './ChallengeSettingsLink'
 import { workspaceSection } from '../models/workspaceNavigation'
 
 function challengeTabDestination(
@@ -39,6 +40,7 @@ export function ChallengeTabs({
   error = '',
   showPersonalTracking = true,
   compact = false,
+  managementOwnerId,
 }: {
   challenges: Challenge[]
   selectedId?: string | null
@@ -46,6 +48,7 @@ export function ChallengeTabs({
   error?: string
   showPersonalTracking?: boolean
   compact?: boolean
+  managementOwnerId?: string
 }) {
   const { pathname, search, hash } = useLocation()
   const querySelection = new URLSearchParams(search).get('challenge') || null
@@ -113,8 +116,22 @@ export function ChallengeTabs({
             })),
           ].map(({ id, label, to }) => {
             const active = id ? selected === id : personalPage && !selected
+            const canManage =
+              active &&
+              Boolean(managementOwnerId) &&
+              challenges.some(
+                (challenge) =>
+                  challenge.id === id &&
+                  challenge.kind === 'group' &&
+                  challenge.ownerId === managementOwnerId,
+              )
             return (
-              <li key={id}>
+              <li
+                key={id}
+                className={
+                  canManage ? 'challenge-context-with-settings' : undefined
+                }
+              >
                 <Link
                   to={to}
                   aria-current={active ? 'page' : undefined}
@@ -123,6 +140,7 @@ export function ChallengeTabs({
                   {label}
                   {active ? <span className="sr-only"> (selected)</span> : null}
                 </Link>
+                {canManage ? <ChallengeSettingsLink /> : null}
               </li>
             )
           })}

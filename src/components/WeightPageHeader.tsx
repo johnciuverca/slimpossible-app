@@ -53,7 +53,7 @@ export function WeightPageHeader({
   )
 }
 
-function StandaloneRecordWeightAction({
+export function StandaloneRecordWeightAction({
   onRecorded,
 }: {
   onRecorded?: () => void
