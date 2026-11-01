@@ -1673,10 +1673,16 @@ for (const viewport of [
     })
     await expect(contexts).toHaveCount(1)
     const row = (await contexts.boundingBox())!
-    const heading = (await page
-      .getByRole('heading', { name: 'E2E authorized group', exact: true })
+    const chart = (await page
+      .locator('.group-history-workspace')
       .boundingBox())!
-    expect(heading.y + heading.height).toBeLessThan(row.y)
+    expect(row.x).toBeCloseTo(chart.x, 0)
+    expect(row.y + row.height).toBeLessThanOrEqual(chart.y)
+    await expect(
+      page
+        .getByRole('navigation', { name: 'Group sections' })
+        .getByRole('button', { name: 'Refresh shared progress' }),
+    ).toBeVisible()
     const second = contexts.getByRole('link', {
       name: 'Group · Second authorized group',
       exact: true,

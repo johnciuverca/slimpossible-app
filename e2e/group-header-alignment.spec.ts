@@ -61,34 +61,73 @@ for (const viewport of [
           exact: true,
         }),
       ).toBeVisible()
-      const header = page.locator('[data-weight-page-header]')
       const action = page.getByRole('button', {
         name: 'Record weight',
         exact: true,
       })
       await expect(action).toBeEnabled()
-      const navBox = (await contexts.boundingBox())!
-      const headerBox = (await header.boundingBox())!
-      const actionBox = (await action.boundingBox())!
-      if (path !== '/group' && !path.startsWith('/challenges')) {
-        expect(headerBox.y - navBox.y - navBox.height).toBeCloseTo(24, 0)
-      } else {
-        expect(navBox.y - headerBox.y - headerBox.height).toBeCloseTo(8, 0)
-      }
-      if (viewport.width >= 1280) {
-        const actionsBox = (await header
+      if (await page.locator('.group-workspace').count()) {
+        const subnav = page.getByRole('navigation', { name: 'Group sections' })
+        await expect(
+          subnav.getByRole('button', { name: 'Record weight', exact: true }),
+        ).toHaveCount(1)
+        // This local fixture can show the empty summary; the chart uses these same content edges.
+        const chart = await page
+          .locator('.app-shell-main')
+          .evaluate((element) => {
+            const rect = element.getBoundingClientRect(),
+              style = getComputedStyle(element)
+            const x = rect.left + parseFloat(style.paddingLeft)
+            return {
+              x,
+              width:
+                rect.width -
+                parseFloat(style.paddingLeft) -
+                parseFloat(style.paddingRight),
+            }
+          })
+        const tabs = (await subnav
+          .locator('.contextual-subnav-scroll')
+          .boundingBox())!
+        const actions = (await subnav
           .getByRole('group', { name: 'Group actions' })
           .boundingBox())!
-        expect(actionBox.y - headerBox.y).toBeCloseTo(0, 0)
-        expect(
-          actionsBox.x + actionsBox.width - headerBox.x - headerBox.width,
-        ).toBeCloseTo(0, 0)
+        const selector = (await contexts.boundingBox())!
+        expect(tabs.x).toBeCloseTo(chart.x, 0)
+        expect(selector.x).toBeCloseTo(chart.x, 0)
+        expect(actions.x + actions.width).toBeCloseTo(chart.x + chart.width, 0)
+        const actionBox = (await action.boundingBox())!
+        expect(actionBox.x).toBeGreaterThanOrEqual(chart.x)
+        expect(actionBox.x + actionBox.width).toBeLessThanOrEqual(
+          chart.x + chart.width + 1,
+        )
+        if (viewport.width >= 1024) expect(actionBox.y).toBeCloseTo(tabs.y, 0)
+        else expect(actions.y).toBeGreaterThanOrEqual(tabs.y + tabs.height)
       } else {
-        const textBox = await header.evaluate((element) => {
-          const box = element.firstElementChild!.getBoundingClientRect()
-          return { bottom: box.bottom }
-        })
-        expect(actionBox.y - textBox.bottom).toBeCloseTo(16, 0)
+        const header = page.locator('[data-weight-page-header]')
+        const navBox = (await contexts.boundingBox())!
+        const headerBox = (await header.boundingBox())!
+        const actionBox = (await action.boundingBox())!
+        if (path !== '/group' && !path.startsWith('/challenges')) {
+          expect(headerBox.y - navBox.y - navBox.height).toBeCloseTo(24, 0)
+        } else {
+          expect(navBox.y - headerBox.y - headerBox.height).toBeCloseTo(8, 0)
+        }
+        if (viewport.width >= 1280) {
+          const actionsBox = (await header
+            .getByRole('group', { name: 'Group actions' })
+            .boundingBox())!
+          expect(actionBox.y - headerBox.y).toBeCloseTo(0, 0)
+          expect(
+            actionsBox.x + actionsBox.width - headerBox.x - headerBox.width,
+          ).toBeCloseTo(0, 0)
+        } else {
+          const textBox = await header.evaluate((element) => {
+            const box = element.firstElementChild!.getBoundingClientRect()
+            return { bottom: box.bottom }
+          })
+          expect(actionBox.y - textBox.bottom).toBeCloseTo(16, 0)
+        }
       }
       if (path === '/group' || path.startsWith('/challenges')) {
         await expect(
