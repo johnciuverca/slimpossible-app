@@ -382,6 +382,7 @@ export function ChallengeSetupPage() {
       : await persistence.repositories.challenges.create({
           ...input,
           kind: challengeKind,
+          ...(challengeKind === 'group' ? { status: 'active' as const } : {}),
         })
 
     setIsSaving(false)

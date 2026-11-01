@@ -21,7 +21,6 @@ function currentDateOnly() {
 
 function statusTone(status: Challenge['status']) {
   if (status === 'active') return 'success'
-  if (status === 'draft') return 'warning'
   return 'neutral'
 }
 
@@ -47,7 +46,7 @@ export function ChallengeManagementPage() {
   })
   const [restoreChoice, setRestoreChoice] = useState<{
     key: string
-    values: Record<string, 'draft' | 'active' | 'completed' | ''>
+    values: Record<string, 'active' | 'completed' | ''>
   }>({ key: ownerKey, values: {} })
   // Increment on every account transition, including leaving and returning to the same owner.
   const generation = useRef({ key: ownerKey, id: 0 })
@@ -162,7 +161,7 @@ export function ChallengeManagementPage() {
 
   function setLegacyRestoreChoice(
     challengeId: string,
-    value: 'draft' | 'active' | 'completed' | '',
+    value: 'active' | 'completed' | '',
   ) {
     setRestoreChoice((current) => ({
       key: ownerKey,
@@ -252,7 +251,7 @@ export function ChallengeManagementPage() {
     <section aria-labelledby="challenge-management-title" className="w-full">
       <Card className="mx-auto max-w-5xl p-5 sm:p-8">
         <PageHeader
-          description="Archive a group challenge to pause new participation while retaining its shared history. Draft, active, and completed status stays explicit."
+          description="Archive a group challenge to pause new participation while retaining its shared history. Active and completed status stays explicit."
           title="Manage group challenges."
           titleId="challenge-management-title"
         >
@@ -334,7 +333,9 @@ export function ChallengeManagementPage() {
               const endDatePassed = challenge.endDate < currentDateOnly()
               const restoredStatus = endDatePassed
                 ? 'completed'
-                : challenge.archivedFromStatus
+                : challenge.archivedFromStatus === 'draft'
+                  ? 'active'
+                  : challenge.archivedFromStatus
               const needsLegacyChoice = archived && !restoredStatus
               const chosenLegacyStatus =
                 selectedRestoreChoices[challenge.id] ?? ''
@@ -371,9 +372,7 @@ export function ChallengeManagementPage() {
                           ? 'Shared history remains available to current authorized viewers. Existing invitations stay revoked.'
                           : challenge.status === 'completed'
                             ? 'Completed challenges remain completed when archived or restored after their end date.'
-                            : challenge.status === 'draft'
-                              ? 'Archiving a draft does not activate it; restore returns it to Draft.'
-                              : 'Archiving pauses new participation, invitations, group writes, and share changes.'}
+                            : 'Archiving pauses new participation, invitations, group writes, and share changes.'}
                       </p>
                     </div>
                     <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-36">
@@ -390,13 +389,12 @@ export function ChallengeManagementPage() {
                                   setLegacyRestoreChoice(
                                     challenge.id,
                                     event.target.value as
-                                      'draft' | 'active' | 'completed' | '',
+                                      'active' | 'completed' | '',
                                   )
                                 }
                                 value={chosenLegacyStatus}
                               >
                                 <option value="">Choose status</option>
-                                <option value="draft">Draft</option>
                                 <option value="active">Active</option>
                                 <option value="completed">Completed</option>
                               </select>

@@ -15,6 +15,12 @@ for task_migration in supabase/migrations/*.sql; do
   # Supabase Storage is not part of the local Auth shim; avatar storage setup
   # is unrelated to challenge archive/restore and requires the hosted storage schema.
   [[ "$task_migration" == *20261026000000_profile_avatars.sql ]] && continue
+  if [[ "$task_migration" == *20261101000001_normalize_group_challenge_lifecycle.sql ]]; then
+    "${task_psql[@]}" -f supabase/tests/group_lifecycle_normalization_fixture.sql
+  fi
   "${task_psql[@]}" -f "$task_migration"
+  if [[ "$task_migration" == *20261101000001_normalize_group_challenge_lifecycle.sql ]]; then
+    "${task_psql[@]}" -f supabase/tests/group_lifecycle_normalization_assertions.sql
+  fi
 done
 "${task_psql[@]}" -f supabase/tests/challenge_archive_restore_authorization.sql

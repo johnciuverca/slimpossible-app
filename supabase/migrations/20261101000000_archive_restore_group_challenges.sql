@@ -36,10 +36,10 @@ begin
     if old.end_date < current_date then
       expected_status := 'completed';
     elsif old.archived_from_status is not null then
-      expected_status := old.archived_from_status;
+      expected_status := case when old.archived_from_status = 'draft' then 'active' else old.archived_from_status end;
     else
       expected_status := new.status;
-      if expected_status not in ('draft', 'active', 'completed') then
+      if expected_status not in ('active', 'completed') then
         raise exception using errcode = '22023',
           message = 'Choose a valid status to restore this older archived challenge.';
       end if;
@@ -167,14 +167,14 @@ begin
   if challenge_row.end_date < current_date then
     restored_status := 'completed';
   elsif challenge_row.archived_from_status is not null then
-    restored_status := challenge_row.archived_from_status;
+    restored_status := case when challenge_row.archived_from_status = 'draft' then 'active' else challenge_row.archived_from_status end;
     if target_restore_status is not null
        and target_restore_status is distinct from restored_status then
       raise exception using errcode = '23514', message = 'Restore status does not match the archived challenge.';
     end if;
   else
     restored_status := target_restore_status;
-    if restored_status is null or restored_status not in ('draft', 'active', 'completed') then
+    if restored_status is null or restored_status not in ('active', 'completed') then
       raise exception using errcode = '22023', message = 'Choose a valid status to restore this older archived challenge.';
     end if;
   end if;

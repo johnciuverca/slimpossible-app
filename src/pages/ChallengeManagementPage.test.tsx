@@ -77,7 +77,9 @@ function installPersistence(initial: Challenge[]) {
         const status =
           current.endDate < new Date().toISOString().slice(0, 10)
             ? 'completed'
-            : (current.archivedFromStatus ?? targetStatus ?? 'draft')
+            : current.archivedFromStatus === 'draft'
+              ? 'active'
+              : (current.archivedFromStatus ?? targetStatus ?? 'active')
         const restored: Challenge = {
           ...current,
           archivedFromStatus: null,
@@ -97,7 +99,7 @@ function installPersistence(initial: Challenge[]) {
 }
 
 describe('ChallengeManagementPage', () => {
-  it('lists non-archived group challenges with their real status and archives through the repository', async () => {
+  it('lists active and completed group challenges with their real status and archives through the repository', async () => {
     const { repository } = installPersistence([
       createChallengeFixture({
         id: 'active-one',
@@ -106,8 +108,8 @@ describe('ChallengeManagementPage', () => {
       }),
       createChallengeFixture({
         id: 'draft-one',
-        name: 'Draft plan',
-        status: 'draft',
+        name: 'Second active plan',
+        status: 'active',
       }),
       createChallengeFixture({
         id: 'done-one',
@@ -126,7 +128,9 @@ describe('ChallengeManagementPage', () => {
 
     const activePanel = await screen.findByRole('tabpanel')
     expect(within(activePanel).getByText('Active plan')).toBeInTheDocument()
-    expect(within(activePanel).getByText('Draft plan')).toBeInTheDocument()
+    expect(
+      within(activePanel).getByText('Second active plan'),
+    ).toBeInTheDocument()
     expect(within(activePanel).getByText('Completed plan')).toBeInTheDocument()
     expect(
       within(activePanel).queryByText('Private plan'),
@@ -247,6 +251,30 @@ describe('ChallengeManagementPage', () => {
     renderPage()
     expect(
       await screen.findByText('02.01.2026 – 04.03.2027'),
+    ).toBeInTheDocument()
+  })
+
+  it('restores a historical Draft archive as Active without offering Draft', async () => {
+    const archived = createChallengeFixture({
+      id: 'old-draft',
+      name: 'Historical group',
+      status: 'archived',
+      archivedFromStatus: 'draft',
+      endDate: '2099-01-01',
+    })
+    const { repository } = installPersistence([archived])
+    renderPage()
+    fireEvent.click(await screen.findByRole('tab', { name: /Archived/ }))
+    expect(screen.getByText('Restores as Active.')).toBeInTheDocument()
+    expect(
+      screen.queryByRole('option', { name: 'Draft' }),
+    ).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Restore' }))
+    await waitFor(() =>
+      expect(repository.restore).toHaveBeenCalledWith('old-draft', undefined),
+    )
+    expect(
+      await screen.findByText(/Historical group was restored as Active/),
     ).toBeInTheDocument()
   })
 

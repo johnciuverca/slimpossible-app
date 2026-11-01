@@ -645,7 +645,7 @@ describe('Supabase repositories', () => {
       name: 'September challenge',
       owner_id: 'owner-1',
       start_date: '2026-09-17',
-      status: 'draft',
+      status: 'active',
       target_weight_kg: null,
       updated_at: '2026-09-17T10:00:00.000Z',
     })
@@ -669,6 +669,7 @@ describe('Supabase repositories', () => {
     const requestBody = JSON.parse(
       String(vi.mocked(fetch).mock.calls[0]?.[1]?.body),
     ) as Record<string, unknown>
+    expect(requestBody).toHaveProperty('status', 'active')
     expect(requestBody).not.toHaveProperty('target_weight_kg')
     expect(requestBody).toHaveProperty('challenge_kind', 'group')
   })

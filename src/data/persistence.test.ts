@@ -37,13 +37,59 @@ describe('challenge and participant persistence', () => {
       persistence.repositories.challenges.listOwned('legacy-owner'),
     ).resolves.toMatchObject({
       data: [
-        expect.objectContaining({ id: 'legacy-challenge', kind: 'group' }),
+        expect.objectContaining({
+          id: 'legacy-challenge',
+          kind: 'group',
+          status: 'active',
+        }),
       ],
       state: 'success',
     })
     expect(window.localStorage.getItem('slimpossible.local.challenges')).toBe(
       legacyJson,
     )
+  })
+
+  it('creates groups Active while preserving personal Draft defaults and restores historical Draft archives as Active', async () => {
+    const persistence = createPersistence(signedOutState)
+    if (persistence.mode !== 'local') throw new Error('Expected local')
+    const input = {
+      name: 'Lifecycle',
+      ownerId: 'owner',
+      createdBy: 'owner',
+      startDate: '2026-01-01',
+      endDate: '2099-01-01',
+    }
+    for (const status of [undefined, 'draft'] as const) {
+      expect(
+        await persistence.repositories.challenges.create({ ...input, status }),
+      ).toMatchObject({ state: 'success', data: { status: 'active' } })
+    }
+    expect(
+      await persistence.repositories.challenges.create({
+        ...input,
+        kind: 'personal',
+      }),
+    ).toMatchObject({ state: 'success', data: { status: 'draft' } })
+    const values = JSON.parse(
+      window.localStorage.getItem('slimpossible.local.challenges')!,
+    )
+    values.push({
+      ...values[1],
+      id: 'historical',
+      status: 'archived',
+      archivedFromStatus: 'draft',
+    })
+    window.localStorage.setItem(
+      'slimpossible.local.challenges',
+      JSON.stringify(values),
+    )
+    expect(
+      await persistence.repositories.challenges.restore('historical'),
+    ).toMatchObject({
+      state: 'success',
+      data: { status: 'active', archivedFromStatus: null },
+    })
   })
 
   it('shows owners and active members only in the local challenge preview', async () => {
@@ -266,7 +312,7 @@ describe('challenge and participant persistence', () => {
     ).resolves.toEqual({ data: null, state: 'empty' })
   })
 
-  it('shares setup-default draft groups for owners and active members, rejecting other lifecycle/access states atomically', async () => {
+  it('shares setup-default active groups for owners and active members, rejecting other lifecycle/access states atomically', async () => {
     const persistence = createPersistence(signedOutState)
     if (persistence.mode !== 'local')
       throw new Error('Expected local persistence')
@@ -278,7 +324,7 @@ describe('challenge and participant persistence', () => {
       endDate: '2026-12-31',
     })
     if (group.state !== 'success') throw new Error('Expected group')
-    expect(group.data.status).toBe('draft')
+    expect(group.data.status).toBe('active')
     const input = {
       date: '2026-10-06',
       weightKg: 82,

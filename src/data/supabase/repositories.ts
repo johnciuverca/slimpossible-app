@@ -634,7 +634,16 @@ export function createRepositories(client: DatabaseClient): Repositories {
             name: input.name,
             owner_id: input.ownerId,
             start_date: input.startDate,
-            ...(input.status ? { status: input.status } : {}),
+            ...(input.kind !== 'personal'
+              ? {
+                  status:
+                    !input.status || input.status === 'draft'
+                      ? 'active'
+                      : input.status,
+                }
+              : input.status
+                ? { status: input.status }
+                : {}),
             ...(input.targetWeightKg === undefined
               ? {}
               : { target_weight_kg: input.targetWeightKg }),

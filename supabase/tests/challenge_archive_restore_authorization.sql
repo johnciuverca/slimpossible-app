@@ -8,7 +8,7 @@ create temp table archive_token as select token from public.create_challenge_inv
 grant select on archive_token to authenticated;
 select public.archive_group_challenge('10000000-0000-4000-8000-000000000001');
 do $$ begin
- if not exists(select 1 from public.challenges where status='archived' and archived_from_status='draft') then raise exception 'archive provenance lost'; end if;
+ if not exists(select 1 from public.challenges where status='archived' and archived_from_status='active') then raise exception 'archive provenance lost'; end if;
  begin
  perform public.create_challenge_invite('10000000-0000-4000-8000-000000000001',now()+interval '1 day');
  raise exception 'archived invite allowed';
@@ -20,7 +20,7 @@ do $$ begin
 end $$;
 select public.restore_group_challenge('10000000-0000-4000-8000-000000000001');
 do $$ begin
- if not exists(select 1 from public.challenges where status='draft' and archived_from_status is null) then raise exception 'draft restore incorrect'; end if;
+ if not exists(select 1 from public.challenges where status='active' and archived_from_status is null) then raise exception 'active restore incorrect'; end if;
  if exists(select 1 from public.preview_challenge_invite((select token from archive_token)) where status <> 'revoked') then raise exception 'token revived'; end if;
 end $$;
 select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000002',false);
@@ -97,7 +97,7 @@ end $$;
 set role authenticated;
 -- Recorded prior state cannot be overridden.
 do $$ begin
- begin perform public.restore_group_challenge('10000000-0000-4000-8000-000000000001','active'); raise exception 'wrong restore allowed'; exception when check_violation then null; end;
+ begin perform public.restore_group_challenge('10000000-0000-4000-8000-000000000001','completed'); raise exception 'wrong restore allowed'; exception when check_violation then null; end;
 end $$;
 select public.restore_group_challenge('10000000-0000-4000-8000-000000000001');
 reset role;
@@ -135,8 +135,8 @@ set role authenticated;
 do $$ begin
  begin perform public.restore_group_challenge('10000000-0000-4000-8000-000000000002'); raise exception 'missing legacy choice accepted'; exception when invalid_parameter_value then null; end;
  begin perform public.restore_group_challenge('10000000-0000-4000-8000-000000000002','archived'); raise exception 'invalid legacy choice accepted'; exception when invalid_parameter_value then null; end;
- perform public.restore_group_challenge('10000000-0000-4000-8000-000000000002','draft');
- if not exists(select 1 from public.challenges where id='10000000-0000-4000-8000-000000000002' and status='draft') then raise exception 'legacy explicit restore failed'; end if;
+ perform public.restore_group_challenge('10000000-0000-4000-8000-000000000002','active');
+ if not exists(select 1 from public.challenges where id='10000000-0000-4000-8000-000000000002' and status='active') then raise exception 'legacy explicit restore failed'; end if;
 end $$;
 reset role;
 \echo PASS revoked token acceptance and legacy restore validation

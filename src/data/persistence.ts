@@ -99,6 +99,10 @@ function readLocalChallenges(storage: Storage): Challenge[] {
       ...challenge,
       // Existing local previews predate challenge kinds and remain group contexts.
       kind: challenge.kind ?? 'group',
+      status:
+        challenge.kind !== 'personal' && challenge.status === 'draft'
+          ? 'active'
+          : challenge.status,
     }),
   )
 }
@@ -156,7 +160,11 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
         name: input.name,
         ownerId: input.ownerId,
         startDate: input.startDate,
-        status: input.status ?? 'draft',
+        status:
+          input.kind !== 'personal' &&
+          (!input.status || input.status === 'draft')
+            ? 'active'
+            : (input.status ?? 'draft'),
         ...(input.targetWeightKg === undefined
           ? {}
           : { targetWeightKg: input.targetWeightKg }),
@@ -217,7 +225,10 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
         name: input.name,
         ownerId: input.ownerId,
         startDate: input.startDate,
-        status: input.status ?? current.status,
+        status:
+          current.kind === 'group' && input.status === 'draft'
+            ? 'active'
+            : (input.status ?? current.status),
         ...(input.targetWeightKg === undefined
           ? {}
           : { targetWeightKg: input.targetWeightKg }),
@@ -238,11 +249,17 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
         return { data: null, state: 'empty' }
       }
       const today = new Date().toISOString().slice(0, 10)
+      const sourceStatus = current.archivedFromStatus ?? targetStatus
       const restoredStatus =
         current.endDate < today
           ? 'completed'
-          : (current.archivedFromStatus ?? targetStatus)
-      if (!restoredStatus) {
+          : sourceStatus === 'draft'
+            ? 'active'
+            : sourceStatus
+      if (
+        !restoredStatus ||
+        (!current.archivedFromStatus && targetStatus === 'draft')
+      ) {
         return {
           error: {
             kind: 'request',
