@@ -1,5 +1,49 @@
 import { Link } from 'react-router-dom'
 
+const gearRotations = Array.from({ length: 8 }, (_, index) => index * 45)
+
+type GearWheelProps = {
+  centerX: number
+  centerY: number
+  hubRadius: number
+  toothWidth: number
+  toothY: number
+  toothHeight: number
+  toothRadius: number
+  centerHoleRadius: number
+}
+
+function GearWheel({
+  centerX,
+  centerY,
+  hubRadius,
+  toothWidth,
+  toothY,
+  toothHeight,
+  toothRadius,
+  centerHoleRadius,
+}: GearWheelProps) {
+  return (
+    <g transform={`translate(${centerX} ${centerY})`}>
+      <circle r={hubRadius} />
+      <g>
+        {gearRotations.map((rotation) => (
+          <rect
+            key={rotation}
+            x={-toothWidth / 2}
+            y={toothY}
+            width={toothWidth}
+            height={toothHeight}
+            rx={toothRadius}
+            transform={`rotate(${rotation})`}
+          />
+        ))}
+      </g>
+      <circle r={centerHoleRadius} fill="var(--group-accent-strong, #145447)" />
+    </g>
+  )
+}
+
 /** Render only for the selected group's verified owner. */
 export function ChallengeSettingsLink() {
   return (
@@ -11,16 +55,33 @@ export function ChallengeSettingsLink() {
     >
       <svg
         aria-hidden="true"
-        width="19"
-        height="19"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinejoin="round"
+        width="24"
+        height="24"
+        viewBox="0 0 28 28"
+        fill="currentColor"
       >
-        <path d="m9 3-1 3-3 1 1 3-2 2 2 2-1 3 3 1 1 3h6l1-3 3-1-1-3 2-2-2-2 1-3-3-1-1-3Z" />
-        <circle cx="12" cy="12" r="3" />
+        <g transform="translate(1 1)">
+          <GearWheel
+            centerX={9}
+            centerY={9}
+            hubRadius={5.25}
+            toothWidth={3}
+            toothY={-9}
+            toothHeight={4.4}
+            toothRadius={0.7}
+            centerHoleRadius={2.4}
+          />
+          <GearWheel
+            centerX={19.5}
+            centerY={18.5}
+            hubRadius={3.3}
+            toothWidth={2.3}
+            toothY={-6.4}
+            toothHeight={3.2}
+            toothRadius={0.55}
+            centerHoleRadius={1.45}
+          />
+        </g>
       </svg>
     </Link>
   )
