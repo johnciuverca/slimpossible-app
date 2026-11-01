@@ -1955,22 +1955,37 @@ export function GroupDashboardPage() {
           >
             <Link
               className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-emerald-50"
-              to={`/challenge/setup?challenge=${encodeURIComponent(selectedChallenge.id)}`}
+              to="/challenge/manage"
             >
-              Manage group
+              Manage challenges
             </Link>
-            <Link
-              className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-emerald-50"
-              to={`/challenge/participants/enroll?${new URLSearchParams({ challenge: selectedChallenge.id, self: 'owner' })}`}
-            >
-              Manage members
-            </Link>
-            <Link
-              className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-emerald-50"
-              to={`/challenge/invites?challenge=${encodeURIComponent(selectedChallenge.id)}`}
-            >
-              Manage invitations
-            </Link>
+            {selectedChallenge.status !== 'archived' ? (
+              <>
+                <Link
+                  className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-emerald-50"
+                  to={`/challenge/setup?challenge=${encodeURIComponent(selectedChallenge.id)}`}
+                >
+                  Manage group
+                </Link>
+                <Link
+                  className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-emerald-50"
+                  to={`/challenge/participants/enroll?${new URLSearchParams({ challenge: selectedChallenge.id, self: 'owner' })}`}
+                >
+                  Manage members
+                </Link>
+                <Link
+                  className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-emerald-50"
+                  to={`/challenge/invites?challenge=${encodeURIComponent(selectedChallenge.id)}`}
+                >
+                  Manage invitations
+                </Link>
+              </>
+            ) : (
+              <p className="px-3 py-2 text-xs leading-5 text-slate-600">
+                This challenge is archived. Restore it before changing group
+                details or members.
+              </p>
+            )}
           </nav>
         </details>
       ) : null}

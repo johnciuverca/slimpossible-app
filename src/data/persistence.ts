@@ -124,6 +124,26 @@ function localStorageError() {
 
 function createLocalRepositories(storage: Storage): PersistenceRepositories {
   const challenges: ChallengeRepository = {
+    async archive(id) {
+      const values = readLocalChallenges(storage)
+      const index = values.findIndex((value) => value.id === id)
+      if (index < 0) return { data: null, state: 'empty' }
+      const current = values[index]
+      if (current.kind !== 'group' || current.status === 'archived') {
+        return { data: null, state: 'empty' }
+      }
+      const challenge: Challenge = {
+        ...current,
+        archivedFromStatus: current.status,
+        status: 'archived',
+        updatedAt: new Date().toISOString(),
+      }
+      values[index] = challenge
+      if (!writeList(storage, challengesStorageKey, values)) {
+        return localStorageError()
+      }
+      return { data: challenge, state: 'success' }
+    },
     async create(input: ChallengeWriteInput) {
       const now = new Date().toISOString()
       const challenge: Challenge = {
@@ -201,6 +221,40 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
         ...(input.targetWeightKg === undefined
           ? {}
           : { targetWeightKg: input.targetWeightKg }),
+        updatedAt: new Date().toISOString(),
+      }
+      values[index] = challenge
+      if (!writeList(storage, challengesStorageKey, values)) {
+        return localStorageError()
+      }
+      return { data: challenge, state: 'success' }
+    },
+    async restore(id, targetStatus) {
+      const values = readLocalChallenges(storage)
+      const index = values.findIndex((value) => value.id === id)
+      if (index < 0) return { data: null, state: 'empty' }
+      const current = values[index]
+      if (current.kind !== 'group' || current.status !== 'archived') {
+        return { data: null, state: 'empty' }
+      }
+      const today = new Date().toISOString().slice(0, 10)
+      const restoredStatus =
+        current.endDate < today
+          ? 'completed'
+          : (current.archivedFromStatus ?? targetStatus)
+      if (!restoredStatus) {
+        return {
+          error: {
+            kind: 'request',
+            message: 'Choose a status for this older archived challenge.',
+          },
+          state: 'error',
+        }
+      }
+      const challenge: Challenge = {
+        ...current,
+        archivedFromStatus: null,
+        status: restoredStatus,
         updatedAt: new Date().toISOString(),
       }
       values[index] = challenge

@@ -15,6 +15,7 @@ export type Database = {
           created_at: string
           created_by: string
           description: string | null
+          archived_from_status: 'draft' | 'active' | 'completed' | null
           end_date: string
           id: string
           name: string
@@ -29,6 +30,7 @@ export type Database = {
           created_at?: string
           created_by: string
           description?: string | null
+          archived_from_status?: 'draft' | 'active' | 'completed' | null
           end_date: string
           id?: string
           name: string
@@ -43,6 +45,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           description?: string | null
+          archived_from_status?: 'draft' | 'active' | 'completed' | null
           end_date?: string
           id?: string
           name?: string
@@ -204,6 +207,17 @@ export type Database = {
     }
     Views: Record<string, never>
     Functions: {
+      archive_group_challenge: {
+        Args: { target_challenge_id: string }
+        Returns: Database['public']['Tables']['challenges']['Row'][]
+      }
+      restore_group_challenge: {
+        Args: {
+          target_challenge_id: string
+          target_restore_status: 'draft' | 'active' | 'completed' | null
+        }
+        Returns: Database['public']['Tables']['challenges']['Row'][]
+      }
       delete_personal_weigh_in: {
         Args: { target_weigh_in_id: string }
         Returns: boolean

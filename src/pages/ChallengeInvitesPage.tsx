@@ -39,6 +39,8 @@ export function ChallengeInvitesPage() {
   const [hasPersonalChallenges, setHasPersonalChallenges] = useState(false)
   const [personalSelectionBlocked, setPersonalSelectionBlocked] =
     useState(false)
+  const [archivedSelectionBlocked, setArchivedSelectionBlocked] =
+    useState(false)
   const [selectedChallengeId, setSelectedChallengeId] = useState(
     searchParams.get('challenge') ?? '',
   )
@@ -77,22 +79,33 @@ export function ChallengeInvitesPage() {
       const selectedPersonal = ownedChallenges.some(
         ({ id, kind }) => id === requestedId && kind === 'personal',
       )
+      const selectedArchived = ownedChallenges.some(
+        ({ id, kind, status }) =>
+          id === requestedId && kind === 'group' && status === 'archived',
+      )
       const groupChallenges = ownedChallenges.filter(
-        ({ kind }) => kind === 'group',
+        ({ kind, status }) => kind === 'group' && status !== 'archived',
       )
       const nextId = selectedPersonal
         ? ''
-        : groupChallenges.some(({ id }) => id === requestedId)
-          ? requestedId!
-          : (groupChallenges[0]?.id ?? '')
+        : selectedArchived
+          ? ''
+          : groupChallenges.some(({ id }) => id === requestedId)
+            ? requestedId!
+            : (groupChallenges[0]?.id ?? '')
 
       setHasPersonalChallenges(
         ownedChallenges.some(({ kind }) => kind === 'personal'),
       )
       setPersonalSelectionBlocked(selectedPersonal)
+      setArchivedSelectionBlocked(selectedArchived)
       setChallenges(groupChallenges)
       setSelectedChallengeId(nextId)
-      if (!selectedPersonal && nextId !== (requestedId ?? '')) {
+      if (
+        !selectedPersonal &&
+        !selectedArchived &&
+        nextId !== (requestedId ?? '')
+      ) {
         const nextParams = new URLSearchParams(searchParams)
         if (nextId) nextParams.set('challenge', nextId)
         else nextParams.delete('challenge')
@@ -111,8 +124,9 @@ export function ChallengeInvitesPage() {
     let isCurrent = true
 
     async function loadInvites() {
+      setInvites([])
+      setGeneratedLink('')
       if (persistence.mode === 'unavailable' || !selectedChallengeId) {
-        setInvites([])
         return
       }
 
@@ -217,17 +231,48 @@ export function ChallengeInvitesPage() {
             {error}
           </p>
         ) : challenges.length === 0 ? (
-          <p className="mt-8 text-sm leading-6 text-slate-600">
-            {hasPersonalChallenges
-              ? 'Personal challenges are private and cannot have group invitations. Create or select a group challenge to invite participants.'
-              : 'Create a group challenge before issuing an invitation.'}
-          </p>
+          <div className="mt-8 space-y-3 text-sm leading-6 text-slate-600">
+            {archivedSelectionBlocked ? (
+              <p role="status">
+                This challenge is archived and its old invite links were
+                revoked. Restore it in{' '}
+                <Link
+                  className="font-semibold underline"
+                  to="/challenge/manage"
+                >
+                  Manage challenges
+                </Link>{' '}
+                before creating new invitations.
+              </p>
+            ) : (
+              <p>
+                {hasPersonalChallenges
+                  ? 'Personal challenges are private and cannot have group invitations. Create or select a group challenge to invite participants.'
+                  : 'Create a group challenge before issuing an invitation.'}
+              </p>
+            )}
+          </div>
         ) : (
           <div className="mt-8 space-y-8">
             {personalSelectionBlocked ? (
               <p className="text-sm leading-6 text-slate-600" role="status">
                 Personal challenges are private and cannot have group
                 invitations. Select a group challenge to continue.
+              </p>
+            ) : null}
+            {archivedSelectionBlocked ? (
+              <p
+                className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm leading-6 text-amber-950"
+                role="status"
+              >
+                This challenge is archived. Its old invite links were revoked;
+                restore it before creating new invitations.{' '}
+                <Link
+                  className="font-semibold underline"
+                  to="/challenge/manage"
+                >
+                  Manage challenges
+                </Link>
               </p>
             ) : null}
             <div>
@@ -244,6 +289,8 @@ export function ChallengeInvitesPage() {
                   setSelectedChallengeId(event.target.value)
                   setSearchParams({ challenge: event.target.value })
                   setGeneratedLink('')
+                  setInvites([])
+                  setArchivedSelectionBlocked(false)
                 }}
                 value={selectedChallengeId}
               >
