@@ -39,7 +39,6 @@ export type SharedChartLine = {
 const left = 64
 const right = 696
 const top = 36
-const bottom = 214
 const day = (date: string) => Date.parse(`${date}T00:00:00Z`) / 86400000
 const dateAtDay = (value: number) =>
   new Date(value * 86400000).toISOString().slice(0, 10)
@@ -214,11 +213,13 @@ export function SharedWeightChart({
     yMaximum = Math.ceil(yMaximum / 5) * 5
     if (yMaximum <= yMinimum) yMaximum = yMinimum + 5
   }
-  const y = (value: number) =>
-    bottom - ((value - yMinimum) / (yMaximum - yMinimum)) * (bottom - top)
   const viewBoxParts = viewBox.trim().split(/\s+/).map(Number)
   const viewBoxWidth = viewBoxParts[2] || 760
   const viewBoxHeight = viewBoxParts[3] || 266
+  const plotBottom = viewBoxHeight - 52
+  const y = (value: number) =>
+    plotBottom -
+    ((value - yMinimum) / (yMaximum - yMinimum)) * (plotBottom - top)
   const chartValueLabelY = new Map(
     layoutChartValueLabels(
       [
@@ -711,7 +712,7 @@ export function SharedWeightChart({
             <text
               key={date}
               x={x(dateAtDay(date))}
-              y="247"
+              y={viewBoxHeight - 19}
               textAnchor={
                 dates.length === 1
                   ? 'middle'
