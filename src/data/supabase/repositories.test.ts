@@ -26,6 +26,80 @@ afterEach(() => {
 })
 
 describe('Supabase repositories', () => {
+  it('maps the bounded signed member display without exposing a raw weigh-in', async () => {
+    stubResponse([
+      {
+        member_key: 'opaque-a',
+        display_name: 'Ava',
+        starting_weight_kg: 100,
+        target_weight_kg: 80,
+        latest_recorded_date: '2026-09-20',
+        completion_percentage: 0,
+        progress_state: 'in_progress',
+        reached_target_milestones: [],
+        signed_display_percentage: -100,
+        negative_progress_capped: true,
+      },
+    ])
+
+    const result =
+      await createRepositories(client).groupProgress.getMemberProgress(
+        'group-a',
+      )
+
+    expect(result).toEqual({
+      state: 'success',
+      data: [
+        {
+          memberKey: 'opaque-a',
+          displayName: 'Ava',
+          startingWeightKg: 100,
+          targetWeightKg: 80,
+          completionPercentage: 0,
+          signedDisplayPercentage: -100,
+          negativeProgressCapped: true,
+          progressState: 'in_progress',
+          reachedTargetMilestones: [],
+        },
+      ],
+    })
+    expect(JSON.stringify(result)).not.toContain('weight_kg')
+    expect(String(vi.mocked(fetch).mock.calls[0]?.[0])).toContain(
+      '/rpc/get_group_member_progress',
+    )
+  })
+
+  it('falls back to clamped progress while a staging database lacks the signed projection', async () => {
+    stubResponse([
+      {
+        member_key: 'opaque-a',
+        display_name: 'Ava',
+        starting_weight_kg: 100,
+        target_weight_kg: 80,
+        latest_recorded_date: '2026-09-20',
+        completion_percentage: 0,
+        progress_state: 'in_progress',
+        reached_target_milestones: [],
+      },
+    ])
+
+    const result =
+      await createRepositories(client).groupProgress.getMemberProgress(
+        'group-a',
+      )
+
+    expect(result).toMatchObject({
+      state: 'success',
+      data: [
+        {
+          completionPercentage: 0,
+          signedDisplayPercentage: 0,
+          negativeProgressCapped: false,
+        },
+      ],
+    })
+  })
+
   it('maps per-challenge weekly win counts without exposing user identities', async () => {
     stubResponse([
       { member_key: 'opaque-a', display_name: 'Ava', win_count: 3 },

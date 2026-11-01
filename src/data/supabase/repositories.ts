@@ -763,6 +763,13 @@ export function createRepositories(client: DatabaseClient): Repositories {
               startingWeightKg: row.starting_weight_kg,
               targetWeightKg: row.target_weight_kg,
               completionPercentage: row.completion_percentage,
+              signedDisplayPercentage:
+                row.signed_display_percentage === null
+                  ? null
+                  : Number.isFinite(row.signed_display_percentage)
+                    ? row.signed_display_percentage
+                    : row.completion_percentage,
+              negativeProgressCapped: row.negative_progress_capped === true,
               progressState:
                 row.progress_state as GroupMemberProgress['progressState'],
               reachedTargetMilestones: milestones.flatMap((milestone) => {

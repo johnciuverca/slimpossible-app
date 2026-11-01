@@ -2310,10 +2310,7 @@ export function GroupDashboardPage() {
             <p>No eligible member progress is available for this group.</p>
           ) : null}
           {memberProgress.map((member) => {
-            const percentage =
-              member.completionPercentage === null
-                ? null
-                : Math.max(0, Math.min(100, member.completionPercentage))
+            const displayPercentage = member.signedDisplayPercentage
             const canChangeTarget =
               member.memberKey === ownMemberKey &&
               ownParticipantMatchesProjection &&
@@ -2330,7 +2327,11 @@ export function GroupDashboardPage() {
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <h3 className="font-semibold">{member.displayName}</h3>
                   <span>
-                    {percentage === null ? 'Unavailable' : `${percentage}%`}
+                    {displayPercentage === null
+                      ? 'Unavailable'
+                      : member.negativeProgressCapped
+                        ? '≤ -100%'
+                        : `${displayPercentage}%`}
                   </span>
                 </div>
                 <p className="mt-1 text-sm text-ink-muted">
@@ -2345,7 +2346,8 @@ export function GroupDashboardPage() {
                 </p>
                 <GroupMemberProgressBar
                   label={`${member.displayName} goal progress`}
-                  percentage={percentage}
+                  percentage={displayPercentage}
+                  negativeProgressCapped={member.negativeProgressCapped}
                 />
                 {member.reachedTargetMilestones.map((milestone) => (
                   <p

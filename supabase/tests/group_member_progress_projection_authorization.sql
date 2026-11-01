@@ -18,6 +18,8 @@ declare
   invalid_id uuid := '00000000-0000-4000-8000-000000000007';
   missing_id uuid := '00000000-0000-4000-8000-000000000008';
   rounded_id uuid := '00000000-0000-4000-8000-000000000009';
+  negative_id uuid := '00000000-0000-4000-8000-000000000010';
+  capped_id uuid := '00000000-0000-4000-8000-000000000011';
   group_id uuid := gen_random_uuid();
   other_group_id uuid := gen_random_uuid();
   personal_id uuid := gen_random_uuid();
@@ -34,24 +36,30 @@ declare
   invalid_entry_id uuid := gen_random_uuid();
   missing_prejoin_id uuid := gen_random_uuid();
   rounded_entry_id uuid := gen_random_uuid();
+  negative_entry_id uuid := gen_random_uuid();
+  capped_entry_id uuid := gen_random_uuid();
   member_row record;
   peer_row record;
   equal_row record;
   invalid_row record;
   missing_row record;
   rounded_row record;
+  negative_row record;
+  capped_row record;
   row_json jsonb;
   visible integer;
 begin
   insert into auth.users (id) values
-    (peer_id), (withdrawn_id), (equal_id), (invalid_id), (missing_id), (rounded_id)
+    (peer_id), (withdrawn_id), (equal_id), (invalid_id), (missing_id), (rounded_id),
+    (negative_id), (capped_id)
   on conflict (id) do nothing;
   insert into public.profiles (id, display_name) values
     (owner_id, 'Projection owner'), (member_id, 'Projection member'),
     (outsider_id, 'Projection outsider'), (peer_id, 'Projection peer'),
     (withdrawn_id, 'Withdrawn projection member'),
     (equal_id, 'Equal target member'), (invalid_id, 'Invalid target member'),
-    (missing_id, 'No entry member'), (rounded_id, 'Rounded progress member')
+    (missing_id, 'No entry member'), (rounded_id, 'Rounded progress member'),
+    (negative_id, 'Negative progress member'), (capped_id, 'Capped progress member')
   on conflict (id) do nothing;
 
   insert into public.challenges (
@@ -71,6 +79,8 @@ begin
     (gen_random_uuid(), group_id, invalid_id, 'Invalid target member', 'active', 100, 110, ((current_date - 5)::timestamp at time zone 'UTC')),
     (gen_random_uuid(), group_id, missing_id, 'No entry member', 'active', 100, 80, ((current_date - 5)::timestamp at time zone 'UTC')),
     (gen_random_uuid(), group_id, rounded_id, 'Rounded progress member', 'active', 100, 70, ((current_date - 5)::timestamp at time zone 'UTC')),
+    (gen_random_uuid(), group_id, negative_id, 'Negative progress member', 'active', 100, 80, ((current_date - 5)::timestamp at time zone 'UTC')),
+    (gen_random_uuid(), group_id, capped_id, 'Capped progress member', 'active', 100, 80, ((current_date - 5)::timestamp at time zone 'UTC')),
     (gen_random_uuid(), group_id, withdrawn_id, 'Withdrawn projection member', 'withdrawn', 100, 80, ((current_date - 5)::timestamp at time zone 'UTC')),
     (gen_random_uuid(), other_group_id, outsider_id, 'Projection outsider', 'active', 100, 80, ((current_date - 5)::timestamp at time zone 'UTC')),
     (gen_random_uuid(), personal_id, equal_id, 'Personal member', 'active', 100, 90, ((current_date - 5)::timestamp at time zone 'UTC'));
@@ -85,7 +95,9 @@ begin
     (other_scope_id, member_id, current_date - 3, 60, 'other challenge private note'),
     (peer_entry_id, peer_id, current_date - 2, 150, 'peer private note'),
     (withdrawn_entry_id, withdrawn_id, current_date - 1, 70, 'withdrawn private note'),
-    (invalid_entry_id, invalid_id, current_date - 1, 90, 'invalid-target private note');
+    (invalid_entry_id, invalid_id, current_date - 1, 90, 'invalid-target private note'),
+    (negative_entry_id, negative_id, current_date - 1, 105, 'negative progress private note'),
+    (capped_entry_id, capped_id, current_date - 1, 130, 'capped progress private note');
   insert into public.personal_weigh_ins (id, user_id, recorded_date, weight_kg, note) values
     (missing_prejoin_id, missing_id, current_date - 6, 50, 'pre-enrollment only entry'),
     (rounded_entry_id, rounded_id, current_date - 1, 84.98, 'rounding fixture note');
@@ -97,7 +109,8 @@ begin
     (private_id, other_group_id),
     (peer_entry_id, group_id), (withdrawn_entry_id, group_id),
     (invalid_entry_id, group_id), (missing_prejoin_id, group_id),
-    (rounded_entry_id, group_id);
+    (rounded_entry_id, group_id), (negative_entry_id, group_id),
+    (capped_entry_id, group_id);
   insert into public.participant_target_milestones (
     challenge_id, participant_id, target_weight_kg, achieved_on
   ) values
@@ -115,7 +128,10 @@ begin
       and member_row.display_name = 'Projection member');
   insert into group_member_projection_checks values
     ('latest_shared_nonfuture_entry_wins', member_row.latest_recorded_date = current_date - 1
-      and member_row.completion_percentage = 100 and member_row.progress_state = 'reached');
+      and member_row.completion_percentage = 100
+      and member_row.signed_display_percentage = 100
+      and not member_row.negative_progress_capped
+      and member_row.progress_state = 'reached');
   select to_jsonb(member_row) into row_json;
   insert into group_member_projection_checks values
     ('projection_excludes_weights_notes_and_raw_ids',
@@ -136,17 +152,36 @@ begin
   insert into group_member_projection_checks values
     ('peer_midpoint_uses_clamped_loss_formula',
       peer_row.completion_percentage = 50.0 and peer_row.progress_state = 'in_progress');
+  select * into negative_row from public.get_group_member_progress(group_id)
+    where member_key = md5(group_id::text || ':' || negative_id::text);
+  insert into group_member_projection_checks values
+    ('above_start_displays_signed_progress_without_changing_clamped_value',
+      negative_row.completion_percentage = 0
+      and negative_row.signed_display_percentage = -25
+      and not negative_row.negative_progress_capped
+      and negative_row.progress_state = 'in_progress');
+  select * into capped_row from public.get_group_member_progress(group_id)
+    where member_key = md5(group_id::text || ':' || capped_id::text);
+  insert into group_member_projection_checks values
+    ('larger_gain_caps_signed_display_at_minus_100',
+      capped_row.completion_percentage = 0
+      and capped_row.signed_display_percentage = -100
+      and capped_row.negative_progress_capped
+      and capped_row.progress_state = 'in_progress');
   select * into rounded_row from public.get_group_member_progress(group_id)
     where member_key = md5(group_id::text || ':' || rounded_id::text);
   insert into group_member_projection_checks values
     ('percentage_is_rounded_to_one_decimal', rounded_row.completion_percentage = 50.1);
   execute 'reset role';
-  update public.personal_weigh_ins set weight_kg = 210 where id = peer_entry_id;
+  update public.personal_weigh_ins set weight_kg = 300 where id = peer_entry_id;
   execute 'set local role authenticated';
   perform set_config('request.jwt.claim.sub', member_id::text, true);
   insert into group_member_projection_checks values
     ('gain_above_start_clamps_to_zero',
-      (select completion_percentage = 0 and progress_state = 'in_progress'
+      (select completion_percentage = 0
+        and signed_display_percentage = -100
+        and not negative_progress_capped
+        and progress_state = 'in_progress'
         from public.get_group_member_progress(group_id)
         where member_key = md5(group_id::text || ':' || peer_id::text)));
   select * into equal_row from public.get_group_member_progress(group_id)
@@ -154,17 +189,23 @@ begin
   insert into group_member_projection_checks values
     ('equal_start_and_target_is_reached_without_fabricated_date',
       equal_row.latest_recorded_date is null and equal_row.completion_percentage = 100
+      and equal_row.signed_display_percentage = 100
       and equal_row.progress_state = 'reached');
   select * into invalid_row from public.get_group_member_progress(group_id)
     where member_key = md5(group_id::text || ':' || invalid_id::text);
   insert into group_member_projection_checks values
     ('target_above_start_is_unavailable',
-      invalid_row.completion_percentage is null and invalid_row.progress_state = 'unavailable');
+      invalid_row.completion_percentage is null
+      and invalid_row.signed_display_percentage is null
+      and not invalid_row.negative_progress_capped
+      and invalid_row.progress_state = 'unavailable');
   select * into missing_row from public.get_group_member_progress(group_id)
     where member_key = md5(group_id::text || ':' || missing_id::text);
   insert into group_member_projection_checks values
     ('missing_shared_current_entry_is_unavailable',
       missing_row.latest_recorded_date is null and missing_row.completion_percentage is null
+      and missing_row.signed_display_percentage is null
+      and not missing_row.negative_progress_capped
       and missing_row.progress_state = 'unavailable');
   insert into group_member_projection_checks values
     ('withdrawn_member_is_not_in_projection', not exists (
@@ -172,14 +213,14 @@ begin
       where member_key = md5(group_id::text || ':' || withdrawn_id::text)));
   insert into group_member_projection_checks values
     ('projection_contains_only_selected_group_members',
-      (select count(*) = 6 from public.get_group_member_progress(group_id))
+      (select count(*) = 8 from public.get_group_member_progress(group_id))
       and not exists (select 1 from public.get_group_member_progress(group_id)
         where member_key = md5(other_group_id::text || ':' || outsider_id::text)));
 
   -- Owner access matches the existing Group contract even without enrollment.
   perform set_config('request.jwt.claim.sub', owner_id::text, true);
   select count(*) into visible from public.get_group_member_progress(group_id);
-  insert into group_member_projection_checks values ('challenge_owner_can_read_group_projection', visible = 6);
+  insert into group_member_projection_checks values ('challenge_owner_can_read_group_projection', visible = 8);
 
   -- Unsharing the latest proof refreshes both the current projection and milestones.
   execute 'reset role';
