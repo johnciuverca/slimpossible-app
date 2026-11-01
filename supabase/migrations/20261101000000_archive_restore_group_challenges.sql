@@ -174,7 +174,7 @@ begin
     end if;
   else
     restored_status := target_restore_status;
-    if restored_status not in ('draft', 'active', 'completed') then
+    if restored_status is null or restored_status not in ('draft', 'active', 'completed') then
       raise exception using errcode = '22023', message = 'Choose a valid status to restore this older archived challenge.';
     end if;
   end if;

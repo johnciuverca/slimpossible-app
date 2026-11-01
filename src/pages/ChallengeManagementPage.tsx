@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { useOptionalAuth } from '../auth/useAuth'
 import { Button, Card, PageHeader, StatusPill } from '../components/ui'
 import { createPersistence } from '../data/persistence'
+import { formatChartDate as formatDate } from '../models/chartDate'
 import type { Challenge } from '../models/challenge'
 
 type Tab = 'active' | 'archived'
@@ -12,13 +13,6 @@ type Snapshot = {
   challenges: Challenge[]
   error: string
   loading: boolean
-}
-
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeZone: 'UTC',
-  }).format(new Date(`${value}T00:00:00.000Z`))
 }
 
 function currentDateOnly() {
@@ -38,10 +32,7 @@ function challengeStatusLabel(status: Challenge['status']) {
 export function ChallengeManagementPage() {
   const { state: auth } = useOptionalAuth()
   const ownerId = auth.status === 'signed-in' ? (auth.user.id ?? '') : ''
-  const persistence = useMemo(
-    () => createPersistence(auth),
-    [auth.status, ownerId],
-  )
+  const persistence = useMemo(() => createPersistence(auth), [auth])
   const ownerKey = `${auth.status}:${ownerId}:${persistence.mode}`
   const [refreshVersion, setRefreshVersion] = useState(0)
   const [snapshot, setSnapshot] = useState<Snapshot>({
@@ -58,8 +49,33 @@ export function ChallengeManagementPage() {
     key: string
     values: Record<string, 'draft' | 'active' | 'completed' | ''>
   }>({ key: ownerKey, values: {} })
-  const [savingId, setSavingId] = useState('')
-  const [actionMessage, setActionMessage] = useState('')
+  // Increment on every account transition, including leaving and returning to the same owner.
+  const generation = useRef({ key: ownerKey, id: 0 })
+  if (generation.current.key !== ownerKey) {
+    generation.current = { key: ownerKey, id: generation.current.id + 1 }
+  }
+  const sessionGeneration = generation.current.id
+  const [action, setAction] = useState({
+    generation: sessionGeneration,
+    savingId: '',
+    message: '',
+  })
+  const savingId =
+    action.generation === sessionGeneration ? action.savingId : ''
+  const actionMessage =
+    action.generation === sessionGeneration ? action.message : ''
+  const setSavingId = (savingId: string) =>
+    setAction((current) => ({
+      ...current,
+      generation: sessionGeneration,
+      savingId,
+    }))
+  const setActionMessage = (message: string) =>
+    setAction((current) => ({
+      ...current,
+      generation: sessionGeneration,
+      message,
+    }))
 
   useEffect(() => {
     let current = true
@@ -174,12 +190,17 @@ export function ChallengeManagementPage() {
 
     setSavingId(challenge.id)
     setActionMessage('')
-    const result = restoring
-      ? await persistence.repositories.challenges.restore(
-          challenge.id,
-          legacyChoice || undefined,
-        )
-      : await persistence.repositories.challenges.archive(challenge.id)
+    const result = await Promise.resolve()
+      .then(() =>
+        restoring
+          ? persistence.repositories.challenges.restore(
+              challenge.id,
+              legacyChoice || undefined,
+            )
+          : persistence.repositories.challenges.archive(challenge.id),
+      )
+      .catch(() => ({ state: 'error' as const }))
+    if (generation.current.id !== sessionGeneration) return
     setSavingId('')
 
     if (result.state === 'error') {
@@ -198,7 +219,11 @@ export function ChallengeManagementPage() {
     }
 
     setSnapshot((current) => {
-      if (current.key !== ownerKey) return current
+      if (
+        generation.current.id !== sessionGeneration ||
+        current.key !== ownerKey
+      )
+        return current
       return {
         ...current,
         challenges: current.challenges.map((item) =>
@@ -212,7 +237,11 @@ export function ChallengeManagementPage() {
         : `${result.data.name} was archived. Group history remains available to current authorized viewers.`,
     )
     setRestoreChoice((current) => {
-      if (current.key !== ownerKey) return current
+      if (
+        generation.current.id !== sessionGeneration ||
+        current.key !== ownerKey
+      )
+        return current
       const values = { ...current.values }
       delete values[challenge.id]
       return { key: ownerKey, values }

@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -162,6 +163,91 @@ describe('ChallengeManagementPage', () => {
     expect(
       within(archivedPanel).queryByRole('button', { name: /delete/i }),
     ).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['success', false],
+    ['error', false],
+    ['rejection', false],
+    ['success', true],
+    ['error', true],
+    ['rejection', true],
+  ] as const)(
+    'discards a pending %s across account changes and a return to the original account',
+    async (outcome, switchBack) => {
+      const challenge = createChallengeFixture({
+        name: 'Private old account',
+        id: 'old-action',
+      })
+      const { repository } = installPersistence([challenge])
+      let resolve!: (
+        value: Awaited<ReturnType<typeof repository.archive>>,
+      ) => void
+      let reject!: (reason: Error) => void
+      repository.archive.mockImplementationOnce(
+        () =>
+          new Promise((done, fail) => {
+            resolve = done
+            reject = fail
+          }),
+      )
+      const view = renderPage()
+      fireEvent.click(await screen.findByRole('button', { name: 'Archive' }))
+      await waitFor(() => expect(repository.archive).toHaveBeenCalledOnce())
+      const changeAccount = (id: string) =>
+        view.rerender(
+          <AuthContext.Provider value={authValue(id)}>
+            <MemoryRouter>
+              <ChallengeManagementPage />
+            </MemoryRouter>
+          </AuthContext.Provider>,
+        )
+      changeAccount('another-owner')
+      expect(screen.queryByText('Private old account')).not.toBeInTheDocument()
+      if (switchBack) {
+        changeAccount('user-owner')
+        await screen.findByRole('button', { name: 'Archive' })
+      }
+      await act(async () => {
+        if (outcome === 'rejection') reject(new Error('Old account failure'))
+        else if (outcome === 'error')
+          resolve({
+            state: 'error',
+            error: { kind: 'request', message: 'Old failure' },
+          } as never)
+        else
+          resolve({
+            state: 'success',
+            data: { ...challenge, status: 'archived' },
+          })
+      })
+      if (switchBack)
+        expect(screen.getByRole('button', { name: 'Archive' })).toBeEnabled()
+      expect(
+        screen.queryByText(
+          /was archived|could not be archived|Old account failure/,
+        ),
+      ).not.toBeInTheDocument()
+      if (switchBack)
+        expect(screen.getByText('Private old account')).toBeInTheDocument()
+      else
+        expect(
+          screen.queryByText('Private old account'),
+        ).not.toBeInTheDocument()
+    },
+  )
+
+  it('uses the established day.month.year date contract', async () => {
+    installPersistence([
+      createChallengeFixture({
+        startDate: '2026-01-02',
+        endDate: '2027-03-04',
+      }),
+    ])
+    renderPage()
+    expect(
+      await screen.findByText('02.01.2026 – 04.03.2027'),
+    ).toBeInTheDocument()
   })
 
   it('restores a tracked completed challenge as Completed after its end date', async () => {
