@@ -97,6 +97,7 @@ export function GroupChartHistory({
   const series = selectedKey
     ? allSeries.filter((member) => member.memberKey === selectedKey)
     : allSeries
+  const chartViewBoxHeight = 266 + Math.max(0, series.length - 1) * 12
   const choices = [{ memberKey: '', label: 'All members' }, ...allSeries]
   const selectedIndex = choices.findIndex(
     (member) => member.memberKey === selectedKey,
@@ -333,7 +334,7 @@ export function GroupChartHistory({
                     floorAtZero={absolute}
                     includeZero={!absolute}
                     className="w-full min-w-[36rem]"
-                    viewBox="0 0 760 266"
+                    viewBox={`0 0 760 ${chartViewBoxHeight}`}
                     series={series.map((member, index) => ({
                       id: member.memberKey,
                       color: colors[index % colors.length],

@@ -68,6 +68,7 @@ describe('Group chart history', () => {
     const chart = await screen.findByRole('img', {
       name: 'Weight (kg) — shared group history',
     })
+    expect(chart).toHaveAttribute('viewBox', '0 0 760 278')
     expect(
       chart.querySelector('[data-series="target-reference"]'),
     ).toHaveAttribute('stroke-dasharray', '9 5')
@@ -211,8 +212,11 @@ describe('Group chart history', () => {
     const chart = screen.getByRole('img', {
       name: 'Weight (kg) — shared group history',
     })
+    expect(chart).toHaveAttribute('viewBox', '0 0 760 302')
     expect(chart).toHaveTextContent('Weight (kg)')
     const circles = Array.from(chart.querySelectorAll('circle'))
+    const plotBottom =
+      Number(chart.getAttribute('viewBox')?.split(/\s+/)[3]) - 52
     const eighty = circles.find(
       (circle) => circle.textContent === 'Member 0: 01.09.2026, 80 kg',
     )!
@@ -225,7 +229,7 @@ describe('Group chart history', () => {
     expect(Number(eighty.getAttribute('cy'))).toBeGreaterThan(36)
     for (const circle of circles) {
       expect(Number(circle.getAttribute('cy'))).toBeGreaterThan(25)
-      expect(Number(circle.getAttribute('cy'))).toBeLessThan(215)
+      expect(Number(circle.getAttribute('cy'))).toBeLessThanOrEqual(plotBottom)
     }
     expect(
       chart.querySelectorAll('[data-series="recorded-connection"]'),
