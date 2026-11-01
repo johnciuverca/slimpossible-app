@@ -384,6 +384,12 @@ export function ChallengeManagementPage() {
                     <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-36">
                       {archived ? (
                         <>
+                          <Link
+                            className="inline-flex min-h-11 items-center justify-center rounded-full border border-line px-4 py-2 text-sm font-semibold text-forest-800 hover:bg-page"
+                            to={`/group?challenge=${encodeURIComponent(challenge.id)}`}
+                          >
+                            View history
+                          </Link>
                           {needsLegacyChoice ? (
                             <label className="text-xs font-semibold text-ink-muted">
                               Original status not recorded. Choose a safe

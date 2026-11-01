@@ -2351,3 +2351,148 @@ test('archive missing-RPC feedback stays visible and announced', async ({
   await expect(feedback).toBeFocused()
   await expect(archive).toBeEnabled()
 })
+
+test('archived groups leave normal navigation and remain accessible as read-only history', async ({
+  page,
+}) => {
+  await installGroupFixtures(page, true, true)
+  let archived = false
+  const rows = () =>
+    [ownGroupId, secondGroupId].map((id, index) => ({
+      id,
+      challenge_kind: 'group',
+      owner_id: viewerId,
+      created_by: viewerId,
+      name:
+        index === 0 ? 'Archived navigation group' : 'Current navigation group',
+      start_date: '2026-01-01',
+      end_date: '2099-01-01',
+      status: index === 0 && archived ? 'archived' : 'active',
+      archived_from_status: index === 0 && archived ? 'active' : null,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    }))
+  await page.route(`${supabaseRestUrl}/challenges*`, (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify(rows()),
+    }),
+  )
+  await page.route(
+    `${supabaseRestUrl}/rpc/archive_group_challenge`,
+    (route) => {
+      archived = true
+      return route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify([rows()[0]]),
+      })
+    },
+  )
+  await page.goto(
+    `/e2e/fixtures/today-harness.html?scenario=group&user=${viewerId}&route=/challenge/manage`,
+  )
+  await page
+    .getByRole('article', { name: 'Archived navigation group' })
+    .getByRole('button', { name: 'Archive', exact: true })
+    .click()
+  await page.getByRole('tab', { name: /Archived/ }).click()
+  await page.getByRole('link', { name: 'View history', exact: true }).click()
+  await expect(
+    page.getByText('Archived · Read-only group history'),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('heading', {
+      name: 'Archived navigation group',
+      exact: true,
+    }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Record weight', exact: true }),
+  ).toBeVisible()
+  await page
+    .getByRole('navigation', { name: 'Group sections' })
+    .getByRole('link', { name: 'Members', exact: true })
+    .click()
+  await expect(
+    page.getByRole('heading', { name: 'Member progress' }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Change target', exact: true }),
+  ).toHaveCount(0)
+  await expect(
+    page.getByRole('button', { name: 'Edit starting weight', exact: true }),
+  ).toHaveCount(0)
+  await page.locator('.group-manage-menu summary').click()
+  await expect(
+    page.getByRole('link', { name: 'Manage invitations', exact: true }),
+  ).toHaveCount(0)
+  await expect(
+    page.getByRole('link', { name: 'Manage members', exact: true }),
+  ).toHaveCount(0)
+  await page
+    .getByRole('link', { name: 'View current groups', exact: true })
+    .click()
+  await expect(
+    page.getByRole('heading', {
+      name: 'Current navigation group',
+      exact: true,
+    }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('link', { name: /Group · Archived navigation group/ }),
+  ).toHaveCount(0)
+  await expect(
+    page.getByRole('link', { name: /Group · Current navigation group/ }),
+  ).toHaveAttribute('aria-current', 'page')
+  // A direct old bookmark remains explicit read-only history after a reload.
+  await page.goto(
+    `/e2e/fixtures/today-harness.html?scenario=group&user=${viewerId}&route=${encodeURIComponent(`/group?challenge=${ownGroupId}`)}`,
+  )
+  await expect(
+    page.getByText('Archived · Read-only group history'),
+  ).toBeVisible()
+  // A page with no explicit selection revalidates on return from another tab.
+  archived = false
+  await page.goto(
+    `/e2e/fixtures/today-harness.html?scenario=group&user=${viewerId}&route=/group`,
+  )
+  await expect(
+    page.getByRole('heading', {
+      name: 'Archived navigation group',
+      exact: true,
+    }),
+  ).toBeVisible()
+  archived = true
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await expect(
+    page.getByRole('heading', {
+      name: 'Current navigation group',
+      exact: true,
+    }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('link', { name: /Group · Archived navigation group/ }),
+  ).toHaveCount(0)
+  archived = false
+  await page.goto(
+    `/e2e/fixtures/today-harness.html?scenario=group&user=${viewerId}&route=${encodeURIComponent(`/group?challenge=${ownGroupId}&tab=members`)}`,
+  )
+  await expect(
+    page.getByRole('button', { name: 'Change target', exact: true }),
+  ).toBeVisible()
+  archived = true
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await expect(
+    page.getByText('Archived · Read-only group history'),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Change target', exact: true }),
+  ).toHaveCount(0)
+  await expect(
+    page.getByRole('button', { name: 'Edit starting weight', exact: true }),
+  ).toHaveCount(0)
+  await page.screenshot({
+    path: '/private/tmp/archive-history-preview.png',
+    fullPage: true,
+  })
+})
