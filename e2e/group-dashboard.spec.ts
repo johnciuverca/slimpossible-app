@@ -526,15 +526,17 @@ for (const layout of [
       const comparison = page.getByRole('img', {
         name: 'Weight (kg) — shared group history',
       })
-      const outOfBoundsLabels = await comparison
-        .locator('text')
-        .evaluateAll((elements) =>
+      const viewBoxHeight = await comparison.evaluate((element) =>
+        Number(element.getAttribute('viewBox')?.trim().split(/\s+/)[3]),
+      )
+      const outOfBoundsLabels = await comparison.locator('text').evaluateAll(
+        (elements, chartHeight) =>
           elements.flatMap((element) => {
             const box = (element as SVGGraphicsElement).getBBox()
             return box.x >= 0 &&
               box.x + box.width <= 720 &&
               box.y >= 0 &&
-              box.y + box.height <= 265
+              box.y + box.height <= chartHeight
               ? []
               : [
                   {
@@ -546,7 +548,8 @@ for (const layout of [
                   },
                 ]
           }),
-        )
+        viewBoxHeight,
+      )
       expect(outOfBoundsLabels).toEqual([])
       expect(
         (await matrix
@@ -1342,10 +1345,14 @@ for (const viewport of [
     const lighter = originalPoints.find(
       (point) => point.label === 'Ava (member 2): 20.09.2026, 70 kg',
     )!
+    const plotBottom = await chart.evaluate(
+      (element) =>
+        Number(element.getAttribute('viewBox')?.trim().split(/\s+/)[3]) - 52,
+    )
     expect(heavier.y).toBeLessThan(lighter.y)
     for (const point of originalPoints) {
       expect(point.y).toBeGreaterThan(25)
-      expect(point.y).toBeLessThan(215)
+      expect(point.y).toBeLessThanOrEqual(plotBottom)
     }
     await expect(chart).toContainText('Weight (kg)')
     await chart.screenshot({
