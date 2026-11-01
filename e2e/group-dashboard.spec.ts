@@ -2175,17 +2175,17 @@ for (const viewport of [
     await expect(fill).toHaveClass(/bg-red-600/)
     expect(
       await fill.evaluate((element) => {
-        const style = (element as HTMLElement).style
+        const style = getComputedStyle(element)
         return {
           left: style.left,
           transform: style.transform,
-          width: style.width,
+          width: (element as HTMLElement).style.width,
         }
       }),
     ).toEqual({
-      left: '50%',
-      transform: 'translateX(-100%)',
-      width: '12.5%',
+      left: '0px',
+      transform: 'none',
+      width: '25%',
     })
     await expect(page.getByText('105 kg')).toHaveCount(0)
     await expect(page.getByText('hidden projection sentinel')).toHaveCount(0)
