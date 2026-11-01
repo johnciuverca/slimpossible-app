@@ -145,7 +145,7 @@ test('challenge cards switch by keyboard and preserve a direct selection after r
     page.getByRole('heading', { name: 'Dashboard', exact: true }),
   ).toBeVisible()
   await expect(
-    page.getByRole('heading', { name: 'Latest personal weight' }),
+    page.getByRole('heading', { name: 'Latest weight' }),
   ).toBeVisible()
   await expect(
     page.getByRole('button', { name: 'Record weight', exact: true }),

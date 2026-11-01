@@ -77,6 +77,48 @@ describe('AuthSessionUI', () => {
     })
   })
 
+  it('uses a safe fallback when the profile name is blank or equals the email', () => {
+    const { rerender } = renderSession({
+      error: null,
+      status: 'signed-in',
+      user: { displayName: 'person@example.com', email: 'person@example.com' },
+    })
+
+    expect(screen.getByText('Your account')).toBeInTheDocument()
+    expect(screen.queryByText('person@example.com')).not.toBeInTheDocument()
+
+    rerender(
+      <MemoryRouter>
+        <AuthProvider
+          initialState={{
+            error: null,
+            status: 'signed-in',
+            user: { displayName: '  ', email: 'person@example.com' },
+          }}
+        >
+          <AuthSessionUI />
+        </AuthProvider>
+      </MemoryRouter>,
+    )
+    expect(screen.getByText('Your account')).toBeInTheDocument()
+  })
+
+  it('shows a non-blocking profile save notice in the profile dialog', () => {
+    renderSession({
+      error: null,
+      profileError:
+        'Your profile name could not be saved. You are still signed in.',
+      status: 'signed-in',
+      user: { displayName: 'Alex', email: 'person@example.com' },
+    })
+
+    fireEvent.click(screen.getByText('Alex'))
+    fireEvent.click(screen.getByRole('button', { name: 'Profile' }))
+    expect(screen.getByRole('dialog')).toHaveTextContent(
+      'Your profile name could not be saved. You are still signed in.',
+    )
+  })
+
   it('sends logout to login and does not leave a protected route available', () => {
     render(
       <MemoryRouter initialEntries={['/today']}>

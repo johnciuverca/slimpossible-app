@@ -20,6 +20,7 @@ import {
 } from './AppPages'
 import { mostRecentSunday } from '../models/groupProgress'
 import { PersonalWeighInsPage } from './PersonalWeighInsPage'
+import { ContextualSubnav } from '../components/ContextualSubnav'
 // These legacy challenge-view tests use ordered HTTP responses. Exercise the
 // independent personal action with real repositories in PersonalWorkspacePages
 // and the cross-page browser suite, rather than mixing its requests into these.
@@ -212,13 +213,21 @@ function renderDashboard(
         user: { email: `${userId}@example.com`, id: userId },
       }}
     >
-      <MemoryRouter initialEntries={[initialEntry]}>{page}</MemoryRouter>
+      <MemoryRouter initialEntries={[initialEntry]}>
+        {initialEntry.startsWith('/group') ? (
+          <ContextualSubnav area="group" />
+        ) : null}
+        {page}
+      </MemoryRouter>
     </AuthProvider>,
   )
 }
 
 function authContextValue(userId: string): AuthContextValue {
   return {
+    changePassword: async () => 'updated',
+    requestEmailChange: async () => false,
+    saveProfileName: async () => false,
     requestPasswordRecovery: vi.fn(),
     resetPassword: vi.fn().mockResolvedValue(false),
     retrySession: vi.fn(),
@@ -388,6 +397,9 @@ describe('HomePage', () => {
 
   it('shows a session-loading state while authentication is being restored', () => {
     const contextValue: AuthContextValue = {
+      changePassword: async () => 'updated',
+      requestEmailChange: async () => false,
+      saveProfileName: async () => false,
       requestPasswordRecovery: vi.fn(),
       resetPassword: vi.fn().mockResolvedValue(false),
       retrySession: vi.fn(),
@@ -1080,9 +1092,14 @@ describe('HomePage', () => {
     ).toHaveAttribute(
       'aria-label',
       expect.stringContaining(
-        '2026-09-17, 95 kilograms to 2026-09-18, 90 kilograms',
+        '17.09.2026, 95 kilograms to 18.09.2026, 90 kilograms',
       ),
     )
+    expect(
+      screen.getByText(
+        /Your personal history is independent of the selected challenge/,
+      ),
+    ).toHaveClass('sr-only')
   })
 
   it('shows the provisional shared leader from the authorized RPC only', async () => {
@@ -1371,12 +1388,12 @@ describe('GroupDashboardPage', () => {
     const challengePayload = [
       {
         created_at: '2026-09-17T10:00:00.000Z',
-        created_by: 'owner-1',
+        created_by: 'member-1',
         description: null,
         end_date: '2026-10-01',
         id: 'challenge-1',
         name: 'Autumn challenge',
-        owner_id: 'owner-1',
+        owner_id: 'member-1',
         start_date: '2026-09-17',
         status: 'active',
         target_weight_kg: null,
@@ -1477,11 +1494,34 @@ describe('GroupDashboardPage', () => {
         String(url).includes('/rpc/get_group_chart_history') ||
         String(url).includes('/rpc/get_group_member_progress')
           ? Promise.resolve(response([]))
-          : fetchMock(url, init),
+          : String(url).includes('/rpc/get_group_weekly_win_counts')
+            ? Promise.resolve(
+                response([
+                  { member_key: 'a', display_name: 'Ava', win_count: 2 },
+                  { member_key: 'b', display_name: 'Ben', win_count: 2 },
+                  { member_key: 'c', display_name: 'Casey', win_count: 0 },
+                ]),
+              )
+            : fetchMock(url, init),
       ),
       '/group?challenge=',
     )
 
+    expect(await screen.findByText('48.5%')).toBeInTheDocument()
+    expect(
+      await screen.findByRole('region', { name: 'Group weight chart' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('table', { name: 'Shared group weight history' }),
+    ).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('Manage', { selector: 'summary' }))
+    expect(
+      screen.getByRole('navigation', { name: 'Selected group management' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: 'Manage invitations' }),
+    ).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('link', { name: 'Weekly results' }))
     expect(
       await screen.findByRole('heading', { name: 'Weekly result' }),
     ).toBeInTheDocument()
@@ -1494,13 +1534,19 @@ describe('GroupDashboardPage', () => {
     expect(
       screen.queryByRole('link', { name: /Personal ·/ }),
     ).not.toBeInTheDocument()
-    expect(screen.getByText('48.5%')).toBeInTheDocument()
+    expect(screen.queryByText('48.5%')).not.toBeInTheDocument()
     expect(screen.getByText(/Shared weekly winners/)).toBeInTheDocument()
     expect(
       screen.getByText(/based on 2 of 3 active members/),
     ).toBeInTheDocument()
-    expect(screen.getAllByText('Ava')).toHaveLength(2)
-    expect(screen.getAllByText('Ben')).toHaveLength(2)
+    expect(
+      await screen.findByRole('heading', { name: 'Weeks won' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('list', { name: 'Challenge weeks won' }),
+    ).toHaveTextContent('Ava2 weeksBen2 weeksCasey0 weeks')
+    expect(screen.getAllByText('Ava')).toHaveLength(3)
+    expect(screen.getAllByText('Ben')).toHaveLength(3)
     expect(
       screen.getByRole('heading', { name: 'Provisional leader' }),
     ).toBeInTheDocument()
@@ -1510,8 +1556,9 @@ describe('GroupDashboardPage', () => {
     })
     expect(provisionalLeaderRegion).toHaveTextContent('Ties are shared')
     expect(
-      screen.queryByRole('navigation', { name: 'Group sections' }),
-    ).not.toBeInTheDocument()
+      screen.getByRole('navigation', { name: 'Group sections' }),
+    ).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('link', { name: 'Charts' }))
     await waitFor(() =>
       expect(
         screen.getByRole('region', {
@@ -1523,9 +1570,11 @@ describe('GroupDashboardPage', () => {
       name: 'Group chart and weigh-in history',
     })
     expect(unavailableHistory).not.toHaveAttribute('aria-disabled')
-    expect(unavailableHistory).toHaveTextContent(
-      'Explicitly shared dates and weights only.',
-    )
+    expect(
+      within(unavailableHistory).getByText(
+        /Explicitly shared dates and weights only/,
+      ),
+    ).toHaveClass('sr-only')
     expect(
       within(unavailableHistory).queryByRole('img'),
     ).not.toBeInTheDocument()
@@ -1535,6 +1584,7 @@ describe('GroupDashboardPage', () => {
     expect(
       within(unavailableHistory).queryByRole('button'),
     ).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('link', { name: 'Weekly results' }))
     expect(
       screen.queryByText('do not render private notes'),
     ).not.toBeInTheDocument()
@@ -1565,7 +1615,11 @@ describe('GroupDashboardPage', () => {
       screen.getByRole('button', { name: 'Refresh shared progress' }),
     )
     expect(await screen.findByText('Casey')).toBeInTheDocument()
-    expect(screen.queryByText('Ava')).not.toBeInTheDocument()
+    expect(
+      within(screen.getByRole('region', { name: 'Weekly result' })).queryByText(
+        'Ava',
+      ),
+    ).not.toBeInTheDocument()
     await waitFor(() =>
       expect(
         screen.getByRole('region', { name: 'Provisional leader' }),
@@ -1622,6 +1676,7 @@ describe('GroupDashboardPage', () => {
     )
 
     expect(await screen.findByText('40%')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('link', { name: 'Weekly results' }))
     expect(
       screen.getByRole('region', { name: 'Weekly result' }),
     ).toBeInTheDocument()
@@ -1688,6 +1743,7 @@ describe('GroupDashboardPage', () => {
     )
 
     expect(await screen.findByText('35%')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('link', { name: 'Weekly results' }))
     expect(screen.getAllByText('Owner')).toHaveLength(2)
     expect(
       screen.queryByText(/Shared progress is unavailable for this challenge/),
@@ -1725,6 +1781,7 @@ describe('GroupDashboardPage', () => {
     )
 
     expect(await screen.findByText('40%')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('link', { name: 'Weekly results' }))
     expect(
       await screen.findByText(
         'Provisional group progress is unavailable right now.',
@@ -1899,13 +1956,16 @@ describe('GroupDashboardPage', () => {
       screen.getByRole('link', { name: /Group · Winter challenge/ }),
     ).toHaveAttribute('aria-current', 'page')
     expect(screen.queryByText('45.1%')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('link', { name: 'Weekly results' }))
     expect(await screen.findByText('Jamie')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('link', { name: 'Overview' }))
 
     fireEvent.click(
       screen.getByRole('button', { name: 'Refresh shared progress' }),
     )
     expect(await screen.findByText('64.3%')).toBeInTheDocument()
     expect(screen.queryByText('61.2%')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('link', { name: 'Weekly results' }))
     expect(await screen.findByText('Jo')).toBeInTheDocument()
 
     const groupRequests = fetchMock.mock.calls.filter(([url]) =>
@@ -1973,17 +2033,20 @@ describe('GroupDashboardPage', () => {
       '/group?challenge=challenge-1',
     )
 
+    const activeMembers = (
+      await screen.findByText('Members', { selector: 'dt' })
+    ).parentElement
+    expect(activeMembers).toHaveTextContent('0')
+    const averageProgress = screen.getByText('Avg. goal progress', {
+      selector: 'dt',
+    }).parentElement
+    expect(averageProgress).toHaveTextContent('—')
+    fireEvent.click(screen.getByRole('link', { name: 'Weekly results' }))
     expect(
       await screen.findByText(
         'No weekly result is available until participants record both Sunday weigh-ins.',
       ),
     ).toBeInTheDocument()
-    const activeMembers = screen.getByText('Active members').parentElement
-    expect(activeMembers).toHaveTextContent('0')
-    const averageProgress = screen.getByText(
-      'Average goal progress',
-    ).parentElement
-    expect(averageProgress).toHaveTextContent('—')
     expect(
       screen.getByText(
         'No active members are available for a provisional result.',

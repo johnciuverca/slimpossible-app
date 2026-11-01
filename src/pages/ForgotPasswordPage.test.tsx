@@ -14,6 +14,8 @@ import { ForgotPasswordPage } from './ForgotPasswordPage'
 
 function createGateway(overrides: Partial<AuthGateway> = {}): AuthGateway {
   return {
+    requestEmailChange: async () => undefined,
+    saveProfileName: async (_user, name) => name,
     ensureProfile: async () => undefined,
     getSession: async () => null,
     onAuthStateChange: () => () => undefined,

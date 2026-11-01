@@ -200,6 +200,7 @@ localStorage.setItem(
 )
 
 const authValue: AuthContextValue = {
+  saveProfileName: async () => false,
   requestPasswordRecovery: async () => undefined,
   resetPassword: async () => false,
   retrySession: () => undefined,

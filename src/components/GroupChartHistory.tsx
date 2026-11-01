@@ -9,15 +9,19 @@ import {
   type GroupChartEntry,
 } from '../models/groupChartHistory'
 import { localDateOnly } from '../models/provisionalGroupLeader'
+import { formatChartDate } from '../models/chartDate'
 import { WeightEntryCard } from './WeightEntryCard'
 import { deriveGroupChartTrend } from '../models/groupChartTrend'
 import type { GroupMemberProgress } from '../models/groupMemberProgress'
+import { SharedWeightChart } from './SharedWeightChart'
 
 const colors = ['#31dbb0', '#67a5ff', '#ff8ba7', '#c49cff', '#ffc164']
 const trendColor = '#ffbf69'
 const referenceColor = '#c49cff'
 const day = (date: string) => Date.parse(`${date}T00:00:00Z`) / 86400000
 const signed = (value: number) => `${value > 0 ? '+' : ''}${value} kg`
+const formatWeight = (value: number) =>
+  new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value)
 
 export function GroupChartHistory({
   challengeId,
@@ -27,6 +31,7 @@ export function GroupChartHistory({
   children,
   enabled = true,
   showHistory = true,
+  compactOverview = false,
   memberProgress = [],
 }: {
   challengeId: string
@@ -36,6 +41,7 @@ export function GroupChartHistory({
   children?: ReactNode
   enabled?: boolean
   showHistory?: boolean
+  compactOverview?: boolean
   memberProgress?: GroupMemberProgress[]
 }) {
   const ownMemberKey = ownGroupMemberKey(challengeId, viewerId)
@@ -91,6 +97,7 @@ export function GroupChartHistory({
   const series = selectedKey
     ? allSeries.filter((member) => member.memberKey === selectedKey)
     : allSeries
+  const chartViewBoxHeight = 266 + Math.max(0, series.length - 1) * 12
   const choices = [{ memberKey: '', label: 'All members' }, ...allSeries]
   const selectedIndex = choices.findIndex(
     (member) => member.memberKey === selectedKey,
@@ -178,10 +185,10 @@ export function GroupChartHistory({
     <div
       id="group-history"
       ref={workspace}
-      className="group-history-workspace min-w-0 space-y-6 scroll-mt-6"
+      className={`group-history-workspace min-w-0 scroll-mt-6 ${compactOverview ? 'space-y-2' : 'space-y-6'}`}
     >
       {children}
-      {showHistory ? (
+      {showHistory && !compactOverview ? (
         <div
           ref={navigationRef}
           className="sticky top-0 z-20 min-w-0 rounded-xl border border-stone-200 bg-page shadow-sm"
@@ -233,29 +240,35 @@ export function GroupChartHistory({
           </div>
         </div>
       ) : null}
-      {enabled && showHistory ? (
+      {enabled && (showHistory || compactOverview) ? (
         <div
           id={`${id}-panel`}
-          role="tabpanel"
-          aria-labelledby={`${id}-tab-${selectedIndex}`}
+          role={compactOverview ? undefined : 'tabpanel'}
+          aria-labelledby={
+            compactOverview ? undefined : `${id}-tab-${selectedIndex}`
+          }
           tabIndex={0}
         >
           <section
-            aria-labelledby="group-history-heading"
-            className="min-w-0 rounded-2xl border border-stone-200 bg-white p-5 sm:p-7"
+            aria-labelledby={`${id}-history-heading`}
+            className={`min-w-0 rounded-2xl border border-stone-200 bg-white ${compactOverview ? 'p-3 sm:p-5' : 'p-5 sm:p-7'}`}
           >
             <h2
-              id="group-history-heading"
-              className="text-xl font-bold text-slate-900"
+              id={`${id}-history-heading`}
+              className={
+                compactOverview ? 'sr-only' : 'text-xl font-bold text-slate-900'
+              }
             >
-              Group chart and weigh-in history
+              {compactOverview
+                ? 'Group weight chart'
+                : 'Group chart and weigh-in history'}
             </h2>
             {selectedKey ? (
               <p className="mt-2 font-semibold">
                 {series[0].label} · shared with this group only
               </p>
             ) : null}
-            <p className="mt-2 text-sm leading-6 text-slate-700">
+            <p className="sr-only">
               Explicitly shared dates and weights only.{' '}
               {absolute ? (
                 'All members plots actual shared Weight (kg), not change from zero. A lower absolute weight is not a winner ranking. Notes and emails are never included.'
@@ -283,7 +296,7 @@ export function GroupChartHistory({
               </p>
             ) : (
               <>
-                <p className="mt-4 text-sm text-slate-700">
+                <p className="sr-only">
                   {absolute ? (
                     'Missing dates are gaps, not estimated weights. Each member starts at their first explicitly shared weight; unshared starting values are not added. Corrections and removed shares update this chart on refresh.'
                   ) : (
@@ -301,12 +314,104 @@ export function GroupChartHistory({
                   tabIndex={0}
                   className="mt-4 overflow-x-auto focus-visible:outline-2 focus-visible:outline-emerald-700"
                 >
+                  <SharedWeightChart
+                    title={
+                      absolute
+                        ? 'Weight (kg) — shared group history'
+                        : 'Change from first shared weight (kg)'
+                    }
+                    description={
+                      absolute
+                        ? `Each member is plotted at their actual shared weight in kilograms, not a common zero baseline. Points represent shared dates; lines connect only consecutive days.${compactOverview ? '' : ' The table below provides every exact recorded weight.'}`
+                        : `Each member has their own zero baseline. Points represent shared recorded dates. Lines connect only consecutive days.${compactOverview ? '' : ' The table below provides every date, exact weight and kg change.'}`
+                    }
+                    yLabel={absolute ? 'Weight (kg)' : 'Change (kg)'}
+                    min={min}
+                    max={max}
+                    maxTicks={8}
+                    paddingRatio={absolute ? 0.05 : 0}
+                    paddingMinimum={0.5}
+                    floorAtZero={absolute}
+                    includeZero={!absolute}
+                    className="w-full min-w-[36rem]"
+                    viewBox={`0 0 760 ${chartViewBoxHeight}`}
+                    series={series.map((member, index) => ({
+                      id: member.memberKey,
+                      color: colors[index % colors.length],
+                      title: `${member.label} recorded shared weights`,
+                      points: member.points.map((point) => ({
+                        date: point.date,
+                        value: pointValue(point),
+                        label: absolute
+                          ? String(point.weightKg)
+                          : `${point.changeKg > 0 ? '+' : ''}${point.changeKg}`,
+                        title: `${member.label}: ${formatChartDate(point.date)}, ${absolute ? `${point.weightKg} kg` : signed(point.changeKg)}`,
+                        markerLabel: `Recorded weight for ${member.label} on ${formatChartDate(point.date)}`,
+                        tooltip: `${member.label} — ${formatChartDate(point.date)}: ${formatWeight(point.weightKg)} kg`,
+                      })),
+                    }))}
+                    lines={[
+                      ...series.flatMap((member) => {
+                        const target = memberProgress.find(
+                          (candidate) =>
+                            candidate.memberKey === member.memberKey,
+                        )?.targetWeightKg
+                        return target === null ||
+                          target === undefined ||
+                          !Number.isFinite(target)
+                          ? []
+                          : [
+                              {
+                                id: `target:${member.memberKey}`,
+                                from: {
+                                  date: member.points[0].date,
+                                  value: chartValue(member.memberKey, target),
+                                },
+                                to: {
+                                  date: member.points.at(-1)!.date,
+                                  value: chartValue(member.memberKey, target),
+                                },
+                                color: referenceColor,
+                                title: `${member.label} target reference: ${target} kg`,
+                                kind: 'reference' as const,
+                              },
+                            ]
+                      }),
+                      ...trends.flatMap(({ memberKey, trend }) =>
+                        trend
+                          ? [
+                              {
+                                id: `trend:${memberKey}`,
+                                from: {
+                                  date: trend.startDate,
+                                  value: chartValue(
+                                    memberKey,
+                                    trend.startWeightKg,
+                                  ),
+                                },
+                                to: {
+                                  date: trend.endDate,
+                                  value: chartValue(
+                                    memberKey,
+                                    trend.endWeightKg,
+                                  ),
+                                },
+                                color: trendColor,
+                                title: `${series.find((member) => member.memberKey === memberKey)?.label ?? 'Member'} derived trend from displayed shared points`,
+                                kind: 'trend' as const,
+                              },
+                            ]
+                          : [],
+                      ),
+                    ]}
+                  />
                   <svg
+                    aria-hidden="true"
                     viewBox="0 0 720 265"
                     role="img"
                     aria-labelledby={`${id}-chart-title`}
                     aria-describedby={`${id}-chart-description`}
-                    className="w-full min-w-[36rem]"
+                    className="hidden"
                   >
                     <title id={`${id}-chart-title`}>
                       {absolute
@@ -443,7 +548,7 @@ export function GroupChartHistory({
                                 r={4}
                               >
                                 <title>
-                                  {member.label}: {point.date},{' '}
+                                  {member.label}: {formatChartDate(point.date)},{' '}
                                   {absolute
                                     ? `${point.weightKg} kg`
                                     : signed(point.changeKg)}
@@ -455,20 +560,24 @@ export function GroupChartHistory({
                       </g>
                     ))}
                     <text x={plotLeft} y={242} fontSize={12}>
-                      {new Date(start * 86400000).toISOString().slice(0, 10)}
+                      {formatChartDate(
+                        new Date(start * 86400000).toISOString().slice(0, 10),
+                      )}
                     </text>
                     <text x={675} y={242} textAnchor="end" fontSize={12}>
-                      {new Date(end * 86400000).toISOString().slice(0, 10)}
+                      {formatChartDate(
+                        new Date(end * 86400000).toISOString().slice(0, 10),
+                      )}
                     </text>
                   </svg>
                 </div>
                 <ul
                   aria-label="Group chart legend"
-                  className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm"
+                  className="mt-3 flex w-full flex-wrap justify-center gap-x-5 gap-y-2 text-sm"
                 >
                   {series.map((member, index) => (
                     <li
-                      key={`recorded:${member.memberKey}`}
+                      key={member.memberKey}
                       className="flex items-center gap-2"
                     >
                       <span
@@ -476,141 +585,114 @@ export function GroupChartHistory({
                         className="inline-block w-6 border-t-2"
                         style={{ borderColor: colors[index % colors.length] }}
                       />
-                      {member.label} · recorded weights
-                    </li>
-                  ))}
-                  {targetWeights.length > 0 ? (
-                    <li className="flex items-center gap-2">
-                      <span
-                        aria-hidden="true"
-                        className="inline-block w-6 border-t-2 border-dashed"
-                        style={{ borderColor: referenceColor }}
-                      />
-                      Target/reference weight
-                    </li>
-                  ) : null}
-                  {trends.some(({ trend }) => trend !== null) ? (
-                    <li className="flex items-center gap-2">
-                      <span
-                        aria-hidden="true"
-                        className="inline-block w-6 border-t-2 border-dotted"
-                        style={{ borderColor: trendColor }}
-                      />
-                      Derived trend from displayed points
-                    </li>
-                  ) : null}
-                  {series.map((member) => (
-                    <li
-                      key={`baseline:${member.memberKey}`}
-                      className="text-ink-muted"
-                    >
-                      {member.label} · {absolute ? 'first shared' : 'baseline'}{' '}
-                      <time dateTime={member.baselineDate}>
-                        {member.baselineDate}
-                      </time>
+                      {member.label}
                     </li>
                   ))}
                 </ul>
-                <div
-                  role="region"
-                  aria-label="Scrollable shared group weights"
-                  tabIndex={0}
-                  className="relative isolate mt-5 max-h-[28rem] overflow-auto rounded-xl border border-stone-200 focus-visible:outline-2 focus-visible:outline-emerald-700"
-                >
-                  <table
-                    aria-label="Shared group weight history"
-                    className="group-history-table table-fixed border-collapse text-left text-xs"
-                    style={{ width: 120 + series.length * 156 }}
+                {!compactOverview ? (
+                  <div
+                    role="region"
+                    aria-label="Scrollable shared group weights"
+                    tabIndex={0}
+                    className="relative isolate mt-5 max-h-[28rem] overflow-auto rounded-xl border border-stone-200 focus-visible:outline-2 focus-visible:outline-emerald-700"
                   >
-                    <colgroup>
-                      <col style={{ width: 120 }} />
-                      {series.map((member) => (
-                        <col key={member.memberKey} style={{ width: 156 }} />
-                      ))}
-                    </colgroup>
-                    <caption className="p-3 text-left font-semibold">
-                      Exact shared weights (kg). A dash means no shared entry.
-                    </caption>
-                    <thead className="bg-stone-50">
-                      <tr>
-                        <th
-                          scope="col"
-                          aria-label="Recorded date"
-                          className="sticky left-0 top-0 z-30 bg-stone-50 px-2 py-2"
-                        >
-                          Date
-                        </th>
+                    <table
+                      aria-label="Shared group weight history"
+                      className="group-history-table table-fixed border-collapse text-left text-xs"
+                      style={{ width: 120 + series.length * 156 }}
+                    >
+                      <colgroup>
+                        <col style={{ width: 120 }} />
                         {series.map((member) => (
-                          <th
-                            key={member.memberKey}
-                            scope="col"
-                            className="sticky top-0 z-20 break-words bg-stone-50 px-1 py-2"
-                          >
-                            {member.label} (kg)
-                          </th>
+                          <col key={member.memberKey} style={{ width: 156 }} />
                         ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-stone-200">
-                      {matrix.map((row) => (
-                        <tr key={row.date}>
+                      </colgroup>
+                      <caption className="p-3 text-left font-semibold">
+                        Exact shared weights (kg). A dash means no shared entry.
+                      </caption>
+                      <thead className="bg-stone-50">
+                        <tr>
                           <th
-                            scope="row"
-                            aria-label={row.date}
-                            className="sticky left-0 z-10 whitespace-nowrap bg-white px-2 py-1 font-medium"
+                            scope="col"
+                            aria-label="Recorded date"
+                            className="sticky left-0 top-0 z-30 bg-stone-50 px-2 py-2"
                           >
-                            <time dateTime={row.date} title={row.date}>
-                              {row.date}
-                            </time>
+                            Date
                           </th>
-                          {row.cells.map((point, index) => (
-                            <td
-                              key={series[index].memberKey}
-                              className="relative z-0 px-1 py-1"
+                          {series.map((member) => (
+                            <th
+                              key={member.memberKey}
+                              scope="col"
+                              className="sticky top-0 z-20 break-words bg-stone-50 px-1 py-2"
                             >
-                              {point ? (
-                                <>
-                                  <WeightEntryCard weightKg={point.weightKg}>
-                                    <span className="sr-only">
-                                      ; change from first shared entry{' '}
-                                      {signed(point.changeKg)}
-                                    </span>
-                                    {point.memberKey === ownMemberKey &&
-                                    personalWorkspace.userId ===
-                                      viewerId.toLowerCase() &&
-                                    personalWorkspace.persistence.mode ===
-                                      'remote' &&
-                                    personalWorkspace.personal.state ===
-                                      'ready' &&
-                                    personalWorkspace.contexts.state ===
-                                      'ready' ? (
-                                      <WeightEntryActions
-                                        key={`${personalWorkspace.ownerKey}:${challengeId}:${point.date}`}
-                                        workspace={personalWorkspace}
-                                        date={point.date}
-                                        compact
-                                        memberLabel={series[index].label}
-                                        requiredSharedChallengeId={challengeId}
-                                      />
-                                    ) : null}
-                                  </WeightEntryCard>{' '}
-                                  <span className="block text-[10px] text-ink-muted">
-                                    Previous shared entry:{' '}
-                                    {point.previousSharedChangeKg === null
-                                      ? '—'
-                                      : signed(point.previousSharedChangeKg)}
-                                  </span>
-                                </>
-                              ) : (
-                                <span aria-label="No shared entry">—</span>
-                              )}
-                            </td>
+                              {member.label} (kg)
+                            </th>
                           ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-stone-200">
+                        {matrix.map((row) => (
+                          <tr key={row.date}>
+                            <th
+                              scope="row"
+                              aria-label={row.date}
+                              className="sticky left-0 z-10 whitespace-nowrap bg-white px-2 py-1 font-medium"
+                            >
+                              <time dateTime={row.date} title={row.date}>
+                                {row.date}
+                              </time>
+                            </th>
+                            {row.cells.map((point, index) => (
+                              <td
+                                key={series[index].memberKey}
+                                className="relative z-0 px-1 py-1"
+                              >
+                                {point ? (
+                                  <>
+                                    <WeightEntryCard weightKg={point.weightKg}>
+                                      <span className="sr-only">
+                                        ; change from first shared entry{' '}
+                                        {signed(point.changeKg)}
+                                      </span>
+                                      {point.memberKey === ownMemberKey &&
+                                      personalWorkspace.userId ===
+                                        viewerId.toLowerCase() &&
+                                      personalWorkspace.persistence.mode ===
+                                        'remote' &&
+                                      personalWorkspace.personal.state ===
+                                        'ready' &&
+                                      personalWorkspace.contexts.state ===
+                                        'ready' ? (
+                                        <WeightEntryActions
+                                          key={`${personalWorkspace.ownerKey}:${challengeId}:${point.date}`}
+                                          workspace={personalWorkspace}
+                                          date={point.date}
+                                          compact
+                                          memberLabel={series[index].label}
+                                          requiredSharedChallengeId={
+                                            challengeId
+                                          }
+                                        />
+                                      ) : null}
+                                    </WeightEntryCard>{' '}
+                                    <span className="block text-[10px] text-ink-muted">
+                                      Previous shared entry:{' '}
+                                      {point.previousSharedChangeKg === null
+                                        ? '—'
+                                        : signed(point.previousSharedChangeKg)}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <span aria-label="No shared entry">—</span>
+                                )}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
               </>
             )}
           </section>

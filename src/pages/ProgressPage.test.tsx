@@ -118,6 +118,9 @@ const weighIns = [
 
 function authValue(userId: string): AuthContextValue {
   return {
+    changePassword: async () => 'updated',
+    requestEmailChange: async () => false,
+    saveProfileName: async () => false,
     requestPasswordRecovery: vi.fn(),
     resetPassword: vi.fn().mockResolvedValue(false),
     retrySession: vi.fn(),

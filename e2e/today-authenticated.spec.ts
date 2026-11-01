@@ -90,22 +90,32 @@ test('renders private, saved Progress records accessibly at a mobile viewport', 
 
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
   await expect(
-    page
-      .getByRole('table', { name: 'Your saved personal weigh-ins' })
-      .getByText('88.4 kg', { exact: true }),
-  ).toHaveCount(1)
+    page.getByRole('table', { name: 'Your saved personal weigh-ins' }),
+  ).toHaveCount(0)
   await expect(page.getByText(/First-to-latest change: −1.6 kg/)).toBeVisible()
   await expect(
     page.getByText('E2E private note for the signed-in participant.'),
-  ).toBeVisible()
+  ).toHaveCount(0)
   await expect(
     page.getByText('Other participant private note must not appear.'),
   ).toHaveCount(0)
   await expect(
     page.getByRole('img', { name: /2 saved weigh-ins/ }),
   ).toBeVisible()
+  await page
+    .getByRole('navigation', { name: 'Dashboard sections' })
+    .getByRole('link', { name: 'Weigh-ins', exact: true })
+    .click()
   await expect(
-    page.getByRole('table', { name: 'Your saved personal weigh-ins' }),
+    page.getByRole('list', { name: 'Personal weigh-in history' }),
+  ).toBeVisible()
+  await expect(
+    page
+      .getByRole('list', { name: 'Personal weigh-in history' })
+      .getByText('88.4 kg', { exact: true }),
+  ).toHaveCount(1)
+  await expect(
+    page.getByText('E2E private note for the signed-in participant.'),
   ).toBeVisible()
 
   const groupHistory = page.getByRole('region', {

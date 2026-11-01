@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { getRecoveryRedirectUrl, isRecoveryCallback } from './authRedirects'
 import { AuthContext, type AuthProviderProps, type AuthState } from './context'
+import type { ProfileAvatarPresetId } from './profileAvatar'
 import { createSupabaseAuthGateway } from './supabaseAuth'
+import { profileNameError } from './profileName'
 
 export type { AuthState, AuthUser } from './context'
 
@@ -34,6 +36,10 @@ export function AuthProvider({
   const authGateway = providedAuthGateway ?? fallbackAuthGateway
   const [state, setState] = useState<AuthState>(initialState ?? loadingState)
   const operationGeneration = useRef(0)
+  const accountGeneration = useRef(0)
+  const profileVersions = useRef(new Map<string, number>())
+  const profileSave = useRef(0)
+  const pendingProfileSaves = useRef(new Set<string>())
   const currentUserKey = useRef(
     initialState?.status === 'signed-in' ||
       initialState?.status === 'recovery-ready'
@@ -45,20 +51,32 @@ export function AuthProvider({
       (!initialState && isRecoveryCallback(window.location)),
   )
   const blockedUserKey = useRef<string | null>(null)
-  const initializedProfiles = useRef(new Set<string>())
-  const pendingProfiles = useRef(new Map<string, Promise<void>>())
+  const initializedProfiles = useRef(new Map<string, string | undefined>())
+  const pendingProfiles = useRef(new Map<string, Promise<string | undefined>>())
 
   const ensureProfileOnce = useCallback(
     (
       user: NonNullable<Extract<AuthState, { status: 'signed-in' }>['user']>,
     ) => {
       const key = userKey(user)
-      if (initializedProfiles.current.has(key)) return Promise.resolve()
+      if (initializedProfiles.current.has(key)) {
+        return Promise.resolve(initializedProfiles.current.get(key))
+      }
       const pending = pendingProfiles.current.get(key)
       if (pending) return pending
 
-      const next = authGateway.ensureProfile(user).then(() => {
-        initializedProfiles.current.add(key)
+      const version = profileVersions.current.get(key) ?? 0
+      const account = accountGeneration.current
+      const generation = operationGeneration.current
+      const next = authGateway.ensureProfile(user).then((displayName) => {
+        if (
+          account !== accountGeneration.current ||
+          generation !== operationGeneration.current ||
+          version !== (profileVersions.current.get(key) ?? 0)
+        )
+          return initializedProfiles.current.get(key)
+        initializedProfiles.current.set(key, displayName)
+        return displayName
       })
       pendingProfiles.current.set(key, next)
       void next
@@ -75,6 +93,7 @@ export function AuthProvider({
 
   const applySignedOut = useCallback((generation: number) => {
     if (generation !== operationGeneration.current) return
+    accountGeneration.current += 1
     currentUserKey.current = null
     blockedUserKey.current = null
     setState(signedOutState)
@@ -93,23 +112,38 @@ export function AuthProvider({
       }
 
       const key = userKey(user)
+      if (currentUserKey.current !== key) {
+        accountGeneration.current += 1
+        initializedProfiles.current.delete(key)
+        pendingProfiles.current.delete(key)
+      }
+      const account = accountGeneration.current
       currentUserKey.current = key
+      const profileVersion = profileVersions.current.get(key) ?? 0
+      const nextUser = initializedProfiles.current.has(key)
+        ? {
+            ...user,
+            displayName:
+              initializedProfiles.current.get(key) ?? user.displayName,
+          }
+        : user
       setState((currentState) => {
         if (
           currentState.status === 'signed-in' &&
           currentState.user.id === user.id &&
           currentState.user.email === user.email &&
-          currentState.user.displayName === user.displayName
+          currentState.user.displayName === nextUser.displayName
         ) {
           return currentState
         }
-        return { error: null, status: 'signed-in', user }
+        return { error: null, status: 'signed-in', user: nextUser }
       })
 
       // Supabase requires auth callbacks to return without starting another
       // Supabase request. Profile initialization is deliberately deferred.
       window.setTimeout(() => {
         if (
+          account !== accountGeneration.current ||
           generation !== operationGeneration.current ||
           currentUserKey.current !== key ||
           blockedUserKey.current === key
@@ -117,21 +151,58 @@ export function AuthProvider({
           return
         }
 
-        void ensureProfileOnce(user).catch((error) => {
-          if (
-            generation === operationGeneration.current &&
-            currentUserKey.current === key
-          ) {
-            setState({
-              error: errorMessage(
-                error,
-                'We could not initialize your profile. Try again.',
-              ),
-              status: 'error',
-              user: null,
+        void ensureProfileOnce(user)
+          .then((displayName) => {
+            if (
+              account !== accountGeneration.current ||
+              generation !== operationGeneration.current ||
+              currentUserKey.current !== key
+            ) {
+              return
+            }
+            setState((current) => {
+              if (
+                current.status !== 'signed-in' ||
+                userKey(current.user) !== key
+              ) {
+                return current
+              }
+              const nextName =
+                (profileVersions.current.get(key) ?? 0) !== profileVersion
+                  ? initializedProfiles.current.get(key) ||
+                    current.user.displayName
+                  : displayName || current.user.displayName
+              if (
+                nextName === current.user.displayName &&
+                !current.profileError
+              ) {
+                return current
+              }
+              return {
+                error: null,
+                status: 'signed-in',
+                user: { ...current.user, displayName: nextName },
+              }
             })
-          }
-        })
+          })
+          .catch(() => {
+            if (
+              account === accountGeneration.current &&
+              generation === operationGeneration.current &&
+              currentUserKey.current === key &&
+              (profileVersions.current.get(key) ?? 0) === profileVersion
+            ) {
+              setState((current) =>
+                current.status === 'signed-in' && userKey(current.user) === key
+                  ? {
+                      ...current,
+                      profileError:
+                        'Your profile name could not be saved. You are still signed in.',
+                    }
+                  : current,
+              )
+            }
+          })
       }, 0)
     },
     [ensureProfileOnce],
@@ -420,9 +491,228 @@ export function AuthProvider({
     [authGateway, state.status],
   )
 
+  const saveProfileName = useCallback(
+    async (name: string) => {
+      const invalid = profileNameError(name)
+      if (invalid) throw new Error(invalid)
+      if (
+        state.status !== 'signed-in' ||
+        !state.user.id ||
+        currentUserKey.current !== userKey(state.user)
+      )
+        throw new Error('Sign in again to edit your username.')
+      const user = state.user
+      const key = userKey(user)
+      if (pendingProfileSaves.current.has(key))
+        throw new Error('Your username is still saving. Try again shortly.')
+      pendingProfileSaves.current.add(key)
+      const generation = operationGeneration.current
+      const account = accountGeneration.current
+      const request = ++profileSave.current
+      profileVersions.current.set(
+        key,
+        (profileVersions.current.get(key) ?? 0) + 1,
+      )
+      const isCurrent = () =>
+        generation === operationGeneration.current &&
+        account === accountGeneration.current &&
+        currentUserKey.current === key &&
+        request === profileSave.current
+      try {
+        const displayName = await authGateway.saveProfileName(user, name.trim())
+        if (!isCurrent()) return false
+        initializedProfiles.current.set(key, displayName)
+        setState((current) =>
+          current.status === 'signed-in' && userKey(current.user) === key
+            ? {
+                error: null,
+                status: 'signed-in',
+                user: { ...current.user, displayName },
+              }
+            : current,
+        )
+        return true
+      } catch {
+        if (!isCurrent()) return false
+        throw new Error('We could not save your username. Try again.')
+      } finally {
+        pendingProfileSaves.current.delete(key)
+      }
+    },
+    [authGateway, state],
+  )
+
+  const requestEmailChange = useCallback(
+    async (email: string) => {
+      const normalizedEmail = email.trim()
+      if (!/^\S+@\S+\.\S+$/.test(normalizedEmail))
+        throw new Error('Enter a valid email address.')
+      if (
+        state.status !== 'signed-in' ||
+        !state.user.id ||
+        currentUserKey.current !== userKey(state.user)
+      )
+        throw new Error('Sign in again to change your email.')
+      if (normalizedEmail.toLowerCase() === state.user.email.toLowerCase())
+        throw new Error(
+          'Enter an email address different from your current one.',
+        )
+      const user = state.user
+      const key = userKey(user)
+      const generation = operationGeneration.current
+      const account = accountGeneration.current
+      try {
+        await authGateway.requestEmailChange(user, normalizedEmail)
+        return (
+          generation === operationGeneration.current &&
+          account === accountGeneration.current &&
+          currentUserKey.current === key
+        )
+      } catch (error) {
+        if (
+          generation !== operationGeneration.current ||
+          account !== accountGeneration.current ||
+          currentUserKey.current !== key
+        )
+          return false
+        throw new Error(
+          errorMessage(
+            error,
+            'We could not request the email change. Try again.',
+          ),
+        )
+      }
+    },
+    [authGateway, state],
+  )
+
+  const changePassword = useCallback(
+    async (currentPassword: string, password: string, nonce?: string) => {
+      if (
+        state.status !== 'signed-in' ||
+        !state.user.id ||
+        currentUserKey.current !== userKey(state.user)
+      )
+        throw new Error('Sign in again to change your password.')
+      if (!currentPassword) throw new Error('Enter your current password.')
+      if (!password || password.length < 8)
+        throw new Error('Use a password with at least 8 characters.')
+      if (nonce !== undefined && !nonce.trim())
+        throw new Error('Enter the verification code we sent you.')
+
+      const user = state.user
+      const key = userKey(user)
+      const generation = operationGeneration.current
+      const account = accountGeneration.current
+      const request = authGateway.changePassword
+      if (!request)
+        throw new Error('Password changes are not available right now.')
+      const isCurrent = () =>
+        generation === operationGeneration.current &&
+        account === accountGeneration.current &&
+        currentUserKey.current === key
+      try {
+        const result = await request(user, currentPassword, password, nonce)
+        if (!isCurrent()) return false
+        return result
+      } catch (error) {
+        if (!isCurrent()) return false
+        throw new Error(
+          errorMessage(error, 'We could not change your password. Try again.'),
+        )
+      }
+    },
+    [authGateway, state],
+  )
+
+  const runAvatarOperation = useCallback(
+    async (
+      operation: (
+        user: Extract<AuthState, { status: 'signed-in' }>['user'],
+      ) => Promise<void>,
+    ) => {
+      if (
+        state.status !== 'signed-in' ||
+        !state.user.id ||
+        currentUserKey.current !== userKey(state.user)
+      )
+        throw new Error('Sign in again to change your profile picture.')
+      const key = userKey(state.user)
+      const generation = operationGeneration.current
+      const account = accountGeneration.current
+      await operation(state.user)
+      return (
+        generation === operationGeneration.current &&
+        account === accountGeneration.current &&
+        currentUserKey.current === key
+      )
+    },
+    [state],
+  )
+
+  const getProfileAvatarUrl = useCallback(async () => {
+    if (
+      state.status !== 'signed-in' ||
+      !state.user.id ||
+      !authGateway.getProfileAvatarUrl
+    )
+      return undefined
+    try {
+      return await authGateway.getProfileAvatarUrl(state.user)
+    } catch {
+      return undefined
+    }
+  }, [authGateway, state])
+
+  const getProfileAvatar = useCallback(async () => {
+    if (
+      state.status !== 'signed-in' ||
+      !state.user.id ||
+      !authGateway.getProfileAvatar
+    )
+      return undefined
+    return await authGateway.getProfileAvatar(state.user)
+  }, [authGateway, state])
+
+  const chooseProfileAvatar = useCallback(
+    async (presetId: ProfileAvatarPresetId) => {
+      if (!authGateway.chooseProfileAvatar)
+        throw new Error('Avatar selection is not available right now.')
+      return runAvatarOperation((user) =>
+        authGateway.chooseProfileAvatar!(user, presetId),
+      )
+    },
+    [authGateway, runAvatarOperation],
+  )
+
+  const saveProfileAvatar = useCallback(
+    async (file: File) => {
+      if (!authGateway.saveProfileAvatar)
+        throw new Error('Profile picture uploads are not available right now.')
+      return runAvatarOperation((user) =>
+        authGateway.saveProfileAvatar!(user, file),
+      )
+    },
+    [authGateway, runAvatarOperation],
+  )
+
+  const clearProfileAvatar = useCallback(async () => {
+    if (!authGateway.clearProfileAvatar)
+      throw new Error('Avatar removal is not available right now.')
+    return runAvatarOperation((user) => authGateway.clearProfileAvatar!(user))
+  }, [authGateway, runAvatarOperation])
+
   const value = useMemo(
     () => ({
+      changePassword,
+      getProfileAvatarUrl,
+      getProfileAvatar,
+      chooseProfileAvatar,
+      saveProfileAvatar,
+      clearProfileAvatar,
+      requestEmailChange,
       requestPasswordRecovery,
+      saveProfileName,
       resetPassword,
       retrySession,
       signIn,
@@ -431,7 +721,15 @@ export function AuthProvider({
       state,
     }),
     [
+      changePassword,
+      getProfileAvatarUrl,
+      getProfileAvatar,
+      chooseProfileAvatar,
+      saveProfileAvatar,
+      clearProfileAvatar,
+      requestEmailChange,
       requestPasswordRecovery,
+      saveProfileName,
       resetPassword,
       retrySession,
       signIn,

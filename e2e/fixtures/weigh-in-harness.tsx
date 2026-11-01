@@ -29,6 +29,7 @@ seedLocalPreview('slimpossible.local.participants', [participant])
 seedLocalPreview('slimpossible.local.weigh-ins', [])
 
 const authValue: AuthContextValue = {
+  saveProfileName: async () => false,
   requestPasswordRecovery: async () => undefined,
   resetPassword: async () => false,
   retrySession: () => undefined,

@@ -21,6 +21,11 @@ for (const width of [1280, 390]) {
       '/weigh-ins',
     ]) {
       await page.goto(fixture(path))
+      if (path.startsWith('/progress') || path.startsWith('/goals'))
+        await page
+          .getByRole('navigation', { name: 'Dashboard sections' })
+          .getByRole('link', { name: 'Overview', exact: true })
+          .click()
       await action.click()
       const emptyEditor =
         path === '/weigh-ins'
@@ -54,6 +59,9 @@ for (const width of [1280, 390]) {
       .getByRole('button', { name: 'Save weight', exact: true })
       .click()
     await expect(editor).toHaveCount(0)
+    await expect(
+      page.locator('.dashboard-save-confirmation[role="status"]'),
+    ).toBeVisible()
 
     for (const path of [
       '/dashboard',
@@ -65,6 +73,11 @@ for (const width of [1280, 390]) {
       '/weigh-ins',
     ]) {
       await page.goto(fixture(path))
+      if (path.startsWith('/progress') || path.startsWith('/goals'))
+        await page
+          .getByRole('navigation', { name: 'Dashboard sections' })
+          .getByRole('link', { name: 'Overview', exact: true })
+          .click()
       await expect(action).toHaveCount(1)
       await expect(action).toBeEnabled()
       const header = page.locator('[data-weight-page-header]')
@@ -75,7 +88,7 @@ for (const width of [1280, 390]) {
       if (await page.locator('.dashboard-workspace').count()) {
         await expect(
           page
-            .locator('.dashboard-action-grid')
+            .locator('.dashboard-latest')
             .getByRole('button', { name: 'Record weight', exact: true }),
         ).toBeVisible()
         expect(actionBox.y).toBeGreaterThan(headingBox.y + headingBox.height)
@@ -133,11 +146,6 @@ for (const width of [1280, 390]) {
       await editor
         .getByRole('button', { name: 'Update weight', exact: true })
         .click()
-      await expect(
-        page.getByText(
-          /Personal weight saved\.|Personal weigh-in saved in this browser\./,
-        ),
-      ).toBeVisible()
       const rows = await page.evaluate(() =>
         JSON.parse(
           localStorage.getItem('slimpossible.local.personal-weigh-ins') ?? '[]',

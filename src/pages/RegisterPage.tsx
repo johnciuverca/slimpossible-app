@@ -9,6 +9,7 @@ import {
   TextInput,
 } from '../components/ui'
 import { safeInternalPath } from '../auth/authRedirects'
+import { PROFILE_NAME_MAX_LENGTH, profileNameError } from '../auth/profileName'
 import { useAuth } from '../auth/useAuth'
 import { getAuthenticationEnvironmentLabel } from '../auth/supabaseConfig'
 import { isValidEmail } from './authValidation'
@@ -28,9 +29,8 @@ function validateRegistration(
 ): RegisterErrors {
   const errors: RegisterErrors = {}
 
-  if (!name.trim()) {
-    errors.name = 'Enter your name.'
-  }
+  const nameError = profileNameError(name)
+  if (nameError) errors.name = nameError
 
   if (!email.trim()) {
     errors.email = 'Enter your email address.'
@@ -113,11 +113,14 @@ export function RegisterPage() {
           onSubmit={handleSubmit}
         >
           <TextInput
-            autoComplete="name"
+            autoComplete="nickname"
             error={errors.name}
             id="register-name"
-            label="Full name"
+            label="Username"
+            placeholder="name or nickname"
+            maxLength={PROFILE_NAME_MAX_LENGTH}
             onChange={(event) => setName(event.target.value)}
+            required
             type="text"
             value={name}
           />

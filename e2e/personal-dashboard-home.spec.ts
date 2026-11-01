@@ -16,7 +16,7 @@ for (const width of [1280, 390]) {
     )
     const route = page.getByTestId('fixture-route')
     await expect(route).toHaveText(
-      '/dashboard?challenge=dashboard-active&source=legacy&tab=progress#goals',
+      '/dashboard?challenge=dashboard-active&source=legacy&tab=overview#goals',
     )
     await expect(
       page.getByRole('tablist', { name: 'Dashboard views' }),
@@ -28,11 +28,22 @@ for (const width of [1280, 390]) {
     ).toHaveCount(2)
     await expect(
       page.getByText('Synthetic first-account private note', { exact: true }),
-    ).toBeVisible()
+    ).toHaveCount(0)
     await expect(
       page.getByText('Synthetic second-account private note', { exact: true }),
     ).toHaveCount(0)
 
+    await page
+      .getByRole('navigation', { name: 'Dashboard sections' })
+      .getByRole('link', { name: 'Weigh-ins', exact: true })
+      .click()
+    await expect(
+      page.getByText('Synthetic first-account private note', { exact: true }),
+    ).toBeVisible()
+    await page
+      .getByRole('navigation', { name: 'Dashboard sections' })
+      .getByRole('link', { name: 'Overview', exact: true })
+      .click()
     await page.reload()
     await expect(
       page.getByRole('heading', { name: 'Goals', exact: true }),
@@ -48,7 +59,10 @@ for (const width of [1280, 390]) {
       '/group?challenge=dashboard-active&source=legacy#group-history',
     )
     await expect(
-      page.getByRole('heading', { name: 'Group', exact: true }),
+      page.getByRole('heading', {
+        name: 'Synthetic active group',
+        exact: true,
+      }),
     ).toBeVisible()
     await expect(
       page.getByText('Synthetic first-account private note', { exact: true }),
@@ -105,8 +119,8 @@ for (const width of [1280, 390]) {
       )
       await page.getByRole('button', { name: 'Close Profile' }).click()
       await expect(
-        page.getByRole('link', { name: 'My Progress and private history' }),
-      ).toHaveAttribute('href', /#personal-history$/)
+        page.getByRole('link', { name: 'My progress' }),
+      ).toHaveAttribute('href', /tab=overview#dashboard-progress-panel$/)
       await expect(
         page.getByRole('button', { name: 'Record weight', exact: true }),
       ).toBeEnabled()

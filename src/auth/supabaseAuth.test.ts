@@ -46,4 +46,27 @@ describe('mapSupabaseAuthError', () => {
       ),
     ).toBe('This recovery link is invalid or expired. Request a new link.')
   })
+
+  it('maps password change, reauthentication, and verification failures safely', () => {
+    expect(
+      mapSupabaseAuthError(
+        { code: 'reauthentication_not_valid', message: 'nonce=secret' },
+        'password-change',
+      ),
+    ).toBe('That verification code did not work. Check it and try again.')
+    expect(
+      mapSupabaseAuthError(
+        { message: 'Current password is incorrect; supplied value=secret' },
+        'password-change',
+      ),
+    ).toBe(
+      'Your current password could not be verified. Check it and try again.',
+    )
+    expect(
+      mapSupabaseAuthError(
+        { code: 'weak_password', message: 'password=secret' },
+        'password-change',
+      ),
+    ).toBe('Choose a stronger password that meets your account requirements.')
+  })
 })

@@ -45,6 +45,7 @@ seedOnce('slimpossible.local.weigh-ins', [])
 seedOnce('slimpossible.local.personal-weigh-ins', [])
 
 const authValue: AuthContextValue = {
+  saveProfileName: async () => false,
   requestPasswordRecovery: async () => undefined,
   resetPassword: async () => false,
   retrySession: () => undefined,

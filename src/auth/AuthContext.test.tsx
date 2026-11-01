@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { AuthGateway } from './context'
@@ -6,6 +7,8 @@ import { AuthProvider } from './AuthContext'
 import { useAuth } from './useAuth'
 
 const signedOutGateway: AuthGateway = {
+  requestEmailChange: async () => undefined,
+  saveProfileName: async (_user, name) => name,
   ensureProfile: async () => undefined,
   getSession: async () => null,
   onAuthStateChange: () => () => undefined,
@@ -22,7 +25,15 @@ function AuthHarness() {
   return (
     <>
       <output>{state.status}</output>
-      {state.status === 'signed-in' ? <p>{state.user.email}</p> : null}
+      {state.status === 'signed-in' ? (
+        <>
+          <p>{state.user.email}</p>
+          <p>{state.user.displayName}</p>
+          {state.profileError ? (
+            <p role="status">{state.profileError}</p>
+          ) : null}
+        </>
+      ) : null}
       <button onClick={() => void signIn('person@example.com', 'password')}>
         Sign in locally
       </button>
@@ -173,12 +184,82 @@ describe('AuthContext', () => {
     expect(ensureProfile).toHaveBeenCalledTimes(1)
   })
 
+  it('uses the persisted profile name after session restoration', async () => {
+    vi.useFakeTimers()
+    const user = {
+      displayName: 'Signup metadata',
+      email: 'person@example.com',
+      id: 'user-1',
+    }
+
+    render(
+      <AuthProvider
+        authGateway={createGateway({
+          ensureProfile: async () => 'Saved profile name',
+          getSession: async () => user,
+        })}
+      >
+        <AuthHarness />
+      </AuthProvider>,
+    )
+
+    await act(async () => {
+      vi.runOnlyPendingTimers()
+      await Promise.resolve()
+      vi.runOnlyPendingTimers()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(screen.getByText('Saved profile name')).toBeInTheDocument()
+    expect(screen.getByText('signed-in')).toBeInTheDocument()
+  })
+
+  it('keeps the authenticated session when profile initialization fails', async () => {
+    vi.useFakeTimers()
+
+    render(
+      <AuthProvider
+        authGateway={createGateway({
+          ensureProfile: async () => {
+            throw new Error('private database detail')
+          },
+          getSession: async () => ({
+            email: 'person@example.com',
+            id: 'user-1',
+          }),
+        })}
+      >
+        <AuthHarness />
+      </AuthProvider>,
+    )
+
+    await act(async () => {
+      vi.runOnlyPendingTimers()
+      await Promise.resolve()
+      vi.runOnlyPendingTimers()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(screen.getByText('signed-in')).toBeInTheDocument()
+    expect(screen.getByText('person@example.com')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Your profile name could not be saved. You are still signed in.',
+      ),
+    ).toHaveAttribute('role', 'status')
+    expect(
+      screen.queryByText('private database detail'),
+    ).not.toBeInTheDocument()
+  })
+
   it('defers repeated auth-event profile work and shares one in-flight request', async () => {
     vi.useFakeTimers()
     const user = { email: 'person@example.com', id: 'user-1' }
     let emitAuthEvent: ((nextUser: typeof user | null) => void) | undefined
-    let resolveProfile!: () => void
-    const profileRequest = new Promise<void>((resolve) => {
+    let resolveProfile!: (displayName?: string) => void
+    const profileRequest = new Promise<string | undefined>((resolve) => {
       resolveProfile = resolve
     })
     const ensureProfile = vi.fn(() => profileRequest)
@@ -307,5 +388,61 @@ describe('AuthContext', () => {
 
     expect(screen.getByText('signed-out')).toBeInTheDocument()
     expect(screen.queryByText('person@example.com')).not.toBeInTheDocument()
+  })
+
+  it('ignores a password change that finishes after the signed-in account changes', async () => {
+    let resolveChange!: (result: 'updated') => void
+    const changeRequest = new Promise<'updated'>((resolve) => {
+      resolveChange = resolve
+    })
+    function PasswordChangeHarness() {
+      const { changePassword, signOut, state } = useAuth()
+      const [result, setResult] = useState<string>('pending')
+      return (
+        <>
+          <output>{state.status}</output>
+          <output aria-label="Password change result">{result}</output>
+          <button
+            onClick={() => {
+              if (!changePassword) return
+              void changePassword('current-secret', 'new-secret-password').then(
+                (value) => setResult(String(value)),
+              )
+            }}
+          >
+            Change password
+          </button>
+          <button onClick={() => void signOut()}>Switch account</button>
+        </>
+      )
+    }
+
+    render(
+      <AuthProvider
+        authGateway={createGateway({
+          changePassword: async () => changeRequest,
+        })}
+        initialState={{
+          error: null,
+          status: 'signed-in',
+          user: { email: 'person@example.com', id: 'user-1' },
+        }}
+      >
+        <PasswordChangeHarness />
+      </AuthProvider>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Change password' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Switch account' }))
+    expect(screen.getByText('signed-out')).toBeInTheDocument()
+    resolveChange('updated')
+
+    await act(async () => {
+      await changeRequest
+    })
+    expect(screen.getByLabelText('Password change result')).toHaveTextContent(
+      'false',
+    )
+    expect(screen.queryByText('updated')).not.toBeInTheDocument()
   })
 })

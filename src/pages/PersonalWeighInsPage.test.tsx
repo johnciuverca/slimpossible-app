@@ -403,9 +403,7 @@ describe('PersonalWeighInsPage', () => {
       ).getByRole('button', { name: 'Delete weight' }),
     )
     await waitFor(() => {
-      expect(
-        screen.getByText(/No personal weigh-ins saved yet/),
-      ).toBeInTheDocument()
+      expect(screen.getByText('No saved weigh-ins yet.')).toBeInTheDocument()
     })
   })
 

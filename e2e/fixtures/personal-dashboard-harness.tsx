@@ -145,6 +145,7 @@ export function Harness() {
           userId === 'user-alex' ? 'Synthetic Alex' : 'Synthetic Second',
       },
     },
+    saveProfileName: async () => false,
     requestPasswordRecovery: async () => undefined,
     resetPassword: async () => false,
     retrySession: () => undefined,

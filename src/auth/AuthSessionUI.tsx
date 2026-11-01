@@ -2,8 +2,16 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 
 import { Button, FeedbackPanel } from '../components/ui'
+import { UnsavedChangesDialog } from '../components/UnsavedChangesDialog'
+import { safeProfileDisplayName } from './profileName'
 import { useAuth } from './useAuth'
 import { trapDialogFocus } from '../components/dialogFocus'
+import { ProfileNameForm } from './ProfileNameForm'
+import { ProfileEmailForm } from './ProfileEmailForm'
+import { ProfilePasswordForm } from './ProfilePasswordForm'
+import { ProfileAvatarForm } from './ProfileAvatarForm'
+import { ProfileAvatarImage } from './ProfileAvatarImage'
+import type { ProfileAvatarPresetId } from './profileAvatar'
 
 export function AuthSessionUI() {
   const { retrySession, signOut, state } = useAuth()
@@ -46,8 +54,15 @@ export function AuthSessionUI() {
     return (
       <AccountControl
         key={`${state.user.id}:${state.user.email}`}
-        name={state.user.displayName?.trim() || 'Your account'}
+        name={
+          safeProfileDisplayName(state.user.displayName, state.user.email) ||
+          'Your account'
+        }
         email={state.user.email}
+        displayName={
+          safeProfileDisplayName(state.user.displayName, state.user.email) ?? ''
+        }
+        profileError={state.profileError}
         onLogout={handleLogout}
       />
     )
@@ -65,16 +80,55 @@ export function AuthSessionUI() {
 
 function AccountControl({
   name,
+  displayName,
   email,
+  profileError,
   onLogout,
 }: {
   name: string
+  displayName: string
   email: string
+  profileError?: string
   onLogout: () => Promise<void>
 }) {
+  const { getProfileAvatar } = useAuth()
+  const [avatarUrl, setAvatarUrl] = useState<string>()
+  const [avatarPreset, setAvatarPreset] =
+    useState<ProfileAvatarPresetId | null>(null)
+  const avatarRetry = useRef(false)
+  const [avatarDirty, setAvatarDirty] = useState(false)
+  const [avatarSaving, setAvatarSaving] = useState(false)
   const [profile, setProfile] = useState(false)
+  const [usernameDirty, setUsernameDirty] = useState(false)
+  const [usernameSaving, setUsernameSaving] = useState(false)
+  const [emailDirty, setEmailDirty] = useState(false)
+  const [emailSaving, setEmailSaving] = useState(false)
+  const [passwordDirty, setPasswordDirty] = useState(false)
+  const [passwordSaving, setPasswordSaving] = useState(false)
+  const [confirmProfileDismiss, setConfirmProfileDismiss] = useState(false)
   const menu = useRef<HTMLDetailsElement>(null)
   const dialog = useRef<HTMLDialogElement>(null)
+  useEffect(() => {
+    const refresh = () => {
+      void getProfileAvatar?.()
+        .then((avatar) => {
+          setAvatarUrl(avatar?.signedUrl)
+          setAvatarPreset(avatar?.presetId ?? null)
+          avatarRetry.current = false
+        })
+        .catch(() => {
+          setAvatarUrl(undefined)
+          setAvatarPreset(null)
+        })
+    }
+    refresh()
+    const timer = window.setInterval(refresh, 4 * 60 * 1000)
+    window.addEventListener('profile-avatar-updated', refresh)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('profile-avatar-updated', refresh)
+    }
+  }, [getProfileAvatar])
   useEffect(() => {
     const closeOnOutsidePointer = (event: PointerEvent) => {
       if (
@@ -93,13 +147,62 @@ function AccountControl({
     if (!profile) return
     const element = dialog.current
     element?.showModal()
-    element?.querySelector<HTMLButtonElement>('button')?.focus()
+    element?.querySelector<HTMLButtonElement>('[data-profile-close]')?.focus()
     return () => element?.close()
   }, [profile])
+  useEffect(() => {
+    if (
+      confirmProfileDismiss &&
+      !usernameDirty &&
+      !usernameSaving &&
+      !emailDirty &&
+      !emailSaving &&
+      !passwordDirty &&
+      !passwordSaving &&
+      !avatarDirty &&
+      !avatarSaving
+    )
+      setConfirmProfileDismiss(false)
+  }, [
+    confirmProfileDismiss,
+    emailDirty,
+    emailSaving,
+    passwordDirty,
+    passwordSaving,
+    avatarDirty,
+    avatarSaving,
+    usernameDirty,
+    usernameSaving,
+  ])
   const close = () => {
+    setConfirmProfileDismiss(false)
+    setUsernameDirty(false)
+    setUsernameSaving(false)
+    setEmailDirty(false)
+    setEmailSaving(false)
+    setPasswordDirty(false)
+    setPasswordSaving(false)
+    setAvatarDirty(false)
+    setAvatarSaving(false)
     dialog.current?.close()
     setProfile(false)
     menu.current?.querySelector('summary')?.focus()
+  }
+  const requestClose = () => {
+    if (
+      usernameDirty ||
+      usernameSaving ||
+      emailDirty ||
+      emailSaving ||
+      passwordDirty ||
+      passwordSaving ||
+      avatarDirty ||
+      avatarSaving
+    ) {
+      setConfirmProfileDismiss(true)
+      return
+    }
+    close()
   }
   return (
     <>
@@ -120,7 +223,36 @@ function AccountControl({
           className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-line px-3 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-forest-700"
         >
           <span className="account-avatar" aria-hidden="true">
-            {name.charAt(0).toUpperCase()}
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt=""
+                className="h-full w-full rounded-full object-cover"
+                onError={() => {
+                  if (avatarRetry.current) return
+                  avatarRetry.current = true
+                  setAvatarUrl(undefined)
+                  window.setTimeout(() => {
+                    void getProfileAvatar?.()
+                      .then((avatar) => {
+                        setAvatarUrl(avatar?.signedUrl)
+                        setAvatarPreset(avatar?.presetId ?? null)
+                      })
+                      .catch(() => {
+                        setAvatarUrl(undefined)
+                        setAvatarPreset(null)
+                      })
+                  }, 0)
+                }}
+              />
+            ) : avatarPreset ? (
+              <ProfileAvatarImage
+                avatarId={avatarPreset}
+                className="h-full w-full rounded-full"
+              />
+            ) : (
+              name.charAt(0).toUpperCase()
+            )}
           </span>
           <span className="account-name min-w-0 truncate">{name}</span>
           <span className="account-chevron" aria-hidden="true">
@@ -163,26 +295,61 @@ function AccountControl({
           aria-labelledby="account-profile-title"
           className="m-auto w-[calc(100%_-_2rem)] max-w-md rounded-2xl border border-line bg-panel p-6 text-ink shadow-panel backdrop:bg-black/60"
           onKeyDown={trapDialogFocus}
+          onClick={(event) => {
+            if (event.target !== event.currentTarget) return
+            const bounds = event.currentTarget.getBoundingClientRect()
+            const outside =
+              event.clientX < bounds.left ||
+              event.clientX > bounds.right ||
+              event.clientY < bounds.top ||
+              event.clientY > bounds.bottom
+            if (outside) requestClose()
+          }}
           onCancel={(event) => {
+            if (event.target !== event.currentTarget) return
             event.preventDefault()
-            close()
+            requestClose()
           }}
         >
           <h2 id="account-profile-title" className="text-2xl font-bold">
             Profile
           </h2>
-          <dl className="my-6 space-y-4">
-            <div>
-              <dt className="text-sm text-ink-muted">Name</dt>
-              <dd className="break-words font-semibold">{name}</dd>
-            </div>
-            <div>
-              <dt className="text-sm text-ink-muted">Email</dt>
-              <dd className="break-all font-semibold">{email}</dd>
-            </div>
-          </dl>
-          <Button onClick={close}>Close Profile</Button>
+          <ProfileAvatarForm
+            onDirtyChange={setAvatarDirty}
+            onSavingChange={setAvatarSaving}
+          />
+          {profileError ? (
+            <p className="mt-4 text-sm text-danger-800" role="status">
+              {profileError}
+            </p>
+          ) : null}
+          <ProfileNameForm
+            displayName={displayName}
+            onDirtyChange={setUsernameDirty}
+            onSavingChange={setUsernameSaving}
+          />
+          <ProfileEmailForm
+            email={email}
+            onDirtyChange={setEmailDirty}
+            onSavingChange={setEmailSaving}
+          />
+          <ProfilePasswordForm
+            onDirtyChange={setPasswordDirty}
+            onSavingChange={setPasswordSaving}
+          />
+          <Button data-profile-close onClick={requestClose}>
+            Close Profile
+          </Button>
         </dialog>
+      ) : null}
+      {confirmProfileDismiss ? (
+        <UnsavedChangesDialog
+          saving={
+            usernameSaving || emailSaving || passwordSaving || avatarSaving
+          }
+          onStay={() => setConfirmProfileDismiss(false)}
+          onDiscard={close}
+        />
       ) : null}
     </>
   )

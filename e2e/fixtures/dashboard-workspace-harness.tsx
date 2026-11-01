@@ -12,6 +12,7 @@ import {
 import { AuthContext, type AuthContextValue } from '../../src/auth/context'
 import { AppLayout } from '../../src/layout/AppLayout'
 import { PersonalDashboardWorkspace } from '../../src/pages/PersonalDashboardPage'
+import { PersonalWeighInsPage } from '../../src/pages/PersonalWeighInsPage'
 import { usePersonalWorkspace } from '../../src/data/usePersonalWorkspace'
 import {
   createChallengeFixture,
@@ -276,6 +277,7 @@ export function Harness() {
         displayName: 'Synthetic account',
       },
     },
+    saveProfileName: async () => false,
     requestPasswordRecovery: async () => undefined,
     resetPassword: async () => false,
     retrySession: () => undefined,
@@ -298,6 +300,7 @@ export function Harness() {
         <CurrentRoute />
         <Routes>
           <Route path="/dashboard" element={<FakeDashboard />} />
+          <Route path="/weigh-ins" element={<PersonalWeighInsPage />} />
           <Route
             path="/progress"
             element={<FakeDashboard initialTab="progress" />}

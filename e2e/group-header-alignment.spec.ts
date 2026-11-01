@@ -33,15 +33,23 @@ for (const viewport of [
         path.startsWith('/goals') || path.startsWith('/progress')
       if (personalWorkspace) {
         await expect(contexts).toHaveCount(0)
+        await page
+          .getByRole('navigation', { name: 'Dashboard sections' })
+          .getByRole('link', { name: 'Weigh-ins', exact: true })
+          .click()
         await expect(
-          page.getByRole('table', { name: 'Your saved personal weigh-ins' }),
+          page.getByRole('list', { name: 'Personal weigh-in history' }),
         ).toBeVisible()
+        await page
+          .getByRole('navigation', { name: 'Dashboard sections' })
+          .getByRole('link', { name: 'Overview', exact: true })
+          .click()
         await expect(
           page.getByRole('button', { name: 'Record weight', exact: true }),
         ).toBeEnabled()
         await expect(
           page
-            .locator('.dashboard-action-grid')
+            .locator('.dashboard-latest')
             .getByRole('button', { name: 'Record weight', exact: true }),
         ).toBeVisible()
         continue
@@ -65,7 +73,7 @@ for (const viewport of [
       if (path !== '/group' && !path.startsWith('/challenges')) {
         expect(headerBox.y - navBox.y - navBox.height).toBeCloseTo(24, 0)
       } else {
-        expect(navBox.y - headerBox.y - headerBox.height).toBeCloseTo(24, 0)
+        expect(navBox.y - headerBox.y - headerBox.height).toBeCloseTo(8, 0)
       }
       if (viewport.width >= 1280) {
         const actionsBox = (await header
@@ -94,6 +102,10 @@ for (const viewport of [
             element.closest('.group-history-workspace'),
           ),
         ).toBeNull()
+        await page
+          .getByRole('navigation', { name: 'Group sections' })
+          .getByRole('link', { name: 'Charts', exact: true })
+          .click()
         const memberNavigation = page.locator(
           '.group-history-workspace > .sticky',
         )
@@ -143,7 +155,7 @@ for (const viewport of [
     await expect(active).toBeFocused()
     await page.keyboard.press('Enter')
     await expect(page.getByTestId('fixture-route')).toHaveText(
-      '/group?challenge=dashboard-active',
+      '/group?tab=charts&challenge=dashboard-active',
     )
     await expect(active).toHaveAttribute('aria-current', 'page')
     await expect(draft).not.toHaveAttribute('aria-current', 'page')
@@ -164,7 +176,7 @@ for (const viewport of [
       })
       .click()
     await expect(page.getByTestId('fixture-route')).toHaveText(
-      '/dashboard?tab=progress&challenge=dashboard-personal#goals',
+      '/dashboard?tab=overview&challenge=dashboard-personal#goals',
     )
     await page.goto(fixture('/group?challenge=missing'))
     await expect(

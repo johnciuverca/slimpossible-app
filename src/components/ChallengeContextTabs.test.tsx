@@ -33,6 +33,8 @@ function Route() {
 }
 function auth(id: string): AuthContextValue {
   return {
+    changePassword: async () => 'updated',
+    requestEmailChange: async () => false,
     state: {
       status: 'signed-in',
       user: { id, email: `${id}@example.invalid` },
@@ -41,6 +43,7 @@ function auth(id: string): AuthContextValue {
     signIn: async () => undefined,
     signOut: async () => undefined,
     signUp: async () => undefined,
+    saveProfileName: async () => false,
     requestPasswordRecovery: async () => undefined,
     resetPassword: async () => false,
     retrySession: () => undefined,
@@ -48,6 +51,23 @@ function auth(id: string): AuthContextValue {
 }
 
 describe('Challenge context navigation', () => {
+  it('retains the selected legacy Group section and useful query state on challenge changes', () => {
+    render(
+      <MemoryRouter
+        initialEntries={[
+          '/group?challenge=old&source=invite&tab=overview#group-progress',
+        ]}
+      >
+        <ChallengeTabs challenges={[group]} showPersonalTracking={false} />
+      </MemoryRouter>,
+    )
+    expect(
+      screen.getByRole('link', { name: 'Group · Joined group' }),
+    ).toHaveAttribute(
+      'href',
+      '/group?challenge=group&source=invite&tab=members',
+    )
+  })
   it.each(['/dashboard', '/today'])(
     'keeps %s personal and routes challenge links to explicit progress',
     (path) => {

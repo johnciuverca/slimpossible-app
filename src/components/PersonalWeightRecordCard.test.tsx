@@ -24,7 +24,10 @@ describe('PersonalWeightRecordCard', () => {
       </ul>,
     )
     expect(screen.getByText('82.4 kg')).toBeInTheDocument()
-    expect(screen.getByText(entry.date)).toHaveAttribute('datetime', entry.date)
+    expect(screen.getByText('01.10.2026')).toHaveAttribute(
+      'datetime',
+      entry.date,
+    )
     expect(screen.getByText('Private')).toBeInTheDocument()
     expect(screen.queryByText('—')).not.toBeInTheDocument()
     expect(

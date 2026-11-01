@@ -144,6 +144,12 @@ export function InviteAcceptancePage() {
       setMessage('The invitation could not be accepted.')
       return
     }
+    if (acceptedResult.data.status !== 'active') {
+      setMessage(
+        'This account has an inactive membership. Contact the challenge owner before trying again.',
+      )
+      return
+    }
 
     setAccepted(true)
     setMessage(
@@ -152,7 +158,7 @@ export function InviteAcceptancePage() {
   }
 
   const destination = preview
-    ? `/today?challenge=${encodeURIComponent(preview.challengeId)}`
+    ? `/group?challenge=${encodeURIComponent(preview.challengeId)}`
     : '/'
 
   return (
@@ -317,7 +323,7 @@ export function InviteAcceptancePage() {
                   className="text-sm text-emerald-700 underline"
                   to={destination}
                 >
-                  Open your challenge dashboard
+                  Open group challenge
                 </Link>
               </div>
             ) : null}

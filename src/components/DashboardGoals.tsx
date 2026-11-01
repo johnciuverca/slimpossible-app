@@ -68,22 +68,18 @@ export function DashboardGoals({
       ref={section}
       id="goals"
       aria-labelledby="dashboard-goals-title"
-      className="space-y-5 scroll-mt-6"
+      className="space-y-4 scroll-mt-6"
     >
       <h2
         id="dashboard-goals-title"
         tabIndex={-1}
-        className="text-2xl font-extrabold"
+        className="text-xl font-extrabold"
       >
         Goals
       </h2>
       {notice && (!requested || requested === notice.challengeId) ? (
         <p role="status">{notice.message}</p>
       ) : null}
-      <p className="text-sm text-ink-muted">
-        Your personal targets and milestones. Personal recording never requires
-        a challenge.
-      </p>
       {workspace.contexts.state === 'loading' ? (
         <FeedbackPanel tone="loading">Loading your goals…</FeedbackPanel>
       ) : workspace.contexts.state === 'error' ? (
@@ -104,7 +100,7 @@ export function DashboardGoals({
                   aria-current={
                     selected?.id === challenge.id ? 'page' : undefined
                   }
-                  to={`/dashboard?${new URLSearchParams({ tab: 'progress', challenge: challenge.id })}#goals`}
+                  to={`/dashboard?${new URLSearchParams({ tab: 'overview', challenge: challenge.id })}#goals`}
                   className={`inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 py-2 text-sm font-semibold ${selected?.id === challenge.id ? 'border-forest-800 bg-forest-800 text-white' : 'border-line bg-panel text-forest-800'}`}
                 >
                   {challenge.name}

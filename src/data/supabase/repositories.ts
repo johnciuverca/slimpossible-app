@@ -19,6 +19,7 @@ import type { GroupChartEntry } from '../../models/groupChartHistory'
 import type { GroupMemberProgress } from '../../models/groupMemberProgress'
 import type {
   GroupProgressSummary,
+  GroupWeeklyWinCount,
   GroupWeighInHistoryEntry,
 } from '../../models/groupProgress'
 import type { ProvisionalGroupLeaderSummary } from '../../models/provisionalGroupLeader'
@@ -124,8 +125,26 @@ export type Profile = {
 }
 
 export type ProfileRepository = {
-  ensure: (input: {
+  getAvatarSelection: (
+    id: string,
+  ) => Promise<
+    RepositoryResult<{ avatarPath: string | null; presetId: string | null }>
+  >
+  setAvatarSelection: (input: {
+    expectedAvatarPath: string | null
+    expectedPresetId: string | null
+    id: string
+    avatarPath: string | null
+    presetId: string | null
+  }) => Promise<
+    RepositoryResult<{ avatarPath: string | null; presetId: string | null }>
+  >
+  saveName: (input: {
+    id: string
     displayName: string
+  }) => Promise<RepositoryResult<Profile>>
+  ensure: (input: {
+    displayName?: string
     id: string
   }) => Promise<RepositoryResult<Profile>>
 }
@@ -154,6 +173,9 @@ export type PersonalWeighInRepository = {
 }
 
 export type GroupProgressRepository = {
+  getWeeklyWinCounts: (
+    challengeId: string,
+  ) => Promise<RepositoryListResult<GroupWeeklyWinCount>>
   getMemberProgress: (
     challengeId: string,
   ) => Promise<RepositoryListResult<GroupMemberProgress>>
@@ -680,6 +702,38 @@ export function createRepositories(client: DatabaseClient): Repositories {
       },
     },
     groupProgress: {
+      async getWeeklyWinCounts(challengeId) {
+        const { data, error } = await client.rpc(
+          'get_group_weekly_win_counts',
+          { target_challenge_id: challengeId },
+        )
+        if (error)
+          return {
+            error: requestError('load weekly win counts', error),
+            state: 'error',
+          }
+        return mapList(
+          data,
+          (row) => {
+            if (
+              typeof row.member_key !== 'string' ||
+              !row.member_key ||
+              typeof row.display_name !== 'string' ||
+              !row.display_name ||
+              !Number.isInteger(row.win_count) ||
+              row.win_count < 0
+            ) {
+              throw new Error('Invalid group weekly win count')
+            }
+            return {
+              displayName: row.display_name,
+              memberKey: row.member_key,
+              winCount: row.win_count,
+            }
+          },
+          'group weekly win counts',
+        )
+      },
       async getMemberProgress(challengeId) {
         const { data, error } = await client.rpc('get_group_member_progress', {
           target_challenge_id: challengeId,
@@ -709,6 +763,13 @@ export function createRepositories(client: DatabaseClient): Repositories {
               startingWeightKg: row.starting_weight_kg,
               targetWeightKg: row.target_weight_kg,
               completionPercentage: row.completion_percentage,
+              signedDisplayPercentage:
+                row.signed_display_percentage === null
+                  ? null
+                  : Number.isFinite(row.signed_display_percentage)
+                    ? row.signed_display_percentage
+                    : row.completion_percentage,
+              negativeProgressCapped: row.negative_progress_capped === true,
               progressState:
                 row.progress_state as GroupMemberProgress['progressState'],
               reachedTargetMilestones: milestones.flatMap((milestone) => {
@@ -997,6 +1058,75 @@ export function createRepositories(client: DatabaseClient): Repositories {
       },
     },
     profiles: {
+      async getAvatarSelection(id) {
+        const { data, error } = await client
+          .from('profiles')
+          .select('avatar_path, avatar_preset_id')
+          .eq('id', id)
+          .maybeSingle()
+        if (error)
+          return {
+            state: 'error',
+            error: requestError('load your profile picture', error),
+          }
+        if (!data) return { data: null, state: 'empty' }
+        return {
+          data: {
+            avatarPath: data.avatar_path,
+            presetId: data.avatar_preset_id,
+          },
+          state: 'success',
+        }
+      },
+      async setAvatarSelection(input) {
+        let update = client
+          .from('profiles')
+          .update({
+            avatar_path: input.avatarPath,
+            avatar_preset_id: input.presetId,
+          })
+          .eq('id', input.id)
+        update =
+          input.expectedAvatarPath === null
+            ? update.is('avatar_path', null)
+            : update.eq('avatar_path', input.expectedAvatarPath)
+        update =
+          input.expectedPresetId === null
+            ? update.is('avatar_preset_id', null)
+            : update.eq('avatar_preset_id', input.expectedPresetId)
+        const { data, error } = await update
+          .select('avatar_path, avatar_preset_id')
+          .maybeSingle()
+        if (error)
+          return {
+            state: 'error',
+            error: requestError('save your profile picture', error),
+          }
+        if (!data) return { data: null, state: 'empty' }
+        return {
+          data: {
+            avatarPath: data.avatar_path,
+            presetId: data.avatar_preset_id,
+          },
+          state: 'success',
+        }
+      },
+      async saveName(input) {
+        const { data, error } = await client
+          .from('profiles')
+          .upsert(
+            { id: input.id, display_name: input.displayName.trim() },
+            { onConflict: 'id' },
+          )
+          .select('*')
+          .single()
+        if (error)
+          return {
+            state: 'error',
+            error: requestError('save your username', error),
+          }
+        return mapSingle(data, mapProfile, 'profile')
+      },
       async ensure(input) {
         const existing = await client
           .from('profiles')
@@ -1013,9 +1143,12 @@ export function createRepositories(client: DatabaseClient): Repositories {
         if (existing.data)
           return mapSingle(existing.data, mapProfile, 'profile')
 
+        const displayName = input.displayName?.trim()
+        if (!displayName) return { data: null, state: 'empty' }
+
         const { data, error } = await client
           .from('profiles')
-          .insert({ id: input.id, display_name: input.displayName })
+          .insert({ id: input.id, display_name: displayName })
           .select('*')
           .single()
 

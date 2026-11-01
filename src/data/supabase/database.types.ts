@@ -95,18 +95,24 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_path: string | null
+          avatar_preset_id: string | null
           created_at: string
           display_name: string
           id: string
           updated_at: string
         }
         Insert: {
+          avatar_path?: string | null
+          avatar_preset_id?: string | null
           created_at?: string
           display_name: string
           id: string
           updated_at?: string
         }
         Update: {
+          avatar_path?: string | null
+          avatar_preset_id?: string | null
           created_at?: string
           display_name?: string
           id?: string
@@ -281,6 +287,14 @@ export type Database = {
           weekly_winner_names: string[]
         }[]
       }
+      get_group_weekly_win_counts: {
+        Args: { target_challenge_id: string }
+        Returns: {
+          display_name: string
+          member_key: string
+          win_count: number
+        }[]
+      }
       get_group_weigh_in_history: {
         Args: { target_challenge_id: string }
         Returns: {
@@ -310,6 +324,8 @@ export type Database = {
           completion_percentage: number | null
           progress_state: string
           reached_target_milestones: Json
+          signed_display_percentage: number | null
+          negative_progress_capped: boolean
         }[]
       }
       change_my_group_target: {
