@@ -2494,7 +2494,7 @@ test('archived groups leave normal navigation and remain accessible as read-only
     page.getByRole('button', { name: 'Edit starting weight', exact: true }),
   ).toHaveCount(0)
   await page.screenshot({
-    path: '/private/tmp/archive-history-preview.png',
+    path: test.info().outputPath('archive-history-preview.png'),
     fullPage: true,
   })
 })
