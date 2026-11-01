@@ -1,5 +1,49 @@
 import { Link } from 'react-router-dom'
 
+const gearRotations = Array.from({ length: 8 }, (_, index) => index * 45)
+
+type GearWheelProps = {
+  centerX: number
+  centerY: number
+  hubRadius: number
+  toothWidth: number
+  toothY: number
+  toothHeight: number
+  toothRadius: number
+  centerHoleRadius: number
+}
+
+function GearWheel({
+  centerX,
+  centerY,
+  hubRadius,
+  toothWidth,
+  toothY,
+  toothHeight,
+  toothRadius,
+  centerHoleRadius,
+}: GearWheelProps) {
+  return (
+    <g transform={`translate(${centerX} ${centerY})`}>
+      <circle r={hubRadius} />
+      <g>
+        {gearRotations.map((rotation) => (
+          <rect
+            key={rotation}
+            x={-toothWidth / 2}
+            y={toothY}
+            width={toothWidth}
+            height={toothHeight}
+            rx={toothRadius}
+            transform={`rotate(${rotation})`}
+          />
+        ))}
+      </g>
+      <circle r={centerHoleRadius} fill="var(--group-accent-strong, #145447)" />
+    </g>
+  )
+}
+
 /** Render only for the selected group's verified owner. */
 export function ChallengeSettingsLink() {
   return (
@@ -11,17 +55,33 @@ export function ChallengeSettingsLink() {
     >
       <svg
         aria-hidden="true"
-        width="22"
-        height="22"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+        width="24"
+        height="24"
+        viewBox="0 0 28 28"
+        fill="currentColor"
       >
-        <path d="M20.02 9.85 22.21 10.02 22.21 13.98 20.02 14.15 19.19 16.15 20.62 17.82 17.82 20.62 16.15 19.19 14.15 20.02 13.98 22.21 10.02 22.21 9.85 20.02 7.85 19.19 6.18 20.62 3.38 17.82 4.81 16.15 3.98 14.15 1.79 13.98 1.79 10.02 3.98 9.85 4.81 7.85 3.38 6.18 6.18 3.38 7.85 4.81 9.85 3.98 10.02 1.79 13.98 1.79 14.15 3.98 16.15 4.81 17.82 3.38 20.62 6.18 19.19 7.85Z" />
-        <circle cx="12" cy="12" r="3.25" />
+        <g transform="translate(1 1)">
+          <GearWheel
+            centerX={9}
+            centerY={9}
+            hubRadius={5.25}
+            toothWidth={3}
+            toothY={-9}
+            toothHeight={4.4}
+            toothRadius={0.7}
+            centerHoleRadius={2.4}
+          />
+          <GearWheel
+            centerX={19.5}
+            centerY={18.5}
+            hubRadius={3.3}
+            toothWidth={2.3}
+            toothY={-6.4}
+            toothHeight={3.2}
+            toothRadius={0.55}
+            centerHoleRadius={1.45}
+          />
+        </g>
       </svg>
     </Link>
   )

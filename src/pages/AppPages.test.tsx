@@ -1521,13 +1521,9 @@ describe('GroupDashboardPage', () => {
     expect(settings).toHaveAttribute('href', '/challenge/manage')
     expect(settings).toHaveAttribute('title', 'Manage challenges')
     const settingsIcon = settings.querySelector('svg[aria-hidden="true"]')
-    expect(settingsIcon).toHaveAttribute('viewBox', '0 0 24 24')
-    expect(settingsIcon).toHaveAttribute('width', '22')
-    expect(settingsIcon?.querySelector('path')?.getAttribute('d')).toContain(
-      'Z',
-    )
-    expect(settingsIcon?.querySelector('circle')).toHaveAttribute('cx', '12')
-    expect(settingsIcon?.querySelector('circle')).toHaveAttribute('cy', '12')
+    expect(settingsIcon).toHaveAttribute('viewBox', '0 0 28 28')
+    expect(settingsIcon).toHaveAttribute('width', '24')
+    expect(settingsIcon?.querySelectorAll(':scope > g > g')).toHaveLength(2)
     expect(
       settings.parentElement?.querySelector('a[aria-current="page"]'),
     ).toBeInTheDocument()
