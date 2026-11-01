@@ -152,6 +152,14 @@ export function ParticipantEnrollmentPage() {
         setIsLoading(false)
         return
       }
+      if (selectedChallenge?.status === 'archived') {
+        setChallengeId('')
+        setSubmitError(
+          'This group challenge is archived and cannot accept participants. Ask the owner to restore it from Manage challenges.',
+        )
+        setIsLoading(false)
+        return
+      }
 
       const nextChallengeId = selectedChallenge?.id ?? localChallengeId
       const nextOwnerBoundUserId =

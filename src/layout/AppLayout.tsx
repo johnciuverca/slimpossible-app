@@ -69,9 +69,14 @@ export function AppLayout({ children }: AppLayoutProps) {
       !new URLSearchParams(search).has('challenge') &&
       signedIn)
   const sharedLayout =
-    ['/dashboard', '/weigh-ins', '/group', '/login', '/register'].includes(
-      pathname,
-    ) ||
+    [
+      '/dashboard',
+      '/weigh-ins',
+      '/group',
+      '/login',
+      '/register',
+      '/challenge/manage',
+    ].includes(pathname) ||
     (pathname === '/' && personalHome)
   const publicAuthShell =
     !signedIn && ['/login', '/register'].includes(pathname)

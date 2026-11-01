@@ -14,6 +14,7 @@ import { AuthProvider } from './auth/AuthContext'
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import { AppLayout } from './layout/AppLayout'
 import { ChallengeSetupPage } from './pages/ChallengeSetupPage'
+import { ChallengeManagementPage } from './pages/ChallengeManagementPage'
 import { PersonalWeighInsPage } from './pages/PersonalWeighInsPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { LoginPage } from './pages/LoginPage'
@@ -199,6 +200,10 @@ function App() {
             element={<ParticipantEnrollmentPage />}
           />
           <Route element={<ProtectedRoute />}>
+            <Route
+              path="challenge/manage"
+              element={<ChallengeManagementPage />}
+            />
             <Route path="dashboard" element={<PersonalDashboardPage />} />
             <Route
               path="today"

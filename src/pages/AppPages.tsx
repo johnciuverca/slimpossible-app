@@ -1664,6 +1664,7 @@ export function GroupDashboardPage() {
     personalWorkspace.contexts.key,
     personalWorkspace.contexts.state,
     memberProgressKey,
+    data?.challenge.status,
     ownParticipant?.id ?? null,
     ownParticipant?.status ?? null,
     ownParticipant?.startingWeightKg ?? null,
@@ -1695,6 +1696,25 @@ export function GroupDashboardPage() {
     targetDialogContextKey,
     ownParticipantMatchesProjection,
   )
+
+  useEffect(() => {
+    const refresh = () => setReloadKey((value) => value + 1)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === null || event.key === 'slimpossible.local.challenges')
+        refresh()
+    }
+    window.addEventListener('focus', refresh)
+    window.addEventListener('storage', onStorage)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.removeEventListener('focus', refresh)
+      window.removeEventListener('storage', onStorage)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [])
 
   useEffect(() => {
     let isCurrent = true
@@ -1746,7 +1766,7 @@ export function GroupDashboardPage() {
       setChallenges(visibleChallenges)
       const challenge = challengeParam
         ? visibleChallenges.find(({ id }) => id === challengeParam)
-        : visibleChallenges[0]
+        : visibleChallenges.find(({ status }) => status !== 'archived')
       if (!challenge) {
         setData(null)
         setMessage(
@@ -1755,7 +1775,7 @@ export function GroupDashboardPage() {
               ({ id, kind }) => id === challengeParam && kind === 'personal',
             )
             ? 'Personal challenges are private and do not have a group dashboard.'
-            : visibleChallenges.length === 0
+            : !visibleChallenges.some(({ status }) => status !== 'archived')
               ? 'No group challenge is available for this account.'
               : 'The selected challenge is unavailable for this account.',
         )
@@ -1855,10 +1875,17 @@ export function GroupDashboardPage() {
   const selectedChallengeId =
     challengeParam ||
     data?.challenge.id ||
-    challenges.find(({ kind }) => kind === 'group')?.id ||
+    challenges.find(
+      ({ kind, status }) => kind === 'group' && status !== 'archived',
+    )?.id ||
     ''
   const selectedChallenge = challenges.find(
     ({ id }) => id === selectedChallengeId,
+  )
+
+  const archivedHistory = selectedChallenge?.status === 'archived'
+  const currentChallenges = challenges.filter(
+    ({ status }) => status !== 'archived',
   )
 
   const scrolledNavigation = useRef('')
@@ -1907,15 +1934,17 @@ export function GroupDashboardPage() {
           onRecorded={() => setReloadKey((value) => value + 1)}
           additionalActions={
             <>
-              <GroupActionsPopover
-                key={personalWorkspace.ownerKey}
-                onOpen={() => setHasOpenedCreateJoinActions(true)}
-              >
-                <DashboardChallengeActions
-                  workspace={personalWorkspace}
-                  protectDraft
-                />
-              </GroupActionsPopover>
+              {!archivedHistory ? (
+                <GroupActionsPopover
+                  key={personalWorkspace.ownerKey}
+                  onOpen={() => setHasOpenedCreateJoinActions(true)}
+                >
+                  <DashboardChallengeActions
+                    workspace={personalWorkspace}
+                    protectDraft
+                  />
+                </GroupActionsPopover>
+              ) : null}
               <Button
                 variant="secondary"
                 className="min-h-11"
@@ -1933,14 +1962,41 @@ export function GroupDashboardPage() {
             {selectedChallenge?.name ?? 'Group'}
           </h1>
         </WeightPageHeader>
-        <ChallengeTabs
-          challenges={challenges}
-          selectedId={selectedChallengeId}
-          loading={isLoading}
-          showPersonalTracking={false}
-          compact
-        />
+        {archivedHistory ? (
+          <div
+            className="rounded-xl border border-line bg-page p-4"
+            role="status"
+          >
+            <p className="font-semibold">Archived · Read-only group history</p>
+            <p className="mt-1 text-sm text-ink-muted">
+              Group participation, invitations, targets, and sharing are paused.
+              Personal weight recording remains available independently.
+            </p>
+            <Link
+              className="mt-2 inline-block font-semibold underline"
+              to="/group"
+            >
+              View current groups
+            </Link>
+          </div>
+        ) : (
+          <ChallengeTabs
+            challenges={currentChallenges}
+            selectedId={selectedChallengeId}
+            loading={isLoading}
+            showPersonalTracking={false}
+            compact
+          />
+        )}
       </div>
+      {!selectedChallenge && !isLoading ? (
+        <Link
+          className="inline-block font-semibold underline"
+          to="/challenge/manage"
+        >
+          Manage challenges and archived history
+        </Link>
+      ) : null}
       {selectedChallenge && selectedChallenge.ownerId === ownerId ? (
         <details className="group-manage-menu relative w-fit">
           <summary className="flex min-h-10 cursor-pointer list-none items-center rounded-lg border border-stone-300 bg-white px-3 text-sm font-semibold">
@@ -1955,22 +2011,37 @@ export function GroupDashboardPage() {
           >
             <Link
               className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-emerald-50"
-              to={`/challenge/setup?challenge=${encodeURIComponent(selectedChallenge.id)}`}
+              to="/challenge/manage"
             >
-              Manage group
+              Manage challenges
             </Link>
-            <Link
-              className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-emerald-50"
-              to={`/challenge/participants/enroll?${new URLSearchParams({ challenge: selectedChallenge.id, self: 'owner' })}`}
-            >
-              Manage members
-            </Link>
-            <Link
-              className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-emerald-50"
-              to={`/challenge/invites?challenge=${encodeURIComponent(selectedChallenge.id)}`}
-            >
-              Manage invitations
-            </Link>
+            {selectedChallenge.status !== 'archived' ? (
+              <>
+                <Link
+                  className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-emerald-50"
+                  to={`/challenge/setup?challenge=${encodeURIComponent(selectedChallenge.id)}`}
+                >
+                  Manage group
+                </Link>
+                <Link
+                  className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-emerald-50"
+                  to={`/challenge/participants/enroll?${new URLSearchParams({ challenge: selectedChallenge.id, self: 'owner' })}`}
+                >
+                  Manage members
+                </Link>
+                <Link
+                  className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-emerald-50"
+                  to={`/challenge/invites?challenge=${encodeURIComponent(selectedChallenge.id)}`}
+                >
+                  Manage invitations
+                </Link>
+              </>
+            ) : (
+              <p className="px-3 py-2 text-xs leading-5 text-slate-600">
+                This challenge is archived. Restore it before changing group
+                details or members.
+              </p>
+            )}
           </nav>
         </details>
       ) : null}
@@ -2295,7 +2366,9 @@ export function GroupDashboardPage() {
           <div>
             <h2 className="text-xl font-bold">Member progress</h2>
             <p className="mt-2 text-sm text-ink-muted">
-              Progress and goal actions for active members.
+              {archivedHistory
+                ? 'Historical member progress. Group goal changes are paused.'
+                : 'Progress and goal actions for active members.'}
             </p>
           </div>
           {memberProgressState === 'loading' ? (
@@ -2312,10 +2385,12 @@ export function GroupDashboardPage() {
           {memberProgress.map((member) => {
             const displayPercentage = member.signedDisplayPercentage
             const canChangeTarget =
+              !archivedHistory &&
               member.memberKey === ownMemberKey &&
               ownParticipantMatchesProjection &&
               ownGoal !== null
             const canCorrectStartingWeight =
+              !archivedHistory &&
               member.memberKey === ownMemberKey &&
               ownParticipantMatchesProjection &&
               ownParticipant?.status === 'active'
@@ -2391,7 +2466,7 @@ export function GroupDashboardPage() {
               </article>
             )
           })}
-          {targetDialogParticipant ? (
+          {!archivedHistory && targetDialogParticipant ? (
             <ChangeTargetDialog
               key={targetDialogContextKey}
               onClose={() => {
@@ -2410,7 +2485,7 @@ export function GroupDashboardPage() {
               workspace={personalWorkspace}
             />
           ) : null}
-          {startingWeightDialogParticipant ? (
+          {!archivedHistory && startingWeightDialogParticipant ? (
             <ChangeStartingWeightDialog
               key={`starting-weight:${targetDialogContextKey}`}
               onClose={() => {

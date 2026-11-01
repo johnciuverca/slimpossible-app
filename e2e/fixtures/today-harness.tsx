@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { AuthContext, type AuthContextValue } from '../../src/auth/context'
 import { ProtectedRoute } from '../../src/auth/ProtectedRoute'
 import { AppLayout } from '../../src/layout/AppLayout'
+import { ChallengeManagementPage } from '../../src/pages/ChallengeManagementPage'
 import { ChallengeSetupPage } from '../../src/pages/ChallengeSetupPage'
 import { PersonalWeighInsPage } from '../../src/pages/PersonalWeighInsPage'
 import { PersonalDashboardPage } from '../../src/pages/PersonalDashboardPage'
@@ -242,6 +243,10 @@ createRoot(document.getElementById('root')!).render(
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route element={<ProtectedRoute />}>
+            <Route
+              path="/challenge/manage"
+              element={<ChallengeManagementPage />}
+            />
             <Route path="/dashboard" element={<PersonalDashboardPage />} />
             <Route path="/challenges" element={<HomePage />} />
             <Route path="/today" element={<TodayPage />} />
