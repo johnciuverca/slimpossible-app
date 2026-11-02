@@ -67,6 +67,7 @@ describe('Supabase repositories', () => {
       {
         member_key: 'opaque-a',
         display_name: 'Ava',
+        avatar_preset_id: 'female-03',
         starting_weight_kg: 100,
         target_weight_kg: 80,
         latest_recorded_date: '2026-09-20',
@@ -89,6 +90,7 @@ describe('Supabase repositories', () => {
         {
           memberKey: 'opaque-a',
           displayName: 'Ava',
+          avatarPresetId: 'female-03',
           startingWeightKg: 100,
           targetWeightKg: 80,
           completionPercentage: 0,

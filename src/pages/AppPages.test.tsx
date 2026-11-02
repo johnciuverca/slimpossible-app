@@ -1492,18 +1492,61 @@ describe('GroupDashboardPage', () => {
     renderDashboard(
       <GroupDashboardPage />,
       vi.fn((url: RequestInfo | URL, init?: RequestInit) =>
-        String(url).includes('/rpc/get_group_chart_history') ||
-        String(url).includes('/rpc/get_group_member_progress')
+        String(url).includes('/rpc/get_group_chart_history')
           ? Promise.resolve(response([]))
-          : String(url).includes('/rpc/get_group_weekly_win_counts')
+          : String(url).includes('/rpc/get_group_member_progress')
             ? Promise.resolve(
                 response([
-                  { member_key: 'a', display_name: 'Ava', win_count: 2 },
-                  { member_key: 'b', display_name: 'Ben', win_count: 2 },
-                  { member_key: 'c', display_name: 'Casey', win_count: 0 },
+                  {
+                    member_key: 'opaque-a',
+                    display_name: 'Ava',
+                    avatar_preset_id: 'female-03',
+                    starting_weight_kg: 90,
+                    target_weight_kg: 80,
+                    latest_recorded_date: null,
+                    completion_percentage: 50,
+                    progress_state: 'in_progress',
+                    reached_target_milestones: [],
+                    signed_display_percentage: 50,
+                    negative_progress_capped: false,
+                  },
+                  {
+                    member_key: 'opaque-b',
+                    display_name: 'Ben',
+                    avatar_preset_id: 'male-02',
+                    starting_weight_kg: 90,
+                    target_weight_kg: 80,
+                    latest_recorded_date: null,
+                    completion_percentage: 50,
+                    progress_state: 'in_progress',
+                    reached_target_milestones: [],
+                    signed_display_percentage: 50,
+                    negative_progress_capped: false,
+                  },
+                  {
+                    member_key: 'opaque-c',
+                    display_name: 'Casey',
+                    avatar_preset_id: null,
+                    starting_weight_kg: 90,
+                    target_weight_kg: 80,
+                    latest_recorded_date: null,
+                    completion_percentage: 50,
+                    progress_state: 'in_progress',
+                    reached_target_milestones: [],
+                    signed_display_percentage: 50,
+                    negative_progress_capped: false,
+                  },
                 ]),
               )
-            : fetchMock(url, init),
+            : String(url).includes('/rpc/get_group_weekly_win_counts')
+              ? Promise.resolve(
+                  response([
+                    { member_key: 'a', display_name: 'Ava', win_count: 2 },
+                    { member_key: 'b', display_name: 'Ben', win_count: 2 },
+                    { member_key: 'c', display_name: 'Casey', win_count: 0 },
+                  ]),
+                )
+              : fetchMock(url, init),
       ),
       '/group?challenge=',
     )
@@ -1539,6 +1582,13 @@ describe('GroupDashboardPage', () => {
     ).not.toBeInTheDocument()
     expect(screen.queryByText('48.5%')).not.toBeInTheDocument()
     expect(screen.getByText(/Shared weekly winners/)).toBeInTheDocument()
+    const winnerList = screen.getByRole('list', { name: 'Weekly winners' })
+    expect(
+      winnerList.querySelector('[data-avatar-preset="female-03"]'),
+    ).toBeInTheDocument()
+    expect(
+      winnerList.querySelector('[data-avatar-preset="male-02"]'),
+    ).toBeInTheDocument()
     expect(
       screen.getByText(/based on 2 of 3 active members/),
     ).toBeInTheDocument()

@@ -24,12 +24,18 @@ const persistence = (
     mode: 'remote',
     repositories: { groupProgress: { getChartHistory: load } },
   }) as unknown as Persistence
+const legendName = (item: Element) => {
+  const copy = item.cloneNode(true) as Element
+  copy.querySelector('[data-avatar-preset]')?.remove()
+  return copy.textContent?.trim()
+}
 describe('Group chart history', () => {
   it('lists only challenge member names while keeping target and trend chart lines', async () => {
     const groupProgress: GroupMemberProgress[] = [
       {
         memberKey: 'a',
         displayName: 'Ava',
+        avatarPresetId: 'female-03',
         targetWeightKg: 85,
         startingWeightKg: 90,
         completionPercentage: 50,
@@ -85,10 +91,12 @@ describe('Group chart history', () => {
     const legend = screen.getByRole('list', { name: 'Group chart legend' })
     expect(legend).toHaveClass('w-full', 'justify-center')
     expect(
-      Array.from(legend.querySelectorAll('li'), (item) =>
-        item.textContent?.trim(),
-      ),
-    ).toEqual(['Ava', 'Nora'])
+      legend.querySelector('[data-avatar-preset="female-03"]'),
+    ).toBeInTheDocument()
+    expect(Array.from(legend.querySelectorAll('li'), legendName)).toEqual([
+      'Ava',
+      'Nora',
+    ])
     expect(legend).not.toHaveTextContent(
       /recorded weights|first shared|baseline|target\/reference|derived trend/i,
     )
@@ -155,9 +163,7 @@ describe('Group chart history', () => {
     })
     expect(individualLegend).toHaveClass('w-full', 'justify-center')
     expect(
-      Array.from(individualLegend.querySelectorAll('li'), (item) =>
-        item.textContent?.trim(),
-      ),
+      Array.from(individualLegend.querySelectorAll('li'), legendName),
     ).toEqual(['Ava'])
     expect(
       screen.getByRole('group', { name: 'Chart date range controls' }),
@@ -415,7 +421,7 @@ describe('Group chart history', () => {
         screen
           .getByRole('list', { name: 'Group chart legend' })
           .querySelectorAll('li'),
-        (item) => item.textContent?.trim(),
+        legendName,
       ),
     ).toEqual(['Ava'])
   })

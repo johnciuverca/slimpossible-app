@@ -14,6 +14,7 @@ import { WeightEntryCard } from './WeightEntryCard'
 import { deriveGroupChartTrend } from '../models/groupChartTrend'
 import type { GroupMemberProgress } from '../models/groupMemberProgress'
 import { SharedWeightChart } from './SharedWeightChart'
+import { GroupParticipantAvatar } from './GroupParticipantAvatar'
 
 const colors = ['#31dbb0', '#67a5ff', '#ff8ba7', '#c49cff', '#ffc164']
 const trendColor = '#ffbf69'
@@ -103,6 +104,9 @@ export function GroupChartHistory({
     (member) => member.memberKey === selectedKey,
   )
   const matrix = createGroupHistoryMatrix(series)
+  const avatarByMemberKey = new Map(
+    memberProgress.map((member) => [member.memberKey, member]),
+  )
   const trends = series.map((member) => ({
     memberKey: member.memberKey,
     trend: deriveGroupChartTrend(member.points),
@@ -585,7 +589,14 @@ export function GroupChartHistory({
                         className="inline-block w-6 border-t-2"
                         style={{ borderColor: colors[index % colors.length] }}
                       />
-                      {member.label}
+                      <GroupParticipantAvatar
+                        avatarPresetId={
+                          avatarByMemberKey.get(member.memberKey)
+                            ?.avatarPresetId
+                        }
+                        displayName={member.label}
+                      />
+                      <span>{member.label}</span>
                     </li>
                   ))}
                 </ul>
