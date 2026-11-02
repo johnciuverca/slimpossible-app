@@ -354,6 +354,18 @@ export function SharedWeightChart({
   const chartTitle = fullRange
     ? title
     : `${title}. Showing ${visibleCount} of ${totalCount} recorded entries from ${formatChartDate(dateAtDay(startDay))} to ${formatChartDate(dateAtDay(endDay))}.`
+  const selectedRangeLabel =
+    selectedPreset === '1w'
+      ? 'Last 7 days'
+      : selectedPreset === '2w'
+        ? 'Last 14 days'
+        : selectedPreset === '1m'
+          ? 'Last month'
+          : selectedPreset === '3m'
+            ? 'Last 3 months'
+            : selectedPreset === 'custom'
+              ? 'Selected dates'
+              : 'All recorded dates'
   const rangePercent = (value: number) =>
     span === 0 ? 0 : ((value - firstDay) / (lastDay - firstDay)) * 100
   const plotStartPercent = (left / viewBoxWidth) * 100
@@ -371,7 +383,7 @@ export function SharedWeightChart({
     )
   }
   const presetClass = (selected: boolean) =>
-    `min-h-9 rounded-full border border-line px-3 text-ink hover:bg-panel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:opacity-50 ${selected ? 'bg-emerald-100 font-semibold ring-1 ring-emerald-700 dark:bg-emerald-950' : 'bg-page'}`
+    `min-h-9 rounded-full border px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:opacity-50 ${selected ? 'border-emerald-800 bg-emerald-800 font-semibold text-white shadow-sm hover:bg-emerald-900 dark:border-emerald-300 dark:bg-emerald-300 dark:text-emerald-950' : 'border-line bg-page text-ink hover:bg-panel'}`
   const choosePreset = (preset: typeof selectedPreset, start: number) => {
     setSelectedPreset(preset)
     setSelectedRange({ start, end: lastDay })
@@ -438,7 +450,7 @@ export function SharedWeightChart({
   }
   return (
     <div
-      className="w-full min-w-[600px]"
+      className="w-full min-w-[600px] pt-2"
       onKeyDown={(event) => {
         if (event.key === 'Escape') setActivePoint(null)
       }}
@@ -454,7 +466,7 @@ export function SharedWeightChart({
           aria-label="Quick date ranges"
           style={{ paddingLeft: `${plotStartPercent}%` }}
         >
-          <span className="mr-1 font-semibold text-ink">Date range</span>
+          <span className="mr-1 font-semibold text-ink">Show range</span>
           <button
             type="button"
             aria-label="Show last 1 week"
@@ -505,6 +517,11 @@ export function SharedWeightChart({
           >
             All
           </button>
+          <p className="basis-full text-xs text-ink-muted">
+            Week ranges end on your newest recorded weigh-in. 1W shows seven
+            calendar days and 2W shows fourteen; shorter histories start at the
+            first available entry.
+          </p>
         </div>
       </div>
       <div
@@ -814,6 +831,8 @@ export function SharedWeightChart({
           aria-live="polite"
           className="mb-1 block text-center text-xs text-ink-muted"
         >
+          <span className="font-semibold text-ink">{selectedRangeLabel}</span>
+          <span aria-hidden="true"> · </span>
           {formatChartDate(dateAtDay(startDay))} –{' '}
           {formatChartDate(dateAtDay(endDay))}
         </output>

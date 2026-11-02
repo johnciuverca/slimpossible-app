@@ -280,7 +280,7 @@ it('selects inclusive 7-day and 14-day windows anchored on the newest saved date
   expect(twoWeeks).toHaveAttribute('aria-pressed', 'false')
   expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(2)
   expect(screen.getByLabelText('Visible date range')).toHaveTextContent(
-    '27.02.2024 – 04.03.2024',
+    'Last 7 days · 27.02.2024 – 04.03.2024',
   )
   expect(
     screen.getByRole('slider', { name: 'Visible range start' }),
@@ -291,7 +291,7 @@ it('selects inclusive 7-day and 14-day windows anchored on the newest saved date
   expect(oneWeek).toHaveAttribute('aria-pressed', 'false')
   expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(3)
   expect(screen.getByLabelText('Visible date range')).toHaveTextContent(
-    '20.02.2024 – 04.03.2024',
+    'Last 14 days · 20.02.2024 – 04.03.2024',
   )
 })
 

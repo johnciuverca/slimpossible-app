@@ -1826,6 +1826,28 @@ for (const viewport of [
       name: 'Quick date ranges',
     })
     await expect(quickRanges.getByRole('button')).toHaveCount(5)
+    await expect(quickRanges).toContainText(
+      /Week ranges end on your newest recorded weigh-in/,
+    )
+    const oneWeek = quickRanges.getByRole('button', {
+      name: 'Show last 1 week',
+    })
+    await oneWeek.click()
+    await expect(oneWeek).toHaveAttribute('aria-pressed', 'true')
+    await expect(
+      historyPanel.getByRole('status', { name: 'Visible date range' }),
+    ).toContainText('Last 7 days')
+    for (const [index, name] of [
+      'Show last 1 week',
+      'Show last 2 weeks',
+      'Show last 1 month',
+      'Show last 3 months',
+      'Show all dates',
+    ].entries()) {
+      await expect(quickRanges.getByRole('button').nth(index)).toHaveAccessibleName(
+        name,
+      )
+    }
     const chartPointCount = await chart
       .locator('circle[data-chart-point]')
       .count()
