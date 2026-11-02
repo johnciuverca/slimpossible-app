@@ -78,12 +78,12 @@ supabase-activity.yml check only calls the Auth health endpoint; it is not a
 migration job. This PR adds no database credentials, GitHub Environments, or
 automated migration steps.
 
-The checked-in timestamp-ordered migration set currently contains seventeen
-files. This inventory is a source-tree check, not evidence that a remote
-project has applied them. Several migrations define SECURITY DEFINER
-functions or change grants/policies; review their exact privileges and run
-the relevant `supabase/tests/` authorization checks on the dedicated staging
-project. Do not treat these as routine unreviewed SQL.
+The release candidate based on staging `1cf5f0d` contains 17
+timestamp-ordered migration files. This source inventory does not establish that
+a hosted project has applied them or that its migration ledger has been reconciled.
+Several migrations define SECURITY DEFINER functions or change grants/policies;
+review their exact privileges and the relevant `supabase/tests/` authorization
+checks before any separately approved hosted operation.
 
 The current checked-in set is:
 
@@ -104,6 +104,20 @@ The current checked-in set is:
 - `20261013000000_correct_own_enrollment_starting_weight.sql`
 - `20261016000000_require_active_challenge_membership.sql`
 - `20261018000000_allow_group_owners_to_view_summaries.sql`
+
+Checked-in rollback scripts cover only a subset of this candidate's migrations
+(8 of 17): `20261005000000`, `20261005000001`, `20261006000000`,
+`20261007000000` (RPC compatibility restore), `20261009000000`,
+`20261012100000`, `20261013000000`, and `20261018000000`. No matching rollback
+file is checked in for `20261008000000`, `20261012000000`,
+`20261016000000`, or the initial core migrations. A present rollback script
+is not an instruction to run it: inspect its preconditions and data effects,
+preserve the migration ledger, and prefer the reviewed forward-compatible
+recovery plan. For the limited pilot, the owner backup waiver in
+[the recovery runbook](production-backup-restore-rehearsal.md) applies;
+backup/restore remains unexecuted. Exact remote schema/history review and
+separate operation approval remain required. No remote migration
+state is asserted by this inventory.
 
 ### Public-table Data API grants
 
@@ -147,18 +161,6 @@ privilege matrix, then runs personal-weigh-in, target-milestone, and member
 projection authorization harnesses. It uses a lightweight local Auth shim;
 this is not connected staging acceptance. Do not apply SQL or change grants in
 staging or production as part of this check.
-
-Guarded rollback scripts are checked in for selected Chapter 16 migrations:
-`20261005000000`, `20261005000001`, `20261006000000`,
-`20261007000000` (RPC compatibility restore), `20261009000000`,
-`20261012100000`, and `20261013000000`. There is no matching rollback file
-for `20261008000000` or `20261012000000`, and the original core migrations
-also have no automatic down scripts. A present rollback script is not an
-instruction to run it: inspect its preconditions and data effects, preserve
-the migration ledger, and prefer the reviewed forward-compatible recovery
-plan. Before any staging or production migration, verify a recoverable
-backup/restore path and the exact remote migration history. No remote
-migration state is asserted by this repository inventory.
 
 For each candidate, an owner uses the checked-out, reviewed migration set and
 explicitly targets each project. The following are operator-run examples;

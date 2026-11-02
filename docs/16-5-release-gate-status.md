@@ -1,5 +1,59 @@
 # 16.5 — Connected sharing release gate status
 
+## Release preparation — 2026-10-21
+
+The release candidate integrates staging `1cf5f0d647360ebea1e310f80a0aac366968e749`
+with main `78b347db03d65dc4535de232f15c1c97809f3e87`, preserving main-only
+PR #296. This section supersedes older operational blockers below. Preparing
+the PR does not authorize its merge, hosted SQL, or deployment.
+
+PM reports successful Production catalog and aggregate preflight in READ ONLY
+transactions ending ROLLBACK: five public tables, 40 columns (8 + 11 + 10 + 4 + 7),
+30 constraints, 14 indexes, 15 policies, two non-internal triggers, and ten
+public routines. All five tables have RLS enabled. The local five-migration
+baseline has the same table/routine names and these catalog counts. This
+summary supports baseline shape, not complete definition/ACL equivalence or
+proof of applied migration versions. The migration ledger is absent; no
+ledger repair is authorized. Canonical personal tables are absent. Nine legacy
+rows have no orphan participants, missing profiles/auth users, or duplicate
+user/date groups. Legacy authenticated INSERT/UPDATE remain effective; the
+write fence has not been applied to Production.
+
+On the exact staging tree above, the isolated PostgreSQL 16.12 rehearsal
+applied the five baseline migrations, seeded synthetic legacy rows, applied the
+legacy-write fence, then applied all twelve pending migrations. Source rows,
+canonical ownership/date/weight/note/timestamps and provenance were preserved;
+private rows stayed unshared and explicit shares stayed source-group-only.
+The fence survived all twelve files, stale-client INSERT/UPDATE failed,
+legacy SELECT/DELETE remained, and canonical save succeeded. The grant/RLS
+audit and 86 authorization checks passed. The #310 catalog query executed on
+local baseline/final schemas with the ledger absent, and on the final schema
+with a synthetic ledger present; all runs were READ ONLY and rolled back.
+PM also reports successful #310 execution on actual Production. Local
+synthetic behavior and PM-reported Production read-only observations remain
+separate evidence; no Production migration or cutover has been executed.
+
+The separate CLI execution-method rehearsal also passed with installed
+Supabase CLI 2.119.0 against a fresh local synthetic five-file baseline. The
+supported `migration repair --status applied` recorded only the five baseline
+versions; `migration list` showed those five applied and exactly twelve pending,
+and `db push --dry-run` listed the expected twelve files in order. Before/after
+public-schema dumps, including synthetic data and ACLs, matched after removing
+only pg_dump's randomized restrict tokens. Both disposable local servers were
+stopped. This validates the local CLI method; it does not authorize or perform
+Production ledger repair.
+
+The owner's limited-pilot backup/restore waiver remains in force under the
+[recovery runbook](production-backup-restore-rehearsal.md); no backup or restore
+is claimed. The reviewed pause/recovery proposal is also checked in. Current
+Supabase incident scope, as checked by PM, concerns Management API project
+lifecycle operations; Postgres, Data APIs and Auth are not listed as affected.
+It does not block PR preparation. Production migration-history review,
+hosted operation approvals, current service health and release acceptance
+remain gates before any separately approved cutover, main merge or deployment.
+
+## Earlier status — superseded by the release preparation record above
+
 As of 2026-10-21, issue #212 remains **OPEN / NOT READY FOR PRODUCTION
 RELEASE**. The latest staging commit is
 `c561477de2ceda91c42fd6ac3398472a76babe6e` (PR #307), and its Vercel status
@@ -265,3 +319,62 @@ closures. Its issue dispositions and blocker table above are historical and
 superseded by the current status at the top of this document and the linked
 live issue records. Production release remains a separate owner-approved action
 after its gates are complete.
+
+## Historical snapshot preserved from main PR #296
+
+The following 2026-10-19 snapshot is retained as historical evidence. Its
+remaining-gate statements are superseded by the current status above and later
+owner/PM observations; they do not reopen completed acceptance checks.
+
+Status snapshot recorded 2026-10-19 for staging candidate
+`00fcf280bd3be0d54ea3497679d23e80633207d4`. This is partial evidence for
+issues #207, #212, and #155. It is not production approval, a hosted migration
+attestation, or authorization to close any issue.
+
+## Verified on this candidate
+
+- **#212 connected sharing/privacy flow: PASS for the observed path.** Using a
+  disposable test record, group-only sharing was saved, then edited to share
+  with both selected groups. Both groups showed the entry without its private
+  note. The entry was deleted, and refreshing both groups confirmed it was
+  absent. Existing records remained; no production data was involved.
+- **Signed-out route: PASS for `/dashboard` only.** Incognito direct navigation
+  redirected to the app's `/login` route. Other protected routes and the wider
+  navigation/reload matrix were not established by this observation.
+- **Local SQL/migration harness: PASS, local only.** Run from this exact
+  candidate, it applied the timestamp-ordered migration set and passed 17
+  permission cases and 15 group-history projection cases. This does not prove
+  that the hosted staging database has the same schema, grants, or migration
+  ledger.
+
+## Still not executed
+
+| Gate                                                                               | Status       |
+| ---------------------------------------------------------------------------------- | ------------ |
+| #155 solo registration, confirmation, sign-in, and saved solo progress             | NOT EXECUTED |
+| #155 group invitation acceptance by a second user                                  | NOT EXECUTED |
+| #155 valid mailbox recovery/reset and used/expired provider links                  | NOT EXECUTED |
+| Recovery/network failure induced against the connected provider                    | NOT EXECUTED |
+| Two-member Sunday ranking and late/corrected-record result after refresh           | NOT EXECUTED |
+| Full #207 protected-route, loading/empty/error, and membership matrix              | NOT EXECUTED |
+| Mobile viewport and keyboard/focus acceptance matrix                               | NOT EXECUTED |
+| Read-only reconciliation of hosted migration history/schema against this candidate | NOT EXECUTED |
+
+Local unit, component, E2E-fallback, and SQL tests remain separate from those
+connected journeys. The local SQL results are summarized above; they must not
+be presented as hosted database evidence.
+
+## Migration and rollback inventory
+
+The exact candidate contains 17 timestamped migration files. The full
+candidate-specific list and the eight checked-in rollback scripts are recorded
+in the [release workflow](release-workflow.md) and
+[staging setup handoff](supabase-staging-setup.md). Rollback scripts exist for
+only a subset; their presence is not an instruction to execute them. No
+statement is made here about which migrations the hosted staging ledger has
+recorded. Production configuration, migrations, deployment, and rollback
+remain separate owner-approved gates.
+
+This status snapshot changes no staging or production settings/data and does
+not close #207, #212, or #155. The remaining connected gates above must be
+completed and reviewed before considering live release sync.
