@@ -12,7 +12,12 @@ import {
 import { MilestoneProgress } from '../components/MilestoneProgress'
 import { PersonalProgressChart } from '../components/PersonalProgressChart'
 import { ChallengeTabs } from '../components/ChallengeContextTabs'
-import { WeightPageHeader } from '../components/WeightPageHeader'
+import { GroupSubnavActions } from '../components/GroupSubnavActions'
+import { ChallengeSettingsLink } from '../components/ChallengeSettingsLink'
+import {
+  WeightPageHeader,
+  StandaloneRecordWeightAction,
+} from '../components/WeightPageHeader'
 import { GroupChartHistory } from '../components/GroupChartHistory'
 import { GroupMemberProgressBar } from '../components/GroupMemberProgressBar'
 import { ChangeTargetDialog } from '../components/ChangeTargetDialog'
@@ -1610,6 +1615,9 @@ export function GroupDashboardPage() {
 
   const ownMemberKey =
     data && ownerId ? ownGroupMemberKey(data.challenge.id, ownerId) : null
+  const challengeOwnerMemberKey = data
+    ? ownGroupMemberKey(data.challenge.id, data.challenge.ownerId)
+    : null
   const ownParticipant =
     personalWorkspace.contexts.state === 'ready'
       ? (personalWorkspace.contexts.data.participants.find(
@@ -1664,6 +1672,7 @@ export function GroupDashboardPage() {
     personalWorkspace.contexts.key,
     personalWorkspace.contexts.state,
     memberProgressKey,
+    data?.challenge.status,
     ownParticipant?.id ?? null,
     ownParticipant?.status ?? null,
     ownParticipant?.startingWeightKg ?? null,
@@ -1695,6 +1704,25 @@ export function GroupDashboardPage() {
     targetDialogContextKey,
     ownParticipantMatchesProjection,
   )
+
+  useEffect(() => {
+    const refresh = () => setReloadKey((value) => value + 1)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === null || event.key === 'slimpossible.local.challenges')
+        refresh()
+    }
+    window.addEventListener('focus', refresh)
+    window.addEventListener('storage', onStorage)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.removeEventListener('focus', refresh)
+      window.removeEventListener('storage', onStorage)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [])
 
   useEffect(() => {
     let isCurrent = true
@@ -1746,7 +1774,7 @@ export function GroupDashboardPage() {
       setChallenges(visibleChallenges)
       const challenge = challengeParam
         ? visibleChallenges.find(({ id }) => id === challengeParam)
-        : visibleChallenges[0]
+        : visibleChallenges.find(({ status }) => status !== 'archived')
       if (!challenge) {
         setData(null)
         setMessage(
@@ -1755,7 +1783,7 @@ export function GroupDashboardPage() {
               ({ id, kind }) => id === challengeParam && kind === 'personal',
             )
             ? 'Personal challenges are private and do not have a group dashboard.'
-            : visibleChallenges.length === 0
+            : !visibleChallenges.some(({ status }) => status !== 'archived')
               ? 'No group challenge is available for this account.'
               : 'The selected challenge is unavailable for this account.',
         )
@@ -1855,10 +1883,17 @@ export function GroupDashboardPage() {
   const selectedChallengeId =
     challengeParam ||
     data?.challenge.id ||
-    challenges.find(({ kind }) => kind === 'group')?.id ||
+    challenges.find(
+      ({ kind, status }) => kind === 'group' && status !== 'archived',
+    )?.id ||
     ''
   const selectedChallenge = challenges.find(
     ({ id }) => id === selectedChallengeId,
+  )
+
+  const archivedHistory = selectedChallenge?.status === 'archived'
+  const currentChallenges = challenges.filter(
+    ({ status }) => status !== 'archived',
   )
 
   const scrolledNavigation = useRef('')
@@ -1903,81 +1938,95 @@ export function GroupDashboardPage() {
       aria-labelledby="group-title"
     >
       <div className="space-y-2">
-        <WeightPageHeader
-          onRecorded={() => setReloadKey((value) => value + 1)}
-          additionalActions={
-            <>
-              <GroupActionsPopover
-                key={personalWorkspace.ownerKey}
-                onOpen={() => setHasOpenedCreateJoinActions(true)}
-              >
-                <DashboardChallengeActions
-                  workspace={personalWorkspace}
-                  protectDraft
-                />
-              </GroupActionsPopover>
-              <Button
-                variant="secondary"
-                className="min-h-11"
-                onClick={() => setReloadKey((value) => value + 1)}
-              >
-                Refresh shared progress
-              </Button>
-            </>
-          }
-        >
-          <h1
-            id="group-title"
-            className="text-2xl font-bold tracking-tight text-ink"
+        <GroupSubnavActions>
+          <StandaloneRecordWeightAction
+            onRecorded={() => setReloadKey((value) => value + 1)}
+          />
+          {!archivedHistory ? (
+            <GroupActionsPopover
+              compact
+              key={personalWorkspace.ownerKey}
+              onOpen={() => setHasOpenedCreateJoinActions(true)}
+            >
+              <DashboardChallengeActions
+                workspace={personalWorkspace}
+                protectDraft
+              />
+            </GroupActionsPopover>
+          ) : null}
+          <Button
+            variant="secondary"
+            className="group-refresh-action"
+            aria-label="Refresh shared progress"
+            title="Refresh shared progress"
+            onClick={() => setReloadKey((value) => value + 1)}
           >
+            <svg
+              aria-hidden="true"
+              width="19"
+              height="19"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M20 7v5h-5M4 17v-5h5" />
+              <path d="M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1" />
+            </svg>
+          </Button>
+        </GroupSubnavActions>
+        <div
+          className={archivedHistory ? 'flex items-center gap-2' : 'sr-only'}
+        >
+          <h1 id="group-title" className="text-xl font-bold">
             {selectedChallenge?.name ?? 'Group'}
           </h1>
-        </WeightPageHeader>
-        <ChallengeTabs
-          challenges={challenges}
-          selectedId={selectedChallengeId}
-          loading={isLoading}
-          showPersonalTracking={false}
-          compact
-        />
-      </div>
-      {selectedChallenge && selectedChallenge.ownerId === ownerId ? (
-        <details className="group-manage-menu relative w-fit">
-          <summary className="flex min-h-10 cursor-pointer list-none items-center rounded-lg border border-stone-300 bg-white px-3 text-sm font-semibold">
-            Manage{' '}
-            <span aria-hidden="true" className="ml-2">
-              ⌄
-            </span>
-          </summary>
-          <nav
-            aria-label="Selected group management"
-            className="absolute left-0 top-full z-30 mt-2 grid min-w-52 gap-1 rounded-xl border border-stone-200 bg-white p-2 shadow-lg"
+          {archivedHistory && selectedChallenge?.ownerId === ownerId ? (
+            <ChallengeSettingsLink />
+          ) : null}
+        </div>
+        {archivedHistory ? (
+          <div
+            className="rounded-xl border border-line bg-page p-4"
+            role="status"
           >
+            <p className="font-semibold">Archived · Read-only group history</p>
+            <p className="mt-1 text-sm text-ink-muted">
+              Group participation, invitations, targets, and sharing are paused.
+              Personal weight recording remains available independently.
+            </p>
             <Link
-              className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-emerald-50"
-              to={`/challenge/setup?challenge=${encodeURIComponent(selectedChallenge.id)}`}
+              className="mt-2 inline-block font-semibold underline"
+              to="/group"
             >
-              Manage group
+              View current groups
             </Link>
-            <Link
-              className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-emerald-50"
-              to={`/challenge/participants/enroll?${new URLSearchParams({ challenge: selectedChallenge.id, self: 'owner' })}`}
-            >
-              Manage members
-            </Link>
-            <Link
-              className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-emerald-50"
-              to={`/challenge/invites?challenge=${encodeURIComponent(selectedChallenge.id)}`}
-            >
-              Manage invitations
-            </Link>
-          </nav>
-        </details>
+          </div>
+        ) : (
+          <ChallengeTabs
+            challenges={currentChallenges}
+            selectedId={selectedChallengeId}
+            loading={isLoading}
+            showPersonalTracking={false}
+            compact
+            managementOwnerId={ownerId}
+          />
+        )}
+      </div>
+      {!selectedChallenge && !isLoading ? (
+        <Link
+          className="inline-block font-semibold underline"
+          to="/challenge/manage"
+        >
+          Manage challenges and archived history
+        </Link>
       ) : null}
       {!summary || section === 'overview' || section === 'weekly-results' ? (
         <Card
           id="group-summary"
-          className={`group-overview-card ${section === 'overview' ? 'group-overview-compact p-3 sm:p-4' : 'p-5 sm:p-8'}`}
+          className={`group-overview-card ${section === 'overview' ? 'group-overview-compact p-0' : 'p-5 sm:p-8'}`}
         >
           <DashboardState
             isLoading={isLoading}
@@ -2295,7 +2344,9 @@ export function GroupDashboardPage() {
           <div>
             <h2 className="text-xl font-bold">Member progress</h2>
             <p className="mt-2 text-sm text-ink-muted">
-              Progress and goal actions for active members.
+              {archivedHistory
+                ? 'Historical member progress. Group goal changes are paused.'
+                : 'Progress and goal actions for active members.'}
             </p>
           </div>
           {memberProgressState === 'loading' ? (
@@ -2312,10 +2363,12 @@ export function GroupDashboardPage() {
           {memberProgress.map((member) => {
             const displayPercentage = member.signedDisplayPercentage
             const canChangeTarget =
+              !archivedHistory &&
               member.memberKey === ownMemberKey &&
               ownParticipantMatchesProjection &&
               ownGoal !== null
             const canCorrectStartingWeight =
+              !archivedHistory &&
               member.memberKey === ownMemberKey &&
               ownParticipantMatchesProjection &&
               ownParticipant?.status === 'active'
@@ -2325,7 +2378,14 @@ export function GroupDashboardPage() {
                 key={member.memberKey}
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <h3 className="font-semibold">{member.displayName}</h3>
+                  <h3 className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-semibold">
+                    {member.displayName}
+                    {member.memberKey === challengeOwnerMemberKey ? (
+                      <span className="inline-flex min-h-5 items-center whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold leading-4 text-emerald-800">
+                        Owner
+                      </span>
+                    ) : null}
+                  </h3>
                   <span>
                     {displayPercentage === null
                       ? 'Unavailable'
@@ -2391,7 +2451,7 @@ export function GroupDashboardPage() {
               </article>
             )
           })}
-          {targetDialogParticipant ? (
+          {!archivedHistory && targetDialogParticipant ? (
             <ChangeTargetDialog
               key={targetDialogContextKey}
               onClose={() => {
@@ -2410,7 +2470,7 @@ export function GroupDashboardPage() {
               workspace={personalWorkspace}
             />
           ) : null}
-          {startingWeightDialogParticipant ? (
+          {!archivedHistory && startingWeightDialogParticipant ? (
             <ChangeStartingWeightDialog
               key={`starting-weight:${targetDialogContextKey}`}
               onClose={() => {

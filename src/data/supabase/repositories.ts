@@ -75,7 +75,9 @@ type GroupReachedTargetMilestoneRow =
   Database['public']['Functions']['get_group_target_milestones']['Returns'][number]
 
 export type ChallengeRepository = {
+  archive: (id: string) => Promise<RepositoryResult<Challenge>>
   create: (input: ChallengeWriteInput) => Promise<RepositoryResult<Challenge>>
+  deleteArchived: (id: string) => Promise<RepositoryResult<boolean>>
   findOwnedById: (
     id: string,
     ownerId: string,
@@ -88,6 +90,10 @@ export type ChallengeRepository = {
     userId: string,
     options?: { signal?: AbortSignal },
   ) => Promise<RepositoryListResult<Challenge>>
+  restore: (
+    id: string,
+    targetStatus?: Exclude<Challenge['status'], 'archived'>,
+  ) => Promise<RepositoryResult<Challenge>>
   update: (
     id: string,
     input: ChallengeWriteInput,
@@ -286,6 +292,7 @@ function mapChallenge(row: ChallengeRow): Challenge {
     createdAt: row.created_at,
     createdBy: row.created_by,
     ...(row.description === null ? {} : { description: row.description }),
+    archivedFromStatus: row.archived_from_status,
     endDate: row.end_date,
     id: row.id,
     name: row.name,
@@ -606,6 +613,32 @@ function mapSingle<TDatabase, TDomain>(
 export function createRepositories(client: DatabaseClient): Repositories {
   return {
     challenges: {
+      async archive(id) {
+        const { data, error } = await client.rpc('archive_group_challenge', {
+          target_challenge_id: id,
+        })
+        return error
+          ? {
+              error: requestError('archive the challenge', error),
+              state: 'error',
+            }
+          : mapSingle(data?.[0] ?? null, mapChallenge, 'challenge')
+      },
+      async deleteArchived(id) {
+        const { data, error } = await client.rpc(
+          'delete_archived_group_challenge',
+          { target_challenge_id: id },
+        )
+        if (error) {
+          return {
+            error: requestError('permanently delete the challenge', error),
+            state: 'error',
+          }
+        }
+        return data === true
+          ? { data: true, state: 'success' }
+          : { data: null, state: 'empty' }
+      },
       async create(input) {
         const { data, error } = await client
           .from('challenges')
@@ -617,7 +650,16 @@ export function createRepositories(client: DatabaseClient): Repositories {
             name: input.name,
             owner_id: input.ownerId,
             start_date: input.startDate,
-            ...(input.status ? { status: input.status } : {}),
+            ...(input.kind !== 'personal'
+              ? {
+                  status:
+                    !input.status || input.status === 'draft'
+                      ? 'active'
+                      : input.status,
+                }
+              : input.status
+                ? { status: input.status }
+                : {}),
             ...(input.targetWeightKg === undefined
               ? {}
               : { target_weight_kg: input.targetWeightKg }),
@@ -699,6 +741,18 @@ export function createRepositories(client: DatabaseClient): Repositories {
               state: 'error',
             }
           : mapSingle(data, mapChallenge, 'challenge')
+      },
+      async restore(id, targetStatus) {
+        const { data, error } = await client.rpc('restore_group_challenge', {
+          target_challenge_id: id,
+          target_restore_status: targetStatus ?? null,
+        })
+        return error
+          ? {
+              error: requestError('restore the challenge', error),
+              state: 'error',
+            }
+          : mapSingle(data?.[0] ?? null, mapChallenge, 'challenge')
       },
     },
     groupProgress: {

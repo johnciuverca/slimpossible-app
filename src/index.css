@@ -992,6 +992,124 @@ body {
 }
 
 .group-workspace .group-overview-compact .group-overview-metric {
-  border-top-width: 0;
+  border: 1px solid #354353;
+  padding: 10px 12px;
   box-shadow: none;
+}
+
+/* Group content uses the chart card's outer edges as the shared shell gutter. */
+.group-shell .app-shell-header-inner {
+  padding-inline: 16px;
+}
+.group-shell .account-control summary {
+  padding-right: 0;
+  border-right-width: 0;
+}
+.group-context-subnav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  max-width: 1280px;
+  margin-inline: auto;
+  padding-inline: 16px;
+}
+.group-context-subnav .contextual-subnav-scroll {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+.group-subnav-actions {
+  --color-forest-100: #173b35;
+  --color-forest-200: #204e44;
+  --color-forest-700: #31dbb0;
+  --color-forest-800: #24caa3;
+  --color-forest-900: #90ebd3;
+  --color-panel: #111c28;
+  --color-page: #0b121b;
+  --color-line: #354353;
+  --color-ink: #f1f6fa;
+  --color-ink-muted: #b5c1d0;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-block: 6px;
+}
+.group-subnav-actions > button,
+.group-subnav-actions > div > button {
+  min-height: 44px;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.group-subnav-actions > button[data-weight-owner]:not(:disabled) {
+  color: #052b24;
+}
+.group-subnav-actions > .group-refresh-action {
+  min-width: 44px;
+  padding: 0;
+}
+.group-workspace .challenge-context-with-settings {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid var(--group-accent);
+  border-radius: 24px;
+  background: var(--group-accent-strong);
+}
+.group-workspace .challenge-context-with-settings > a[aria-current='page'] {
+  min-height: 42px;
+  padding-right: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--group-ink);
+}
+.challenge-settings-link {
+  display: inline-flex;
+  min-width: 44px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  color: var(--group-accent-ink, #b6f5e3);
+  border-radius: 50%;
+}
+.challenge-context-with-settings > .challenge-settings-link {
+  border-left: 1px solid var(--group-line);
+  border-radius: 0;
+}
+.challenge-settings-link:hover {
+  background: var(--group-accent-soft, #12352f);
+}
+.challenge-settings-link:focus-visible {
+  outline: 2px solid var(--group-accent, #31dbb0);
+  outline-offset: -4px;
+}
+.group-workspace .group-overview-card.group-overview-compact {
+  border-width: 0;
+}
+@media (min-width: 640px) {
+  .group-shell .app-shell-header-inner,
+  .group-context-subnav-inner {
+    padding-inline: 32px;
+  }
+}
+@media (max-width: 1023px) {
+  .group-context-subnav-inner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+  .group-context-subnav .contextual-subnav-scroll {
+    width: 100%;
+  }
+  .group-subnav-actions {
+    border-top: 1px solid var(--color-line);
+  }
+  .group-subnav-actions > button,
+  .group-subnav-actions > div > button {
+    padding-inline: 12px;
+    font-size: 12px;
+  }
 }

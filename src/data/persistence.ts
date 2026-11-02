@@ -99,6 +99,10 @@ function readLocalChallenges(storage: Storage): Challenge[] {
       ...challenge,
       // Existing local previews predate challenge kinds and remain group contexts.
       kind: challenge.kind ?? 'group',
+      status:
+        challenge.kind !== 'personal' && challenge.status === 'draft'
+          ? 'active'
+          : challenge.status,
     }),
   )
 }
@@ -124,6 +128,26 @@ function localStorageError() {
 
 function createLocalRepositories(storage: Storage): PersistenceRepositories {
   const challenges: ChallengeRepository = {
+    async archive(id) {
+      const values = readLocalChallenges(storage)
+      const index = values.findIndex((value) => value.id === id)
+      if (index < 0) return { data: null, state: 'empty' }
+      const current = values[index]
+      if (current.kind !== 'group' || current.status === 'archived') {
+        return { data: null, state: 'empty' }
+      }
+      const challenge: Challenge = {
+        ...current,
+        archivedFromStatus: current.status,
+        status: 'archived',
+        updatedAt: new Date().toISOString(),
+      }
+      values[index] = challenge
+      if (!writeList(storage, challengesStorageKey, values)) {
+        return localStorageError()
+      }
+      return { data: challenge, state: 'success' }
+    },
     async create(input: ChallengeWriteInput) {
       const now = new Date().toISOString()
       const challenge: Challenge = {
@@ -136,7 +160,11 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
         name: input.name,
         ownerId: input.ownerId,
         startDate: input.startDate,
-        status: input.status ?? 'draft',
+        status:
+          input.kind !== 'personal' &&
+          (!input.status || input.status === 'draft')
+            ? 'active'
+            : (input.status ?? 'draft'),
         ...(input.targetWeightKg === undefined
           ? {}
           : { targetWeightKg: input.targetWeightKg }),
@@ -147,6 +175,86 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
         return localStorageError()
       }
       return { data: challenge, state: 'success' }
+    },
+    async deleteArchived(id: string) {
+      const currentChallenges = readLocalChallenges(storage)
+      const challenge = currentChallenges.find((value) => value.id === id)
+      if (
+        !challenge ||
+        challenge.kind !== 'group' ||
+        challenge.status !== 'archived'
+      ) {
+        return { data: null, state: 'empty' }
+      }
+
+      const participants = readList<Participant>(
+        storage,
+        participantsStorageKey,
+      )
+      const removedParticipantIds = new Set(
+        participants
+          .filter((participant) => participant.challengeId === id)
+          .map((participant) => participant.id),
+      )
+      const before = new Map(
+        [
+          challengesStorageKey,
+          participantsStorageKey,
+          weighInsStorageKey,
+          personalWeighInsStorageKey,
+          invitesStorageKey,
+        ].map((key) => [key, storage.getItem(key)]),
+      )
+      const next = new Map<string, unknown[]>([
+        [
+          challengesStorageKey,
+          currentChallenges.filter((value) => value.id !== id),
+        ],
+        [
+          participantsStorageKey,
+          participants.filter((participant) => participant.challengeId !== id),
+        ],
+        [
+          weighInsStorageKey,
+          readList<WeighIn>(storage, weighInsStorageKey).filter(
+            (weighIn) => !removedParticipantIds.has(weighIn.participantId),
+          ),
+        ],
+        [
+          personalWeighInsStorageKey,
+          readList<PersonalWeighIn & { userId: string }>(
+            storage,
+            personalWeighInsStorageKey,
+          ).map((weighIn) => ({
+            ...weighIn,
+            sharedChallengeIds: (weighIn.sharedChallengeIds ?? []).filter(
+              (challengeId) => challengeId !== id,
+            ),
+          })),
+        ],
+        [
+          invitesStorageKey,
+          readList<LocalChallengeInvite>(storage, invitesStorageKey).filter(
+            (invite) => invite.challengeId !== id,
+          ),
+        ],
+      ])
+      try {
+        for (const [key, values] of next) {
+          storage.setItem(key, JSON.stringify(values))
+        }
+      } catch {
+        for (const [key, value] of before) {
+          try {
+            if (value === null) storage.removeItem(key)
+            else storage.setItem(key, value)
+          } catch {
+            // Best-effort rollback for the non-authoritative local preview.
+          }
+        }
+        return localStorageError()
+      }
+      return { data: true, state: 'success' }
     },
     async findOwnedById(id: string, ownerId: string) {
       const challenge = readLocalChallenges(storage).find(
@@ -197,10 +305,53 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
         name: input.name,
         ownerId: input.ownerId,
         startDate: input.startDate,
-        status: input.status ?? current.status,
+        status:
+          current.kind === 'group' && input.status === 'draft'
+            ? 'active'
+            : (input.status ?? current.status),
         ...(input.targetWeightKg === undefined
           ? {}
           : { targetWeightKg: input.targetWeightKg }),
+        updatedAt: new Date().toISOString(),
+      }
+      values[index] = challenge
+      if (!writeList(storage, challengesStorageKey, values)) {
+        return localStorageError()
+      }
+      return { data: challenge, state: 'success' }
+    },
+    async restore(id, targetStatus) {
+      const values = readLocalChallenges(storage)
+      const index = values.findIndex((value) => value.id === id)
+      if (index < 0) return { data: null, state: 'empty' }
+      const current = values[index]
+      if (current.kind !== 'group' || current.status !== 'archived') {
+        return { data: null, state: 'empty' }
+      }
+      const today = new Date().toISOString().slice(0, 10)
+      const sourceStatus = current.archivedFromStatus ?? targetStatus
+      const restoredStatus =
+        current.endDate < today
+          ? 'completed'
+          : sourceStatus === 'draft'
+            ? 'active'
+            : sourceStatus
+      if (
+        !restoredStatus ||
+        (!current.archivedFromStatus && targetStatus === 'draft')
+      ) {
+        return {
+          error: {
+            kind: 'request',
+            message: 'Choose a status for this older archived challenge.',
+          },
+          state: 'error',
+        }
+      }
+      const challenge: Challenge = {
+        ...current,
+        archivedFromStatus: null,
+        status: restoredStatus,
         updatedAt: new Date().toISOString(),
       }
       values[index] = challenge

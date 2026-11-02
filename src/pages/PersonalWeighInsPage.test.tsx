@@ -190,7 +190,7 @@ describe('PersonalWeighInsPage', () => {
     ).toMatchObject({ data: [{ sharedChallengeIds: [group.data.id] }] })
   })
 
-  it('shares with a setup-created draft group and preserves that share when editing', async () => {
+  it('shares with a setup-created active group and preserves that share when editing', async () => {
     const setup = render(
       <AuthProvider
         initialState={{
@@ -206,7 +206,7 @@ describe('PersonalWeighInsPage', () => {
     )
     await screen.findByRole('textbox', { name: 'Challenge name' })
     fireEvent.change(screen.getByLabelText('Challenge name'), {
-      target: { value: 'Setup draft group' },
+      target: { value: 'Setup active group' },
     })
     fireEvent.change(screen.getByLabelText('Start date'), {
       target: { value: '2026-10-01' },
@@ -223,8 +223,8 @@ describe('PersonalWeighInsPage', () => {
       ).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            name: 'Setup draft group',
-            status: 'draft',
+            name: 'Setup active group',
+            status: 'active',
           }),
         ]),
       ),
@@ -232,7 +232,7 @@ describe('PersonalWeighInsPage', () => {
     setup.unmount()
     renderPage()
     const choice = await screen.findByRole('checkbox', {
-      name: 'Setup draft group',
+      name: 'Setup active group',
     })
     expect(choice).not.toBeChecked()
     fireEvent.click(choice)
@@ -240,10 +240,10 @@ describe('PersonalWeighInsPage', () => {
       target: { value: '82' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Save weight' }))
-    await screen.findByText('Shared with Setup draft group')
+    await screen.findByText('Shared with Setup active group')
     fireEvent.click(screen.getByRole('button', { name: /Edit/ }))
     expect(
-      screen.getByRole('checkbox', { name: 'Setup draft group' }),
+      screen.getByRole('checkbox', { name: 'Setup active group' }),
     ).toBeChecked()
     expect(screen.queryByText(/Saving will remove/)).not.toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('Weight in kg'), {
@@ -252,7 +252,7 @@ describe('PersonalWeighInsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Update weight' }))
     await screen.findByText(/81.9 kg/)
     expect(
-      screen.getByText('Shared with Setup draft group'),
+      screen.getByText('Shared with Setup active group'),
     ).toBeInTheDocument()
   })
 

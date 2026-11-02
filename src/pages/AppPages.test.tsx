@@ -25,6 +25,7 @@ import { ContextualSubnav } from '../components/ContextualSubnav'
 // independent personal action with real repositories in PersonalWorkspacePages
 // and the cross-page browser suite, rather than mixing its requests into these.
 vi.mock('../components/WeightPageHeader', () => ({
+  StandaloneRecordWeightAction: () => <button>Record weight</button>,
   WeightPageHeader: ({
     children,
     action,
@@ -1514,13 +1515,19 @@ describe('GroupDashboardPage', () => {
     expect(
       screen.queryByRole('table', { name: 'Shared group weight history' }),
     ).not.toBeInTheDocument()
-    fireEvent.click(screen.getByText('Manage', { selector: 'summary' }))
+    const settings = screen.getByRole('link', {
+      name: 'Manage challenges',
+    })
+    expect(settings).toHaveAttribute('href', '/challenge/manage')
+    expect(settings).toHaveAttribute('title', 'Manage challenges')
+    const settingsIcon = settings.querySelector('svg[aria-hidden="true"]')
+    expect(settingsIcon).toHaveAttribute('viewBox', '0 0 28 28')
+    expect(settingsIcon).toHaveAttribute('width', '24')
+    expect(settingsIcon?.querySelectorAll(':scope > g > g')).toHaveLength(2)
     expect(
-      screen.getByRole('navigation', { name: 'Selected group management' }),
+      settings.parentElement?.querySelector('a[aria-current="page"]'),
     ).toBeInTheDocument()
-    expect(
-      screen.getByRole('link', { name: 'Manage invitations' }),
-    ).toBeInTheDocument()
+    expect(settings.closest('button')).toBeNull()
     fireEvent.click(screen.getByRole('link', { name: 'Weekly results' }))
     expect(
       await screen.findByRole('heading', { name: 'Weekly result' }),

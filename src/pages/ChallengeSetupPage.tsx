@@ -112,6 +112,8 @@ export function ChallengeSetupPage() {
   const [submitError, setSubmitError] = useState('')
   const [requestedChallengeUnavailable, setRequestedChallengeUnavailable] =
     useState(false)
+  const [requestedChallengeArchived, setRequestedChallengeArchived] =
+    useState(false)
   const [loadedOwnerId, setLoadedOwnerId] = useState(ownerId)
   const [loadedChallengeId, setLoadedChallengeId] = useState('')
   const previousOwnerId = useRef(ownerId)
@@ -154,6 +156,7 @@ export function ChallengeSetupPage() {
     if (ownerChanged) {
       setChallenges([])
       updateSelectedChallengeId('')
+      setRequestedChallengeArchived(false)
       if (!preserveRestoringDraft) {
         setValues(initialValues)
         setChallengeKind(requestedKind)
@@ -212,12 +215,20 @@ export function ChallengeSetupPage() {
         }
 
         const ownedChallenges = result.state === 'success' ? result.data : []
-        setChallenges(ownedChallenges)
         const requestedChallenge = ownedChallenges.find(
           ({ id }) => id === requestedChallengeId,
         )
+        setChallenges(
+          ownedChallenges.filter(
+            (challenge) => challenge.status !== 'archived',
+          ),
+        )
         if (requestedChallengeId) {
-          if (requestedChallenge) {
+          if (requestedChallenge?.status === 'archived') {
+            updateSelectedChallengeId('')
+            setRequestedChallengeArchived(true)
+            setRequestedChallengeUnavailable(true)
+          } else if (requestedChallenge) {
             updateSelectedChallengeId(requestedChallenge.id)
             setChallengeKind(requestedChallenge.kind)
             setValues({
@@ -226,12 +237,15 @@ export function ChallengeSetupPage() {
               name: requestedChallenge.name,
               startDate: requestedChallenge.startDate,
             })
+            setRequestedChallengeArchived(false)
             setRequestedChallengeUnavailable(false)
           } else {
             updateSelectedChallengeId('')
+            setRequestedChallengeArchived(false)
             setRequestedChallengeUnavailable(true)
           }
         } else {
+          setRequestedChallengeArchived(false)
           setRequestedChallengeUnavailable(false)
         }
         setLoadedOwnerId(ownerId)
@@ -305,6 +319,7 @@ export function ChallengeSetupPage() {
     if (id) nextParams.set('challenge', id)
     else nextParams.delete('challenge')
     setSearchParams(nextParams, { replace: true })
+    setRequestedChallengeArchived(false)
     setRequestedChallengeUnavailable(false)
     setLoadedOwnerId(ownerId)
     setLoadedChallengeId(id)
@@ -367,6 +382,7 @@ export function ChallengeSetupPage() {
       : await persistence.repositories.challenges.create({
           ...input,
           kind: challengeKind,
+          ...(challengeKind === 'group' ? { status: 'active' as const } : {}),
         })
 
     setIsSaving(false)
@@ -437,9 +453,18 @@ export function ChallengeSetupPage() {
                 className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950"
                 role="alert"
               >
-                That saved challenge is unavailable for this account. Choose an
-                owned challenge or explicitly create a new one.
+                {requestedChallengeArchived
+                  ? 'This group challenge is archived. Restore it from Manage challenges before editing its details.'
+                  : 'That saved challenge is unavailable for this account. Choose an owned challenge or explicitly create a new one.'}
               </p>
+              {requestedChallengeArchived ? (
+                <Link
+                  className="inline-block text-sm font-semibold text-emerald-800 underline"
+                  to="/challenge/manage"
+                >
+                  Open Manage challenges
+                </Link>
+              ) : null}
               {challenges.length > 0 ? (
                 <div>
                   <label

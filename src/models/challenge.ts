@@ -21,6 +21,7 @@ export type Challenge = {
   ownerId: string
   startDate: DateOnly
   status: ChallengeStatus
+  archivedFromStatus?: Exclude<ChallengeStatus, 'archived'> | null
   targetWeightKg?: number
   updatedAt: string
 }

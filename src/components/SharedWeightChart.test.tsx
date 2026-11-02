@@ -254,3 +254,103 @@ it('applies quick ranges, adjustable date endpoints, clipped trend/reference lin
   )
   expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(3)
 })
+
+it('selects inclusive 7-day and 14-day windows anchored on the newest saved date', () => {
+  render(
+    <SharedWeightChart
+      title="Weight history"
+      description="Saved entries only."
+      yLabel="Weight (kg)"
+      min={70}
+      max={100}
+      points={[
+        { date: '2024-02-19', value: 90, title: '19 Feb' },
+        { date: '2024-02-20', value: 89, title: '20 Feb' },
+        { date: '2024-02-29', value: 88, title: '29 Feb' },
+        { date: '2024-03-04', value: 87, title: '4 Mar' },
+      ]}
+    />,
+  )
+  const chart = () => screen.getByRole('img', { name: /Weight history/ })
+  const oneWeek = screen.getByRole('button', { name: 'Show last 1 week' })
+  const twoWeeks = screen.getByRole('button', { name: 'Show last 2 weeks' })
+
+  fireEvent.click(oneWeek)
+  expect(oneWeek).toHaveAttribute('aria-pressed', 'true')
+  expect(twoWeeks).toHaveAttribute('aria-pressed', 'false')
+  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(2)
+  expect(screen.getByLabelText('Visible date range')).toHaveTextContent(
+    'Last 7 days · 27.02.2024 – 04.03.2024',
+  )
+  expect(
+    screen.getByRole('slider', { name: 'Visible range start' }),
+  ).toHaveAttribute('aria-valuetext', '27.02.2024')
+
+  fireEvent.click(twoWeeks)
+  expect(twoWeeks).toHaveAttribute('aria-pressed', 'true')
+  expect(oneWeek).toHaveAttribute('aria-pressed', 'false')
+  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(3)
+  expect(screen.getByLabelText('Visible date range')).toHaveTextContent(
+    'Last 14 days · 20.02.2024 – 04.03.2024',
+  )
+})
+
+it('keeps the chosen quick range selected when a short history clamps to its first date', () => {
+  render(
+    <SharedWeightChart
+      title="Short history"
+      description="Two saved entries."
+      yLabel="Weight (kg)"
+      min={70}
+      max={100}
+      points={[
+        { date: '2024-03-03', value: 90, title: '3 Mar' },
+        { date: '2024-03-04', value: 89, title: '4 Mar' },
+      ]}
+    />,
+  )
+  const oneWeek = screen.getByRole('button', { name: 'Show last 1 week' })
+  const twoWeeks = screen.getByRole('button', { name: 'Show last 2 weeks' })
+  const all = screen.getByRole('button', { name: 'Show all dates' })
+
+  fireEvent.click(oneWeek)
+  expect(oneWeek).toHaveAttribute('aria-pressed', 'true')
+  expect(all).toHaveAttribute('aria-pressed', 'false')
+  fireEvent.click(twoWeeks)
+  expect(twoWeeks).toHaveAttribute('aria-pressed', 'true')
+  expect(oneWeek).toHaveAttribute('aria-pressed', 'false')
+})
+
+it('keeps valid axes and accessible dates when keyboard sliders select an empty gap', () => {
+  render(
+    <SharedWeightChart
+      title="Sparse history"
+      description="Only saved entries are shown."
+      yLabel="Weight (kg)"
+      min={70}
+      max={100}
+      points={[
+        { date: '2024-03-01', value: 90, title: '1 Mar' },
+        { date: '2024-03-10', value: 89, title: '10 Mar' },
+        { date: '2024-03-20', value: 88, title: '20 Mar' },
+      ]}
+    />,
+  )
+  const chart = () => screen.getByRole('img', { name: /Sparse history/ })
+  const start = screen.getByRole('slider', { name: 'Visible range start' })
+  const end = screen.getByRole('slider', { name: 'Visible range end' })
+
+  for (let index = 0; index < 10; index += 1)
+    fireEvent.keyDown(start, { key: 'ArrowRight' })
+  fireEvent.keyDown(end, { key: 'Home' })
+
+  expect(start).toHaveAttribute('aria-valuetext', '11.03.2024')
+  expect(end).toHaveAttribute('aria-valuetext', '11.03.2024')
+  expect(screen.getByLabelText('Visible date range')).toHaveTextContent(
+    '11.03.2024 – 11.03.2024',
+  )
+  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(0)
+  expect(chart().querySelectorAll('[data-chart-tick]').length).toBeGreaterThan(
+    0,
+  )
+})
