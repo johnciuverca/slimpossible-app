@@ -2689,6 +2689,30 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
   })
 }
 
+test('group selector matches the member tabs container surface on Charts', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 900 })
+  await installGroupFixtures(page, false, true)
+  await page.goto(
+    `/e2e/fixtures/today-harness.html?scenario=group&user=${viewerId}&route=${encodeURIComponent(`/group?challenge=${ownGroupId}`)}`,
+  )
+  await page
+    .getByRole('navigation', { name: 'Group sections' })
+    .getByRole('link', { name: 'Charts', exact: true })
+    .click()
+
+  const selector = page.locator('[aria-label="Challenge contexts"] > div')
+  const memberTabs = page.locator('.group-history-workspace > .sticky')
+  await expect(selector).toBeVisible()
+  await expect(memberTabs).toBeVisible()
+  const [selectorBackground, memberTabsBackground] = await Promise.all([
+    selector.evaluate((element) => getComputedStyle(element).backgroundColor),
+    memberTabs.evaluate((element) => getComputedStyle(element).backgroundColor),
+  ])
+  expect(selectorBackground).toBe(memberTabsBackground)
+})
+
 test('shows the challenge owner badge only in Members and fits on mobile', async ({
   page,
 }) => {

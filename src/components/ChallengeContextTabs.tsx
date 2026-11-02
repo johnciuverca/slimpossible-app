@@ -96,7 +96,7 @@ export function ChallengeTabs({
       <div
         className={
           compact
-            ? 'flex min-w-0 items-center gap-2 rounded-xl border border-stone-200 bg-page p-1 shadow-sm'
+            ? 'flex min-w-0 items-center gap-2 rounded-xl border border-stone-200 bg-panel p-1 shadow-sm'
             : undefined
         }
       >
