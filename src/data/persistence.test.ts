@@ -13,6 +13,102 @@ afterEach(() => {
 })
 
 describe('challenge and participant persistence', () => {
+  it('removes an archived local group fixture but preserves personal data and other challenge shares', async () => {
+    window.localStorage.setItem(
+      'slimpossible.local.challenges',
+      JSON.stringify([
+        {
+          id: 'delete-target',
+          kind: 'group',
+          name: 'Archived target',
+          ownerId: 'owner',
+          createdBy: 'owner',
+          startDate: '2026-01-01',
+          endDate: '2026-12-31',
+          status: 'archived',
+          archivedFromStatus: 'active',
+        },
+        {
+          id: 'keep-other',
+          kind: 'group',
+          name: 'Other challenge',
+          ownerId: 'owner',
+          createdBy: 'owner',
+          startDate: '2026-01-01',
+          endDate: '2026-12-31',
+          status: 'active',
+        },
+      ]),
+    )
+    window.localStorage.setItem(
+      'slimpossible.local.participants',
+      JSON.stringify([
+        { id: 'target-member', challengeId: 'delete-target', userId: 'member' },
+        { id: 'other-member', challengeId: 'keep-other', userId: 'member' },
+      ]),
+    )
+    window.localStorage.setItem(
+      'slimpossible.local.weigh-ins',
+      JSON.stringify([
+        { participantId: 'target-member', date: '2026-01-01', weightKg: 90 },
+        { participantId: 'other-member', date: '2026-01-01', weightKg: 89 },
+      ]),
+    )
+    window.localStorage.setItem(
+      'slimpossible.local.personal-weigh-ins',
+      JSON.stringify([
+        {
+          id: 'personal-entry',
+          userId: 'member',
+          date: '2026-01-01',
+          weightKg: 90,
+          note: 'Private note',
+          sharedChallengeIds: ['delete-target', 'keep-other'],
+        },
+      ]),
+    )
+    window.localStorage.setItem(
+      'slimpossible.local.challenge-invites',
+      JSON.stringify([
+        { id: 'target-invite', challengeId: 'delete-target', token: 'old' },
+        { id: 'other-invite', challengeId: 'keep-other', token: 'valid' },
+      ]),
+    )
+    const persistence = createPersistence(signedOutState)
+    if (persistence.mode !== 'local') throw new Error('Expected local')
+
+    await expect(
+      persistence.repositories.challenges.deleteArchived('delete-target'),
+    ).resolves.toEqual({ data: true, state: 'success' })
+    expect(
+      JSON.parse(window.localStorage.getItem('slimpossible.local.challenges')!),
+    ).toMatchObject([{ id: 'keep-other' }])
+    expect(
+      JSON.parse(
+        window.localStorage.getItem('slimpossible.local.participants')!,
+      ),
+    ).toMatchObject([{ id: 'other-member' }])
+    expect(
+      JSON.parse(window.localStorage.getItem('slimpossible.local.weigh-ins')!),
+    ).toMatchObject([{ participantId: 'other-member' }])
+    expect(
+      JSON.parse(
+        window.localStorage.getItem('slimpossible.local.personal-weigh-ins')!,
+      ),
+    ).toMatchObject([
+      {
+        id: 'personal-entry',
+        note: 'Private note',
+        sharedChallengeIds: ['keep-other'],
+      },
+    ])
+    expect(
+      JSON.parse(
+        window.localStorage.getItem('slimpossible.local.challenge-invites')!,
+      ),
+    ).toMatchObject([{ id: 'other-invite' }])
+  })
+
   it('reads legacy local challenges as groups without rewriting saved JSON', async () => {
     const legacyJson = JSON.stringify([
       {

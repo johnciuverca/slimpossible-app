@@ -77,6 +77,7 @@ type GroupReachedTargetMilestoneRow =
 export type ChallengeRepository = {
   archive: (id: string) => Promise<RepositoryResult<Challenge>>
   create: (input: ChallengeWriteInput) => Promise<RepositoryResult<Challenge>>
+  deleteArchived: (id: string) => Promise<RepositoryResult<boolean>>
   findOwnedById: (
     id: string,
     ownerId: string,
@@ -622,6 +623,21 @@ export function createRepositories(client: DatabaseClient): Repositories {
               state: 'error',
             }
           : mapSingle(data?.[0] ?? null, mapChallenge, 'challenge')
+      },
+      async deleteArchived(id) {
+        const { data, error } = await client.rpc(
+          'delete_archived_group_challenge',
+          { target_challenge_id: id },
+        )
+        if (error) {
+          return {
+            error: requestError('permanently delete the challenge', error),
+            state: 'error',
+          }
+        }
+        return data === true
+          ? { data: true, state: 'success' }
+          : { data: null, state: 'empty' }
       },
       async create(input) {
         const { data, error } = await client

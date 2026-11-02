@@ -26,6 +26,42 @@ afterEach(() => {
 })
 
 describe('Supabase repositories', () => {
+  it('deletes an archived challenge only through the owner-checked server RPC', async () => {
+    stubResponse(true)
+
+    const result =
+      await createRepositories(client).challenges.deleteArchived('archived-1')
+
+    expect(result).toEqual({ data: true, state: 'success' })
+    expect(String(vi.mocked(fetch).mock.calls[0]?.[0])).toContain(
+      '/rpc/delete_archived_group_challenge',
+    )
+    expect(
+      JSON.parse(String(vi.mocked(fetch).mock.calls[0]?.[1]?.body)) as Record<
+        string,
+        unknown
+      >,
+    ).toEqual({ target_challenge_id: 'archived-1' })
+  })
+
+  it('does not confirm permanent deletion when the server reports no deletion', async () => {
+    stubResponse(false)
+
+    const result =
+      await createRepositories(client).challenges.deleteArchived('active-1')
+
+    expect(result).toEqual({ data: null, state: 'empty' })
+  })
+
+  it('keeps server authorization errors explicit for permanent deletion', async () => {
+    stubResponse({ code: '42501', message: 'Ownership required.' }, 403)
+
+    const result =
+      await createRepositories(client).challenges.deleteArchived('other-1')
+
+    expect(result.state).toBe('error')
+  })
+
   it('maps the bounded signed member display without exposing a raw weigh-in', async () => {
     stubResponse([
       {

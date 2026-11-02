@@ -207,6 +207,10 @@ export type Database = {
     }
     Views: Record<string, never>
     Functions: {
+      delete_archived_group_challenge: {
+        Args: { target_challenge_id: string }
+        Returns: boolean
+      }
       archive_group_challenge: {
         Args: { target_challenge_id: string }
         Returns: Database['public']['Tables']['challenges']['Row'][]

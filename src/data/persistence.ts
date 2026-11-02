@@ -176,6 +176,86 @@ function createLocalRepositories(storage: Storage): PersistenceRepositories {
       }
       return { data: challenge, state: 'success' }
     },
+    async deleteArchived(id: string) {
+      const currentChallenges = readLocalChallenges(storage)
+      const challenge = currentChallenges.find((value) => value.id === id)
+      if (
+        !challenge ||
+        challenge.kind !== 'group' ||
+        challenge.status !== 'archived'
+      ) {
+        return { data: null, state: 'empty' }
+      }
+
+      const participants = readList<Participant>(
+        storage,
+        participantsStorageKey,
+      )
+      const removedParticipantIds = new Set(
+        participants
+          .filter((participant) => participant.challengeId === id)
+          .map((participant) => participant.id),
+      )
+      const before = new Map(
+        [
+          challengesStorageKey,
+          participantsStorageKey,
+          weighInsStorageKey,
+          personalWeighInsStorageKey,
+          invitesStorageKey,
+        ].map((key) => [key, storage.getItem(key)]),
+      )
+      const next = new Map<string, unknown[]>([
+        [
+          challengesStorageKey,
+          currentChallenges.filter((value) => value.id !== id),
+        ],
+        [
+          participantsStorageKey,
+          participants.filter((participant) => participant.challengeId !== id),
+        ],
+        [
+          weighInsStorageKey,
+          readList<WeighIn>(storage, weighInsStorageKey).filter(
+            (weighIn) => !removedParticipantIds.has(weighIn.participantId),
+          ),
+        ],
+        [
+          personalWeighInsStorageKey,
+          readList<PersonalWeighIn & { userId: string }>(
+            storage,
+            personalWeighInsStorageKey,
+          ).map((weighIn) => ({
+            ...weighIn,
+            sharedChallengeIds: (weighIn.sharedChallengeIds ?? []).filter(
+              (challengeId) => challengeId !== id,
+            ),
+          })),
+        ],
+        [
+          invitesStorageKey,
+          readList<LocalChallengeInvite>(storage, invitesStorageKey).filter(
+            (invite) => invite.challengeId !== id,
+          ),
+        ],
+      ])
+      try {
+        for (const [key, values] of next) {
+          storage.setItem(key, JSON.stringify(values))
+        }
+      } catch {
+        for (const [key, value] of before) {
+          try {
+            if (value === null) storage.removeItem(key)
+            else storage.setItem(key, value)
+          } catch {
+            // Best-effort rollback for the non-authoritative local preview.
+          }
+        }
+        return localStorageError()
+      }
+      return { data: true, state: 'success' }
+    },
     async findOwnedById(id: string, ownerId: string) {
       const challenge = readLocalChallenges(storage).find(
         (value) => value.id === id && value.ownerId === ownerId,
