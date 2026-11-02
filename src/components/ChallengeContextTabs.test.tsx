@@ -128,6 +128,53 @@ describe('Challenge context navigation', () => {
       screen.queryByRole('link', { name: /Personal tracking/ }),
     ).not.toBeInTheDocument()
   })
+  it('keeps one owner-only Manage action beside the scrollable group tabs', () => {
+    const ownedGroup = createChallengeFixture({
+      id: 'owned-group',
+      name: 'Owned group',
+      ownerId: 'user-alex',
+    })
+    render(
+      <MemoryRouter initialEntries={['/group?challenge=owned-group']}>
+        <ChallengeTabs
+          challenges={[group, ownedGroup]}
+          showPersonalTracking={false}
+          compact
+          managementOwnerId="user-alex"
+        />
+      </MemoryRouter>,
+    )
+
+    const manage = screen.getByRole('link', { name: 'Manage' })
+    expect(manage).toHaveAttribute('href', '/challenge/manage')
+    expect(manage).toHaveClass('shrink-0')
+    expect(
+      screen.getAllByRole('navigation', { name: 'Challenge contexts' })[0],
+    ).toContainElement(manage)
+    expect(
+      manage.parentElement?.querySelector('[aria-current="page"]'),
+    ).toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: 'Manage' })).toHaveLength(1)
+  })
+  it('hides the shared Manage action for a non-owner of the selected group', () => {
+    render(
+      <MemoryRouter initialEntries={['/group?challenge=group']}>
+        <ChallengeTabs
+          challenges={[group]}
+          showPersonalTracking={false}
+          compact
+          managementOwnerId="another-user"
+        />
+      </MemoryRouter>,
+    )
+
+    expect(
+      screen.queryByRole('link', { name: 'Manage' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: /Group · Joined group/ }),
+    ).toHaveAttribute('aria-current', 'page')
+  })
   it('keeps an unavailable group selection truthful without a personal fallback', () => {
     render(
       <MemoryRouter initialEntries={['/group?challenge=missing']}>

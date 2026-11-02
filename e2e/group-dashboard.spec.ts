@@ -2570,10 +2570,8 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
         .querySelector('.group-history-workspace')!
         .getBoundingClientRect()
       const selector = document
-        .querySelector(
-          '[aria-label="Challenge contexts"] a[aria-current="page"]',
-        )!
-        .parentElement!.getBoundingClientRect()
+        .querySelector('[aria-label="Challenge contexts"] > div')!
+        .getBoundingClientRect()
       const tabs = document
         .querySelector('.group-context-subnav .contextual-subnav-scroll')!
         .getBoundingClientRect()
@@ -2636,27 +2634,27 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
       expect(edges.plot.width).toBeCloseTo(600, 0)
       expect(edges.plot.height).toBeCloseTo(219.46875, 0)
     }
-    const gear = page.getByRole('link', {
-      name: 'Manage challenges',
+    const manage = page.getByRole('link', {
+      name: 'Manage',
       exact: true,
     })
-    await expect(gear).toHaveAttribute('title', 'Manage challenges')
+    await expect(manage).toHaveAttribute('title', 'Manage challenges')
     expect(
-      await gear.evaluate((element) =>
+      await manage.evaluate((element) =>
         Boolean(element.parentElement?.querySelector('a[aria-current="page"]')),
       ),
     ).toBe(true)
     expect(
-      await gear.evaluate((element) =>
+      await manage.evaluate((element) =>
         Boolean(element.parentElement?.closest('a,button')),
       ),
     ).toBe(false)
-    const gearBox = (await gear.boundingBox())!
-    expect(gearBox.width).toBeGreaterThanOrEqual(44)
-    expect(gearBox.height).toBeGreaterThanOrEqual(44)
+    const manageBox = (await manage.boundingBox())!
+    expect(manageBox.width).toBeGreaterThanOrEqual(44)
+    expect(manageBox.height).toBeGreaterThanOrEqual(44)
     await page.getByRole('link', { name: /Group · testtest/ }).focus()
     await page.keyboard.press('Tab')
-    await expect(gear).toBeFocused()
+    await expect(manage).toBeFocused()
     await page.keyboard.press('Enter')
     await expect(
       page.getByRole('heading', { name: 'Manage group challenges.' }),
@@ -2685,7 +2683,7 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
         page.getByRole('link', { name: /Group · testtest/ }),
       ).toBeVisible()
       await expect(
-        page.getByRole('link', { name: 'Manage challenges', exact: true }),
+        page.getByRole('link', { name: 'Manage', exact: true }),
       ).toHaveCount(0)
     }
   })

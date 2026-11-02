@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom'
 import { useOptionalAuth } from '../auth/useAuth'
 import { createPersistence } from '../data/persistence'
 import type { Challenge } from '../models/challenge'
-import { ChallengeSettingsLink } from './ChallengeSettingsLink'
 import { workspaceSection } from '../models/workspaceNavigation'
 
 function challengeTabDestination(
@@ -95,56 +94,67 @@ export function ChallengeTabs({
         </p>
       ) : null}
       <div
-        ref={row}
-        className={`app-nav-scroll max-w-full overflow-x-auto ${compact ? 'py-1' : 'py-2'}`}
+        className={
+          compact
+            ? 'flex min-w-0 items-center gap-2 rounded-xl border border-stone-200 bg-page p-1 shadow-sm'
+            : undefined
+        }
       >
-        <ul className="flex w-max min-w-full gap-2">
-          {[
-            ...(showPersonalTracking
-              ? [
-                  {
-                    id: '',
-                    label: 'Personal tracking',
-                    to: challengeTabDestination(pathname),
-                  },
-                ]
-              : []),
-            ...challenges.map((challenge) => ({
-              id: challenge.id,
-              label: `${challenge.kind === 'personal' ? 'Personal' : 'Group'} · ${challenge.name}`,
-              to: challengeTabDestination(pathname, challenge, search, hash),
-            })),
-          ].map(({ id, label, to }) => {
-            const active = id ? selected === id : personalPage && !selected
-            const canManage =
-              active &&
-              Boolean(managementOwnerId) &&
-              challenges.some(
-                (challenge) =>
-                  challenge.id === id &&
-                  challenge.kind === 'group' &&
-                  challenge.ownerId === managementOwnerId,
+        <div
+          ref={row}
+          className={`app-nav-scroll min-w-0 overflow-x-auto ${compact ? 'flex-1 py-1' : 'max-w-full py-2'}`}
+        >
+          <ul className="flex w-max min-w-full gap-2">
+            {[
+              ...(showPersonalTracking
+                ? [
+                    {
+                      id: '',
+                      label: 'Personal tracking',
+                      to: challengeTabDestination(pathname),
+                    },
+                  ]
+                : []),
+              ...challenges.map((challenge) => ({
+                id: challenge.id,
+                label: `${challenge.kind === 'personal' ? 'Personal' : 'Group'} · ${challenge.name}`,
+                to: challengeTabDestination(pathname, challenge, search, hash),
+              })),
+            ].map(({ id, label, to }) => {
+              const active = id ? selected === id : personalPage && !selected
+              return (
+                <li key={id}>
+                  <Link
+                    to={to}
+                    aria-current={active ? 'page' : undefined}
+                    className={`relative inline-flex min-h-11 items-center whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700 ${active ? 'border-forest-800 bg-forest-800 text-white' : 'border-line bg-panel text-forest-800 hover:bg-forest-50'}`}
+                  >
+                    {label}
+                    {active ? (
+                      <span className="sr-only"> (selected)</span>
+                    ) : null}
+                  </Link>
+                </li>
               )
-            return (
-              <li
-                key={id}
-                className={
-                  canManage ? 'challenge-context-with-settings' : undefined
-                }
-              >
-                <Link
-                  to={to}
-                  aria-current={active ? 'page' : undefined}
-                  className={`relative inline-flex min-h-11 items-center whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700 ${active ? 'border-forest-800 bg-forest-800 text-white' : 'border-line bg-panel text-forest-800 hover:bg-forest-50'}`}
-                >
-                  {label}
-                  {active ? <span className="sr-only"> (selected)</span> : null}
-                </Link>
-                {canManage ? <ChallengeSettingsLink /> : null}
-              </li>
-            )
-          })}
-        </ul>
+            })}
+          </ul>
+        </div>
+        {compact &&
+        Boolean(managementOwnerId) &&
+        challenges.some(
+          (challenge) =>
+            challenge.id === selected &&
+            challenge.kind === 'group' &&
+            challenge.ownerId === managementOwnerId,
+        ) ? (
+          <Link
+            to="/challenge/manage"
+            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-line bg-panel px-4 py-2 text-sm font-semibold text-forest-800 hover:bg-forest-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700"
+            title="Manage challenges"
+          >
+            Manage
+          </Link>
+        ) : null}
       </div>
       {loading ? (
         <p role="status" className="text-sm text-ink-muted">
