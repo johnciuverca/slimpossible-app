@@ -119,16 +119,36 @@ export function SharedWeightChart({
     start: number
     end: number
   } | null>(null)
+  const [selectedPreset, setSelectedPreset] = useState<
+    '1w' | '2w' | '1m' | '3m' | 'all' | 'custom'
+  >('all')
   const plotted = [...(points ?? []), ...series.flatMap((item) => item.points)]
   if (!plotted.length) return null
   const firstDay = Math.min(...plotted.map((point) => day(point.date)))
   const lastDay = Math.max(...plotted.map((point) => day(point.date)))
-  const startDay = selectedRange
+  const oneWeekStart = Math.max(firstDay, lastDay - 6)
+  const twoWeekStart = Math.max(firstDay, lastDay - 13)
+  const oneMonthStart = Math.max(firstDay, shiftMonths(lastDay, 1))
+  const threeMonthStart = Math.max(firstDay, shiftMonths(lastDay, 3))
+  const customStart = selectedRange
     ? Math.max(firstDay, Math.min(lastDay, selectedRange.start))
     : firstDay
-  const endDay = selectedRange
-    ? Math.max(startDay, Math.min(lastDay, selectedRange.end))
+  const customEnd = selectedRange
+    ? Math.max(customStart, Math.min(lastDay, selectedRange.end))
     : lastDay
+  const startDay =
+    selectedPreset === '1w'
+      ? oneWeekStart
+      : selectedPreset === '2w'
+        ? twoWeekStart
+        : selectedPreset === '1m'
+          ? oneMonthStart
+          : selectedPreset === '3m'
+            ? threeMonthStart
+            : selectedPreset === 'custom'
+              ? customStart
+              : firstDay
+  const endDay = selectedPreset === 'custom' ? customEnd : lastDay
   const fullRange = startDay === firstDay && endDay === lastDay
   const span = endDay - startDay
   const x = (date: string) =>
@@ -326,8 +346,6 @@ export function SharedWeightChart({
           `${index ? 'L' : 'M'} ${x(point.date)} ${y(point.value)}`,
       )
       .join(' ')
-  const oneMonthStart = Math.max(firstDay, shiftMonths(lastDay, 1))
-  const threeMonthStart = Math.max(firstDay, shiftMonths(lastDay, 3))
   const visibleCount =
     visiblePoints.length +
     visibleSeries.reduce((sum, item) => sum + item.points.length, 0)
@@ -336,6 +354,18 @@ export function SharedWeightChart({
   const chartTitle = fullRange
     ? title
     : `${title}. Showing ${visibleCount} of ${totalCount} recorded entries from ${formatChartDate(dateAtDay(startDay))} to ${formatChartDate(dateAtDay(endDay))}.`
+  const selectedRangeLabel =
+    selectedPreset === '1w'
+      ? 'Last 7 days'
+      : selectedPreset === '2w'
+        ? 'Last 14 days'
+        : selectedPreset === '1m'
+          ? 'Last month'
+          : selectedPreset === '3m'
+            ? 'Last 3 months'
+            : selectedPreset === 'custom'
+              ? 'Selected dates'
+              : 'All recorded dates'
   const rangePercent = (value: number) =>
     span === 0 ? 0 : ((value - firstDay) / (lastDay - firstDay)) * 100
   const plotStartPercent = (left / viewBoxWidth) * 100
@@ -346,6 +376,17 @@ export function SharedWeightChart({
     } else {
       setSelectedRange({ start: startDay, end: Math.max(value, startDay) })
     }
+    const nextStart = thumb === 'start' ? Math.min(value, endDay) : startDay
+    const nextEnd = thumb === 'end' ? Math.max(value, startDay) : endDay
+    setSelectedPreset(
+      nextStart === firstDay && nextEnd === lastDay ? 'all' : 'custom',
+    )
+  }
+  const presetClass = (selected: boolean) =>
+    `min-h-9 rounded-full border px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:opacity-50 ${selected ? 'border-emerald-800 bg-emerald-800 font-semibold text-white shadow-sm hover:bg-emerald-900 dark:border-emerald-300 dark:bg-emerald-300 dark:text-emerald-950' : 'border-line bg-page text-ink hover:bg-panel'}`
+  const choosePreset = (preset: typeof selectedPreset, start: number) => {
+    setSelectedPreset(preset)
+    setSelectedRange({ start, end: lastDay })
   }
   const moveThumbFromPointer = (thumb: 'start' | 'end', clientX: number) => {
     const bounds = rangeTrackRef.current?.getBoundingClientRect()
@@ -409,7 +450,7 @@ export function SharedWeightChart({
   }
   return (
     <div
-      className="w-full min-w-[600px]"
+      className="w-full min-w-[600px] pt-2"
       onKeyDown={(event) => {
         if (event.key === 'Escape') setActivePoint(null)
       }}
@@ -428,35 +469,51 @@ export function SharedWeightChart({
           <span className="mr-1 font-semibold text-ink">Date range</span>
           <button
             type="button"
-            aria-label="Show last 1 month"
-            aria-pressed={endDay === lastDay && startDay === oneMonthStart}
+            aria-label="Show last 1 week"
+            aria-pressed={selectedPreset === '1w'}
             disabled={firstDay === lastDay}
-            onClick={() =>
-              setSelectedRange({ start: oneMonthStart, end: lastDay })
-            }
-            className="min-h-9 rounded-full border border-line bg-page px-3 text-ink hover:bg-panel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:opacity-50"
+            onClick={() => choosePreset('1w', oneWeekStart)}
+            className={presetClass(selectedPreset === '1w')}
+          >
+            1W
+          </button>
+          <button
+            type="button"
+            aria-label="Show last 2 weeks"
+            aria-pressed={selectedPreset === '2w'}
+            disabled={firstDay === lastDay}
+            onClick={() => choosePreset('2w', twoWeekStart)}
+            className={presetClass(selectedPreset === '2w')}
+          >
+            2W
+          </button>
+          <button
+            type="button"
+            aria-label="Show last 1 month"
+            aria-pressed={selectedPreset === '1m'}
+            disabled={firstDay === lastDay}
+            onClick={() => choosePreset('1m', oneMonthStart)}
+            className={presetClass(selectedPreset === '1m')}
           >
             1M
           </button>
           <button
             type="button"
             aria-label="Show last 3 months"
-            aria-pressed={endDay === lastDay && startDay === threeMonthStart}
+            aria-pressed={selectedPreset === '3m'}
             disabled={firstDay === lastDay}
-            onClick={() =>
-              setSelectedRange({ start: threeMonthStart, end: lastDay })
-            }
-            className="min-h-9 rounded-full border border-line bg-page px-3 text-ink hover:bg-panel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:opacity-50"
+            onClick={() => choosePreset('3m', threeMonthStart)}
+            className={presetClass(selectedPreset === '3m')}
           >
             3M
           </button>
           <button
             type="button"
             aria-label="Show all dates"
-            aria-pressed={fullRange}
-            disabled={fullRange}
-            onClick={() => setSelectedRange(null)}
-            className="min-h-9 rounded-full border border-line bg-page px-3 text-ink hover:bg-panel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:opacity-50"
+            aria-pressed={selectedPreset === 'all'}
+            disabled={selectedPreset === 'all'}
+            onClick={() => choosePreset('all', firstDay)}
+            className={presetClass(selectedPreset === 'all')}
           >
             All
           </button>
@@ -744,18 +801,6 @@ export function SharedWeightChart({
             {visibleActivePoint.point.tooltip ?? visibleActivePoint.point.title}
           </div>
         ) : null}
-        {referenceLinesOutsideRange.map((line) => (
-          <p
-            key={line.id}
-            data-chart-reference-outside
-            role="note"
-            className="mt-2 text-xs text-ink-muted"
-          >
-            Goal reference is outside the data-scaled chart range:{' '}
-            {line.title ?? `${format(line.from.value)} kg`}. The chart scale
-            follows the visible recorded weights.
-          </p>
-        ))}
       </div>
       <div
         className="mt-2 px-2"
@@ -769,6 +814,8 @@ export function SharedWeightChart({
           aria-live="polite"
           className="mb-1 block text-center text-xs text-ink-muted"
         >
+          <span className="font-semibold text-ink">{selectedRangeLabel}</span>
+          <span aria-hidden="true"> · </span>
           {formatChartDate(dateAtDay(startDay))} –{' '}
           {formatChartDate(dateAtDay(endDay))}
         </output>
