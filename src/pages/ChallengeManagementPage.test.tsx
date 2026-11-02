@@ -7,18 +7,34 @@ import {
   waitFor,
   within,
 } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 
 import { AuthContext, type AuthContextValue } from '../auth/context'
 import * as persistenceModule from '../data/persistence'
 import type { Challenge } from '../models/challenge'
+import type { RepositoryResult } from '../data/supabase/repositories'
 import { createChallengeFixture } from '../models/fixtures'
 import { ChallengeManagementPage } from './ChallengeManagementPage'
 
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
+})
+
+beforeEach(() => {
+  Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
+    configurable: true,
+    value: function (this: HTMLDialogElement) {
+      this.setAttribute('open', '')
+    },
+  })
+  Object.defineProperty(HTMLDialogElement.prototype, 'close', {
+    configurable: true,
+    value: function (this: HTMLDialogElement) {
+      this.removeAttribute('open')
+    },
+  })
 })
 
 function authValue(id = 'user-owner'): AuthContextValue {
@@ -65,6 +81,19 @@ function installPersistence(initial: Challenge[]) {
       challenges[index] = archived
       return { data: archived, state: 'success' as const }
     }),
+    deleteArchived: vi.fn(
+      async (id: string): Promise<RepositoryResult<boolean>> => {
+        const index = challenges.findIndex((challenge) => challenge.id === id)
+        if (
+          index < 0 ||
+          challenges[index]?.kind === 'personal' ||
+          challenges[index]?.status !== 'archived'
+        )
+          return { data: null, state: 'empty' }
+        challenges.splice(index, 1)
+        return { data: true, state: 'success' }
+      },
+    ),
     listOwned: vi.fn(async () => ({
       data: [...challenges],
       state: 'success' as const,
@@ -165,8 +194,98 @@ describe('ChallengeManagementPage', () => {
       within(archivedPanel).getByRole('button', { name: 'Restore' }),
     ).toBeInTheDocument()
     expect(
-      within(archivedPanel).queryByRole('button', { name: /delete/i }),
-    ).not.toBeInTheDocument()
+      within(archivedPanel).getByRole('button', {
+        name: 'Delete permanently',
+      }),
+    ).toBeInTheDocument()
+  })
+
+  it('requires the exact archived challenge name and removes it only after confirmed success', async () => {
+    const archived = createChallengeFixture({
+      id: 'archived-to-delete',
+      name: 'Spring Reset Challenge',
+      status: 'archived',
+      archivedFromStatus: 'active',
+    })
+    const { repository } = installPersistence([archived])
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('tab', { name: /Archived/ }))
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Delete permanently' }),
+    )
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Delete this challenge permanently?',
+    })
+    expect(dialog).toHaveTextContent('Spring Reset Challenge')
+    expect(dialog).toHaveTextContent('group history')
+    expect(dialog).toHaveTextContent('personal weigh-ins and private notes')
+    const confirm = within(dialog).getByLabelText(
+      'Type the challenge name to confirm',
+    )
+    const deleteButton = within(dialog).getByRole('button', {
+      name: 'Delete challenge',
+    })
+    expect(deleteButton).toBeDisabled()
+
+    fireEvent.change(confirm, { target: { value: 'spring reset challenge' } })
+    expect(deleteButton).toBeDisabled()
+    expect(repository.deleteArchived).not.toHaveBeenCalled()
+
+    fireEvent.change(confirm, { target: { value: 'Spring Reset Challenge' } })
+    expect(deleteButton).toBeEnabled()
+    fireEvent.click(deleteButton)
+
+    await waitFor(() =>
+      expect(repository.deleteArchived).toHaveBeenCalledWith(
+        'archived-to-delete',
+      ),
+    )
+    expect(
+      await screen.findByText('No archived group challenges.'),
+    ).toBeInTheDocument()
+    expect(
+      await screen.findByText(/personal records were preserved/),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('keeps the archived challenge visible when permanent deletion fails', async () => {
+    const archived = createChallengeFixture({
+      id: 'archived-delete-failed',
+      name: 'Spring Reset Challenge',
+      status: 'archived',
+      archivedFromStatus: 'active',
+    })
+    const { repository } = installPersistence([archived])
+    repository.deleteArchived.mockResolvedValue({
+      error: { kind: 'request', message: 'Denied' },
+      state: 'error',
+    })
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('tab', { name: /Archived/ }))
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Delete permanently' }),
+    )
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Delete this challenge permanently?',
+    })
+    fireEvent.change(
+      within(dialog).getByLabelText('Type the challenge name to confirm'),
+      { target: { value: 'Spring Reset Challenge' } },
+    )
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Delete challenge' }),
+    )
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'The challenge could not be deleted. No completion was confirmed',
+    )
+    expect(
+      screen.getByRole('heading', { name: 'Spring Reset Challenge' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 
   it.each([

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 
 import { useOptionalAuth } from '../auth/useAuth'
 import { Button, Card, PageHeader, StatusPill } from '../components/ui'
+import { DeleteArchivedChallengeDialog } from '../components/DeleteArchivedChallengeDialog'
 import { createPersistence } from '../data/persistence'
 import { formatChartDate as formatDate } from '../models/chartDate'
 import type { Challenge } from '../models/challenge'
@@ -54,6 +55,10 @@ export function ChallengeManagementPage() {
     generation.current = { key: ownerKey, id: generation.current.id + 1 }
   }
   const sessionGeneration = generation.current.id
+  const [deleteChoice, setDeleteChoice] = useState<{
+    generation: number
+    challenge: Challenge | null
+  }>({ generation: sessionGeneration, challenge: null })
   const [action, setAction] = useState({
     generation: sessionGeneration,
     savingId: '',
@@ -159,6 +164,10 @@ export function ChallengeManagementPage() {
     restoreChoice.key === ownerKey ? restoreChoice.values : {}
   const visibleChallenges =
     selectedTab === 'active' ? activeChallenges : archivedChallenges
+  const deletingChallenge =
+    deleteChoice.generation === sessionGeneration
+      ? deleteChoice.challenge
+      : null
 
   function selectTab(next: Tab) {
     setTabState({ key: ownerKey, tab: next })
@@ -176,6 +185,30 @@ export function ChallengeManagementPage() {
         [challengeId]: value,
       },
     }))
+  }
+
+  function closeDeleteDialog() {
+    setDeleteChoice({ generation: sessionGeneration, challenge: null })
+  }
+
+  function completeDelete(deletedChallenge: Challenge) {
+    setSnapshot((current) => {
+      if (
+        generation.current.id !== sessionGeneration ||
+        current.key !== ownerKey
+      )
+        return current
+      return {
+        ...current,
+        challenges: current.challenges.filter(
+          (challenge) => challenge.id !== deletedChallenge.id,
+        ),
+      }
+    })
+    closeDeleteDialog()
+    setActionMessage(
+      `${deletedChallenge.name} was permanently deleted. Its group history and sharing links were removed; personal records were preserved.`,
+    )
   }
 
   async function transitionChallenge(challenge: Challenge) {
@@ -390,6 +423,19 @@ export function ChallengeManagementPage() {
                           >
                             View history
                           </Link>
+                          <Button
+                            className="border border-red-200 bg-red-50 text-red-800 hover:bg-red-100"
+                            disabled={Boolean(savingId)}
+                            onClick={() =>
+                              setDeleteChoice({
+                                generation: sessionGeneration,
+                                challenge,
+                              })
+                            }
+                            variant="secondary"
+                          >
+                            Delete permanently
+                          </Button>
                           {needsLegacyChoice ? (
                             <label className="text-xs font-semibold text-ink-muted">
                               Original status not recorded. Choose a safe
@@ -491,8 +537,9 @@ export function ChallengeManagementPage() {
             Personal records remain separate.
           </p>
           <p className="mt-1 text-sm leading-6 text-ink-muted">
-            Everyone can continue to edit their own personal weigh-ins. This
-            page changes only the group challenge lifecycle.
+            Everyone can continue to edit their own personal weigh-ins.
+            Permanently deleting an archived challenge removes its group history
+            and sharing links while preserving personal records.
           </p>
         </aside>
 
@@ -503,6 +550,18 @@ export function ChallengeManagementPage() {
           Back to Group
         </Link>
       </Card>
+      {deletingChallenge ? (
+        <DeleteArchivedChallengeDialog
+          challenge={deletingChallenge}
+          deleteArchived={
+            persistence.mode === 'unavailable'
+              ? async () => ({ data: null, state: 'empty' as const })
+              : persistence.repositories.challenges.deleteArchived
+          }
+          onClose={closeDeleteDialog}
+          onDeleted={completeDelete}
+        />
+      ) : null}
     </section>
   )
 }
