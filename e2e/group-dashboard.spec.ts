@@ -26,6 +26,7 @@ async function installGroupFixtures(
   priorOwnWeight?: number,
   targetChangeControl?: TargetChangeControl,
   startingWeightCorrectionControl?: StartingWeightCorrectionControl,
+  challengeOwnerId = 'e2e-owner',
 ) {
   const challengeId = ownEntries ? ownGroupId : 'e2e-challenge'
   const secondId = ownEntries ? secondGroupId : 'e2e-second-group'
@@ -269,7 +270,7 @@ async function installGroupFixtures(
             end_date: '2026-12-01',
             id: challengeId,
             name: 'E2E authorized group',
-            owner_id: 'e2e-owner',
+            owner_id: challengeOwnerId,
             start_date: '2026-09-17',
             status: 'active',
             target_weight_kg: null,
@@ -284,7 +285,7 @@ async function installGroupFixtures(
                   end_date: '2026-12-01',
                   id: secondId,
                   name: 'Second authorized group',
-                  owner_id: 'e2e-owner',
+                  owner_id: challengeOwnerId,
                   start_date: '2026-09-17',
                   status: 'active',
                   target_weight_kg: null,
@@ -2670,3 +2671,60 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
     }
   })
 }
+
+test('shows the challenge owner badge only in Members and fits on mobile', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 800 })
+  await installGroupFixtures(
+    page,
+    true,
+    true,
+    false,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    otherViewerId,
+  )
+  await page.goto(
+    `/e2e/fixtures/today-harness.html?scenario=group&user=${viewerId}&route=${encodeURIComponent(`/group?challenge=${ownGroupId}`)}`,
+  )
+
+  const sections = page.getByRole('navigation', { name: 'Group sections' })
+  await sections.getByRole('link', { name: 'Members', exact: true }).click()
+  await expect(
+    page.getByRole('heading', { name: 'Member progress', exact: true }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('heading', {
+      name: 'Same display name Owner',
+      exact: true,
+    }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: 'Same display name', exact: true }),
+  ).toBeVisible()
+  const ownerBadge = page.getByText('Owner', { exact: true })
+  await expect(ownerBadge).toHaveCount(1)
+  const badgeMetrics = await ownerBadge.evaluate((element) => {
+    const bounds = element.getBoundingClientRect()
+    return {
+      fontSize: getComputedStyle(element).fontSize,
+      height: bounds.height,
+    }
+  })
+  expect(badgeMetrics.fontSize).toBe('12px')
+  expect(badgeMetrics.height).toBeGreaterThanOrEqual(20)
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true)
+
+  await sections.getByRole('link', { name: 'Charts', exact: true }).click()
+  await expect(page.getByText('Owner', { exact: true })).toHaveCount(0)
+  await expect(
+    page.getByRole('list', { name: 'Group chart legend' }),
+  ).not.toContainText('Owner')
+})

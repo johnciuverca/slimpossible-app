@@ -1615,6 +1615,9 @@ export function GroupDashboardPage() {
 
   const ownMemberKey =
     data && ownerId ? ownGroupMemberKey(data.challenge.id, ownerId) : null
+  const challengeOwnerMemberKey = data
+    ? ownGroupMemberKey(data.challenge.id, data.challenge.ownerId)
+    : null
   const ownParticipant =
     personalWorkspace.contexts.state === 'ready'
       ? (personalWorkspace.contexts.data.participants.find(
@@ -2375,7 +2378,14 @@ export function GroupDashboardPage() {
                 key={member.memberKey}
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <h3 className="font-semibold">{member.displayName}</h3>
+                  <h3 className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-semibold">
+                    {member.displayName}
+                    {member.memberKey === challengeOwnerMemberKey ? (
+                      <span className="inline-flex min-h-5 items-center whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold leading-4 text-emerald-800">
+                        Owner
+                      </span>
+                    ) : null}
+                  </h3>
                   <span>
                     {displayPercentage === null
                       ? 'Unavailable'
