@@ -1844,9 +1844,9 @@ for (const viewport of [
       'Show last 3 months',
       'Show all dates',
     ].entries()) {
-      await expect(quickRanges.getByRole('button').nth(index)).toHaveAccessibleName(
-        name,
-      )
+      await expect(
+        quickRanges.getByRole('button').nth(index),
+      ).toHaveAccessibleName(name)
     }
     const chartPointCount = await chart
       .locator('circle[data-chart-point]')
