@@ -198,9 +198,7 @@ it.each([83, 120])(
     expect(Math.max(...majorTicks())).toBeLessThanOrEqual(100.5)
     expect(chart().querySelectorAll('[data-chart-minor-tick]')).toHaveLength(0)
     expect(chart().querySelector('[data-chart-reference]')).toBeNull()
-    expect(screen.getByRole('note')).toHaveTextContent(
-      `outside the data-scaled chart range: The selected goal target at ${referenceWeightKg} kilograms`,
-    )
+    expect(screen.queryByRole('note')).not.toBeInTheDocument()
   },
 )
 

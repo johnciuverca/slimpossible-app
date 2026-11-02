@@ -1826,9 +1826,6 @@ for (const viewport of [
       name: 'Quick date ranges',
     })
     await expect(quickRanges.getByRole('button')).toHaveCount(5)
-    await expect(quickRanges).toContainText(
-      /Week ranges end on your newest recorded weigh-in/,
-    )
     const oneWeek = quickRanges.getByRole('button', {
       name: 'Show last 1 week',
     })

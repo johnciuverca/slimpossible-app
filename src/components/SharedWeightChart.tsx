@@ -466,7 +466,7 @@ export function SharedWeightChart({
           aria-label="Quick date ranges"
           style={{ paddingLeft: `${plotStartPercent}%` }}
         >
-          <span className="mr-1 font-semibold text-ink">Show range</span>
+          <span className="mr-1 font-semibold text-ink">Date range</span>
           <button
             type="button"
             aria-label="Show last 1 week"
@@ -517,11 +517,6 @@ export function SharedWeightChart({
           >
             All
           </button>
-          <p className="basis-full text-xs text-ink-muted">
-            Week ranges end on your newest recorded weigh-in. 1W shows seven
-            calendar days and 2W shows fourteen; shorter histories start at the
-            first available entry.
-          </p>
         </div>
       </div>
       <div
@@ -806,18 +801,6 @@ export function SharedWeightChart({
             {visibleActivePoint.point.tooltip ?? visibleActivePoint.point.title}
           </div>
         ) : null}
-        {referenceLinesOutsideRange.map((line) => (
-          <p
-            key={line.id}
-            data-chart-reference-outside
-            role="note"
-            className="mt-2 text-xs text-ink-muted"
-          >
-            Goal reference is outside the data-scaled chart range:{' '}
-            {line.title ?? `${format(line.from.value)} kg`}. The chart scale
-            follows the visible recorded weights.
-          </p>
-        ))}
       </div>
       <div
         className="mt-2 px-2"
