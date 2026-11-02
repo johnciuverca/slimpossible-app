@@ -1515,19 +1515,15 @@ describe('GroupDashboardPage', () => {
     expect(
       screen.queryByRole('table', { name: 'Shared group weight history' }),
     ).not.toBeInTheDocument()
-    const settings = screen.getByRole('link', {
-      name: 'Manage challenges',
-    })
-    expect(settings).toHaveAttribute('href', '/challenge/manage')
-    expect(settings).toHaveAttribute('title', 'Manage challenges')
-    const settingsIcon = settings.querySelector('svg[aria-hidden="true"]')
-    expect(settingsIcon).toHaveAttribute('viewBox', '0 0 28 28')
-    expect(settingsIcon).toHaveAttribute('width', '24')
-    expect(settingsIcon?.querySelectorAll(':scope > g > g')).toHaveLength(2)
+    const manage = screen.getByRole('link', { name: 'Manage' })
+    expect(manage).toHaveAttribute('href', '/challenge/manage')
+    expect(manage).toHaveAttribute('title', 'Manage challenges')
     expect(
-      settings.parentElement?.querySelector('a[aria-current="page"]'),
+      manage.parentElement?.querySelector('a[aria-current="page"]'),
     ).toBeInTheDocument()
-    expect(settings.closest('button')).toBeNull()
+    expect(
+      screen.queryByRole('link', { name: 'Manage challenges' }),
+    ).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('link', { name: 'Weekly results' }))
     expect(
       await screen.findByRole('heading', { name: 'Weekly result' }),

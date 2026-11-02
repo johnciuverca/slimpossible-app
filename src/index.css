@@ -1051,21 +1051,6 @@ body {
   min-width: 44px;
   padding: 0;
 }
-.group-workspace .challenge-context-with-settings {
-  display: flex;
-  align-items: center;
-  overflow: hidden;
-  border: 1px solid var(--group-accent);
-  border-radius: 24px;
-  background: var(--group-accent-strong);
-}
-.group-workspace .challenge-context-with-settings > a[aria-current='page'] {
-  min-height: 42px;
-  padding-right: 8px;
-  border: 0;
-  background: transparent;
-  color: var(--group-ink);
-}
 .challenge-settings-link {
   display: inline-flex;
   min-width: 44px;
@@ -1074,10 +1059,6 @@ body {
   justify-content: center;
   color: var(--group-accent-ink, #b6f5e3);
   border-radius: 50%;
-}
-.challenge-context-with-settings > .challenge-settings-link {
-  border-left: 1px solid var(--group-line);
-  border-radius: 0;
 }
 .challenge-settings-link:hover {
   background: var(--group-accent-soft, #12352f);
