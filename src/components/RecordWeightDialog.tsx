@@ -63,10 +63,16 @@ export function RecordWeightDialog({
         ? document.activeElement
         : null
     element?.showModal()
-    if (
-      window.matchMedia?.('(min-width: 640px)').matches ??
-      window.innerWidth >= 640
-    )
+    const viewport = window.visualViewport
+    const wideViewport =
+      (window.matchMedia?.('(min-width: 768px) and (min-height: 501px)')
+        .matches ??
+        (window.innerWidth >= 768 && window.innerHeight > 500)) &&
+      (!viewport ||
+        (viewport.width >= 768 &&
+          viewport.height > 500 &&
+          viewport.scale <= 1.05))
+    if (wideViewport)
       element?.querySelector<HTMLInputElement>('input[type="number"]')?.focus()
     else element?.focus()
     return () => {
@@ -79,13 +85,25 @@ export function RecordWeightDialog({
     if (!dialog.current) return
     const element = dialog.current
     const viewport = window.visualViewport
-    const compactViewport = window.matchMedia?.('(max-width: 639px)')
+    const compactViewport = window.matchMedia?.(
+      '(max-width: 767px), (max-height: 500px)',
+    )
     const updateViewport = () => {
-      if (!(compactViewport?.matches ?? window.innerWidth < 640) || !viewport) {
+      const isCompact =
+        compactViewport?.matches ??
+        (window.innerWidth < 768 || window.innerHeight <= 500)
+      const compactVisualViewport =
+        !!viewport &&
+        (viewport.width < 768 ||
+          viewport.height <= 500 ||
+          viewport.scale > 1.05)
+      if ((!isCompact && !compactVisualViewport) || !viewport) {
+        element.removeAttribute('data-compact-viewport')
         element.style.removeProperty('--record-weight-available-height')
         element.style.removeProperty('bottom')
         return
       }
+      element.setAttribute('data-compact-viewport', '')
       const visibleBottom = viewport.offsetTop + viewport.height
       const keyboardInset = Math.max(0, window.innerHeight - visibleBottom)
       element.style.setProperty(
@@ -208,7 +226,7 @@ export function RecordWeightDialog({
           event.preventDefault()
           dismiss()
         }}
-        className="fixed inset-x-0 bottom-0 top-auto m-0 max-h-[90dvh] w-full max-w-none overflow-y-auto overscroll-contain rounded-t-3xl border border-line bg-panel p-5 text-ink shadow-panel backdrop:bg-black/40 sm:inset-0 sm:m-auto sm:max-w-xl sm:rounded-3xl sm:p-8"
+        className="record-weight-dialog fixed inset-x-0 bottom-0 top-auto m-0 max-h-[90dvh] w-full max-w-none overflow-y-auto overscroll-contain rounded-t-3xl border border-line bg-panel p-5 text-ink shadow-panel backdrop:bg-black/40"
         style={{
           maxHeight: 'min(90dvh, var(--record-weight-available-height, 90dvh))',
         }}

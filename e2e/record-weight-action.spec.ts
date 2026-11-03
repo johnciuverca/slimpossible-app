@@ -22,9 +22,8 @@ test('compact mobile Record weight keeps group choices and Save reachable', asyn
   ])
   expect(dateBox).not.toBeNull()
   expect(weightBox).not.toBeNull()
-  expect(Math.abs(dateBox!.y - weightBox!.y)).toBeLessThan(2)
-  expect(dateBox!.x + dateBox!.width).toBeLessThanOrEqual(weightBox!.x)
-  expect(weightBox!.x - (dateBox!.x + dateBox!.width)).toBeGreaterThan(0)
+  expect(Math.abs(dateBox!.x - weightBox!.x)).toBeLessThan(2)
+  expect(dateBox!.y + dateBox!.height).toBeLessThanOrEqual(weightBox!.y)
 
   const noteToggle = dialog.getByRole('button', { name: /Private note/ })
   await expect(noteToggle).toHaveAttribute('aria-expanded', 'false')
@@ -96,6 +95,123 @@ test('compact mobile Record weight keeps group choices and Save reachable', asyn
     delete (visualViewport as VisualViewport & { height?: number }).height
     visualViewport.dispatchEvent(new Event('resize'))
   })
+})
+
+test('localized date and weight controls fit narrow, landscape, zoomed, and wide viewports', async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    locale: 'ru-RU',
+    viewport: { width: 320, height: 720 },
+  })
+  const page = await context.newPage()
+  await page.goto(fixture('/dashboard'))
+  expect(await page.evaluate(() => navigator.language)).toMatch(/^ru/)
+  await page.getByRole('button', { name: 'Record weight', exact: true }).click()
+
+  const dialog = page.getByRole('dialog', { name: 'Record weight' })
+  const date = dialog.getByLabel('Date')
+  const weight = dialog.getByLabel('Weight in kg')
+  await date.fill('2025-11-03')
+
+  for (const viewport of [
+    { width: 320, height: 720 },
+    { width: 360, height: 720 },
+    { width: 390, height: 844 },
+    { width: 767, height: 390 },
+    { width: 844, height: 390 },
+    { width: 1024, height: 768 },
+  ]) {
+    await page.setViewportSize(viewport)
+    const [dateBox, weightBox, dateRow, weightRow, dialogBox] =
+      await Promise.all([
+        date.boundingBox(),
+        weight.boundingBox(),
+        date.locator('xpath=../..').boundingBox(),
+        weight.locator('xpath=../..').boundingBox(),
+        dialog.boundingBox(),
+      ])
+    expect(dateBox).not.toBeNull()
+    expect(weightBox).not.toBeNull()
+    expect(dateRow).not.toBeNull()
+    expect(weightRow).not.toBeNull()
+    expect(dialogBox).not.toBeNull()
+    expect(dateBox!.x).toBeGreaterThanOrEqual(dateRow!.x)
+    expect(dateBox!.x + dateBox!.width).toBeLessThanOrEqual(
+      dateRow!.x + dateRow!.width,
+    )
+    expect(weightBox!.x).toBeGreaterThanOrEqual(weightRow!.x)
+    expect(weightBox!.x + weightBox!.width).toBeLessThanOrEqual(
+      weightRow!.x + weightRow!.width,
+    )
+    expect(dateRow!.x).toBeGreaterThanOrEqual(dialogBox!.x)
+    expect(weightRow!.x + weightRow!.width).toBeLessThanOrEqual(
+      dialogBox!.x + dialogBox!.width,
+    )
+
+    const stacked = viewport.width < 768 || viewport.height <= 500
+    if (stacked) {
+      expect(dateBox!.y + dateBox!.height).toBeLessThanOrEqual(weightBox!.y)
+      expect(Math.abs(dateBox!.x - weightBox!.x)).toBeLessThan(2)
+      await expect(
+        dialog.getByRole('button', { name: /Private note/ }),
+      ).toHaveAttribute('aria-expanded', 'false')
+    } else {
+      expect(dateBox!.x + dateBox!.width).toBeLessThanOrEqual(weightBox!.x)
+      expect(weightBox!.x - (dateBox!.x + dateBox!.width)).toBeGreaterThan(0)
+    }
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(viewport.width)
+  }
+
+  await page.evaluate(() => {
+    const viewport = window.visualViewport
+    if (!viewport) throw new Error('VisualViewport is unavailable')
+    Object.defineProperties(viewport, {
+      width: { configurable: true, value: 512 },
+      scale: { configurable: true, value: 2 },
+    })
+    viewport.dispatchEvent(new Event('resize'))
+  })
+  await expect(dialog).toHaveAttribute('data-compact-viewport', '')
+  await expect(
+    dialog.getByRole('button', { name: /Private note/ }),
+  ).toHaveAttribute('aria-expanded', 'false')
+  const [zoomedDateBox, zoomedWeightBox] = await Promise.all([
+    date.boundingBox(),
+    weight.boundingBox(),
+  ])
+  expect(zoomedDateBox!.y + zoomedDateBox!.height).toBeLessThanOrEqual(
+    zoomedWeightBox!.y,
+  )
+
+  await page.setViewportSize({ width: 844, height: 390 })
+  const noteToggle = dialog.getByRole('button', { name: /Private note/ })
+  await expect(noteToggle).toHaveAttribute('aria-expanded', 'false')
+  await expect(
+    dialog.getByRole('checkbox', { name: 'Synthetic active group' }),
+  ).toBeVisible()
+
+  const save = dialog.getByRole('button', { name: 'Save weight', exact: true })
+  await page.getByLabel('Weight in kg').focus()
+  await page.evaluate(() => {
+    const viewport = window.visualViewport
+    if (!viewport) throw new Error('VisualViewport is unavailable')
+    Object.defineProperty(viewport, 'height', {
+      configurable: true,
+      value: 180,
+    })
+    viewport.dispatchEvent(new Event('resize'))
+  })
+  await expect
+    .poll(() => dialog.evaluate((element) => element.style.bottom))
+    .toBe('210px')
+  await save.scrollIntoViewIfNeeded()
+  const saveBox = (await save.boundingBox())!
+  expect(saveBox.y + saveBox.height).toBeLessThanOrEqual(180)
+
+  await context.close()
 })
 
 for (const width of [1280, 390]) {

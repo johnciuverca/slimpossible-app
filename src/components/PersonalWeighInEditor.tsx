@@ -41,11 +41,18 @@ export function PersonalWeighInEditor({
   compactMobile = false,
 }: PersonalWeighInEditorProps) {
   const initial = useRef(JSON.stringify(values))
+  const visualViewport = window.visualViewport
+  const wideEnoughForColumns =
+    window.matchMedia?.('(min-width: 768px) and (min-height: 501px)').matches ??
+    (window.innerWidth >= 768 && window.innerHeight > 500)
+  const zoomedIntoCompactViewport =
+    !!visualViewport &&
+    (visualViewport.width < 768 ||
+      visualViewport.height <= 500 ||
+      visualViewport.scale > 1.05)
   const [noteExpanded, setNoteExpanded] = useState(
     () =>
-      !compactMobile ||
-      (window.matchMedia?.('(min-width: 640px)').matches ??
-        window.innerWidth >= 640),
+      !compactMobile || (wideEnoughForColumns && !zoomedIntoCompactViewport),
   )
   useUnsavedNavigation(
     isSaving
@@ -56,11 +63,24 @@ export function PersonalWeighInEditor({
   )
   useEffect(() => {
     if (!compactMobile || !window.matchMedia) return
-    const breakpoint = window.matchMedia('(min-width: 640px)')
-    const syncNoteVisibility = (event: MediaQueryListEvent) =>
-      setNoteExpanded(event.matches)
+    const breakpoint = window.matchMedia(
+      '(min-width: 768px) and (min-height: 501px)',
+    )
+    const viewport = window.visualViewport
+    const syncNoteVisibility = () =>
+      setNoteExpanded(
+        breakpoint.matches &&
+          (!viewport ||
+            (viewport.width >= 768 &&
+              viewport.height > 500 &&
+              viewport.scale <= 1.05)),
+      )
     breakpoint.addEventListener('change', syncNoteVisibility)
-    return () => breakpoint.removeEventListener('change', syncNoteVisibility)
+    viewport?.addEventListener('resize', syncNoteVisibility)
+    return () => {
+      breakpoint.removeEventListener('change', syncNoteVisibility)
+      viewport?.removeEventListener('resize', syncNoteVisibility)
+    }
   }, [compactMobile])
   function toggleGroup(id: string, selected: boolean) {
     onChange(
@@ -74,12 +94,12 @@ export function PersonalWeighInEditor({
   return (
     <form
       aria-label="Personal weigh-in form"
-      className={compactMobile ? 'space-y-4 sm:space-y-5' : 'space-y-5'}
+      className={compactMobile ? 'space-y-4 md:space-y-5' : 'space-y-5'}
       noValidate
       onSubmit={onSubmit}
     >
       {compactMobile ? (
-        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3 sm:block sm:space-y-5">
+        <div className="record-weight-fields">
           <div className="min-w-0">
             <TextInput
               className="min-w-0 max-w-full"
@@ -142,7 +162,7 @@ export function PersonalWeighInEditor({
           <button
             aria-controls="personal-weigh-in-note-content"
             aria-expanded={noteExpanded}
-            className="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-line px-3 py-2 text-left sm:hidden"
+            className="record-weight-note-toggle flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-line px-3 py-2 text-left"
             disabled={isSaving}
             onClick={() => setNoteExpanded((expanded) => !expanded)}
             type="button"
@@ -163,16 +183,16 @@ export function PersonalWeighInEditor({
         ) : null}
         <div
           className={
-            compactMobile && !noteExpanded ? 'hidden sm:block' : undefined
+            compactMobile
+              ? `record-weight-note-content${noteExpanded ? '' : ' is-collapsed'}`
+              : undefined
           }
           id="personal-weigh-in-note-content"
         >
           <label
             className={
               compactMobile
-                ? noteExpanded
-                  ? 'text-sm font-semibold text-ink sm:block'
-                  : 'hidden text-sm font-semibold text-ink sm:block'
+                ? `record-weight-note-label${noteExpanded ? ' is-visible' : ''} text-sm font-semibold text-ink`
                 : 'text-sm font-semibold text-ink'
             }
             htmlFor="personal-weigh-in-note"
@@ -251,7 +271,7 @@ export function PersonalWeighInEditor({
       <div
         className={
           compactMobile
-            ? 'sticky bottom-[-1.25rem] z-10 -mx-5 mt-1 flex flex-wrap gap-3 border-t border-line bg-panel px-5 pt-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:static sm:mx-0 sm:mt-0 sm:border-0 sm:bg-transparent sm:p-0'
+            ? 'record-weight-actions sticky bottom-[-1.25rem] z-10 -mx-5 mt-1 flex flex-wrap gap-3 border-t border-line bg-panel px-5 pt-3 pb-[calc(env(safe-area-inset-bottom)+1rem)]'
             : 'flex flex-wrap gap-3'
         }
       >

@@ -43,7 +43,7 @@ describe('PersonalWeighInEditor', () => {
     expect(screen.getByLabelText('Weight in kg')).toBeVisible()
     expect(
       screen.getByLabelText('Private note (optional)').parentElement,
-    ).toHaveClass('hidden')
+    ).toHaveClass('record-weight-note-content', 'is-collapsed')
 
     fireEvent.click(toggle)
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
@@ -52,7 +52,7 @@ describe('PersonalWeighInEditor', () => {
     ).not.toHaveClass('hidden')
     expect(
       screen.getByLabelText('Private note (optional)').parentElement,
-    ).not.toHaveClass('hidden')
+    ).not.toHaveClass('is-collapsed')
     expect(screen.getByLabelText('Private note (optional)')).toHaveValue(
       'Existing private note',
     )
