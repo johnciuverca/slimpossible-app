@@ -79,30 +79,36 @@ export function PersonalWeighInEditor({
       onSubmit={onSubmit}
     >
       {compactMobile ? (
-        <div className="grid grid-cols-2 gap-3 sm:block sm:space-y-5">
-          <TextInput
-            error={errors.date}
-            disabled={isSaving}
-            id="personal-weigh-in-date"
-            label="Date"
-            max={today}
-            onChange={(event) => onChange('date', event.target.value)}
-            type="date"
-            value={values.date}
-          />
-          <TextInput
-            error={errors.weightKg}
-            disabled={isSaving}
-            id="personal-weigh-in-weight"
-            inputMode="decimal"
-            label="Weight in kg"
-            min="0"
-            onChange={(event) => onChange('weightKg', event.target.value)}
-            onWheel={(event) => event.currentTarget.blur()}
-            step="0.01"
-            type="number"
-            value={values.weightKg}
-          />
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3 sm:block sm:space-y-5">
+          <div className="min-w-0">
+            <TextInput
+              className="min-w-0 max-w-full"
+              error={errors.date}
+              disabled={isSaving}
+              id="personal-weigh-in-date"
+              label="Date"
+              max={today}
+              onChange={(event) => onChange('date', event.target.value)}
+              type="date"
+              value={values.date}
+            />
+          </div>
+          <div className="min-w-0">
+            <TextInput
+              className="min-w-0 max-w-full"
+              error={errors.weightKg}
+              disabled={isSaving}
+              id="personal-weigh-in-weight"
+              inputMode="decimal"
+              label="Weight in kg"
+              min="0"
+              onChange={(event) => onChange('weightKg', event.target.value)}
+              onWheel={(event) => event.currentTarget.blur()}
+              step="0.01"
+              type="number"
+              value={values.weightKg}
+            />
+          </div>
         </div>
       ) : (
         <>

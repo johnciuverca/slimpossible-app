@@ -23,6 +23,8 @@ test('compact mobile Record weight keeps group choices and Save reachable', asyn
   expect(dateBox).not.toBeNull()
   expect(weightBox).not.toBeNull()
   expect(Math.abs(dateBox!.y - weightBox!.y)).toBeLessThan(2)
+  expect(dateBox!.x + dateBox!.width).toBeLessThanOrEqual(weightBox!.x)
+  expect(weightBox!.x - (dateBox!.x + dateBox!.width)).toBeGreaterThan(0)
 
   const noteToggle = dialog.getByRole('button', { name: /Private note/ })
   await expect(noteToggle).toHaveAttribute('aria-expanded', 'false')
