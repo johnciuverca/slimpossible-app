@@ -3,6 +3,99 @@ import { expect, test } from '@playwright/test'
 const fixture = (path: string) =>
   `/e2e/fixtures/personal-dashboard-harness.html?${new URLSearchParams({ scenario: 'groups', path })}`
 
+test('compact mobile Record weight keeps group choices and Save reachable', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(fixture('/dashboard'))
+  await page.getByRole('button', { name: 'Record weight', exact: true }).click()
+
+  let dialog = page.getByRole('dialog', { name: 'Record weight' })
+  const date = dialog.getByLabel('Date')
+  const weight = dialog.getByLabel('Weight in kg')
+  await expect(date).toBeVisible()
+  await expect(weight).toBeVisible()
+  await expect(weight).not.toBeFocused()
+  const [dateBox, weightBox] = await Promise.all([
+    date.boundingBox(),
+    weight.boundingBox(),
+  ])
+  expect(dateBox).not.toBeNull()
+  expect(weightBox).not.toBeNull()
+  expect(Math.abs(dateBox!.y - weightBox!.y)).toBeLessThan(2)
+
+  const noteToggle = dialog.getByRole('button', { name: /Private note/ })
+  await expect(noteToggle).toHaveAttribute('aria-expanded', 'false')
+  await expect(dialog.getByLabel('Private note (optional)')).not.toBeVisible()
+  await expect(
+    dialog.getByRole('checkbox', { name: 'Synthetic draft group' }),
+  ).toBeVisible()
+  const group = dialog.getByRole('checkbox', {
+    name: 'Synthetic active group',
+  })
+  await expect(group).toBeVisible()
+  await expect(group).not.toBeChecked()
+
+  const save = dialog.getByRole('button', { name: 'Save weight', exact: true })
+  await expect(save).toBeVisible()
+  const saveBox = (await save.boundingBox())!
+  expect(saveBox.y + saveBox.height).toBeLessThanOrEqual(844)
+
+  await noteToggle.click()
+  await expect(
+    dialog.getByText('Private note (optional)', { exact: true }),
+  ).toBeVisible()
+  await dialog
+    .getByLabel('Private note (optional)')
+    .fill('Private compact note')
+  await weight.fill('82.3')
+  await group.check()
+  await save.click()
+  await expect(dialog).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Record weight', exact: true }).click()
+  dialog = page.getByRole('dialog', { name: 'Edit weight' })
+  const savedNoteToggle = dialog.getByRole('button', { name: /Private note/ })
+  await expect(savedNoteToggle).toHaveAttribute('aria-expanded', 'false')
+  await expect(savedNoteToggle).toContainText('Saved note')
+  await savedNoteToggle.click()
+  await expect(dialog.getByLabel('Private note (optional)')).toHaveValue(
+    'Private compact note',
+  )
+  await expect(
+    dialog.getByRole('checkbox', { name: 'Synthetic active group' }),
+  ).toBeChecked()
+
+  const update = dialog.getByRole('button', {
+    name: 'Update weight',
+    exact: true,
+  })
+  await dialog.getByLabel('Weight in kg').focus()
+  await page.evaluate(() => {
+    const visualViewport = window.visualViewport
+    if (!visualViewport) throw new Error('VisualViewport is unavailable')
+    Object.defineProperty(visualViewport, 'height', {
+      configurable: true,
+      value: 400,
+    })
+    visualViewport.dispatchEvent(new Event('resize'))
+  })
+  await expect(update).toBeVisible()
+  await expect
+    .poll(() => dialog.evaluate((element) => element.style.bottom))
+    .toBe('444px')
+  const keyboardViewportSave = (await update.boundingBox())!
+  expect(
+    keyboardViewportSave.y + keyboardViewportSave.height,
+  ).toBeLessThanOrEqual(400)
+  await page.evaluate(() => {
+    const visualViewport = window.visualViewport
+    if (!visualViewport) return
+    delete (visualViewport as VisualViewport & { height?: number }).height
+    visualViewport.dispatchEvent(new Event('resize'))
+  })
+})
+
 for (const width of [1280, 390]) {
   test(`shared recording action preserves today's canonical note and shares across pages at ${width}px`, async ({
     page,
@@ -49,6 +142,8 @@ for (const width of [1280, 390]) {
     await action.click()
     let editor = page.getByRole('dialog')
     await editor.getByLabel('Weight in kg').fill('90')
+    if (width <= 600)
+      await editor.getByRole('button', { name: /Private note/ }).click()
     await editor
       .getByLabel('Private note (optional)')
       .fill('Synthetic preserved note')
@@ -154,7 +249,12 @@ for (const width of [1280, 390]) {
         path === '/weigh-ins'
           ? page.getByRole('form', { name: 'Personal weigh-in form' })
           : page.getByRole('dialog', { name: 'Edit weight' })
-      await expect(editor.getByLabel('Weight in kg')).toBeFocused()
+      if (path === '/weigh-ins' || width > 600)
+        await expect(editor.getByLabel('Weight in kg')).toBeFocused()
+      else {
+        await expect(editor).toBeFocused()
+        await editor.getByRole('button', { name: /Private note/ }).click()
+      }
       await expect(editor.getByLabel('Private note (optional)')).toHaveValue(
         'Synthetic preserved note',
       )

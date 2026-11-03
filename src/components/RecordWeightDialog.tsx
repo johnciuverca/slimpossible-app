@@ -63,10 +63,47 @@ export function RecordWeightDialog({
         ? document.activeElement
         : null
     element?.showModal()
-    element?.querySelector<HTMLInputElement>('input[type="number"]')?.focus()
+    if (
+      window.matchMedia?.('(min-width: 640px)').matches ??
+      window.innerWidth >= 640
+    )
+      element?.querySelector<HTMLInputElement>('input[type="number"]')?.focus()
+    else element?.focus()
     return () => {
       active.current = false
       element?.close()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!dialog.current) return
+    const element = dialog.current
+    const viewport = window.visualViewport
+    const compactViewport = window.matchMedia?.('(max-width: 639px)')
+    const updateViewport = () => {
+      if (!(compactViewport?.matches ?? window.innerWidth < 640) || !viewport) {
+        element.style.removeProperty('--record-weight-available-height')
+        element.style.removeProperty('bottom')
+        return
+      }
+      const visibleBottom = viewport.offsetTop + viewport.height
+      const keyboardInset = Math.max(0, window.innerHeight - visibleBottom)
+      element.style.setProperty(
+        '--record-weight-available-height',
+        `${Math.max(240, viewport.height)}px`,
+      )
+      element.style.bottom = `${keyboardInset}px`
+    }
+    updateViewport()
+    viewport?.addEventListener('resize', updateViewport)
+    viewport?.addEventListener('scroll', updateViewport)
+    compactViewport?.addEventListener('change', updateViewport)
+    return () => {
+      viewport?.removeEventListener('resize', updateViewport)
+      viewport?.removeEventListener('scroll', updateViewport)
+      compactViewport?.removeEventListener('change', updateViewport)
+      element.style.removeProperty('--record-weight-available-height')
+      element.style.removeProperty('bottom')
     }
   }, [])
 
@@ -163,6 +200,7 @@ export function RecordWeightDialog({
     <>
       <dialog
         ref={dialog}
+        tabIndex={-1}
         onKeyDown={trapDialogFocus}
         aria-labelledby="record-weight-title"
         aria-describedby="record-weight-description"
@@ -170,7 +208,10 @@ export function RecordWeightDialog({
           event.preventDefault()
           dismiss()
         }}
-        className="fixed inset-x-0 bottom-0 top-auto m-0 max-h-[90dvh] w-full max-w-none overflow-y-auto rounded-t-3xl border border-line bg-panel p-5 text-ink shadow-panel backdrop:bg-black/40 sm:inset-0 sm:m-auto sm:max-w-xl sm:rounded-3xl sm:p-8"
+        className="fixed inset-x-0 bottom-0 top-auto m-0 max-h-[90dvh] w-full max-w-none overflow-y-auto overscroll-contain rounded-t-3xl border border-line bg-panel p-5 text-ink shadow-panel backdrop:bg-black/40 sm:inset-0 sm:m-auto sm:max-w-xl sm:rounded-3xl sm:p-8"
+        style={{
+          maxHeight: 'min(90dvh, var(--record-weight-available-height, 90dvh))',
+        }}
       >
         <div className="mb-5 flex items-start justify-between gap-3">
           <div>
@@ -226,6 +267,7 @@ export function RecordWeightDialog({
               onCancel={dismiss}
               onSubmit={submit}
               submitLabel={entry ? 'Update weight' : 'Save weight'}
+              compactMobile
               onChange={(field, value) => {
                 setValues((current) =>
                   field === 'sharedChallengeIds'

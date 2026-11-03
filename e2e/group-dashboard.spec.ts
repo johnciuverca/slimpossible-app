@@ -1188,7 +1188,12 @@ for (const viewport of [
       name: 'Edit weight',
       exact: true,
     })
-    await expect(editor.getByLabel('Weight in kg')).toBeFocused()
+    if (viewport.width > 600)
+      await expect(editor.getByLabel('Weight in kg')).toBeFocused()
+    else {
+      await expect(editor).toBeFocused()
+      await editor.getByRole('button', { name: /Private note/ }).click()
+    }
     await expect(editor.getByLabel('Weight in kg')).toHaveValue('88.5')
     await expect(editor.getByLabel('Private note (optional)')).toHaveValue(
       'Author-only disposable private note',

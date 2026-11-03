@@ -1,4 +1,4 @@
-import { useRef, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useUnsavedNavigation } from './navigationSafety'
 
 import type { Challenge } from '../models/challenge'
@@ -24,6 +24,7 @@ type PersonalWeighInEditorProps = {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   submitLabel: string
   values: PersonalWeighInFormValues
+  compactMobile?: boolean
 }
 
 const today = personalWeighInToday()
@@ -37,8 +38,15 @@ export function PersonalWeighInEditor({
   onSubmit,
   submitLabel,
   values,
+  compactMobile = false,
 }: PersonalWeighInEditorProps) {
   const initial = useRef(JSON.stringify(values))
+  const [noteExpanded, setNoteExpanded] = useState(
+    () =>
+      !compactMobile ||
+      (window.matchMedia?.('(min-width: 640px)').matches ??
+        window.innerWidth >= 640),
+  )
   useUnsavedNavigation(
     isSaving
       ? 'saving'
@@ -46,6 +54,14 @@ export function PersonalWeighInEditor({
         ? 'dirty'
         : null,
   )
+  useEffect(() => {
+    if (!compactMobile || !window.matchMedia) return
+    const breakpoint = window.matchMedia('(min-width: 640px)')
+    const syncNoteVisibility = (event: MediaQueryListEvent) =>
+      setNoteExpanded(event.matches)
+    breakpoint.addEventListener('change', syncNoteVisibility)
+    return () => breakpoint.removeEventListener('change', syncNoteVisibility)
+  }, [compactMobile])
   function toggleGroup(id: string, selected: boolean) {
     onChange(
       'sharedChallengeIds',
@@ -58,64 +74,130 @@ export function PersonalWeighInEditor({
   return (
     <form
       aria-label="Personal weigh-in form"
-      className="space-y-5"
+      className={compactMobile ? 'space-y-4 sm:space-y-5' : 'space-y-5'}
       noValidate
       onSubmit={onSubmit}
     >
-      <TextInput
-        error={errors.date}
-        disabled={isSaving}
-        id="personal-weigh-in-date"
-        label="Date"
-        max={today}
-        onChange={(event) => onChange('date', event.target.value)}
-        type="date"
-        value={values.date}
-      />
-      <TextInput
-        error={errors.weightKg}
-        disabled={isSaving}
-        id="personal-weigh-in-weight"
-        inputMode="decimal"
-        label="Weight in kg"
-        min="0"
-        onChange={(event) => onChange('weightKg', event.target.value)}
-        onWheel={(event) => event.currentTarget.blur()}
-        step="0.01"
-        type="number"
-        value={values.weightKg}
-      />
+      {compactMobile ? (
+        <div className="grid grid-cols-2 gap-3 sm:block sm:space-y-5">
+          <TextInput
+            error={errors.date}
+            disabled={isSaving}
+            id="personal-weigh-in-date"
+            label="Date"
+            max={today}
+            onChange={(event) => onChange('date', event.target.value)}
+            type="date"
+            value={values.date}
+          />
+          <TextInput
+            error={errors.weightKg}
+            disabled={isSaving}
+            id="personal-weigh-in-weight"
+            inputMode="decimal"
+            label="Weight in kg"
+            min="0"
+            onChange={(event) => onChange('weightKg', event.target.value)}
+            onWheel={(event) => event.currentTarget.blur()}
+            step="0.01"
+            type="number"
+            value={values.weightKg}
+          />
+        </div>
+      ) : (
+        <>
+          <TextInput
+            error={errors.date}
+            disabled={isSaving}
+            id="personal-weigh-in-date"
+            label="Date"
+            max={today}
+            onChange={(event) => onChange('date', event.target.value)}
+            type="date"
+            value={values.date}
+          />
+          <TextInput
+            error={errors.weightKg}
+            disabled={isSaving}
+            id="personal-weigh-in-weight"
+            inputMode="decimal"
+            label="Weight in kg"
+            min="0"
+            onChange={(event) => onChange('weightKg', event.target.value)}
+            onWheel={(event) => event.currentTarget.blur()}
+            step="0.01"
+            type="number"
+            value={values.weightKg}
+          />
+        </>
+      )}
       <div>
-        <label
-          className="text-sm font-semibold text-ink"
-          htmlFor="personal-weigh-in-note"
-        >
-          Private note{' '}
-          <span className="font-normal text-ink-muted">(optional)</span>
-        </label>
-        <textarea
-          disabled={isSaving}
-          aria-describedby={
-            errors.note ? 'personal-weigh-in-note-error' : undefined
-          }
-          aria-invalid={errors.note ? true : undefined}
-          className="mt-2 block min-h-28 w-full rounded-xl border border-line bg-panel px-4 py-3 text-ink outline-none focus:border-forest-700 focus:ring-2 focus:ring-forest-100"
-          id="personal-weigh-in-note"
-          maxLength={2000}
-          onChange={(event) => onChange('note', event.target.value)}
-          value={values.note}
-        />
-        <p className="mt-2 text-xs leading-5 text-ink-muted">
-          This note is private to you and is never included in group views.
-        </p>
-        {errors.note ? (
-          <p
-            className="mt-2 text-sm text-red-700"
-            id="personal-weigh-in-note-error"
+        {compactMobile ? (
+          <button
+            aria-controls="personal-weigh-in-note-content"
+            aria-expanded={noteExpanded}
+            className="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-line px-3 py-2 text-left sm:hidden"
+            disabled={isSaving}
+            onClick={() => setNoteExpanded((expanded) => !expanded)}
+            type="button"
           >
-            {errors.note}
-          </p>
+            <span className="font-semibold text-ink">
+              {noteExpanded ? 'Private note' : 'Private note (optional)'}
+            </span>
+            <span className="min-w-0 text-right text-xs text-ink-muted">
+              {errors.note
+                ? `Needs attention: ${errors.note}`
+                : values.note.trim()
+                  ? 'Saved note · tap to view or edit'
+                  : noteExpanded
+                    ? 'Stays private'
+                    : 'Add note · stays private'}
+            </span>
+          </button>
         ) : null}
+        <div
+          className={
+            compactMobile && !noteExpanded ? 'hidden sm:block' : undefined
+          }
+          id="personal-weigh-in-note-content"
+        >
+          <label
+            className={
+              compactMobile
+                ? noteExpanded
+                  ? 'text-sm font-semibold text-ink sm:block'
+                  : 'hidden text-sm font-semibold text-ink sm:block'
+                : 'text-sm font-semibold text-ink'
+            }
+            htmlFor="personal-weigh-in-note"
+          >
+            Private note{' '}
+            <span className="font-normal text-ink-muted">(optional)</span>
+          </label>
+          <textarea
+            disabled={isSaving}
+            aria-describedby={
+              errors.note ? 'personal-weigh-in-note-error' : undefined
+            }
+            aria-invalid={errors.note ? true : undefined}
+            className="mt-2 block min-h-28 w-full rounded-xl border border-line bg-panel px-4 py-3 text-ink outline-none focus:border-forest-700 focus:ring-2 focus:ring-forest-100"
+            id="personal-weigh-in-note"
+            maxLength={2000}
+            onChange={(event) => onChange('note', event.target.value)}
+            value={values.note}
+          />
+          <p className="mt-2 text-xs leading-5 text-ink-muted">
+            This note is private to you and is never included in group views.
+          </p>
+          {errors.note ? (
+            <p
+              className="mt-2 text-sm text-red-700"
+              id="personal-weigh-in-note-error"
+            >
+              {errors.note}
+            </p>
+          ) : null}
+        </div>
       </div>
 
       <fieldset className="rounded-xl border border-line p-4">
@@ -160,7 +242,13 @@ export function PersonalWeighInEditor({
         ) : null}
       </fieldset>
 
-      <div className="flex flex-wrap gap-3">
+      <div
+        className={
+          compactMobile
+            ? 'sticky bottom-[-1.25rem] z-10 -mx-5 mt-1 flex flex-wrap gap-3 border-t border-line bg-panel px-5 pt-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:static sm:mx-0 sm:mt-0 sm:border-0 sm:bg-transparent sm:p-0'
+            : 'flex flex-wrap gap-3'
+        }
+      >
         <Button disabled={isSaving} type="submit">
           {isSaving ? 'Saving…' : submitLabel}
         </Button>
