@@ -149,17 +149,27 @@ export function PersonalWeighInEditor({
             type="button"
           >
             <span className="font-semibold text-ink">
-              {noteExpanded ? 'Private note' : 'Private note (optional)'}
+              Private note (optional)
             </span>
-            <span className="min-w-0 text-right text-xs text-ink-muted">
-              {errors.note
-                ? `Needs attention: ${errors.note}`
-                : values.note.trim()
-                  ? 'Saved note · tap to view or edit'
-                  : noteExpanded
-                    ? 'Stays private'
-                    : 'Add note · stays private'}
-            </span>
+            {errors.note ? (
+              <span className="ml-auto text-xs text-danger-800">
+                Needs attention
+              </span>
+            ) : null}
+            <svg
+              aria-hidden="true"
+              className={`size-5 shrink-0 transition-transform${noteExpanded ? ' rotate-180' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <path
+                d="m6 9 6 6 6-6"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+              />
+            </svg>
           </button>
         ) : null}
         <div
@@ -170,19 +180,18 @@ export function PersonalWeighInEditor({
           }
           id="personal-weigh-in-note-content"
         >
-          <label
-            className={
-              compactMobile
-                ? `record-weight-note-label${noteExpanded ? ' is-visible' : ''} text-sm font-semibold text-ink`
-                : 'text-sm font-semibold text-ink'
-            }
-            htmlFor="personal-weigh-in-note"
-          >
-            Private note{' '}
-            <span className="font-normal text-ink-muted">(optional)</span>
-          </label>
+          {!compactMobile ? (
+            <label
+              className="text-sm font-semibold text-ink"
+              htmlFor="personal-weigh-in-note"
+            >
+              Private note{' '}
+              <span className="font-normal text-ink-muted">(optional)</span>
+            </label>
+          ) : null}
           <textarea
             disabled={isSaving}
+            aria-label={compactMobile ? 'Private note (optional)' : undefined}
             aria-describedby={
               errors.note ? 'personal-weigh-in-note-error' : undefined
             }
@@ -193,9 +202,11 @@ export function PersonalWeighInEditor({
             onChange={(event) => onChange('note', event.target.value)}
             value={values.note}
           />
-          <p className="mt-2 text-xs leading-5 text-ink-muted">
-            This note is private to you and is never included in group views.
-          </p>
+          {!compactMobile ? (
+            <p className="mt-2 text-xs leading-5 text-ink-muted">
+              This note is private to you and is never included in group views.
+            </p>
+          ) : null}
           {errors.note ? (
             <p
               className="mt-2 text-sm text-red-700"

@@ -139,14 +139,6 @@ body {
   display: none;
 }
 
-.record-weight-note-label {
-  display: none;
-}
-
-.record-weight-note-label.is-visible {
-  display: block;
-}
-
 .record-weight-actions {
   padding-bottom: calc(env(safe-area-inset-bottom) + 1rem);
 }
@@ -170,10 +162,6 @@ body {
   }
 
   .record-weight-note-content.is-collapsed {
-    display: block;
-  }
-
-  .record-weight-note-label {
     display: block;
   }
 
@@ -208,15 +196,6 @@ body {
 .record-weight-dialog[data-compact-viewport]
   .record-weight-note-content.is-collapsed {
   display: none;
-}
-
-.record-weight-dialog[data-compact-viewport] .record-weight-note-label {
-  display: none;
-}
-
-.record-weight-dialog[data-compact-viewport]
-  .record-weight-note-label.is-visible {
-  display: block;
 }
 
 .record-weight-dialog[data-compact-viewport] .record-weight-actions {

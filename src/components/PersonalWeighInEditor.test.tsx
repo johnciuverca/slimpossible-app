@@ -75,25 +75,31 @@ describe('PersonalWeighInEditor', () => {
       />,
     )
 
-    const toggle = screen.getByRole('button', { name: /Private note/ })
+    const toggle = screen.getByRole('button', {
+      name: 'Private note (optional)Needs attention',
+    })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    expect(toggle).toHaveTextContent('Needs attention: Note must be text')
+    expect(toggle.querySelector('svg')).not.toHaveClass('rotate-180')
     expect(screen.getByLabelText('Weight in kg')).toBeVisible()
+    const note = screen.getByRole('textbox', {
+      name: 'Private note (optional)',
+    })
+    expect(note.parentElement).toHaveClass(
+      'record-weight-note-content',
+      'is-collapsed',
+    )
     expect(
-      screen.getByLabelText('Private note (optional)').parentElement,
-    ).toHaveClass('record-weight-note-content', 'is-collapsed')
+      container.querySelector('label[for="personal-weigh-in-note"]'),
+    ).toBeNull()
 
     fireEvent.click(toggle)
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
-    expect(
-      container.querySelector('label[for="personal-weigh-in-note"]'),
-    ).not.toHaveClass('hidden')
-    expect(
-      screen.getByLabelText('Private note (optional)').parentElement,
-    ).not.toHaveClass('is-collapsed')
-    expect(screen.getByLabelText('Private note (optional)')).toHaveValue(
-      'Existing private note',
+    expect(toggle).toHaveAccessibleName(
+      'Private note (optional)Needs attention',
     )
+    expect(toggle.querySelector('svg')).toHaveClass('rotate-180')
+    expect(note.parentElement).not.toHaveClass('is-collapsed')
+    expect(note).toHaveValue('Existing private note')
     expect(screen.getByText('Note must be text when provided.')).toBeVisible()
   })
 })

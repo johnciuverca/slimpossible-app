@@ -56,7 +56,8 @@ function lockPageScroll() {
         else element.style.removeProperty(property)
       })
     })
-    window.scrollTo(scrollX, scrollY)
+    if (window.scrollX !== scrollX || window.scrollY !== scrollY)
+      window.scrollTo(scrollX, scrollY)
   }
 }
 

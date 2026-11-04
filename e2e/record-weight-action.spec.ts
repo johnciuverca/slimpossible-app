@@ -121,8 +121,9 @@ test('compact mobile Record weight keeps group choices and Save reachable', asyn
   dialog = page.getByRole('dialog', { name: 'Edit weight' })
   const savedNoteToggle = dialog.getByRole('button', { name: /Private note/ })
   await expect(savedNoteToggle).toHaveAttribute('aria-expanded', 'false')
-  await expect(savedNoteToggle).toContainText('Saved note')
+  await expect(savedNoteToggle).toHaveAccessibleName('Private note (optional)')
   await savedNoteToggle.click()
+  await expect(savedNoteToggle).toHaveAccessibleName('Private note (optional)')
   await expect(dialog.getByLabel('Private note (optional)')).toHaveValue(
     'Private compact note',
   )
@@ -304,6 +305,20 @@ test('localized date and weight controls fit narrow, landscape, zoomed, and wide
     { width: 1024, height: 768 },
   ]) {
     await page.setViewportSize(viewport)
+    const stacked = viewport.width < 768 || viewport.height <= 500
+    await expect
+      .poll(async () => {
+        const [dateBox, weightBox] = await Promise.all([
+          date.boundingBox(),
+          weight.boundingBox(),
+        ])
+        if (!dateBox || !weightBox) return false
+        return stacked
+          ? dateBox.y + dateBox.height <= weightBox.y &&
+              Math.abs(dateBox.x - weightBox.x) < 2
+          : dateBox.x + dateBox.width <= weightBox.x
+      })
+      .toBe(true)
     const [dateBox, weightBox, dateRow, weightRow, dialogBox] =
       await Promise.all([
         date.boundingBox(),
@@ -330,7 +345,6 @@ test('localized date and weight controls fit narrow, landscape, zoomed, and wide
       dialogBox!.x + dialogBox!.width,
     )
 
-    const stacked = viewport.width < 768 || viewport.height <= 500
     if (stacked) {
       expect(dateBox!.y + dateBox!.height).toBeLessThanOrEqual(weightBox!.y)
       expect(Math.abs(dateBox!.x - weightBox!.x)).toBeLessThan(2)
