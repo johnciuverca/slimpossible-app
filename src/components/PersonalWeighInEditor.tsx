@@ -235,19 +235,19 @@ export function PersonalWeighInEditor({
             <div className="space-y-3">
               {groups.map((group) => (
                 <label
-                  className="flex items-start gap-3 text-sm text-ink"
+                  className="flex items-center gap-3 text-sm text-ink"
                   key={group.id}
                 >
                   <input
                     disabled={isSaving}
                     checked={values.sharedChallengeIds.includes(group.id)}
-                    className="mt-1 size-4 accent-forest-800"
+                    className="size-4 shrink-0 accent-forest-800"
                     onChange={(event) =>
                       toggleGroup(group.id, event.target.checked)
                     }
                     type="checkbox"
                   />
-                  <span>{group.name}</span>
+                  <span className="min-w-0 break-words">{group.name}</span>
                 </label>
               ))}
             </div>

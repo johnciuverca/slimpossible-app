@@ -90,6 +90,20 @@ test('compact mobile Record weight keeps group choices and Save reachable', asyn
   })
   await expect(group).toBeVisible()
   await expect(group).not.toBeChecked()
+  const groupLabel = dialog.getByText('Synthetic active group', { exact: true })
+  const [groupBox, groupNameBox] = await Promise.all([
+    group.boundingBox(),
+    groupLabel.boundingBox(),
+  ])
+  expect(groupBox).not.toBeNull()
+  expect(groupNameBox).not.toBeNull()
+  expect(groupBox!.y + groupBox!.height / 2).toBeCloseTo(
+    groupNameBox!.y + groupNameBox!.height / 2,
+    0,
+  )
+  await groupLabel.click()
+  await expect(group).toBeChecked()
+  await group.uncheck()
 
   const save = dialog.getByRole('button', { name: 'Save weight', exact: true })
   await expect(save).toBeVisible()
