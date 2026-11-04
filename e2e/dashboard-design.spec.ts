@@ -69,7 +69,7 @@ for (const width of [1280, 390]) {
     )
     await expect(chart.locator('.chart-legend')).toHaveCount(0)
     await expect(chart).toHaveAccessibleDescription(/least-squares fit/)
-    await expect(chart.locator('.chart-value')).toHaveCount(5)
+    await expect(chart.locator('.chart-value')).toHaveCount(2)
     await expect(chart).toHaveAttribute(
       'viewBox',
       width <= 600 ? '0 0 320 266' : '0 0 760 266',

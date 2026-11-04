@@ -50,6 +50,27 @@ for (const viewport of viewports) {
     await expect(chart).toBeVisible()
     await chart.scrollIntoViewIfNeeded()
     await expect(chart.locator('circle[data-date]')).toHaveCount(13)
+    const valueLabels = chart.locator('.chart-value')
+    await expect(valueLabels).toHaveCount(2)
+    expect(
+      await valueLabels.evaluateAll((labels) =>
+        labels
+          .map((label) => Number(label.getAttribute('data-weight-kg')))
+          .sort((first, second) => first - second),
+      ),
+    ).toEqual([99, 105])
+    if (viewport.width <= 600) {
+      const labelBounds = await valueLabels.evaluateAll((labels) =>
+        labels.map((label) => {
+          const bounds = (label as SVGTextElement).getBBox()
+          return { left: bounds.x, right: bounds.x + bounds.width }
+        }),
+      )
+      for (const bounds of labelBounds) {
+        expect(bounds.left).toBeGreaterThanOrEqual(48)
+        expect(bounds.right).toBeLessThanOrEqual(312)
+      }
+    }
 
     const [cardBox, groupBox, chartBox] = await Promise.all([
       card.boundingBox(),
@@ -156,10 +177,18 @@ for (const viewport of viewports) {
     )
     await point.dispatchEvent('pointerdown', { pointerType: 'touch' })
     await expect(page.getByRole('tooltip')).toHaveText(exactDetail)
+    await chart.dispatchEvent('keydown', { key: 'Escape' })
     await rangeControls
       .getByRole('button', { name: 'Show last 1 month' })
       .click()
     await expect(chart.locator('circle[data-date]')).toHaveCount(2)
+    expect(
+      await valueLabels.evaluateAll((labels) =>
+        labels
+          .map((label) => Number(label.getAttribute('data-weight-kg')))
+          .sort((first, second) => first - second),
+      ),
+    ).toEqual([104.5, 105])
     await rangeControls.getByRole('button', { name: 'Show all dates' }).click()
     await expect(chart.locator('circle[data-date]')).toHaveCount(13)
 

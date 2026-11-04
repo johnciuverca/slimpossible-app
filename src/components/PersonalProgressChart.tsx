@@ -12,11 +12,13 @@ export function PersonalProgressChart({
   referenceWeightKg,
   referenceLabel,
   fitContainer = false,
+  labelExtremesOnly = false,
 }: {
   weighIns: readonly WeighIn[]
   referenceWeightKg?: number
   referenceLabel?: string
   fitContainer?: boolean
+  labelExtremesOnly?: boolean
 }) {
   const id = useId()
   const chronological = [...weighIns].sort((a, b) =>
@@ -107,6 +109,7 @@ export function PersonalProgressChart({
           paddingRatio={0.14}
           paddingMinimum={0.5}
           fitContainer={fitContainer}
+          labelExtremesOnly={labelExtremesOnly}
         />
       </div>
       {!fitContainer ? (

@@ -31,7 +31,13 @@ it('fits a Dashboard personal trend inside its card while keeping range controls
     weightKg: 100 - index,
     participantId: 'own',
   }))
-  render(<PersonalProgressChart fitContainer weighIns={weighIns} />)
+  render(
+    <PersonalProgressChart
+      fitContainer
+      labelExtremesOnly
+      weighIns={weighIns}
+    />,
+  )
 
   const chart = screen.getByRole('img', { name: /Personal weight history/ })
   expect(chart).toHaveAttribute('viewBox', '0 0 320 266')
@@ -43,6 +49,19 @@ it('fits a Dashboard personal trend inside its card while keeping range controls
   expect(chart.querySelectorAll('circle[data-date]')).toHaveLength(
     weighIns.length,
   )
+  const extremeLabels = Array.from(
+    chart.querySelectorAll<SVGTextElement>('.chart-value'),
+  )
+  expect(extremeLabels).toHaveLength(2)
+  expect(
+    extremeLabels.map((label) => Number(label.getAttribute('data-weight-kg'))),
+  ).toEqual([100, 93])
+  for (const label of extremeLabels) {
+    const x = Number(label.getAttribute('x'))
+    const halfWidth = (label.textContent!.length * 5.4) / 2
+    expect(x - halfWidth).toBeGreaterThanOrEqual(48)
+    expect(x + halfWidth).toBeLessThanOrEqual(312)
+  }
   const dateTicks = Array.from(
     chart.querySelectorAll('[data-chart-date-tick]'),
     (tick) => tick.getAttribute('data-chart-date-tick'),
@@ -64,6 +83,75 @@ it('fits a Dashboard personal trend inside its card while keeping range controls
   const point = chart.querySelector('circle[data-chart-point]')!
   fireEvent.pointerDown(point, { pointerType: 'touch' })
   expect(screen.getByRole('tooltip')).toHaveTextContent(/01\.01\.2025: 100 kg/)
+})
+
+it('labels one point per extreme, one point on equal values, and updates extremes with the selected range', () => {
+  const tiedWeighIns = [
+    { date: '2026-01-01', weightKg: 90, participantId: 'own' },
+    { date: '2026-01-08', weightKg: 80, participantId: 'own' },
+    { date: '2026-01-15', weightKg: 90, participantId: 'own' },
+    { date: '2026-01-22', weightKg: 80, participantId: 'own' },
+  ]
+  const { rerender } = render(
+    <PersonalProgressChart labelExtremesOnly weighIns={tiedWeighIns} />,
+  )
+  const chart = () =>
+    screen.getByRole('img', { name: /Personal weight history/ })
+  const labels = () => Array.from(chart().querySelectorAll('.chart-value'))
+  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(4)
+  expect(labels().map((label) => label.getAttribute('data-date'))).toEqual([
+    '2026-01-01',
+    '2026-01-08',
+  ])
+
+  rerender(
+    <PersonalProgressChart
+      labelExtremesOnly
+      weighIns={[
+        { date: '2026-02-01', weightKg: 88, participantId: 'own' },
+        { date: '2026-02-08', weightKg: 88, participantId: 'own' },
+        { date: '2026-02-15', weightKg: 88, participantId: 'own' },
+      ]}
+    />,
+  )
+  expect(labels()).toHaveLength(1)
+
+  rerender(
+    <PersonalProgressChart
+      labelExtremesOnly
+      weighIns={[{ date: '2026-03-01', weightKg: 88, participantId: 'own' }]}
+    />,
+  )
+  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(1)
+  expect(labels()).toHaveLength(1)
+
+  const daysAgo = (days: number) =>
+    new Date(Date.now() - days * 86400000).toISOString().slice(0, 10)
+  rerender(
+    <PersonalProgressChart
+      labelExtremesOnly
+      weighIns={[70, 40, 20, 0].map((days, index) => ({
+        date: daysAgo(days),
+        weightKg: [110, 80, 95, 90][index],
+        participantId: 'own',
+      }))}
+    />,
+  )
+  expect(labels().map((label) => label.getAttribute('data-weight-kg'))).toEqual(
+    ['110', '80'],
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'Show last 1 month' }))
+  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(2)
+  expect(labels().map((label) => label.getAttribute('data-weight-kg'))).toEqual(
+    ['95', '90'],
+  )
+  const visiblePoint = chart().querySelector(
+    'circle[data-chart-point][data-weight-kg="95"]',
+  )!
+  fireEvent.pointerDown(visiblePoint, { pointerType: 'touch' })
+  expect(screen.getByRole('tooltip')).toHaveTextContent(/95 kg/)
+  fireEvent.click(screen.getByRole('button', { name: 'Show all dates' }))
+  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(4)
 })
 it('keeps derived trend and goal lines separate from exact saved points', () => {
   render(

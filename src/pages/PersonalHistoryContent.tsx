@@ -42,6 +42,7 @@ export function PersonalHistoryContent({
           {history.length ? (
             <PersonalProgressChart
               fitContainer
+              labelExtremesOnly
               referenceWeightKg={referenceWeightKg}
               referenceLabel={referenceLabel}
               weighIns={history.map((entry) => ({
