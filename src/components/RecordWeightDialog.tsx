@@ -14,6 +14,53 @@ import {
   type PersonalWeighIn,
 } from '../models/personalWeighIn'
 
+const pageScrollProperties = [
+  'overflow',
+  'overscroll-behavior',
+  'position',
+  'top',
+  'left',
+  'right',
+  'width',
+] as const
+
+function lockPageScroll() {
+  const scrollX = window.scrollX
+  const scrollY = window.scrollY
+  const elements = [document.documentElement, document.body]
+  const previousStyles = elements.map((element) =>
+    pageScrollProperties.map((property) => ({
+      property,
+      value: element.style.getPropertyValue(property),
+      priority: element.style.getPropertyPriority(property),
+    })),
+  )
+
+  document.documentElement.style.setProperty('overflow', 'hidden')
+  document.documentElement.style.setProperty('overscroll-behavior', 'none')
+  document.body.style.setProperty('position', 'fixed')
+  document.body.style.setProperty('top', `${-scrollY}px`)
+  document.body.style.setProperty('left', `${-scrollX}px`)
+  document.body.style.setProperty('right', '0')
+  document.body.style.setProperty('width', '100%')
+  document.body.style.setProperty('overflow', 'hidden')
+  document.body.style.setProperty('overscroll-behavior', 'none')
+
+  let restored = false
+  return () => {
+    if (restored) return
+    restored = true
+    elements.forEach((element, elementIndex) => {
+      previousStyles[elementIndex].forEach(({ property, value, priority }) => {
+        if (value) element.style.setProperty(property, value, priority)
+        else element.style.removeProperty(property)
+      })
+    })
+    if (window.scrollX !== scrollX || window.scrollY !== scrollY)
+      window.scrollTo(scrollX, scrollY)
+  }
+}
+
 export function RecordWeightDialog({
   workspace,
   entry,
@@ -27,6 +74,7 @@ export function RecordWeightDialog({
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
   const trigger = useRef<HTMLElement | null>(null)
+  const restorePageScroll = useRef<(() => void) | null>(null)
   const active = useRef(true)
   const groups = workspace.groups
   const eligibleIds = new Set(groups.map(({ id }) => id))
@@ -62,11 +110,70 @@ export function RecordWeightDialog({
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null
+    const restoreScroll = lockPageScroll()
+    restorePageScroll.current = restoreScroll
     element?.showModal()
-    element?.querySelector<HTMLInputElement>('input[type="number"]')?.focus()
+    const viewport = window.visualViewport
+    const wideViewport =
+      (window.matchMedia?.('(min-width: 768px) and (min-height: 501px)')
+        .matches ??
+        (window.innerWidth >= 768 && window.innerHeight > 500)) &&
+      (!viewport ||
+        (viewport.width >= 768 &&
+          viewport.height > 500 &&
+          viewport.scale <= 1.05))
+    if (wideViewport)
+      element?.querySelector<HTMLInputElement>('input[type="number"]')?.focus()
+    else element?.focus()
     return () => {
       active.current = false
       element?.close()
+      restoreScroll()
+      restorePageScroll.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!dialog.current) return
+    const element = dialog.current
+    const viewport = window.visualViewport
+    const compactViewport = window.matchMedia?.(
+      '(max-width: 767px), (max-height: 500px)',
+    )
+    const updateViewport = () => {
+      const isCompact =
+        compactViewport?.matches ??
+        (window.innerWidth < 768 || window.innerHeight <= 500)
+      const compactVisualViewport =
+        !!viewport &&
+        (viewport.width < 768 ||
+          viewport.height <= 500 ||
+          viewport.scale > 1.05)
+      if ((!isCompact && !compactVisualViewport) || !viewport) {
+        element.removeAttribute('data-compact-viewport')
+        element.style.removeProperty('--record-weight-available-height')
+        element.style.removeProperty('bottom')
+        return
+      }
+      element.setAttribute('data-compact-viewport', '')
+      const visibleBottom = viewport.offsetTop + viewport.height
+      const keyboardInset = Math.max(0, window.innerHeight - visibleBottom)
+      element.style.setProperty(
+        '--record-weight-available-height',
+        `${Math.max(240, viewport.height)}px`,
+      )
+      element.style.bottom = `${keyboardInset}px`
+    }
+    updateViewport()
+    viewport?.addEventListener('resize', updateViewport)
+    viewport?.addEventListener('scroll', updateViewport)
+    compactViewport?.addEventListener('change', updateViewport)
+    return () => {
+      viewport?.removeEventListener('resize', updateViewport)
+      viewport?.removeEventListener('scroll', updateViewport)
+      compactViewport?.removeEventListener('change', updateViewport)
+      element.style.removeProperty('--record-weight-available-height')
+      element.style.removeProperty('bottom')
     }
   }, [])
 
@@ -84,6 +191,8 @@ export function RecordWeightDialog({
     // Only an explicit dismissal restores focus; account-switch cleanup must not
     // focus a trigger belonging to the previous account.
     dialog.current?.close()
+    restorePageScroll.current?.()
+    restorePageScroll.current = null
     if (trigger.current?.isConnected) trigger.current.focus()
     onClose()
   }
@@ -150,6 +259,8 @@ export function RecordWeightDialog({
         return
       }
       dialog.current?.close()
+      restorePageScroll.current?.()
+      restorePageScroll.current = null
       focusAfterWeightMutation(trigger.current, onSaved)
     } catch {
       if (active.current) {
@@ -163,6 +274,7 @@ export function RecordWeightDialog({
     <>
       <dialog
         ref={dialog}
+        tabIndex={-1}
         onKeyDown={trapDialogFocus}
         aria-labelledby="record-weight-title"
         aria-describedby="record-weight-description"
@@ -170,7 +282,10 @@ export function RecordWeightDialog({
           event.preventDefault()
           dismiss()
         }}
-        className="fixed inset-x-0 bottom-0 top-auto m-0 max-h-[90dvh] w-full max-w-none overflow-y-auto rounded-t-3xl border border-line bg-panel p-5 text-ink shadow-panel backdrop:bg-black/40 sm:inset-0 sm:m-auto sm:max-w-xl sm:rounded-3xl sm:p-8"
+        className="record-weight-dialog fixed inset-x-0 bottom-0 top-auto m-0 max-h-[90dvh] w-full max-w-none overflow-y-auto overscroll-contain rounded-t-3xl border border-line bg-panel p-5 text-ink shadow-panel backdrop:bg-black/40"
+        style={{
+          maxHeight: 'min(90dvh, var(--record-weight-available-height, 90dvh))',
+        }}
       >
         <div className="mb-5 flex items-start justify-between gap-3">
           <div>
@@ -226,6 +341,7 @@ export function RecordWeightDialog({
               onCancel={dismiss}
               onSubmit={submit}
               submitLabel={entry ? 'Update weight' : 'Save weight'}
+              compactMobile
               onChange={(field, value) => {
                 setValues((current) =>
                   field === 'sharedChallengeIds'
