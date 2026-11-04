@@ -39,7 +39,12 @@ for (const viewport of [
       exact: true,
     })
     await expect(dialog).toBeVisible()
-    await expect(dialog.getByLabel('Weight in kg')).toBeFocused()
+    if (viewport.label === 'desktop')
+      await expect(dialog.getByLabel('Weight in kg')).toBeFocused()
+    else {
+      await expect(dialog).toBeFocused()
+      await dialog.getByRole('button', { name: /Private note/ }).click()
+    }
     await expect(dialog.getByRole('checkbox')).toHaveCount(0)
     if (viewport.label === 'mobile') {
       const rect = await dialog.boundingBox()
@@ -50,6 +55,8 @@ for (const viewport of [
     await expect(dialog).toHaveCount(0)
     await expect(record).toBeFocused()
     await page.keyboard.press('Enter')
+    if (viewport.label === 'mobile')
+      await dialog.getByRole('button', { name: /Private note/ }).click()
     await dialog.getByLabel('Weight in kg').fill('82.4')
     await dialog
       .getByLabel('Private note (optional)')
