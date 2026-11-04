@@ -102,20 +102,21 @@ export function PersonalWeighInEditor({
         <div className="record-weight-fields">
           <div className="min-w-0">
             <TextInput
-              className="min-w-0 max-w-full"
+              className="record-weight-shell-control"
               error={errors.date}
               disabled={isSaving}
               id="personal-weigh-in-date"
               label="Date"
               max={today}
               onChange={(event) => onChange('date', event.target.value)}
+              shellClassName={`record-weight-field-shell${errors.date ? ' has-error' : ''}`}
               type="date"
               value={values.date}
             />
           </div>
           <div className="min-w-0">
             <TextInput
-              className="min-w-0 max-w-full"
+              className="record-weight-shell-control"
               error={errors.weightKg}
               disabled={isSaving}
               id="personal-weigh-in-weight"
@@ -124,6 +125,7 @@ export function PersonalWeighInEditor({
               min="0"
               onChange={(event) => onChange('weightKg', event.target.value)}
               onWheel={(event) => event.currentTarget.blur()}
+              shellClassName={`record-weight-field-shell${errors.weightKg ? ' has-error' : ''}`}
               step="0.01"
               type="number"
               value={values.weightKg}

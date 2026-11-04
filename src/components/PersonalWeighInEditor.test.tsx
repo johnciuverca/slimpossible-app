@@ -8,6 +8,44 @@ afterEach(() => {
 })
 
 describe('PersonalWeighInEditor', () => {
+  it('keeps Date and Weight validation attached to their shared field shells', () => {
+    const { container } = render(
+      <PersonalWeighInEditor
+        compactMobile
+        errors={{ date: 'Choose a date.', weightKg: 'Enter a weight.' }}
+        groups={[]}
+        isSaving={false}
+        onChange={vi.fn()}
+        onSubmit={vi.fn()}
+        submitLabel="Save weight"
+        values={{
+          date: '',
+          note: '',
+          sharedChallengeIds: [],
+          weightKg: '',
+        }}
+      />,
+    )
+
+    for (const { id, message } of [
+      { id: 'personal-weigh-in-date', message: 'Choose a date.' },
+      { id: 'personal-weigh-in-weight', message: 'Enter a weight.' },
+    ]) {
+      const input = screen.getByLabelText(
+        id === 'personal-weigh-in-date' ? 'Date' : 'Weight in kg',
+      )
+      expect(input).toHaveAttribute('aria-invalid', 'true')
+      expect(input.parentElement).toHaveClass(
+        'record-weight-field-shell',
+        'has-error',
+      )
+      expect(screen.getByText(message)).toBeVisible()
+    }
+    expect(
+      container.querySelectorAll('.record-weight-field-shell'),
+    ).toHaveLength(2)
+  })
+
   it('keeps existing private notes and note errors discoverable when collapsed on mobile', () => {
     vi.stubGlobal(
       'matchMedia',

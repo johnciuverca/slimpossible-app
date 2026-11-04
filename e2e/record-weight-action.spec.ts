@@ -20,10 +20,64 @@ test('compact mobile Record weight keeps group choices and Save reachable', asyn
     date.boundingBox(),
     weight.boundingBox(),
   ])
+  const dateShell = dialog.locator('.record-weight-field-shell').nth(0)
+  const weightShell = dialog.locator('.record-weight-field-shell').nth(1)
+  const [dateShellBox, weightShellBox, noteBox, sharingBox, saveButton] =
+    await Promise.all([
+      dateShell.boundingBox(),
+      weightShell.boundingBox(),
+      dialog.getByRole('button', { name: /Private note/ }).boundingBox(),
+      dialog.locator('fieldset').boundingBox(),
+      dialog.getByRole('button', { name: 'Save weight', exact: true }),
+    ])
+  const [dateShellStyle, weightShellStyle] = await Promise.all([
+    dateShell.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return {
+        height: style.height,
+        radius: style.borderRadius,
+        padding: style.padding,
+      }
+    }),
+    weightShell.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return {
+        height: style.height,
+        radius: style.borderRadius,
+        padding: style.padding,
+      }
+    }),
+  ])
   expect(dateBox).not.toBeNull()
   expect(weightBox).not.toBeNull()
+  expect(dateShellBox).not.toBeNull()
+  expect(weightShellBox).not.toBeNull()
+  expect(noteBox).not.toBeNull()
+  expect(sharingBox).not.toBeNull()
+  expect(dateShellStyle).toEqual(weightShellStyle)
+  expect(dateShellBox!.height).toBeCloseTo(weightShellBox!.height, 1)
+  expect(dateBox!.x).toBeGreaterThanOrEqual(dateShellBox!.x)
+  expect(dateBox!.x + dateBox!.width).toBeLessThanOrEqual(
+    dateShellBox!.x + dateShellBox!.width,
+  )
+  expect(weightBox!.x).toBeGreaterThanOrEqual(weightShellBox!.x)
+  expect(weightBox!.x + weightBox!.width).toBeLessThanOrEqual(
+    weightShellBox!.x + weightShellBox!.width,
+  )
+  expect(Math.abs(dateShellBox!.x - weightShellBox!.x)).toBeLessThan(1)
+  expect(dateShellBox!.width).toBeCloseTo(weightShellBox!.width, 1)
+  expect(dateShellBox!.x).toBeCloseTo(noteBox!.x, 1)
+  expect(dateShellBox!.width).toBeCloseTo(noteBox!.width, 1)
+  expect(dateShellBox!.x).toBeCloseTo(sharingBox!.x, 1)
+  expect(dateShellBox!.width).toBeCloseTo(sharingBox!.width, 1)
+  const actionBox = (await saveButton.boundingBox())!
+  expect(actionBox.x).toBeCloseTo(dateShellBox!.x, 1)
   expect(Math.abs(dateBox!.x - weightBox!.x)).toBeLessThan(2)
   expect(dateBox!.y + dateBox!.height).toBeLessThanOrEqual(weightBox!.y)
+  await expect(date).toHaveAttribute('type', 'date')
+  await date.focus()
+  await expect(date).toBeFocused()
+  await dialog.focus()
 
   const noteToggle = dialog.getByRole('button', { name: /Private note/ })
   await expect(noteToggle).toHaveAttribute('aria-expanded', 'false')
@@ -127,8 +181,8 @@ test('localized date and weight controls fit narrow, landscape, zoomed, and wide
       await Promise.all([
         date.boundingBox(),
         weight.boundingBox(),
-        date.locator('xpath=../..').boundingBox(),
-        weight.locator('xpath=../..').boundingBox(),
+        date.locator('xpath=../../..').boundingBox(),
+        weight.locator('xpath=../../..').boundingBox(),
         dialog.boundingBox(),
       ])
     expect(dateBox).not.toBeNull()
