@@ -49,6 +49,9 @@ body {
 
 .record-weight-dialog {
   overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 
 .record-weight-fields {
@@ -118,8 +121,11 @@ body {
 }
 
 .record-weight-shell-control[type='date']::-webkit-date-and-time-value {
+  display: flex;
   width: 100%;
   min-width: 0;
+  height: 100%;
+  align-items: center;
   margin: 0;
   text-align: left;
 }

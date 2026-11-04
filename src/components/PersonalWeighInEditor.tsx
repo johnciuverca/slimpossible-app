@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { useUnsavedNavigation } from './navigationSafety'
 
 import type { Challenge } from '../models/challenge'
@@ -61,27 +61,6 @@ export function PersonalWeighInEditor({
         ? 'dirty'
         : null,
   )
-  useEffect(() => {
-    if (!compactMobile || !window.matchMedia) return
-    const breakpoint = window.matchMedia(
-      '(min-width: 768px) and (min-height: 501px)',
-    )
-    const viewport = window.visualViewport
-    const syncNoteVisibility = () =>
-      setNoteExpanded(
-        breakpoint.matches &&
-          (!viewport ||
-            (viewport.width >= 768 &&
-              viewport.height > 500 &&
-              viewport.scale <= 1.05)),
-      )
-    breakpoint.addEventListener('change', syncNoteVisibility)
-    viewport?.addEventListener('resize', syncNoteVisibility)
-    return () => {
-      breakpoint.removeEventListener('change', syncNoteVisibility)
-      viewport?.removeEventListener('resize', syncNoteVisibility)
-    }
-  }, [compactMobile])
   function toggleGroup(id: string, selected: boolean) {
     onChange(
       'sharedChallengeIds',

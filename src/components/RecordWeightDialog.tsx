@@ -14,6 +14,52 @@ import {
   type PersonalWeighIn,
 } from '../models/personalWeighIn'
 
+const pageScrollProperties = [
+  'overflow',
+  'overscroll-behavior',
+  'position',
+  'top',
+  'left',
+  'right',
+  'width',
+] as const
+
+function lockPageScroll() {
+  const scrollX = window.scrollX
+  const scrollY = window.scrollY
+  const elements = [document.documentElement, document.body]
+  const previousStyles = elements.map((element) =>
+    pageScrollProperties.map((property) => ({
+      property,
+      value: element.style.getPropertyValue(property),
+      priority: element.style.getPropertyPriority(property),
+    })),
+  )
+
+  document.documentElement.style.setProperty('overflow', 'hidden')
+  document.documentElement.style.setProperty('overscroll-behavior', 'none')
+  document.body.style.setProperty('position', 'fixed')
+  document.body.style.setProperty('top', `${-scrollY}px`)
+  document.body.style.setProperty('left', `${-scrollX}px`)
+  document.body.style.setProperty('right', '0')
+  document.body.style.setProperty('width', '100%')
+  document.body.style.setProperty('overflow', 'hidden')
+  document.body.style.setProperty('overscroll-behavior', 'none')
+
+  let restored = false
+  return () => {
+    if (restored) return
+    restored = true
+    elements.forEach((element, elementIndex) => {
+      previousStyles[elementIndex].forEach(({ property, value, priority }) => {
+        if (value) element.style.setProperty(property, value, priority)
+        else element.style.removeProperty(property)
+      })
+    })
+    window.scrollTo(scrollX, scrollY)
+  }
+}
+
 export function RecordWeightDialog({
   workspace,
   entry,
@@ -27,6 +73,7 @@ export function RecordWeightDialog({
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
   const trigger = useRef<HTMLElement | null>(null)
+  const restorePageScroll = useRef<(() => void) | null>(null)
   const active = useRef(true)
   const groups = workspace.groups
   const eligibleIds = new Set(groups.map(({ id }) => id))
@@ -62,6 +109,8 @@ export function RecordWeightDialog({
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null
+    const restoreScroll = lockPageScroll()
+    restorePageScroll.current = restoreScroll
     element?.showModal()
     const viewport = window.visualViewport
     const wideViewport =
@@ -78,6 +127,8 @@ export function RecordWeightDialog({
     return () => {
       active.current = false
       element?.close()
+      restoreScroll()
+      restorePageScroll.current = null
     }
   }, [])
 
@@ -139,6 +190,8 @@ export function RecordWeightDialog({
     // Only an explicit dismissal restores focus; account-switch cleanup must not
     // focus a trigger belonging to the previous account.
     dialog.current?.close()
+    restorePageScroll.current?.()
+    restorePageScroll.current = null
     if (trigger.current?.isConnected) trigger.current.focus()
     onClose()
   }
@@ -205,6 +258,8 @@ export function RecordWeightDialog({
         return
       }
       dialog.current?.close()
+      restorePageScroll.current?.()
+      restorePageScroll.current = null
       focusAfterWeightMutation(trigger.current, onSaved)
     } catch {
       if (active.current) {

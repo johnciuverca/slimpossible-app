@@ -107,6 +107,15 @@ test('compact mobile Record weight keeps group choices and Save reachable', asyn
   await group.check()
   await save.click()
   await expect(dialog).toHaveCount(0)
+  await expect
+    .poll(() =>
+      page.evaluate(() => ({
+        htmlOverflow: document.documentElement.style.overflow,
+        bodyPosition: document.body.style.position,
+        bodyOverflow: document.body.style.overflow,
+      })),
+    )
+    .toEqual({ htmlOverflow: '', bodyPosition: '', bodyOverflow: '' })
 
   await page.getByRole('button', { name: 'Record weight', exact: true }).click()
   dialog = page.getByRole('dialog', { name: 'Edit weight' })
@@ -149,6 +158,124 @@ test('compact mobile Record weight keeps group choices and Save reachable', asyn
     delete (visualViewport as VisualViewport & { height?: number }).height
     visualViewport.dispatchEvent(new Event('resize'))
   })
+})
+
+test('mobile note stays expanded and focused through keyboard resize, and the sheet contains scrolling', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 520 })
+  await page.goto(fixture('/dashboard'))
+  await page.evaluate(() => {
+    document.body.style.minHeight = '2400px'
+    window.scrollTo(0, 240)
+  })
+  await page.getByRole('button', { name: 'Record weight', exact: true }).click()
+
+  const dialog = page.getByRole('dialog', { name: 'Record weight' })
+  const noteToggle = dialog.getByRole('button', { name: /Private note/ })
+  const note = dialog.getByLabel('Private note (optional)')
+  await expect(noteToggle).toHaveAttribute('aria-expanded', 'false')
+  await noteToggle.click()
+  await expect(noteToggle).toHaveAttribute('aria-expanded', 'true')
+  await note.focus()
+  await page.evaluate(() => {
+    const viewport = window.visualViewport
+    if (!viewport) throw new Error('VisualViewport is unavailable')
+    Object.defineProperty(viewport, 'height', {
+      configurable: true,
+      value: 280,
+    })
+    viewport.dispatchEvent(new Event('resize'))
+  })
+  await expect(noteToggle).toHaveAttribute('aria-expanded', 'true')
+  await expect(note).toBeFocused()
+  await note.fill('Draft survives the virtual keyboard resize')
+  const save = dialog.getByRole('button', {
+    name: 'Save weight',
+    exact: true,
+  })
+  await save.scrollIntoViewIfNeeded()
+  const keyboardSaveBox = (await save.boundingBox())!
+  expect(keyboardSaveBox.y + keyboardSaveBox.height).toBeLessThanOrEqual(280)
+  await page.evaluate(() => {
+    const viewport = window.visualViewport
+    if (!viewport) return
+    delete (viewport as VisualViewport & { height?: number }).height
+    viewport.dispatchEvent(new Event('resize'))
+  })
+  await expect(noteToggle).toHaveAttribute('aria-expanded', 'true')
+  await expect(note).toBeFocused()
+  await expect(note).toHaveValue('Draft survives the virtual keyboard resize')
+
+  const scrollState = await page.evaluate(() => ({
+    htmlOverflow: document.documentElement.style.overflow,
+    bodyPosition: document.body.style.position,
+    bodyTop: document.body.style.top,
+    scrollY: window.scrollY,
+  }))
+  expect(scrollState.htmlOverflow).toBe('hidden')
+  expect(scrollState.bodyPosition).toBe('fixed')
+  const initialDialogScroll = await dialog.evaluate(
+    (element) => element.scrollTop,
+  )
+  await page.mouse.move(200, 430)
+  await page.mouse.wheel(0, 360)
+  await expect
+    .poll(() => dialog.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(initialDialogScroll)
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrollState.scrollY)
+  await dialog.evaluate((element) => {
+    element.scrollTop = element.scrollHeight
+  })
+  const bottomDialogScroll = await dialog.evaluate(
+    (element) => element.scrollTop,
+  )
+  await page.mouse.wheel(0, 360)
+  await expect
+    .poll(() => dialog.evaluate((element) => element.scrollTop))
+    .toBe(bottomDialogScroll)
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrollState.scrollY)
+  await expect(save).toBeVisible()
+
+  await noteToggle.click()
+  await expect(noteToggle).toHaveAttribute('aria-expanded', 'false')
+  await expect(note).not.toBeVisible()
+  await noteToggle.click()
+  await expect(note).toHaveValue('Draft survives the virtual keyboard resize')
+
+  await dialog.getByRole('button', { name: 'Close weight editor' }).click()
+  await page.getByRole('button', { name: 'Discard and leave' }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect
+    .poll(() =>
+      page.evaluate(() => ({
+        htmlOverflow: document.documentElement.style.overflow,
+        htmlOverscroll: document.documentElement.style.overscrollBehavior,
+        bodyPosition: document.body.style.position,
+        bodyTop: document.body.style.top,
+        bodyLeft: document.body.style.left,
+        bodyRight: document.body.style.right,
+        bodyWidth: document.body.style.width,
+        bodyOverflow: document.body.style.overflow,
+        bodyOverscroll: document.body.style.overscrollBehavior,
+        bodyMinHeight: document.body.style.minHeight,
+      })),
+    )
+    .toEqual({
+      htmlOverflow: '',
+      htmlOverscroll: '',
+      bodyPosition: '',
+      bodyTop: '',
+      bodyLeft: '',
+      bodyRight: '',
+      bodyWidth: '',
+      bodyOverflow: '',
+      bodyOverscroll: '',
+      bodyMinHeight: '2400px',
+    })
+  expect(await page.evaluate(() => window.scrollY)).toBe(
+    Math.abs(Number.parseFloat(scrollState.bodyTop)),
+  )
 })
 
 test('localized date and weight controls fit narrow, landscape, zoomed, and wide viewports', async ({
