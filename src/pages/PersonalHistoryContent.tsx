@@ -41,6 +41,7 @@ export function PersonalHistoryContent({
           </p>
           {history.length ? (
             <PersonalProgressChart
+              fitContainer
               referenceWeightKg={referenceWeightKg}
               referenceLabel={referenceLabel}
               weighIns={history.map((entry) => ({

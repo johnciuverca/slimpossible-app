@@ -1,8 +1,70 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { PersonalProgressChart } from './PersonalProgressChart'
 import { SharedWeightChart } from './SharedWeightChart'
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
+
+it('fits a Dashboard personal trend inside its card while keeping range controls and exact point details', () => {
+  vi.stubGlobal('innerWidth', 390)
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => ({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  )
+  const weighIns = [
+    '2025-01-01',
+    '2025-04-01',
+    '2025-07-01',
+    '2025-10-01',
+    '2026-01-01',
+    '2026-04-01',
+    '2026-07-01',
+    '2026-10-01',
+  ].map((date, index) => ({
+    date,
+    weightKg: 100 - index,
+    participantId: 'own',
+  }))
+  render(<PersonalProgressChart fitContainer weighIns={weighIns} />)
+
+  const chart = screen.getByRole('img', { name: /Personal weight history/ })
+  expect(chart).toHaveAttribute('viewBox', '0 0 320 266')
+  expect(chart).toHaveClass('min-w-0')
+  expect(chart).not.toHaveClass('min-w-[600px]')
+  expect(
+    screen.getByRole('group', { name: 'Personal weight chart' }),
+  ).toHaveClass('min-w-0')
+  expect(chart.querySelectorAll('circle[data-date]')).toHaveLength(
+    weighIns.length,
+  )
+  const dateTicks = Array.from(
+    chart.querySelectorAll('[data-chart-date-tick]'),
+    (tick) => tick.getAttribute('data-chart-date-tick'),
+  )
+  expect(dateTicks.length).toBeLessThanOrEqual(4)
+  expect(dateTicks[0]).toBe(weighIns[0].date)
+  expect(dateTicks.at(-1)).toBe(weighIns.at(-1)!.date)
+  expect(screen.getByRole('group', { name: 'Quick date ranges' })).toBeVisible()
+  for (const name of [
+    'Show last 1 week',
+    'Show last 2 weeks',
+    'Show last 1 month',
+    'Show last 3 months',
+    'Show all dates',
+  ])
+    expect(screen.getByRole('button', { name })).toBeVisible()
+  expect(screen.getAllByRole('slider')).toHaveLength(2)
+
+  const point = chart.querySelector('circle[data-chart-point]')!
+  fireEvent.pointerDown(point, { pointerType: 'touch' })
+  expect(screen.getByRole('tooltip')).toHaveTextContent(/01\.01\.2025: 100 kg/)
+})
 it('keeps derived trend and goal lines separate from exact saved points', () => {
   render(
     <PersonalProgressChart

@@ -72,6 +72,7 @@ export function SharedWeightChart({
   adaptiveWeightTicks = false,
   floorAtZero = false,
   includeZero = false,
+  fitContainer = false,
   className = 'block h-auto w-full min-w-[600px]',
   viewBox = '0 0 760 266',
 }: {
@@ -89,9 +90,41 @@ export function SharedWeightChart({
   adaptiveWeightTicks?: boolean
   floorAtZero?: boolean
   includeZero?: boolean
+  fitContainer?: boolean
   className?: string
   viewBox?: string
 }) {
+  const [compactFitLayout, setCompactFitLayout] = useState(
+    () =>
+      fitContainer && typeof window !== 'undefined' && window.innerWidth <= 600,
+  )
+  useEffect(() => {
+    if (!fitContainer) {
+      setCompactFitLayout(false)
+      return
+    }
+    const media = window.matchMedia?.('(max-width: 600px)')
+    const update = () =>
+      setCompactFitLayout(media?.matches ?? window.innerWidth <= 600)
+    update()
+    if (media) {
+      media.addEventListener('change', update)
+      return () => media.removeEventListener('change', update)
+    }
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [fitContainer])
+  const compactLayout = fitContainer && compactFitLayout
+  const chartLeft = compactLayout ? 48 : left
+  const chartRight = compactLayout ? 312 : right
+  const chartTop = top
+  const chartViewBox = compactLayout ? '0 0 320 266' : viewBox
+  const chartClassName = fitContainer
+    ? className.replace('min-w-[600px]', 'min-w-0')
+    : className
+  const chartFrameClassName = fitContainer
+    ? 'w-full min-w-0 pt-2'
+    : 'w-full min-w-[600px] pt-2'
   const rangeId = useId()
   const tooltipId = useId()
   const rangeTrackRef = useRef<HTMLDivElement>(null)
@@ -153,8 +186,8 @@ export function SharedWeightChart({
   const span = endDay - startDay
   const x = (date: string) =>
     span
-      ? left + ((day(date) - startDay) / span) * (right - left)
-      : (left + right) / 2
+      ? chartLeft + ((day(date) - startDay) / span) * (chartRight - chartLeft)
+      : (chartLeft + chartRight) / 2
   const inRange = (date: string) => day(date) >= startDay && day(date) <= endDay
   const visiblePoints = points.filter((point) => inRange(point.date))
   const visibleSeries = series.map((item) => ({
@@ -233,13 +266,13 @@ export function SharedWeightChart({
     yMaximum = Math.ceil(yMaximum / 5) * 5
     if (yMaximum <= yMinimum) yMaximum = yMinimum + 5
   }
-  const viewBoxParts = viewBox.trim().split(/\s+/).map(Number)
+  const viewBoxParts = chartViewBox.trim().split(/\s+/).map(Number)
   const viewBoxWidth = viewBoxParts[2] || 760
   const viewBoxHeight = viewBoxParts[3] || 266
   const plotBottom = viewBoxHeight - 52
   const y = (value: number) =>
     plotBottom -
-    ((value - yMinimum) / (yMaximum - yMinimum)) * (plotBottom - top)
+    ((value - yMinimum) / (yMaximum - yMinimum)) * (plotBottom - chartTop)
   const chartValueLabelY = new Map(
     layoutChartValueLabels(
       [
@@ -289,7 +322,10 @@ export function SharedWeightChart({
   )
   const tickStep = useFiveKgTicks
     ? 5
-    : Math.max(1, Math.ceil((yMaximum - yMinimum) / maxTicks))
+    : Math.max(
+        1,
+        Math.ceil((yMaximum - yMinimum) / (compactLayout ? 8 : maxTicks)),
+      )
   const firstTick = Math.ceil(yMinimum / tickStep) * tickStep
   const ticks = Array.from(
     {
@@ -313,13 +349,13 @@ export function SharedWeightChart({
       }
     : null
   const tooltipAlignment = tooltipPosition
-    ? tooltipPosition.x < left + 110
+    ? tooltipPosition.x < chartLeft + (compactLayout ? 56 : 110)
       ? 'start'
-      : tooltipPosition.x > right - 110
+      : tooltipPosition.x > chartRight - (compactLayout ? 56 : 110)
         ? 'end'
         : 'center'
     : 'center'
-  const tooltipTransform = `translate(${tooltipAlignment === 'start' ? '0' : tooltipAlignment === 'end' ? '-100%' : '-50%'}, ${tooltipPosition && tooltipPosition.y < top + 52 ? '10px' : 'calc(-100% - 10px)'})`
+  const tooltipTransform = `translate(${tooltipAlignment === 'start' ? '0' : tooltipAlignment === 'end' ? '-100%' : '-50%'}, ${tooltipPosition && tooltipPosition.y < chartTop + 52 ? '10px' : 'calc(-100% - 10px)'})`
   const setPointSource = (
     event: ReactPointerEvent<SVGCircleElement>,
     id: string,
@@ -335,10 +371,17 @@ export function SharedWeightChart({
   ) => {
     if (event.pointerType === 'touch') setActivePoint({ id, source: 'touch' })
   }
-  const dates = Array.from(
-    { length: span ? Math.floor(span / 7) + 1 : 1 },
-    (_, index) => startDay + index * 7,
-  )
+  const compactDateTickCount = Math.min(4, Math.ceil(span / 120) + 1)
+  const dates = compactLayout
+    ? Array.from({ length: span ? compactDateTickCount : 1 }, (_, index) =>
+        compactDateTickCount === 1
+          ? startDay
+          : Math.round(startDay + (span * index) / (compactDateTickCount - 1)),
+      ).filter((date, index, allDates) => allDates.indexOf(date) === index)
+    : Array.from(
+        { length: span ? Math.floor(span / 7) + 1 : 1 },
+        (_, index) => startDay + index * 7,
+      )
   const pathFor = (items: SharedChartPoint[]) =>
     items
       .map(
@@ -368,8 +411,8 @@ export function SharedWeightChart({
               : 'All recorded dates'
   const rangePercent = (value: number) =>
     span === 0 ? 0 : ((value - firstDay) / (lastDay - firstDay)) * 100
-  const plotStartPercent = (left / viewBoxWidth) * 100
-  const plotWidthPercent = ((right - left) / viewBoxWidth) * 100
+  const plotStartPercent = (chartLeft / viewBoxWidth) * 100
+  const plotWidthPercent = ((chartRight - chartLeft) / viewBoxWidth) * 100
   const setThumbValue = (thumb: 'start' | 'end', value: number) => {
     if (thumb === 'start') {
       setSelectedRange({ start: Math.min(value, endDay), end: endDay })
@@ -450,7 +493,7 @@ export function SharedWeightChart({
   }
   return (
     <div
-      className="w-full min-w-[600px] pt-2"
+      className={chartFrameClassName}
       onKeyDown={(event) => {
         if (event.key === 'Escape') setActivePoint(null)
       }}
@@ -531,12 +574,12 @@ export function SharedWeightChart({
           aria-description={
             typeof description === 'string' ? description : undefined
           }
-          className={className}
-          viewBox={viewBox}
+          className={chartClassName}
+          viewBox={chartViewBox}
         >
           <title>{title}</title>
           <desc>{description}</desc>
-          <text x={left} y="17" className="chart-axis" fontSize="13">
+          <text x={chartLeft} y="17" className="chart-axis" fontSize="13">
             {yLabel}
           </text>
           {minorTicks.map((value) => (
@@ -544,8 +587,8 @@ export function SharedWeightChart({
               key={value}
               data-chart-minor-tick={value}
               aria-hidden="true"
-              x1={left}
-              x2={right}
+              x1={chartLeft}
+              x2={chartRight}
               y1={y(value)}
               y2={y(value)}
               stroke="var(--color-line, #cbd5e1)"
@@ -556,18 +599,18 @@ export function SharedWeightChart({
           {ticks.map((value) => (
             <g key={value} data-chart-tick={value}>
               <line
-                x1={left}
-                x2={right}
+                x1={chartLeft}
+                x2={chartRight}
                 y1={y(value)}
                 y2={y(value)}
                 stroke="var(--color-line, #cbd5e1)"
               />
               <text
-                x={left - 10}
+                x={chartLeft - 10}
                 y={y(value) + 4}
                 textAnchor="end"
                 className="chart-axis"
-                fontSize="12"
+                fontSize={compactLayout ? '13' : '12'}
               >
                 {format(value)}
               </text>
@@ -689,7 +732,7 @@ export function SharedWeightChart({
                         y={chartValueLabelY.get(pointId) ?? y(point.value) - 12}
                         textAnchor="middle"
                         className="chart-value"
-                        fontSize="6.6"
+                        fontSize={compactLayout ? '9' : '6.6'}
                         fontWeight="700"
                         data-date={point.date}
                         data-value={point.value}
@@ -754,7 +797,7 @@ export function SharedWeightChart({
                     y={chartValueLabelY.get(pointId) ?? y(point.value) - 12}
                     textAnchor="middle"
                     className="chart-value"
-                    fontSize="6.6"
+                    fontSize={compactLayout ? '9' : '6.6'}
                     fontWeight="700"
                     data-date={point.date}
                     data-weight-kg={point.value}
@@ -780,7 +823,7 @@ export function SharedWeightChart({
                       : 'middle'
               }
               className="chart-axis"
-              fontSize="6.5"
+              fontSize={compactLayout ? '10' : '6.5'}
               data-chart-date-tick={dateAtDay(date)}
             >
               {formatChartDate(dateAtDay(date))}
