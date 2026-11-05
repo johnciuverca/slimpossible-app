@@ -1,8 +1,59 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { SharedWeightChart } from './SharedWeightChart'
 
 afterEach(cleanup)
+
+it('marks estimates as hollow, labels them accessibly, and activates their date/value', () => {
+  const onPointActivate = vi.fn()
+  render(
+    <SharedWeightChart
+      title="Estimated history"
+      description="Saved points and estimates."
+      yLabel="Weight (kg)"
+      min={80}
+      max={90}
+      onPointActivate={onPointActivate}
+      points={[
+        {
+          date: '2026-11-01',
+          value: 90,
+          title: 'Saved',
+          markerLabel: 'Recorded weight',
+        },
+        {
+          date: '2026-11-02',
+          value: 89.75,
+          estimated: true,
+          title: 'Estimated',
+          markerLabel: 'Estimated weight on 2 Nov',
+          tooltip: 'Estimated — 89.75 kg',
+        },
+        {
+          date: '2026-11-03',
+          value: 89.5,
+          title: 'Saved again',
+          markerLabel: 'Recorded weight',
+        },
+      ]}
+    />,
+  )
+  const estimate = screen.getByRole('button', {
+    name: 'Estimated weight on 2 Nov',
+  })
+  expect(estimate).toHaveAttribute('data-point-kind', 'estimated')
+  expect(estimate).toHaveAttribute('fill', 'var(--color-panel, white)')
+  fireEvent.keyDown(estimate, { key: 'Enter' })
+  expect(onPointActivate).toHaveBeenCalledWith(
+    expect.objectContaining({
+      date: '2026-11-02',
+      value: 89.75,
+      estimated: true,
+    }),
+  )
+  fireEvent.click(estimate)
+  expect(onPointActivate).toHaveBeenCalledTimes(2)
+})
 
 it('shares axis, weekly date ticks, numeric labels and exact tooltips without bridging missing days', () => {
   render(

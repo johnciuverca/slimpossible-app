@@ -3,6 +3,7 @@ import type { WeighIn } from '../models/weighIn'
 import { personalChartTrend } from '../models/personalChartTrend'
 import { formatChartDate } from '../models/chartDate'
 import { SharedWeightChart } from './SharedWeightChart'
+import { interpolateMissingWeights } from '../models/estimatedWeighIns'
 
 const formatWeight = (value: number) =>
   new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value)
@@ -13,12 +14,18 @@ export function PersonalProgressChart({
   referenceLabel,
   fitContainer = false,
   labelExtremesOnly = false,
+  onPointActivate,
 }: {
   weighIns: readonly WeighIn[]
   referenceWeightKg?: number
   referenceLabel?: string
   fitContainer?: boolean
   labelExtremesOnly?: boolean
+  onPointActivate?: (point: {
+    date: string
+    value: number
+    estimated?: boolean
+  }) => void
 }) {
   const id = useId()
   const chronological = [...weighIns].sort((a, b) =>
@@ -49,6 +56,17 @@ export function PersonalProgressChart({
     tooltip: `${formatChartDate(point.date)}: ${formatWeight(point.weightKg)} kg`,
     title: `${formatChartDate(point.date)}: ${formatWeight(point.weightKg)} kg recorded`,
   }))
+  const estimates = interpolateMissingWeights(chronological).map((point) => ({
+    date: point.date,
+    value: point.weightKg,
+    estimated: true,
+    markerLabel: `Estimated weight on ${formatChartDate(point.date)}`,
+    tooltip: `Estimated — ${formatChartDate(point.date)}: ${formatWeight(point.weightKg)} kg`,
+    title: `Estimated: ${formatChartDate(point.date)}, ${formatWeight(point.weightKg)} kg`,
+  }))
+  const plottedPoints = [...points, ...estimates].sort((a, b) =>
+    a.date.localeCompare(b.date),
+  )
   const lines = [
     ...(reference === null
       ? []
@@ -98,9 +116,10 @@ export function PersonalProgressChart({
         tabIndex={fitContainer ? undefined : 0}
       >
         <SharedWeightChart
-          title={`Personal weight history chart. ${points.length} saved weigh-ins, from ${rangeDescription}. Each point is a saved entry; no values are estimated.`}
-          description={`Recorded points show saved dates and weights. The dashed trend is a least-squares fit of only these visible records, not additional weigh-ins. The solid line connects recorded weights.${referenceDescription} Private notes are never plotted.`}
-          points={points}
+          title={`Personal weight history chart. ${points.length} saved weigh-ins, from ${rangeDescription}. Hollow points are daily estimates between saved entries.`}
+          description={`Solid points show saved dates and weights. Hollow points are estimates between saved entries and are not saved or used in the trend. Dashed segments connect estimated dates; solid segments connect adjacent saved dates. The trend uses only saved records.${referenceDescription} Private notes are never plotted.`}
+          points={plottedPoints}
+          onPointActivate={(point) => onPointActivate?.(point)}
           lines={lines}
           yLabel="Weight (kg)"
           adaptiveWeightTicks
@@ -120,7 +139,7 @@ export function PersonalProgressChart({
       <figcaption id={`${id}-caption`} className="sr-only">
         {points.length === 1
           ? 'One saved weigh-in is shown. Add another entry to compare your trend.'
-          : `${points.length} saved weigh-ins from ${formatChartDate(first.date)} to ${formatChartDate(latest.date)}. No missing weights are estimated.`}
+          : `${points.length} saved weigh-ins from ${formatChartDate(first.date)} to ${formatChartDate(latest.date)}. Hollow points are display-only daily estimates.`}
         {trend
           ? ' The trend summarizes these recorded points; it is not a saved weigh-in or a prediction.'
           : null}

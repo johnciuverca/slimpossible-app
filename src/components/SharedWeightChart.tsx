@@ -16,6 +16,7 @@ export type SharedChartPoint = {
   tooltip?: ReactNode
   label?: string
   markerLabel?: string
+  estimated?: boolean
 }
 
 export type SharedChartSeries = {
@@ -64,6 +65,7 @@ export function SharedWeightChart({
   points = [],
   series = [],
   lines = [],
+  onPointActivate,
   yLabel,
   min,
   max,
@@ -84,6 +86,7 @@ export function SharedWeightChart({
   points?: SharedChartPoint[]
   series?: SharedChartSeries[]
   lines?: SharedChartLine[]
+  onPointActivate?: (point: SharedChartPoint, seriesId?: string) => void
   yLabel: string
   min: number
   max: number
@@ -197,17 +200,18 @@ export function SharedWeightChart({
   const visiblePoints = points.filter((point) => inRange(point.date))
   const extremeLabelPointIds = new Set<string>()
   if (labelExtremesOnly && visiblePoints.length) {
-    const values = visiblePoints.map((point) => point.value)
+    const actualPoints = visiblePoints.filter((point) => !point.estimated)
+    const values = actualPoints.map((point) => point.value)
     const minimumValue = Math.min(...values)
     const maximumValue = Math.max(...values)
     const minimumIndex = values.indexOf(minimumValue)
     const maximumIndex = values.indexOf(maximumValue)
     extremeLabelPointIds.add(
-      `point:${visiblePoints[minimumIndex].date}:${minimumIndex}`,
+      `point:${actualPoints[minimumIndex].date}:${visiblePoints.indexOf(actualPoints[minimumIndex])}`,
     )
     if (maximumValue !== minimumValue) {
       extremeLabelPointIds.add(
-        `point:${visiblePoints[maximumIndex].date}:${maximumIndex}`,
+        `point:${actualPoints[maximumIndex].date}:${visiblePoints.indexOf(actualPoints[maximumIndex])}`,
       )
     }
   }
@@ -239,16 +243,17 @@ export function SharedWeightChart({
   const extremeSeriesPointIds = new Set<string>()
   if (labelSeriesExtremesOnly) {
     visibleSeries.forEach((item) => {
-      if (!item.points.length) return
-      const values = item.points.map((point) => point.value)
+      const actualPoints = item.points.filter((point) => !point.estimated)
+      if (!actualPoints.length) return
+      const values = actualPoints.map((point) => point.value)
       const minimumIndex = values.indexOf(Math.min(...values))
       const maximumIndex = values.indexOf(Math.max(...values))
       extremeSeriesPointIds.add(
-        `series:${item.id}:${item.points[minimumIndex].date}:${minimumIndex}`,
+        `series:${item.id}:${actualPoints[minimumIndex].date}:${item.points.indexOf(actualPoints[minimumIndex])}`,
       )
       if (values[minimumIndex] !== values[maximumIndex])
         extremeSeriesPointIds.add(
-          `series:${item.id}:${item.points[maximumIndex].date}:${maximumIndex}`,
+          `series:${item.id}:${actualPoints[maximumIndex].date}:${item.points.indexOf(actualPoints[maximumIndex])}`,
         )
     })
   }
@@ -460,18 +465,20 @@ export function SharedWeightChart({
         { length: span ? Math.floor(span / 7) + 1 : 1 },
         (_, index) => startDay + index * 7,
       )
-  const pathFor = (items: SharedChartPoint[]) =>
-    items
-      .map(
-        (point, index) =>
-          `${index ? 'L' : 'M'} ${x(point.date)} ${y(point.value)}`,
-      )
-      .join(' ')
   const visibleCount =
-    visiblePoints.length +
-    visibleSeries.reduce((sum, item) => sum + item.points.length, 0)
+    visiblePoints.filter((point) => !point.estimated).length +
+    visibleSeries.reduce(
+      (sum, item) =>
+        sum + item.points.filter((point) => !point.estimated).length,
+      0,
+    )
   const totalCount =
-    points.length + series.reduce((sum, item) => sum + item.points.length, 0)
+    points.filter((point) => !point.estimated).length +
+    series.reduce(
+      (sum, item) =>
+        sum + item.points.filter((point) => !point.estimated).length,
+      0,
+    )
   const chartTitle = fullRange
     ? title
     : `${title}. Showing ${visibleCount} of ${totalCount} recorded entries from ${formatChartDate(dateAtDay(startDay))} to ${formatChartDate(dateAtDay(endDay))}.`
@@ -730,41 +737,56 @@ export function SharedWeightChart({
               </line>
             )
           })}
-          {visiblePoints.length > 1 ? (
-            <path
-              d={pathFor(visiblePoints)}
-              fill="none"
-              stroke="var(--chart-recorded, #087756)"
-              strokeWidth="3"
-              strokeLinejoin="round"
-            />
-          ) : null}
+          {visiblePoints.slice(1).map((point, index) => {
+            const previous = visiblePoints[index]
+            return (
+              <path
+                key={`${previous.date}-${point.date}`}
+                data-series={
+                  previous.estimated || point.estimated
+                    ? 'estimated-connection'
+                    : 'recorded-connection'
+                }
+                d={`M ${x(previous.date)} ${y(previous.value)} L ${x(point.date)} ${y(point.value)}`}
+                fill="none"
+                stroke="var(--chart-recorded, #087756)"
+                strokeWidth="3"
+                strokeLinejoin="round"
+                strokeDasharray={
+                  previous.estimated || point.estimated ? '4 4' : undefined
+                }
+                opacity={previous.estimated || point.estimated ? 0.62 : 1}
+              />
+            )
+          })}
           {visibleSeries.map((item) => (
             <g key={item.id}>
-              {item.points.length > 1 &&
-              item.points.some(
-                (point, index) =>
-                  index > 0 &&
-                  (item.connectGaps ||
-                    day(point.date) - day(item.points[index - 1].date) === 1),
-              ) ? (
-                <path
-                  data-series="recorded-connection"
-                  d={item.points
-                    .map(
-                      (point, index) =>
-                        `${index && (item.connectGaps || day(point.date) - day(item.points[index - 1].date) === 1) ? 'L' : 'M'} ${x(point.date)} ${y(point.value)}`,
-                    )
-                    .join(' ')}
-                  fill="none"
-                  stroke={item.color}
-                  strokeWidth="3"
-                  strokeLinejoin="round"
-                  strokeDasharray={item.dashed ? '5 3' : undefined}
-                >
-                  {item.title ? <title>{item.title}</title> : null}
-                </path>
-              ) : null}
+              {item.points.slice(1).map((point, index) => {
+                const previous = item.points[index]
+                const connected =
+                  item.connectGaps || day(point.date) - day(previous.date) === 1
+                if (!connected) return null
+                const estimated = previous.estimated || point.estimated
+                return (
+                  <path
+                    key={`line-${previous.date}-${point.date}`}
+                    data-series={
+                      estimated ? 'estimated-connection' : 'recorded-connection'
+                    }
+                    d={`M ${x(previous.date)} ${y(previous.value)} L ${x(point.date)} ${y(point.value)}`}
+                    fill="none"
+                    stroke={item.color}
+                    strokeWidth="3"
+                    strokeLinejoin="round"
+                    strokeDasharray={
+                      item.dashed || estimated ? '5 3' : undefined
+                    }
+                    opacity={estimated ? 0.62 : 1}
+                  >
+                    {item.title ? <title>{item.title}</title> : null}
+                  </path>
+                )
+              })}
               {item.points.map((point, index) => {
                 const pointId = `series:${item.id}:${point.date}:${index}`
                 const labelPosition = valueLabelPosition(
@@ -780,9 +802,21 @@ export function SharedWeightChart({
                       cx={x(point.date)}
                       cy={y(point.value)}
                       r="5"
-                      fill={item.color}
-                      stroke="var(--color-panel, white)"
+                      fill={
+                        point.estimated
+                          ? 'var(--color-panel, white)'
+                          : item.color
+                      }
+                      stroke={
+                        point.estimated
+                          ? item.color
+                          : 'var(--color-panel, white)'
+                      }
                       strokeWidth="2"
+                      data-point-kind={
+                        point.estimated ? 'estimated' : 'recorded'
+                      }
+                      opacity={point.estimated ? 0.72 : 1}
                       data-date={point.date}
                       data-value={point.value}
                       aria-label={point.markerLabel}
@@ -815,8 +849,10 @@ export function SharedWeightChart({
                         else if (event.key === 'Enter' || event.key === ' ') {
                           event.preventDefault()
                           setActivePoint({ id: pointId, source: 'focus' })
+                          onPointActivate?.(point, item.id)
                         }
                       }}
+                      onClick={() => onPointActivate?.(point, item.id)}
                     >
                       <title>{point.title}</title>
                     </circle>
@@ -857,9 +893,19 @@ export function SharedWeightChart({
                   r="5"
                   data-date={point.date}
                   data-weight-kg={point.value}
-                  fill="var(--chart-recorded, #087756)"
-                  stroke="var(--color-panel)"
+                  fill={
+                    point.estimated
+                      ? 'var(--color-panel, white)'
+                      : 'var(--chart-recorded, #087756)'
+                  }
+                  stroke={
+                    point.estimated
+                      ? 'var(--chart-recorded, #087756)'
+                      : 'var(--color-panel)'
+                  }
                   strokeWidth="2"
+                  data-point-kind={point.estimated ? 'estimated' : 'recorded'}
+                  opacity={point.estimated ? 0.72 : 1}
                   aria-label={point.markerLabel ?? 'Recorded weight point'}
                   aria-describedby={
                     activePoint?.id === pointId ? tooltipId : undefined
@@ -887,8 +933,10 @@ export function SharedWeightChart({
                     else if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault()
                       setActivePoint({ id: pointId, source: 'focus' })
+                      onPointActivate?.(point)
                     }
                   }}
+                  onClick={() => onPointActivate?.(point)}
                 >
                   <title>{point.title}</title>
                 </circle>

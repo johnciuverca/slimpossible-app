@@ -64,11 +64,15 @@ function lockPageScroll() {
 export function RecordWeightDialog({
   workspace,
   entry,
+  initialValues,
+  estimateNotice,
   onClose,
   onSaved,
 }: {
   workspace: PersonalWorkspace
   entry?: PersonalWeighIn
+  initialValues?: Partial<PersonalWeighInFormValues>
+  estimateNotice?: string
   onClose: () => void
   onSaved: () => void
 }) {
@@ -83,10 +87,11 @@ export function RecordWeightDialog({
   const blocked =
     workspace.contexts.state !== 'ready' && !!entry?.sharedChallengeIds.length
   const [values, setValues] = useState<PersonalWeighInFormValues>({
-    date: entry?.date ?? personalWeighInToday(),
-    weightKg: entry ? String(entry.weightKg) : '',
-    note: entry?.note ?? '',
-    sharedChallengeIds: entry?.sharedChallengeIds ?? [],
+    date: entry?.date ?? initialValues?.date ?? personalWeighInToday(),
+    weightKg: entry ? String(entry.weightKg) : (initialValues?.weightKg ?? ''),
+    note: entry?.note ?? initialValues?.note ?? '',
+    sharedChallengeIds:
+      entry?.sharedChallengeIds ?? initialValues?.sharedChallengeIds ?? [],
   })
   const [errors, setErrors] = useState<
     Partial<Record<keyof PersonalWeighInFormValues, string>>
@@ -323,6 +328,15 @@ export function RecordWeightDialog({
         {workspace.contexts.state === 'loading' ? (
           <p role="status" className="mb-4">
             Loading optional group choices…
+          </p>
+        ) : null}
+        {estimateNotice ? (
+          <p
+            className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"
+            role="status"
+          >
+            {estimateNotice} Review the date and weight, then save explicitly.
+            Sharing is optional and off by default.
           </p>
         ) : null}
         {workspace.contexts.error ? (

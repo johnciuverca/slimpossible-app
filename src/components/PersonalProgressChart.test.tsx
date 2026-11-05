@@ -46,9 +46,9 @@ it('fits a Dashboard personal trend inside its card while keeping range controls
   expect(
     screen.getByRole('group', { name: 'Personal weight chart' }),
   ).toHaveClass('min-w-0')
-  expect(chart.querySelectorAll('circle[data-date]')).toHaveLength(
-    weighIns.length,
-  )
+  expect(
+    chart.querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
+  ).toHaveLength(weighIns.length)
   const extremeLabels = Array.from(
     chart.querySelectorAll<SVGTextElement>('.chart-value'),
   )
@@ -98,7 +98,9 @@ it('labels one point per extreme, one point on equal values, and updates extreme
   const chart = () =>
     screen.getByRole('img', { name: /Personal weight history/ })
   const labels = () => Array.from(chart().querySelectorAll('.chart-value'))
-  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(4)
+  expect(
+    chart().querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
+  ).toHaveLength(4)
   expect(labels().map((label) => label.getAttribute('data-date'))).toEqual([
     '2026-01-01',
     '2026-01-08',
@@ -122,7 +124,9 @@ it('labels one point per extreme, one point on equal values, and updates extreme
       weighIns={[{ date: '2026-03-01', weightKg: 88, participantId: 'own' }]}
     />,
   )
-  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(1)
+  expect(
+    chart().querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
+  ).toHaveLength(1)
   expect(labels()).toHaveLength(1)
 
   const daysAgo = (days: number) =>
@@ -141,7 +145,9 @@ it('labels one point per extreme, one point on equal values, and updates extreme
     ['110', '80'],
   )
   fireEvent.click(screen.getByRole('button', { name: 'Show last 1 month' }))
-  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(2)
+  expect(
+    chart().querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
+  ).toHaveLength(2)
   expect(labels().map((label) => label.getAttribute('data-weight-kg'))).toEqual(
     ['95', '90'],
   )
@@ -151,7 +157,9 @@ it('labels one point per extreme, one point on equal values, and updates extreme
   fireEvent.pointerDown(visiblePoint, { pointerType: 'touch' })
   expect(screen.getByRole('tooltip')).toHaveTextContent(/95 kg/)
   fireEvent.click(screen.getByRole('button', { name: 'Show all dates' }))
-  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(4)
+  expect(
+    chart().querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
+  ).toHaveLength(4)
 })
 it('keeps derived trend and goal lines separate from exact saved points', () => {
   render(
@@ -165,13 +173,13 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
     />,
   )
   const chart = screen.getByRole('img')
-  expect(chart).toHaveAccessibleDescription(
-    /The dashed trend is a least-squares fit/,
-  )
+  expect(chart).toHaveAccessibleDescription(/The trend uses only saved records/)
   expect(
     screen.getByText(/saved weigh-ins from 01\.10\.2026 to 11\.10\.2026/),
   ).toHaveClass('sr-only')
-  expect(chart.querySelectorAll('circle[data-date]')).toHaveLength(2)
+  expect(
+    chart.querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
+  ).toHaveLength(2)
   expect(chart.querySelector('[data-chart-trend]')).toBeInTheDocument()
   expect(chart.querySelector('[data-chart-trend]')).toHaveAttribute(
     'opacity',
@@ -224,8 +232,9 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
     '2',
   )
   expect(
-    Array.from(chart.querySelectorAll('circle[data-date]'), (point) =>
-      Number(point.getAttribute('cx')),
+    Array.from(
+      chart.querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
+      (point) => Number(point.getAttribute('cx')),
     ),
   ).toEqual([64, 696])
   expect(chart.querySelectorAll('circle title')[0]).toHaveTextContent(
@@ -283,7 +292,9 @@ it('uses aligned five-kilogram labels for wide visible spans and finer ticks aft
   expect(chart()).toHaveAttribute('viewBox', '0 0 760 266')
 
   fireEvent.click(screen.getByRole('button', { name: 'Show last 1 month' }))
-  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(3)
+  expect(
+    chart().querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
+  ).toHaveLength(3)
   const narrowTicks = majorTicks()
   expect(narrowTicks.length).toBeGreaterThan(2)
   expect(narrowTicks.every((tick) => tick % 5 === 0)).toBe(false)
@@ -387,7 +398,9 @@ it('labels every saved weigh-in with only its numeric value', () => {
   ]
   render(<PersonalProgressChart weighIns={weighIns} />)
   const chart = screen.getByRole('img')
-  const points = Array.from(chart.querySelectorAll('circle[data-date]'))
+  const points = Array.from(
+    chart.querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
+  )
   const labels = Array.from(chart.querySelectorAll('.chart-value'))
   expect(points).toHaveLength(weighIns.length)
   expect(labels).toHaveLength(points.length)
@@ -421,9 +434,13 @@ it('changes the personal chart window without changing saved weigh-ins', () => {
   render(<PersonalProgressChart weighIns={weighIns} />)
   const chart = () =>
     screen.getByRole('img', { name: /Personal weight history chart/ })
-  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(5)
+  expect(
+    chart().querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
+  ).toHaveLength(5)
   fireEvent.click(screen.getByRole('button', { name: 'Show last 1 month' }))
-  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(2)
+  expect(
+    chart().querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
+  ).toHaveLength(2)
   expect(
     chart().querySelectorAll('[data-chart-date-tick]').length,
   ).toBeLessThan(18)
@@ -434,8 +451,12 @@ it('changes the personal chart window without changing saved weigh-ins', () => {
   fireEvent.keyDown(screen.getByRole('slider', { name: 'Visible range end' }), {
     key: 'ArrowLeft',
   })
-  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(1)
+  expect(
+    chart().querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
+  ).toHaveLength(1)
   expect(weighIns).toHaveLength(5)
   fireEvent.click(screen.getByRole('button', { name: 'Show all dates' }))
-  expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(5)
+  expect(
+    chart().querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
+  ).toHaveLength(5)
 })

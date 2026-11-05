@@ -26,6 +26,7 @@ import { DashboardChallengeActions } from '../components/DashboardChallengeActio
 import { GroupActionsPopover } from '../components/GroupActionsPopover'
 import { WeightEntryActions } from '../components/WeightEntryActions'
 import { WeightEntryCard } from '../components/WeightEntryCard'
+import { RecordWeightDialog } from '../components/RecordWeightDialog'
 import type { PersonalWorkspace } from '../data/usePersonalWorkspace'
 import { usePersonalWorkspace } from '../data/usePersonalWorkspace'
 import { ownGroupMemberKey } from '../models/ownGroupMemberKey'
@@ -2511,6 +2512,14 @@ export function ProgressPage({
 }: { personalHeader?: boolean } = {}) {
   const { data, isLoading, message, messageTone } = usePersonalDashboard()
   const { state: authState } = useOptionalAuth()
+  const [chartPointSelection, setChartPointSelection] = useState<{
+    date: string
+    weightKg: number
+    estimated: boolean
+  } | null>(null)
+  const personalWorkspace = usePersonalWorkspace({
+    enabled: Boolean(authState.user?.id && chartPointSelection),
+  })
   const persistence = useMemo(() => createPersistence(authState), [authState])
   const [provisionalSummary, setProvisionalSummary] =
     useState<ProvisionalGroupLeaderSummary | null>(null)
@@ -2816,6 +2825,13 @@ export function ProgressPage({
                 ) : (
                   <PersonalProgressChart
                     weighIns={data.flow.historyTrend.history}
+                    onPointActivate={(point) =>
+                      setChartPointSelection({
+                        date: point.date,
+                        weightKg: point.value,
+                        estimated: !!point.estimated,
+                      })
+                    }
                   />
                 )}
                 {data.flow.historyTrend.trendChangeKg !== null ? (
@@ -3008,6 +3024,40 @@ export function ProgressPage({
           ) : null}
         </DashboardState>
       </Card>
+      {chartPointSelection && personalWorkspace.personal.state === 'ready'
+        ? (() => {
+            const entry = chartPointSelection.estimated
+              ? undefined
+              : personalWorkspace.personal.data.find(
+                  (item) => item.date === chartPointSelection.date,
+                )
+            return entry || chartPointSelection.estimated ? (
+              <RecordWeightDialog
+                key={`personal-chart:${chartPointSelection.date}:${entry?.id ?? 'new'}`}
+                workspace={personalWorkspace}
+                entry={entry}
+                initialValues={
+                  entry
+                    ? undefined
+                    : {
+                        date: chartPointSelection.date,
+                        weightKg: String(chartPointSelection.weightKg),
+                      }
+                }
+                estimateNotice={
+                  chartPointSelection.estimated
+                    ? 'This is a display-only estimate.'
+                    : undefined
+                }
+                onClose={() => setChartPointSelection(null)}
+                onSaved={() => {
+                  setChartPointSelection(null)
+                  personalWorkspace.refresh()
+                }}
+              />
+            ) : null
+          })()
+        : null}
     </section>
   )
 }

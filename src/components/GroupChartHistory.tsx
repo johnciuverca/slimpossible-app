@@ -14,6 +14,8 @@ import { WeightEntryCard } from './WeightEntryCard'
 import { deriveGroupChartTrend } from '../models/groupChartTrend'
 import type { GroupMemberProgress } from '../models/groupMemberProgress'
 import { SharedWeightChart } from './SharedWeightChart'
+import { interpolateMissingWeights } from '../models/estimatedWeighIns'
+import { RecordWeightDialog } from './RecordWeightDialog'
 
 const colors = ['#31dbb0', '#67a5ff', '#ff8ba7', '#c49cff', '#ffc164']
 const trendColor = '#ffbf69'
@@ -59,6 +61,11 @@ export function GroupChartHistory({
     key: string
     state: 'success' | 'error'
     entries: GroupChartEntry[]
+  } | null>(null)
+  const [chartAction, setChartAction] = useState<{
+    date: string
+    weightKg: number
+    estimated: boolean
   } | null>(null)
   useEffect(() => {
     let current = true
@@ -298,13 +305,14 @@ export function GroupChartHistory({
               <>
                 <p className="sr-only">
                   {absolute ? (
-                    'Missing dates are gaps, not estimated weights. Each member starts at their first explicitly shared weight; unshared starting values are not added. Corrections and removed shares update this chart on refresh.'
+                    'Hollow points estimate missing dates only between a member’s explicitly shared entries. Each member starts at their first explicitly shared weight; unshared starting values are not added. Estimates are visual only. Corrections and removed shares update this chart on refresh.'
                   ) : (
                     <>
-                      Missing dates are gaps, not estimated weights. A single
-                      shared entry establishes a zero-change baseline. Late
-                      entries, corrections and removed shares recalculate the
-                      baseline on refresh.
+                      Hollow points estimate missing dates only between a
+                      member’s explicitly shared entries. A single shared entry
+                      establishes a zero-change baseline. Estimates are visual
+                      only. Late entries, corrections and removed shares
+                      recalculate the baseline on refresh.
                     </>
                   )}
                 </p>
@@ -342,17 +350,67 @@ export function GroupChartHistory({
                       color: colors[index % colors.length],
                       title: `${member.label} recorded shared weights`,
                       extremeLabelPrefix: member.label,
-                      points: member.points.map((point) => ({
-                        date: point.date,
-                        value: pointValue(point),
-                        label: absolute
-                          ? String(point.weightKg)
-                          : `${point.changeKg > 0 ? '+' : ''}${point.changeKg}`,
-                        title: `${member.label}: ${formatChartDate(point.date)}, ${absolute ? `${point.weightKg} kg` : signed(point.changeKg)}`,
-                        markerLabel: `Recorded weight for ${member.label} on ${formatChartDate(point.date)}`,
-                        tooltip: `${member.label} — ${formatChartDate(point.date)}: ${formatWeight(point.weightKg)} kg`,
-                      })),
+                      points: [
+                        ...member.points.map((point) => ({
+                          date: point.date,
+                          value: pointValue(point),
+                          label: absolute
+                            ? String(point.weightKg)
+                            : `${point.changeKg > 0 ? '+' : ''}${point.changeKg}`,
+                          title: `${member.label}: ${formatChartDate(point.date)}, ${absolute ? `${point.weightKg} kg` : signed(point.changeKg)}`,
+                          markerLabel: `Recorded weight for ${member.label} on ${formatChartDate(point.date)}`,
+                          tooltip: `${member.label} — ${formatChartDate(point.date)}: ${formatWeight(point.weightKg)} kg`,
+                        })),
+                        ...interpolateMissingWeights(
+                          member.points.map((point) => ({
+                            date: point.date,
+                            weightKg: point.weightKg,
+                          })),
+                        ).map((point) => ({
+                          date: point.date,
+                          value: absolute
+                            ? point.weightKg
+                            : point.weightKg -
+                              (member.points[0]?.weightKg ?? point.weightKg),
+                          estimated: true,
+                          title: `${member.label}: Estimated ${formatChartDate(point.date)}, ${formatWeight(point.weightKg)} kg`,
+                          markerLabel: `Estimated weight for ${member.label} on ${formatChartDate(point.date)}`,
+                          tooltip: `${member.label} — Estimated ${formatChartDate(point.date)}: ${formatWeight(point.weightKg)} kg`,
+                        })),
+                      ].sort((a, b) => a.date.localeCompare(b.date)),
                     }))}
+                    onPointActivate={(point, memberKey) => {
+                      if (
+                        memberKey !== ownMemberKey ||
+                        personalWorkspace.userId !== viewerId.toLowerCase() ||
+                        personalWorkspace.personal.state !== 'ready' ||
+                        personalWorkspace.contexts.state !== 'ready'
+                      )
+                        return
+                      const entry = personalWorkspace.personal.data.find(
+                        (item) =>
+                          item.date === point.date &&
+                          item.sharedChallengeIds.includes(challengeId),
+                      )
+                      if (point.estimated) {
+                        const baseline =
+                          series.find(
+                            (member) => member.memberKey === ownMemberKey,
+                          )?.points[0]?.weightKg ?? 0
+                        setChartAction({
+                          date: point.date,
+                          weightKg: absolute
+                            ? point.value
+                            : baseline + point.value,
+                          estimated: true,
+                        })
+                      } else if (entry)
+                        setChartAction({
+                          date: point.date,
+                          weightKg: entry.weightKg,
+                          estimated: false,
+                        })
+                    }}
                     lines={[
                       ...series.flatMap((member) => {
                         const target = memberProgress.find(
@@ -701,6 +759,42 @@ export function GroupChartHistory({
           </section>
         </div>
       ) : null}
+      {chartAction && personalWorkspace.personal.state === 'ready'
+        ? (() => {
+            const entry = chartAction.estimated
+              ? undefined
+              : personalWorkspace.personal.data.find(
+                  (item) =>
+                    item.date === chartAction.date &&
+                    item.sharedChallengeIds.includes(challengeId),
+                )
+            return entry || chartAction.estimated ? (
+              <RecordWeightDialog
+                key={`group-chart:${chartAction.date}:${entry?.id ?? 'new'}`}
+                workspace={personalWorkspace}
+                entry={entry}
+                initialValues={
+                  entry
+                    ? undefined
+                    : {
+                        date: chartAction.date,
+                        weightKg: String(chartAction.weightKg),
+                      }
+                }
+                estimateNotice={
+                  chartAction.estimated
+                    ? 'This group-chart value is a display-only estimate.'
+                    : undefined
+                }
+                onClose={() => setChartAction(null)}
+                onSaved={() => {
+                  setChartAction(null)
+                  personalWorkspace.refresh()
+                }}
+              />
+            ) : null
+          })()
+        : null}
     </div>
   )
 }
