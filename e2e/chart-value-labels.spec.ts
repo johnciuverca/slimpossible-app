@@ -29,7 +29,9 @@ for (const width of [1280, 390]) {
     const chart = page.getByRole('img', {
       name: /^Personal weight history chart/,
     })
-    await expect(chart.locator('circle[data-chart-point]')).toHaveCount(4)
+    await expect(
+      chart.locator('circle[data-point-kind="recorded"][data-chart-point]'),
+    ).toHaveCount(4)
     await expect(chart.locator('.chart-value')).toHaveCount(2)
     const labels = await chart.locator('.chart-value').evaluateAll((elements) =>
       elements.map((element) => ({
@@ -42,7 +44,7 @@ for (const width of [1280, 390]) {
       })),
     )
     const points = await chart
-      .locator('circle[data-chart-point]')
+      .locator('circle[data-point-kind="recorded"][data-chart-point]')
       .evaluateAll((elements) =>
         elements.map((element) => ({
           date: element.getAttribute('data-date'),

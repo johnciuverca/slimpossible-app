@@ -101,7 +101,9 @@ it('fits a Dashboard personal trend inside its card while keeping range controls
     expect(screen.getByRole('button', { name })).toBeVisible()
   expect(screen.getAllByRole('slider')).toHaveLength(2)
 
-  const point = chart.querySelector('circle[data-chart-point]')!
+  const point = chart.querySelector(
+    'circle[data-point-kind="recorded"][data-chart-point]',
+  )!
   fireEvent.pointerDown(point, { pointerType: 'touch' })
   expect(screen.getByRole('tooltip')).toHaveTextContent(/01\.01\.2025: 100 kg/)
 })
@@ -258,9 +260,9 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
       (point) => Number(point.getAttribute('cx')),
     ),
   ).toEqual([64, 696])
-  expect(chart.querySelectorAll('circle title')[0]).toHaveTextContent(
-    '01.10.2026: 100 kg recorded',
-  )
+  expect(
+    chart.querySelector('circle[data-point-kind="recorded"] title'),
+  ).toHaveTextContent('01.10.2026: 100 kg recorded')
   expect(chart.querySelectorAll('[data-chart-date-tick]')[0]).toHaveTextContent(
     '01.10.2026',
   )

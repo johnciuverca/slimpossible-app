@@ -1354,7 +1354,9 @@ for (const viewport of [
       name: 'Weight (kg) — shared group history',
     })
     await expect(chart).toBeVisible()
-    const firstChartPoint = chart.locator('circle[data-chart-point]').first()
+    const firstChartPoint = chart
+      .locator('circle[data-point-kind="recorded"][data-chart-point]')
+      .first()
     await firstChartPoint.hover()
     const pointTooltip = page.getByRole('tooltip')
     await expect(pointTooltip).toContainText(
@@ -1390,7 +1392,7 @@ for (const viewport of [
     }
     await expectLegendCentered()
     const originalPoints = await chart
-      .locator('circle')
+      .locator('circle[data-point-kind="recorded"]')
       .evaluateAll((elements) =>
         elements.map((circle) => ({
           label: circle.textContent,
@@ -1453,7 +1455,9 @@ for (const viewport of [
         ),
       ).toBeLessThan(2)
     }
-    const initialChartPoints = await chart.locator('circle[data-date]').count()
+    const initialChartPoints = await chart
+      .locator('circle[data-point-kind="recorded"][data-date]')
+      .count()
     const groupStartSlider = chartControlsTrack.getByRole('slider', {
       name: 'Visible range start',
     })
@@ -1465,11 +1469,13 @@ for (const viewport of [
       'aria-valuetext',
       initialStartDate!,
     )
-    await expect(chart.locator('circle[data-date]')).toHaveCount(2)
+    await expect(
+      chart.locator('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveCount(2)
     await rangeControls.getByRole('button', { name: 'Show all dates' }).click()
-    await expect(chart.locator('circle[data-date]')).toHaveCount(
-      initialChartPoints,
-    )
+    await expect(
+      chart.locator('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveCount(initialChartPoints)
     const allMembersEnd = chartControlsTrack.getByRole('slider', {
       name: 'Visible range end',
     })
@@ -1481,11 +1487,13 @@ for (const viewport of [
       'aria-valuetext',
       originalAllMembersEnd!,
     )
-    await expect(chart.locator('circle[data-date]')).toHaveCount(3)
+    await expect(
+      chart.locator('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveCount(3)
     await rangeControls.getByRole('button', { name: 'Show all dates' }).click()
-    await expect(chart.locator('circle[data-date]')).toHaveCount(
-      initialChartPoints,
-    )
+    await expect(
+      chart.locator('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveCount(initialChartPoints)
     await expect(table.getByRole('columnheader')).toHaveText([
       'Date',
       'Ava (member 1) (kg)',
@@ -1508,7 +1516,9 @@ for (const viewport of [
     await expect(table.getByRole('columnheader')).toHaveCount(2)
     await expect(table).toContainText('88.50 kg')
     await expect(table).not.toContainText('70.00 kg')
-    await expect(page.getByRole('img').locator('circle')).toHaveCount(2)
+    await expect(
+      page.getByRole('img').locator('circle[data-point-kind="recorded"]'),
+    ).toHaveCount(2)
     await page.keyboard.press('End')
     await expect(
       tabs.getByRole('tab', { name: 'Ava (member 2)' }),
@@ -1521,13 +1531,18 @@ for (const viewport of [
     const individualChart = page.getByRole('img', {
       name: /Change from first shared weight \(kg\)/,
     })
-    await individualChart.locator('circle[data-chart-point]').first().hover()
+    await individualChart
+      .locator('circle[data-point-kind="recorded"][data-chart-point]')
+      .first()
+      .hover()
     await expect(page.getByRole('tooltip')).toContainText(
       /Ava \(member 2\).*20\.09\.2026.*70 kg/,
     )
     await expect(groupLegend.locator('li')).toHaveText(['Ava (member 2)'])
     await expectLegendCentered()
-    await expect(individualChart.locator('circle[data-date]')).toHaveCount(2)
+    await expect(
+      individualChart.locator('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveCount(2)
     const individualTrack = page.getByRole('group', {
       name: 'Adjust visible date range',
     })
@@ -1536,14 +1551,18 @@ for (const viewport of [
     })
     await individualStart.focus()
     await page.keyboard.press('ArrowRight')
-    await expect(individualChart.locator('circle[data-date]')).toHaveCount(1)
+    await expect(
+      individualChart.locator('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveCount(1)
     const individualControls = page.getByRole('group', {
       name: 'Chart date range controls',
     })
     await individualControls
       .getByRole('button', { name: 'Show all dates' })
       .click()
-    await expect(individualChart.locator('circle[data-date]')).toHaveCount(2)
+    await expect(
+      individualChart.locator('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveCount(2)
     const individualEnd = individualTrack.getByRole('slider', {
       name: 'Visible range end',
     })
@@ -1555,11 +1574,15 @@ for (const viewport of [
       'aria-valuetext',
       originalIndividualEnd!,
     )
-    await expect(individualChart.locator('circle[data-date]')).toHaveCount(1)
+    await expect(
+      individualChart.locator('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveCount(1)
     await individualControls
       .getByRole('button', { name: 'Show all dates' })
       .click()
-    await expect(individualChart.locator('circle[data-date]')).toHaveCount(2)
+    await expect(
+      individualChart.locator('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveCount(2)
     await all.click()
     const weights = page.getByRole('region', {
       name: 'Scrollable shared group weights',
@@ -2319,14 +2342,18 @@ test('the shared chart range handles respond to mobile touch dragging', async ({
     const chart = page.getByRole('img', {
       name: 'Weight (kg) — shared group history',
     })
-    const points = chart.locator('circle[data-date]')
+    const points = chart.locator(
+      'circle[data-point-kind="recorded"][data-date]',
+    )
     await expect(points).toHaveCount(4)
     await page.evaluate(() =>
       document.querySelector('[data-chart-point]')?.scrollIntoView({
         block: 'center',
       }),
     )
-    const firstPoint = chart.locator('circle[data-chart-point]').first()
+    const firstPoint = chart
+      .locator('circle[data-point-kind="recorded"][data-chart-point]')
+      .first()
     await expect(firstPoint).toBeAttached()
     const firstPointBounds = await firstPoint.boundingBox()
     expect(firstPointBounds).not.toBeNull()

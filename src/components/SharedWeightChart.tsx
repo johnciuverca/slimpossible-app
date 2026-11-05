@@ -789,178 +789,197 @@ export function SharedWeightChart({
                   </path>
                 )
               })}
-              {item.points.map((point, index) => {
-                const pointId = `series:${item.id}:${point.date}:${index}`
-                const labelPosition = valueLabelPosition(
-                  pointId,
-                  seriesLabelX(item, point),
-                  y(point.value),
+              {item.points
+                .map((point, index) => ({ point, index }))
+                .sort(
+                  (a, b) =>
+                    Number(Boolean(b.point.estimated)) -
+                    Number(Boolean(a.point.estimated)),
                 )
-                const showSeriesLabel =
-                  !labelSeriesExtremesOnly || extremeSeriesPointIds.has(pointId)
-                return (
-                  <g key={`${point.date}-${index}`}>
-                    <circle
-                      cx={x(point.date)}
-                      cy={y(point.value)}
-                      r="5"
-                      fill={
-                        point.estimated
-                          ? 'var(--color-panel, white)'
-                          : item.color
-                      }
-                      stroke={
-                        point.estimated
-                          ? item.color
-                          : 'var(--color-panel, white)'
-                      }
-                      strokeWidth="2"
-                      data-point-kind={
-                        point.estimated ? 'estimated' : 'recorded'
-                      }
-                      data-series-id={item.id}
-                      opacity={point.estimated ? 0.72 : 1}
-                      data-date={point.date}
-                      data-value={point.value}
-                      aria-label={point.markerLabel}
-                      aria-describedby={
-                        activePoint?.id === pointId ? tooltipId : undefined
-                      }
-                      role="button"
-                      tabIndex={0}
-                      data-chart-point
-                      onPointerEnter={(event) => setPointSource(event, pointId)}
-                      onPointerDown={(event) =>
-                        selectTouchPoint(event, pointId)
-                      }
-                      onFocus={() =>
-                        setActivePoint((current) =>
-                          current?.id === pointId && current.source === 'touch'
-                            ? current
-                            : { id: pointId, source: 'focus' },
-                        )
-                      }
-                      onBlur={() =>
-                        setActivePoint((current) =>
-                          current?.id === pointId && current.source === 'focus'
-                            ? null
-                            : current,
-                        )
-                      }
-                      onKeyDown={(event) => {
-                        if (event.key === 'Escape') setActivePoint(null)
-                        else if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault()
-                          setActivePoint({ id: pointId, source: 'focus' })
-                          onPointActivate?.(point, item.id)
+                .map(({ point, index }) => {
+                  const pointId = `series:${item.id}:${point.date}:${index}`
+                  const labelPosition = valueLabelPosition(
+                    pointId,
+                    seriesLabelX(item, point),
+                    y(point.value),
+                  )
+                  const showSeriesLabel =
+                    !labelSeriesExtremesOnly ||
+                    extremeSeriesPointIds.has(pointId)
+                  return (
+                    <g key={`${point.date}-${index}`}>
+                      <circle
+                        cx={x(point.date)}
+                        cy={y(point.value)}
+                        r="5"
+                        fill={
+                          point.estimated
+                            ? 'var(--color-panel, white)'
+                            : item.color
                         }
-                      }}
-                      onClick={() => onPointActivate?.(point, item.id)}
-                    >
-                      <title>{point.title}</title>
-                    </circle>
-                    {point.label && showSeriesLabel ? (
-                      <text
-                        x={labelPosition.x}
-                        y={labelPosition.y}
-                        textAnchor="middle"
-                        className="chart-value"
-                        fontSize={compactLayout ? '9' : '6.6'}
-                        fontWeight="700"
+                        stroke={
+                          point.estimated
+                            ? item.color
+                            : 'var(--color-panel, white)'
+                        }
+                        strokeWidth="2"
+                        data-point-kind={
+                          point.estimated ? 'estimated' : 'recorded'
+                        }
+                        data-series-id={item.id}
+                        opacity={point.estimated ? 0.72 : 1}
                         data-date={point.date}
                         data-value={point.value}
+                        aria-label={point.markerLabel}
+                        aria-describedby={
+                          activePoint?.id === pointId ? tooltipId : undefined
+                        }
+                        role="button"
+                        tabIndex={0}
+                        data-chart-point
+                        onPointerEnter={(event) =>
+                          setPointSource(event, pointId)
+                        }
+                        onPointerDown={(event) =>
+                          selectTouchPoint(event, pointId)
+                        }
+                        onFocus={() =>
+                          setActivePoint((current) =>
+                            current?.id === pointId &&
+                            current.source === 'touch'
+                              ? current
+                              : { id: pointId, source: 'focus' },
+                          )
+                        }
+                        onBlur={() =>
+                          setActivePoint((current) =>
+                            current?.id === pointId &&
+                            current.source === 'focus'
+                              ? null
+                              : current,
+                          )
+                        }
+                        onKeyDown={(event) => {
+                          if (event.key === 'Escape') setActivePoint(null)
+                          else if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault()
+                            setActivePoint({ id: pointId, source: 'focus' })
+                            onPointActivate?.(point, item.id)
+                          }
+                        }}
+                        onClick={() => onPointActivate?.(point, item.id)}
                       >
-                        {item.extremeLabelPrefix
-                          ? `${item.extremeLabelPrefix}: ${point.label}`
-                          : point.label}
-                      </text>
-                    ) : null}
-                  </g>
-                )
-              })}
+                        <title>{point.title}</title>
+                      </circle>
+                      {point.label && showSeriesLabel ? (
+                        <text
+                          x={labelPosition.x}
+                          y={labelPosition.y}
+                          textAnchor="middle"
+                          className="chart-value"
+                          fontSize={compactLayout ? '9' : '6.6'}
+                          fontWeight="700"
+                          data-date={point.date}
+                          data-value={point.value}
+                        >
+                          {item.extremeLabelPrefix
+                            ? `${item.extremeLabelPrefix}: ${point.label}`
+                            : point.label}
+                        </text>
+                      ) : null}
+                    </g>
+                  )
+                })}
             </g>
           ))}
-          {visiblePoints.map((point, index) => {
-            const pointId = `point:${point.date}:${index}`
-            const labelPosition = valueLabelPosition(
-              pointId,
-              pointLabelX(point),
-              y(point.value),
+          {visiblePoints
+            .map((point, index) => ({ point, index }))
+            .sort(
+              (a, b) =>
+                Number(Boolean(b.point.estimated)) -
+                Number(Boolean(a.point.estimated)),
             )
-            return (
-              <g key={`${point.date}-${index}`}>
-                <circle
-                  tabIndex={0}
-                  cx={x(point.date)}
-                  cy={y(point.value)}
-                  r="5"
-                  data-date={point.date}
-                  data-weight-kg={point.value}
-                  fill={
-                    point.estimated
-                      ? 'var(--color-panel, white)'
-                      : 'var(--chart-recorded, #087756)'
-                  }
-                  stroke={
-                    point.estimated
-                      ? 'var(--chart-recorded, #087756)'
-                      : 'var(--color-panel)'
-                  }
-                  strokeWidth="2"
-                  data-point-kind={point.estimated ? 'estimated' : 'recorded'}
-                  opacity={point.estimated ? 0.72 : 1}
-                  aria-label={point.markerLabel ?? 'Recorded weight point'}
-                  aria-describedby={
-                    activePoint?.id === pointId ? tooltipId : undefined
-                  }
-                  role="button"
-                  data-chart-point
-                  onPointerEnter={(event) => setPointSource(event, pointId)}
-                  onPointerDown={(event) => selectTouchPoint(event, pointId)}
-                  onFocus={() =>
-                    setActivePoint((current) =>
-                      current?.id === pointId && current.source === 'touch'
-                        ? current
-                        : { id: pointId, source: 'focus' },
-                    )
-                  }
-                  onBlur={() =>
-                    setActivePoint((current) =>
-                      current?.id === pointId && current.source === 'focus'
-                        ? null
-                        : current,
-                    )
-                  }
-                  onKeyDown={(event) => {
-                    if (event.key === 'Escape') setActivePoint(null)
-                    else if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      setActivePoint({ id: pointId, source: 'focus' })
-                      onPointActivate?.(point)
-                    }
-                  }}
-                  onClick={() => onPointActivate?.(point)}
-                >
-                  <title>{point.title}</title>
-                </circle>
-                {point.label &&
-                (!labelExtremesOnly || extremeLabelPointIds.has(pointId)) ? (
-                  <text
-                    x={labelPosition.x}
-                    y={labelPosition.y}
-                    textAnchor="middle"
-                    className="chart-value"
-                    fontSize={compactLayout ? '9' : '6.6'}
-                    fontWeight="700"
+            .map(({ point, index }) => {
+              const pointId = `point:${point.date}:${index}`
+              const labelPosition = valueLabelPosition(
+                pointId,
+                pointLabelX(point),
+                y(point.value),
+              )
+              return (
+                <g key={`${point.date}-${index}`}>
+                  <circle
+                    tabIndex={0}
+                    cx={x(point.date)}
+                    cy={y(point.value)}
+                    r="5"
                     data-date={point.date}
                     data-weight-kg={point.value}
+                    fill={
+                      point.estimated
+                        ? 'var(--color-panel, white)'
+                        : 'var(--chart-recorded, #087756)'
+                    }
+                    stroke={
+                      point.estimated
+                        ? 'var(--chart-recorded, #087756)'
+                        : 'var(--color-panel)'
+                    }
+                    strokeWidth="2"
+                    data-point-kind={point.estimated ? 'estimated' : 'recorded'}
+                    opacity={point.estimated ? 0.72 : 1}
+                    aria-label={point.markerLabel ?? 'Recorded weight point'}
+                    aria-describedby={
+                      activePoint?.id === pointId ? tooltipId : undefined
+                    }
+                    role="button"
+                    data-chart-point
+                    onPointerEnter={(event) => setPointSource(event, pointId)}
+                    onPointerDown={(event) => selectTouchPoint(event, pointId)}
+                    onFocus={() =>
+                      setActivePoint((current) =>
+                        current?.id === pointId && current.source === 'touch'
+                          ? current
+                          : { id: pointId, source: 'focus' },
+                      )
+                    }
+                    onBlur={() =>
+                      setActivePoint((current) =>
+                        current?.id === pointId && current.source === 'focus'
+                          ? null
+                          : current,
+                      )
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape') setActivePoint(null)
+                      else if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        setActivePoint({ id: pointId, source: 'focus' })
+                        onPointActivate?.(point)
+                      }
+                    }}
+                    onClick={() => onPointActivate?.(point)}
                   >
-                    {point.label}
-                  </text>
-                ) : null}
-              </g>
-            )
-          })}
+                    <title>{point.title}</title>
+                  </circle>
+                  {point.label &&
+                  (!labelExtremesOnly || extremeLabelPointIds.has(pointId)) ? (
+                    <text
+                      x={labelPosition.x}
+                      y={labelPosition.y}
+                      textAnchor="middle"
+                      className="chart-value"
+                      fontSize={compactLayout ? '9' : '6.6'}
+                      fontWeight="700"
+                      data-date={point.date}
+                      data-weight-kg={point.value}
+                    >
+                      {point.label}
+                    </text>
+                  ) : null}
+                </g>
+              )
+            })}
           {dates.map((date, index) => (
             <text
               key={date}

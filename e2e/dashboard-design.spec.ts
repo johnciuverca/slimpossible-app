@@ -60,7 +60,9 @@ for (const width of [1280, 390]) {
     const chart = page.getByRole('img', {
       name: /^Personal weight history chart/,
     })
-    await expect(chart.locator('circle[data-date]')).toHaveCount(5)
+    await expect(
+      chart.locator('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveCount(5)
     await expect(chart.locator('[data-chart-trend]')).toHaveCount(1)
     await expect(chart.locator('[data-chart-reference]')).toHaveCount(1)
     await expect(chart.locator('[data-chart-trend]')).toHaveAttribute(
@@ -68,13 +70,17 @@ for (const width of [1280, 390]) {
       '0.35',
     )
     await expect(chart.locator('.chart-legend')).toHaveCount(0)
-    await expect(chart).toHaveAccessibleDescription(/least-squares fit/)
+    await expect(chart).toHaveAccessibleDescription(
+      /The trend uses only saved records/,
+    )
     await expect(chart.locator('.chart-value')).toHaveCount(2)
     await expect(chart).toHaveAttribute(
       'viewBox',
       width <= 600 ? '0 0 320 266' : '0 0 760 266',
     )
-    const firstPoint = chart.locator('circle[data-chart-point]').first()
+    const firstPoint = chart
+      .locator('circle[data-point-kind="recorded"][data-chart-point]')
+      .first()
     await firstPoint.hover()
     const pointTooltip = page.getByRole('tooltip')
     await expect(pointTooltip).toBeVisible()
@@ -170,14 +176,16 @@ for (const width of [1280, 390]) {
     await dateControls
       .getByRole('button', { name: 'Show last 1 month' })
       .click()
-    await expect(chart.locator('circle[data-date]')).toHaveCount(4)
+    await expect(
+      chart.locator('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveCount(4)
     const recentTicks = await chart
       .locator('[data-chart-tick]')
       .evaluateAll((ticks) =>
         ticks.map((tick) => Number(tick.getAttribute('data-chart-tick'))),
       )
-    expect(recentTicks.every((tick) => tick % 5 === 0)).toBe(false)
-    await expect(chart.locator('[data-chart-minor-tick]')).toHaveCount(0)
+    expect(recentTicks.every((tick) => tick % 5 === 0)).toBe(true)
+    await expect(chart.locator('[data-chart-minor-tick]')).not.toHaveCount(0)
     const startSlider = sliderTrack.getByRole('slider', {
       name: 'Visible range start',
     })
@@ -189,7 +197,9 @@ for (const width of [1280, 390]) {
       originalStart!,
     )
     await dateControls.getByRole('button', { name: 'Show all dates' }).click()
-    await expect(chart.locator('circle[data-date]')).toHaveCount(5)
+    await expect(
+      chart.locator('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveCount(5)
     const endSlider = sliderTrack.getByRole('slider', {
       name: 'Visible range end',
     })
@@ -197,7 +207,9 @@ for (const width of [1280, 390]) {
     await endSlider.focus()
     await page.keyboard.press('ArrowLeft')
     await expect(endSlider).not.toHaveAttribute('aria-valuetext', originalEnd!)
-    await expect(chart.locator('circle[data-date]')).toHaveCount(4)
+    await expect(
+      chart.locator('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveCount(4)
     await chart.scrollIntoViewIfNeeded()
     const chartBottomBox = await chart.boundingBox()
     const sliderBox = await sliderTrack.boundingBox()
@@ -207,7 +219,9 @@ for (const width of [1280, 390]) {
       chartBottomBox!.y + chartBottomBox!.height - 1,
     )
     await dateControls.getByRole('button', { name: 'Show all dates' }).click()
-    await expect(chart.locator('circle[data-date]')).toHaveCount(5)
+    await expect(
+      chart.locator('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveCount(5)
     await expect(
       dateControls.getByRole('button', { name: 'Show all dates' }),
     ).toHaveAttribute('aria-pressed', 'true')
@@ -236,6 +250,8 @@ for (const width of [1280, 390]) {
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await expect(account).toBeFocused()
 
-    await expect(chart.locator('circle[data-date]')).toHaveCount(5)
+    await expect(
+      chart.locator('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveCount(5)
   })
 }

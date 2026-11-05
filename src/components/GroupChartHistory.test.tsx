@@ -88,7 +88,9 @@ describe('Group chart history', () => {
     expect(
       chart.querySelectorAll('[data-chart-date-tick]')[0],
     ).toHaveTextContent('01.09.2026')
-    const firstPoint = chart.querySelector('circle[data-chart-point]')!
+    const firstPoint = chart.querySelector(
+      'circle[data-point-kind="recorded"][data-chart-point]',
+    )!
     fireEvent.focus(firstPoint)
     expect(screen.getByRole('tooltip')).toHaveTextContent('01.09.2026')
     const legend = screen.getByRole('list', { name: 'Group chart legend' })
@@ -305,9 +307,9 @@ describe('Group chart history', () => {
     const individual = screen.getByRole('img', {
       name: 'Change from first shared weight (kg)',
     })
-    expect(individual.querySelector('circle title')).toHaveTextContent(
-      'Member 0: 01.09.2026, 0 kg',
-    )
+    expect(
+      individual.querySelector('circle[data-point-kind="recorded"] title'),
+    ).toHaveTextContent('Member 0: 01.09.2026, 0 kg')
     expect(individual).toHaveTextContent('-1 kg')
   })
   it('shows a date/member matrix and keyboard-selects only one duplicate-name member without fetching personal data', async () => {

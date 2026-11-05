@@ -41,6 +41,14 @@ it('marks estimates as hollow, labels them accessibly, and activates their date/
   const estimate = screen.getByRole('button', {
     name: 'Estimated weight on 2 Nov',
   })
+  expect(
+    Array.from(
+      screen
+        .getByRole('img', { name: /Estimated history/ })
+        .querySelectorAll('circle[data-point-kind]'),
+      (point) => point.getAttribute('data-point-kind'),
+    ),
+  ).toEqual(['estimated', 'recorded', 'recorded'])
   expect(estimate).toHaveAttribute('data-point-kind', 'estimated')
   expect(estimate).toHaveAttribute('fill', 'var(--color-panel, white)')
   fireEvent.keyDown(estimate, { key: 'Enter' })
