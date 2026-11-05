@@ -7,6 +7,27 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+it('keeps an estimate-only selected range safe and labels no estimates as extrema', () => {
+  render(
+    <PersonalProgressChart
+      labelExtremesOnly
+      weighIns={[
+        { date: '2026-11-01', weightKg: 90, participantId: 'own' },
+        { date: '2026-11-11', weightKg: 80, participantId: 'own' },
+      ]}
+    />,
+  )
+  const chart = screen.getByRole('img', { name: /Personal weight history/ })
+  const start = screen.getByRole('slider', { name: 'Visible range start' })
+  const end = screen.getByRole('slider', { name: 'Visible range end' })
+  fireEvent.keyDown(start, { key: 'ArrowRight' })
+  fireEvent.keyDown(end, { key: 'ArrowLeft' })
+  expect(
+    chart.querySelectorAll('circle[data-point-kind="estimated"]'),
+  ).toHaveLength(9)
+  expect(chart.querySelectorAll('.chart-value')).toHaveLength(0)
+})
+
 it('fits a Dashboard personal trend inside its card while keeping range controls and exact point details', () => {
   vi.stubGlobal('innerWidth', 390)
   vi.stubGlobal(

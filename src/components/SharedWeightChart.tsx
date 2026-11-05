@@ -199,20 +199,22 @@ export function SharedWeightChart({
   const inRange = (date: string) => day(date) >= startDay && day(date) <= endDay
   const visiblePoints = points.filter((point) => inRange(point.date))
   const extremeLabelPointIds = new Set<string>()
-  if (labelExtremesOnly && visiblePoints.length) {
+  if (labelExtremesOnly) {
     const actualPoints = visiblePoints.filter((point) => !point.estimated)
-    const values = actualPoints.map((point) => point.value)
-    const minimumValue = Math.min(...values)
-    const maximumValue = Math.max(...values)
-    const minimumIndex = values.indexOf(minimumValue)
-    const maximumIndex = values.indexOf(maximumValue)
-    extremeLabelPointIds.add(
-      `point:${actualPoints[minimumIndex].date}:${visiblePoints.indexOf(actualPoints[minimumIndex])}`,
-    )
-    if (maximumValue !== minimumValue) {
+    if (actualPoints.length) {
+      const values = actualPoints.map((point) => point.value)
+      const minimumValue = Math.min(...values)
+      const maximumValue = Math.max(...values)
+      const minimumIndex = values.indexOf(minimumValue)
+      const maximumIndex = values.indexOf(maximumValue)
       extremeLabelPointIds.add(
-        `point:${actualPoints[maximumIndex].date}:${visiblePoints.indexOf(actualPoints[maximumIndex])}`,
+        `point:${actualPoints[minimumIndex].date}:${visiblePoints.indexOf(actualPoints[minimumIndex])}`,
       )
+      if (maximumValue !== minimumValue) {
+        extremeLabelPointIds.add(
+          `point:${actualPoints[maximumIndex].date}:${visiblePoints.indexOf(actualPoints[maximumIndex])}`,
+        )
+      }
     }
   }
   const pointLabelX = (point: SharedChartPoint) => {
@@ -816,6 +818,7 @@ export function SharedWeightChart({
                       data-point-kind={
                         point.estimated ? 'estimated' : 'recorded'
                       }
+                      data-series-id={item.id}
                       opacity={point.estimated ? 0.72 : 1}
                       data-date={point.date}
                       data-value={point.value}

@@ -50,7 +50,8 @@ export function GroupChartHistory({
   const personalWorkspace = usePersonalWorkspace({
     enabled: enabled && ownMemberKey !== null,
   })
-  const key = `${viewerId}:${challengeId}:${refreshVersion}:${persistence.mode}`
+  const [localHistoryRefresh, setLocalHistoryRefresh] = useState(0)
+  const key = `${viewerId}:${challengeId}:${refreshVersion}:${localHistoryRefresh}:${persistence.mode}`
   const context = `${viewerId}:${challengeId}:${persistence.mode}`
   const [selection, setSelection] = useState({ context, memberKey: '' })
   const tabs = useRef<HTMLDivElement>(null)
@@ -383,8 +384,7 @@ export function GroupChartHistory({
                       if (
                         memberKey !== ownMemberKey ||
                         personalWorkspace.userId !== viewerId.toLowerCase() ||
-                        personalWorkspace.personal.state !== 'ready' ||
-                        personalWorkspace.contexts.state !== 'ready'
+                        personalWorkspace.personal.state !== 'ready'
                       )
                         return
                       const entry = personalWorkspace.personal.data.find(
@@ -790,6 +790,7 @@ export function GroupChartHistory({
                 onSaved={() => {
                   setChartAction(null)
                   personalWorkspace.refresh()
+                  setLocalHistoryRefresh((version) => version + 1)
                 }}
               />
             ) : null

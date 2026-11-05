@@ -3053,6 +3053,7 @@ export function ProgressPage({
                 onSaved={() => {
                   setChartPointSelection(null)
                   personalWorkspace.refresh()
+                  setRefreshVersion((version) => version + 1)
                 }}
               />
             ) : null

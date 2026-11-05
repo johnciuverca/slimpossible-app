@@ -305,3 +305,85 @@ for (const viewport of [
     ).toBeVisible()
   })
 }
+
+test('Dashboard chart opens edit/create drafts and only an explicit save records an estimate', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await page.goto(fixture('groups'))
+  const offset = (date: string, days: number) => {
+    const value = new Date(`${date}T00:00:00.000Z`)
+    value.setUTCDate(value.getUTCDate() + days)
+    return value.toISOString().slice(0, 10)
+  }
+
+  await page.getByRole('button', { name: 'Record weight', exact: true }).click()
+  const firstDialog = page.getByRole('dialog', { name: 'Record weight' })
+  const today = (await firstDialog.getByLabel('Date').getAttribute('max'))!
+  const firstDate = offset(today, -4)
+  const estimateDate = offset(today, -2)
+  await firstDialog.getByLabel('Date').fill(firstDate)
+  await firstDialog.getByLabel('Weight in kg').fill('90')
+  await firstDialog.getByRole('button', { name: 'Save weight' }).click()
+
+  await page.getByRole('button', { name: 'Record weight', exact: true }).click()
+  const secondDialog = page.getByRole('dialog', { name: 'Record weight' })
+  await secondDialog.getByLabel('Weight in kg').fill('88.5')
+  await secondDialog.getByRole('button', { name: 'Save weight' }).click()
+
+  const chart = page.getByRole('img', { name: /Personal weight history chart/ })
+  const actual = chart.locator(
+    `circle[data-date="${firstDate}"][data-point-kind="recorded"]`,
+  )
+  await expect(actual).toBeVisible()
+  await actual.click()
+  const edit = page.getByRole('dialog', { name: 'Edit weight' })
+  await expect(edit.getByLabel('Date')).toHaveValue(firstDate)
+  await expect(edit.getByLabel('Weight in kg')).toHaveValue('90')
+  await edit.getByRole('button', { name: 'Close' }).click()
+  await expect(edit).toHaveCount(0)
+
+  const estimate = chart.locator(
+    `circle[data-date="${estimateDate}"][data-point-kind="estimated"]`,
+  )
+  await estimate.click()
+  const create = page.getByRole('dialog', { name: 'Record weight' })
+  await expect(create.getByLabel('Date')).toHaveValue(estimateDate)
+  await expect(create.getByLabel('Weight in kg')).toHaveValue('89.25')
+  await expect(create.getByText(/display-only estimate/)).toBeVisible()
+  expect(
+    await create
+      .getByRole('checkbox')
+      .evaluateAll((boxes) =>
+        boxes.every((box) => !(box as HTMLInputElement).checked),
+      ),
+  ).toBe(true)
+  await create.getByRole('button', { name: 'Close' }).click()
+  await expect(create).toHaveCount(0)
+  await expect(estimate).toBeVisible()
+
+  await estimate.click()
+  const confirmedCreate = page.getByRole('dialog', { name: 'Record weight' })
+  await confirmedCreate.getByRole('button', { name: 'Save weight' }).click()
+  await expect(confirmedCreate).toHaveCount(0)
+  await expect(
+    chart.locator(
+      `circle[data-date="${estimateDate}"][data-point-kind="recorded"]`,
+    ),
+  ).toBeVisible()
+  await expect(
+    chart.locator(
+      `circle[data-date="${estimateDate}"][data-point-kind="estimated"]`,
+    ),
+  ).toHaveCount(0)
+  const entries = await page.evaluate(() =>
+    JSON.parse(
+      localStorage.getItem('slimpossible.local.personal-weigh-ins') ?? '[]',
+    ),
+  )
+  expect(entries).toHaveLength(3)
+  expect(
+    entries.find((entry: { date: string }) => entry.date === estimateDate)
+      .sharedChallengeIds,
+  ).toEqual([])
+})

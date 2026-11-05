@@ -33,6 +33,8 @@ async function installGroupFixtures(
   const requests: string[] = []
   let ownWeight: number | null =
     initialOwnWeight ?? (differentWeights ? 95.1 : 88.5)
+  let ownEstimatedSaved = false
+  let ownEstimatedSharedChallengeIds: string[] = []
   let ownTarget = 80
   let ownStartingWeight = 100
   page.on('request', (request) => requests.push(request.url()))
@@ -90,6 +92,17 @@ async function installGroupFixtures(
             ? []
             : [
                 ownRow(),
+                ...(ownEstimatedSaved
+                  ? [
+                      {
+                        id: 'disposable-own-estimated-entry',
+                        recorded_date: '2026-09-21',
+                        weight_kg: 89.25,
+                        note: '',
+                        shared_challenge_ids: ownEstimatedSharedChallengeIds,
+                      },
+                    ]
+                  : []),
                 ...(priorOwnWeight === undefined
                   ? []
                   : [
@@ -169,7 +182,34 @@ async function installGroupFixtures(
       return
     }
     if (ownEntries && url.pathname === '/rest/v1/rpc/save_personal_weigh_in') {
-      const body = request.postDataJSON()
+      const body = request.postDataJSON() as {
+        target_weigh_in_id: string | null
+        target_recorded_date: string
+        target_weight_kg: number
+        target_note: string
+        target_shared_challenge_ids: string[]
+      }
+      if (body.target_weigh_in_id === null) {
+        expect(body.target_recorded_date).toBe('2026-09-21')
+        expect(body.target_weight_kg).toBeCloseTo(89.25)
+        expect(body.target_note).toBeNull()
+        expect(body.target_shared_challenge_ids).toEqual([challengeId])
+        ownEstimatedSaved = true
+        ownEstimatedSharedChallengeIds = body.target_shared_challenge_ids
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify([
+            {
+              id: 'disposable-own-estimated-entry',
+              recorded_date: '2026-09-21',
+              weight_kg: 89.25,
+              note: '',
+              shared_challenge_ids: ownEstimatedSharedChallengeIds,
+            },
+          ]),
+        })
+        return
+      }
       expect(body.target_weigh_in_id).toBe('disposable-own-entry')
       expect(body.target_note).toBe('Author-only disposable private note')
       expect(body.target_shared_challenge_ids).toEqual([challengeId, secondId])
@@ -223,6 +263,18 @@ async function installGroupFixtures(
                   recorded_date: '2026-09-22',
                   weight_kg: ownEntries ? ownWeight : 88.5,
                 },
+                ...(ownEntries &&
+                ownEstimatedSaved &&
+                ownEstimatedSharedChallengeIds.includes(target_challenge_id)
+                  ? [
+                      {
+                        member_key: ownKey,
+                        display_name: name,
+                        recorded_date: '2026-09-21',
+                        weight_kg: 89.25,
+                      },
+                    ]
+                  : []),
               ]),
           {
             member_key: otherKey,
@@ -2546,6 +2598,99 @@ test('archived groups leave normal navigation and remain accessible as read-only
   await page.screenshot({
     path: test.info().outputPath('archive-history-preview.png'),
     fullPage: true,
+  })
+})
+
+test.describe('group chart weigh-in dots', () => {
+  test.use({ hasTouch: true, viewport: { width: 1280, height: 900 } })
+
+  test('own points edit/create through explicit save; another member remains read-only', async ({
+    page,
+  }) => {
+    const requests = await installGroupFixtures(page, true, true)
+    await page.goto(
+      `/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
+    )
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Charts', exact: true })
+      .click()
+    const chart = page.getByRole('img', {
+      name: 'Weight (kg) — shared group history',
+    })
+    const ownKey = memberKey(ownGroupId, viewerId)
+    const otherKey = memberKey(ownGroupId, otherViewerId)
+    const ownRecorded = chart.locator(
+      `circle[data-series-id="${ownKey}"][data-date="2026-09-22"][data-point-kind="recorded"]`,
+    )
+    const ownEstimate = chart.locator(
+      `circle[data-series-id="${ownKey}"][data-date="2026-09-21"][data-point-kind="estimated"]`,
+    )
+    const otherRecorded = chart.locator(
+      `circle[data-series-id="${otherKey}"][data-date="2026-09-21"][data-point-kind="recorded"]`,
+    )
+
+    await expect(ownRecorded).toBeVisible()
+    await expect(ownEstimate).toHaveAttribute('aria-label', /Estimated/)
+    await otherRecorded.click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+
+    await ownRecorded.focus()
+    await page.keyboard.press('Enter')
+    const edit = page.getByRole('dialog', { name: 'Edit weight' })
+    await expect(edit.getByLabel('Date')).toHaveValue('2026-09-22')
+    await expect(edit.getByLabel('Weight in kg')).toHaveValue('88.5')
+    await expect(edit.getByLabel('Private note (optional)')).toHaveValue(
+      'Author-only disposable private note',
+    )
+    await edit.getByRole('button', { name: 'Close' }).click()
+    await expect(edit).toHaveCount(0)
+    expect(
+      requests.filter((url) => url.includes('/rpc/save_personal_weigh_in')),
+    ).toHaveLength(0)
+
+    const tapEstimate = async () => {
+      const bounds = await ownEstimate.boundingBox()
+      expect(bounds).not.toBeNull()
+      await page.touchscreen.tap(
+        bounds!.x + bounds!.width / 2,
+        bounds!.y + bounds!.height / 2,
+      )
+    }
+    await tapEstimate()
+    const create = page.getByRole('dialog', { name: 'Record weight' })
+    await expect(create.getByLabel('Date')).toHaveValue('2026-09-21')
+    await expect(create.getByLabel('Weight in kg')).toHaveValue('89.25')
+    await expect(create.getByText(/display-only estimate/)).toBeVisible()
+    const groupShare = create.getByLabel('E2E authorized group')
+    await expect(groupShare).not.toBeChecked()
+    await create.getByRole('button', { name: 'Close' }).click()
+    await expect(create).toHaveCount(0)
+    expect(
+      requests.filter((url) => url.includes('/rpc/save_personal_weigh_in')),
+    ).toHaveLength(0)
+
+    await tapEstimate()
+    const confirmedCreate = page.getByRole('dialog', { name: 'Record weight' })
+    await confirmedCreate.getByLabel('E2E authorized group').check()
+    await confirmedCreate.getByRole('button', { name: 'Save weight' }).click()
+    await expect(confirmedCreate).toHaveCount(0)
+    await expect(
+      chart.locator(
+        `circle[data-series-id="${ownKey}"][data-date="2026-09-21"][data-point-kind="recorded"]`,
+      ),
+    ).toBeVisible()
+    await expect(
+      chart.locator(
+        `circle[data-series-id="${ownKey}"][data-date="2026-09-21"][data-point-kind="estimated"]`,
+      ),
+    ).toHaveCount(0)
+    expect(
+      requests.filter((url) => url.includes('/rpc/save_personal_weigh_in')),
+    ).toHaveLength(1)
+    await expect(
+      page.getByText('Author-only disposable private note'),
+    ).toHaveCount(0)
   })
 })
 
