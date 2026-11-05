@@ -1,4 +1,7 @@
+import type { ProfileAvatarPresetId } from '../auth/profileAvatar'
+
 export type GroupMemberProgress = {
+  avatarPresetId?: ProfileAvatarPresetId | null
   completionPercentage: number | null
   displayName: string
   memberKey: string

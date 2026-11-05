@@ -20,6 +20,7 @@ import {
 } from '../components/WeightPageHeader'
 import { GroupChartHistory } from '../components/GroupChartHistory'
 import { GroupMemberProgressBar } from '../components/GroupMemberProgressBar'
+import { GroupParticipantAvatar } from '../components/GroupParticipantAvatar'
 import { ChangeTargetDialog } from '../components/ChangeTargetDialog'
 import { ChangeStartingWeightDialog } from '../components/ChangeStartingWeightDialog'
 import { DashboardChallengeActions } from '../components/DashboardChallengeActions'
@@ -2195,14 +2196,27 @@ export function GroupDashboardPage() {
                           aria-label="Weekly winners"
                           className="mt-3 space-y-2"
                         >
-                          {weeklyCelebration.winnerNames.map((name, index) => (
-                            <li
-                              className="rounded-xl bg-emerald-50 px-4 py-3 font-semibold text-slate-900"
-                              key={`${name}-${index}`}
-                            >
-                              {name}
-                            </li>
-                          ))}
+                          {weeklyCelebration.winnerNames.map((name, index) => {
+                            const matchingMembers = memberProgress.filter(
+                              (member) => member.displayName === name,
+                            )
+                            const avatarMember =
+                              matchingMembers.length === 1
+                                ? matchingMembers[0]
+                                : null
+                            return (
+                              <li
+                                className="flex items-center gap-3 rounded-xl bg-emerald-50 px-4 py-3 font-semibold text-slate-900"
+                                key={`${name}-${index}`}
+                              >
+                                <GroupParticipantAvatar
+                                  avatarPresetId={avatarMember?.avatarPresetId}
+                                  displayName={name}
+                                />
+                                {name}
+                              </li>
+                            )
+                          })}
                         </ul>
                       ) : null}
                     </section>
@@ -2379,6 +2393,10 @@ export function GroupDashboardPage() {
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <h3 className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-semibold">
+                    <GroupParticipantAvatar
+                      avatarPresetId={member.avatarPresetId}
+                      displayName={member.displayName}
+                    />
                     {member.displayName}
                     {member.memberKey === challengeOwnerMemberKey ? (
                       <span className="inline-flex min-h-5 items-center whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold leading-4 text-emerald-800">
