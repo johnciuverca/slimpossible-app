@@ -12,7 +12,14 @@ import type { Persistence } from '../data/persistence'
 import type { GroupChartEntry } from '../models/groupChartHistory'
 import type { GroupMemberProgress } from '../models/groupMemberProgress'
 import type { RepositoryListResult } from '../data/supabase/repositories'
-afterEach(cleanup)
+const originalInnerWidth = window.innerWidth
+afterEach(() => {
+  cleanup()
+  Object.defineProperty(window, 'innerWidth', {
+    configurable: true,
+    value: originalInnerWidth,
+  })
+})
 const rows: GroupChartEntry[] = [
   { memberKey: 'a', displayName: 'Ava', date: '2026-09-01', weightKg: 90 },
   { memberKey: 'a', displayName: 'Ava', date: '2026-09-03', weightKg: 88.5 },
@@ -95,6 +102,10 @@ describe('Group chart history', () => {
     expect(screen.getByRole('rowheader', { name: '2026-09-03' })).toBeVisible()
   })
   it('uses the same view-only ranges for all members and an individual member chart', async () => {
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: 430,
+    })
     const entries: GroupChartEntry[] = [
       { memberKey: 'a', displayName: 'Ava', date: '2026-01-01', weightKg: 90 },
       { memberKey: 'a', displayName: 'Ava', date: '2026-02-01', weightKg: 89 },
@@ -128,6 +139,21 @@ describe('Group chart history', () => {
       name: 'Weight (kg) — shared group history',
     })
     expect(chart.querySelectorAll('circle[data-date]')).toHaveLength(5)
+    expect(chart.querySelectorAll('text.chart-value')).toHaveLength(2)
+    expect(chart.querySelectorAll('text.chart-value')[0]).toHaveTextContent(
+      'Ava: 90',
+    )
+    expect(chart.querySelectorAll('text.chart-value')[1]).toHaveTextContent(
+      'Ava: 86',
+    )
+    expect(
+      screen.getByRole('region', { name: 'Group comparison chart' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('region', {
+        name: 'Scrollable group comparison chart',
+      }),
+    ).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Show last 1 month' }))
     expect(chart.querySelectorAll('circle[data-date]')).toHaveLength(2)
     expect(chart.querySelector('[data-chart-reference]')).toBeInTheDocument()
@@ -215,6 +241,20 @@ describe('Group chart history', () => {
     expect(chart).toHaveAttribute('viewBox', '0 0 760 302')
     expect(chart).toHaveTextContent('Weight (kg)')
     const circles = Array.from(chart.querySelectorAll('circle'))
+    const extremaLabels = Array.from(
+      chart.querySelectorAll<SVGTextElement>('text.chart-value'),
+      (label) => label.textContent,
+    )
+    expect(extremaLabels).toEqual(
+      expect.arrayContaining([
+        'Member 0: 80',
+        'Member 0: 79',
+        'Member 1: 100',
+        'Member 1: 98',
+        'Member 2: 90',
+        'Member 3: 110',
+      ]),
+    )
     const plotBottom =
       Number(chart.getAttribute('viewBox')?.split(/\s+/)[3]) - 52
     const eighty = circles.find(

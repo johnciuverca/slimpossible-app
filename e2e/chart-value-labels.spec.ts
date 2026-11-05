@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 for (const width of [1280, 390]) {
-  test(`centers every personal chart value and staggers clustered labels at ${width}px`, async ({
+  test(`labels only the Dashboard range extremes and keeps labels inside the plot at ${width}px`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 900 })
@@ -30,7 +30,7 @@ for (const width of [1280, 390]) {
       name: /^Personal weight history chart/,
     })
     await expect(chart.locator('circle[data-chart-point]')).toHaveCount(4)
-    await expect(chart.locator('.chart-value')).toHaveCount(4)
+    await expect(chart.locator('.chart-value')).toHaveCount(2)
     const labels = await chart.locator('.chart-value').evaluateAll((elements) =>
       elements.map((element) => ({
         date: element.getAttribute('data-date'),
@@ -38,6 +38,7 @@ for (const width of [1280, 390]) {
         x: Number(element.getAttribute('x')),
         y: Number(element.getAttribute('y')),
         anchor: element.getAttribute('text-anchor'),
+        value: Number(element.getAttribute('data-weight-kg')),
       })),
     )
     const points = await chart
@@ -47,32 +48,31 @@ for (const width of [1280, 390]) {
           date: element.getAttribute('data-date'),
           x: Number(element.getAttribute('cx')),
           y: Number(element.getAttribute('cy')),
+          value: Number(element.getAttribute('data-weight-kg')),
         })),
       )
 
+    const minValue = Math.min(...points.map((point) => point.value))
+    const maxValue = Math.max(...points.map((point) => point.value))
+    expect(labels.map((label) => label.value)).toEqual([maxValue, minValue])
+    expect(labels.map((label) => label.date)).toEqual([
+      points.find((point) => point.value === maxValue)!.date,
+      points.find((point) => point.value === minValue)!.date,
+    ])
     for (const label of labels) {
       const point = points.find((candidate) => candidate.date === label.date)
       expect(point).toBeDefined()
       expect(label.anchor).toBe('middle')
-      expect(label.x).toBe(point!.x)
       expect(label.y).toBeLessThan(point!.y)
       expect(label.y).toBeGreaterThan(0)
-      const estimatedHalfWidth = (label.text.length * 4.2) / 2
-      expect(label.x - estimatedHalfWidth).toBeGreaterThan(0)
-      expect(label.x + estimatedHalfWidth).toBeLessThan(760)
-    }
-
-    const clustered = labels.filter((label) => label.text === '90')
-    expect(clustered).toHaveLength(3)
-    for (const first of clustered) {
-      for (const second of clustered) {
-        if (first === second) continue
-        const horizontalGap = Math.abs(first.x - second.x)
-        const labelsOverlapHorizontally =
-          horizontalGap < ((first.text.length + second.text.length) * 4.2) / 2
-        if (labelsOverlapHorizontally)
-          expect(Math.abs(first.y - second.y)).toBeGreaterThanOrEqual(7)
-      }
+      const estimatedHalfWidth =
+        (label.text.length * (width <= 600 ? 5.4 : 4.2)) / 2
+      expect(label.x - estimatedHalfWidth).toBeGreaterThanOrEqual(
+        width <= 600 ? 48 : 0,
+      )
+      expect(label.x + estimatedHalfWidth).toBeLessThanOrEqual(
+        width <= 600 ? 312 : 760,
+      )
     }
     await chart.screenshot({
       path: test.info().outputPath(`chart-value-labels-${width}px.png`),

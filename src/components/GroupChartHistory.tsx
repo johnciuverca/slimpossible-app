@@ -310,9 +310,9 @@ export function GroupChartHistory({
                 </p>
                 <div
                   role="region"
-                  aria-label="Scrollable group comparison chart"
+                  aria-label="Group comparison chart"
                   tabIndex={0}
-                  className="mt-4 overflow-x-auto focus-visible:outline-2 focus-visible:outline-emerald-700"
+                  className="mt-4 min-w-0 focus-visible:outline-2 focus-visible:outline-emerald-700"
                 >
                   <SharedWeightChart
                     title={
@@ -333,12 +333,15 @@ export function GroupChartHistory({
                     paddingMinimum={0.5}
                     floorAtZero={absolute}
                     includeZero={!absolute}
-                    className="w-full min-w-[36rem]"
+                    className="w-full min-w-0"
                     viewBox={`0 0 760 ${chartViewBoxHeight}`}
+                    fitContainer
+                    labelSeriesExtremesOnly
                     series={series.map((member, index) => ({
                       id: member.memberKey,
                       color: colors[index % colors.length],
                       title: `${member.label} recorded shared weights`,
+                      extremeLabelPrefix: member.label,
                       points: member.points.map((point) => ({
                         date: point.date,
                         value: pointValue(point),

@@ -11,10 +11,14 @@ export function PersonalProgressChart({
   weighIns,
   referenceWeightKg,
   referenceLabel,
+  fitContainer = false,
+  labelExtremesOnly = false,
 }: {
   weighIns: readonly WeighIn[]
   referenceWeightKg?: number
   referenceLabel?: string
+  fitContainer?: boolean
+  labelExtremesOnly?: boolean
 }) {
   const id = useId()
   const chronological = [...weighIns].sort((a, b) =>
@@ -84,10 +88,14 @@ export function PersonalProgressChart({
       aria-labelledby={`${id}-caption`}
     >
       <div
-        className="overflow-x-auto"
+        className={fitContainer ? 'min-w-0' : 'overflow-x-auto'}
         role="group"
-        aria-label="Scrollable personal weight chart"
-        tabIndex={0}
+        aria-label={
+          fitContainer
+            ? 'Personal weight chart'
+            : 'Scrollable personal weight chart'
+        }
+        tabIndex={fitContainer ? undefined : 0}
       >
         <SharedWeightChart
           title={`Personal weight history chart. ${points.length} saved weigh-ins, from ${rangeDescription}. Each point is a saved entry; no values are estimated.`}
@@ -100,11 +108,15 @@ export function PersonalProgressChart({
           max={maximum}
           paddingRatio={0.14}
           paddingMinimum={0.5}
+          fitContainer={fitContainer}
+          labelExtremesOnly={labelExtremesOnly}
         />
       </div>
-      <p className="mt-2 text-xs text-ink-muted sm:hidden">
-        Scroll sideways to see every recorded date.
-      </p>
+      {!fitContainer ? (
+        <p className="mt-2 text-xs text-ink-muted sm:hidden">
+          Scroll sideways to see every recorded date.
+        </p>
+      ) : null}
       <figcaption id={`${id}-caption`} className="sr-only">
         {points.length === 1
           ? 'One saved weigh-in is shown. Add another entry to compare your trend.'
