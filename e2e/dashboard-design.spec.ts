@@ -122,10 +122,30 @@ for (const width of [1280, 390]) {
     const chartBox = await chart.boundingBox()
     expect(dateRangeLabel).not.toBeNull()
     expect(chartBox).not.toBeNull()
-    const plotStart = width <= 600 ? 48 / 320 : 64 / 760
-    expect(
-      Math.abs(dateRangeLabel!.x - (chartBox!.x + plotStart * chartBox!.width)),
-    ).toBeLessThan(2)
+    if (width <= 600) {
+      expect(
+        Math.abs(
+          dateRangeLabel!.x +
+            dateRangeLabel!.width / 2 -
+            (chartBox!.x + chartBox!.width / 2),
+        ),
+      ).toBeLessThan(2)
+      const presetButtons = await dateControls
+        .getByRole('button')
+        .evaluateAll((buttons) =>
+          buttons.map((button) => button.getBoundingClientRect().y),
+        )
+      expect(
+        Math.max(...presetButtons) - Math.min(...presetButtons),
+      ).toBeLessThan(1)
+    } else {
+      const plotStart = 64 / 760
+      expect(
+        Math.abs(
+          dateRangeLabel!.x - (chartBox!.x + plotStart * chartBox!.width),
+        ),
+      ).toBeLessThan(2)
+    }
     for (const name of [
       'Show last 1 week',
       'Show last 2 weeks',

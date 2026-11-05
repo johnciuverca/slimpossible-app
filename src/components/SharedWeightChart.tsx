@@ -118,7 +118,7 @@ export function SharedWeightChart({
   }, [fitContainer])
   const compactLayout = fitContainer && compactFitLayout
   const chartLeft = compactLayout ? 48 : left
-  const chartRight = compactLayout ? 312 : right
+  let chartRight = compactLayout ? 312 : right
   const chartTop = top
   const chartViewBox = compactLayout ? '0 0 320 266' : viewBox
   const chartClassName = fitContainer
@@ -293,9 +293,31 @@ export function SharedWeightChart({
     yMaximum = Math.ceil(yMaximum / 5) * 5
     if (yMaximum <= yMinimum) yMaximum = yMinimum + 5
   }
+  const tickStep = useFiveKgTicks
+    ? 5
+    : Math.max(
+        1,
+        Math.ceil((yMaximum - yMinimum) / (compactLayout ? 8 : maxTicks)),
+      )
+  const firstTick = Math.ceil(yMinimum / tickStep) * tickStep
+  const ticks = Array.from(
+    {
+      length: Math.max(
+        0,
+        Math.floor((yMaximum - firstTick + Number.EPSILON) / tickStep) + 1,
+      ),
+    },
+    (_, index) => firstTick + index * tickStep,
+  )
   const viewBoxParts = chartViewBox.trim().split(/\s+/).map(Number)
   const viewBoxWidth = viewBoxParts[2] || 760
   const viewBoxHeight = viewBoxParts[3] || 266
+  const compactYAxisLabelWidth = compactLayout
+    ? Math.max(0, ...ticks.map((value) => format(value).length * 7.2))
+    : 0
+  if (compactLayout) {
+    chartRight = viewBoxWidth - (chartLeft - 10 - compactYAxisLabelWidth)
+  }
   const plotBottom = viewBoxHeight - 52
   const y = (value: number) =>
     plotBottom -
@@ -354,22 +376,6 @@ export function SharedWeightChart({
     : []
   const renderedLines = visibleLines.filter(
     (line) => !referenceLinesOutsideRange.includes(line),
-  )
-  const tickStep = useFiveKgTicks
-    ? 5
-    : Math.max(
-        1,
-        Math.ceil((yMaximum - yMinimum) / (compactLayout ? 8 : maxTicks)),
-      )
-  const firstTick = Math.ceil(yMinimum / tickStep) * tickStep
-  const ticks = Array.from(
-    {
-      length: Math.max(
-        0,
-        Math.floor((yMaximum - firstTick + Number.EPSILON) / tickStep) + 1,
-      ),
-    },
-    (_, index) => firstTick + index * tickStep,
   )
   const minorTicks = useFiveKgTicks
     ? Array.from(
@@ -448,6 +454,9 @@ export function SharedWeightChart({
     span === 0 ? 0 : ((value - firstDay) / (lastDay - firstDay)) * 100
   const plotStartPercent = (chartLeft / viewBoxWidth) * 100
   const plotWidthPercent = ((chartRight - chartLeft) / viewBoxWidth) * 100
+  const compactContentInsetPercent =
+    ((chartLeft - 10 - compactYAxisLabelWidth) / viewBoxWidth) * 100 + 0.5
+  const compactContentWidthPercent = 100 - compactContentInsetPercent * 2
   const setThumbValue = (thumb: 'start' | 'end', value: number) => {
     if (thumb === 'start') {
       setSelectedRange({ start: Math.min(value, endDay), end: endDay })
@@ -540,11 +549,17 @@ export function SharedWeightChart({
       >
         <div
           role="group"
-          className="mb-3 flex w-full flex-wrap items-center gap-2"
+          className={`mb-3 flex w-full flex-wrap items-center gap-2 ${compactLayout ? 'justify-center' : ''}`}
           aria-label="Quick date ranges"
-          style={{ paddingLeft: `${plotStartPercent}%` }}
+          style={
+            compactLayout ? undefined : { paddingLeft: `${plotStartPercent}%` }
+          }
         >
-          <span className="mr-1 font-semibold text-ink">Date range</span>
+          <span
+            className={`${compactLayout ? 'w-full text-center' : 'mr-1'} font-semibold text-ink`}
+          >
+            Date range
+          </span>
           <button
             type="button"
             aria-label="Show last 1 week"
@@ -892,10 +907,10 @@ export function SharedWeightChart({
         ) : null}
       </div>
       <div
-        className="mt-2 px-2"
+        className={`mt-2 ${compactLayout ? '' : 'px-2'}`}
         style={{
-          marginLeft: `${plotStartPercent}%`,
-          width: `${plotWidthPercent}%`,
+          marginLeft: `${compactLayout ? compactContentInsetPercent : plotStartPercent}%`,
+          width: `${compactLayout ? compactContentWidthPercent : plotWidthPercent}%`,
         }}
       >
         <output

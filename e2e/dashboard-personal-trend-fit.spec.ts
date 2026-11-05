@@ -139,11 +139,62 @@ for (const viewport of viewports) {
         }
       })
       expect(scrollMetrics.groupScrollWidth).toBeLessThanOrEqual(
-        scrollMetrics.groupClientWidth,
+        scrollMetrics.groupClientWidth + 1,
       )
       expect(scrollMetrics.frameScrollWidth).toBeLessThanOrEqual(
-        scrollMetrics.frameClientWidth,
+        scrollMetrics.frameClientWidth + 1,
       )
+      const plotMetrics = await chart.evaluate((element) => {
+        const tickLabels = Array.from(
+          element.querySelectorAll('[data-chart-tick] text'),
+        )
+        const plotLines = Array.from(
+          element.querySelectorAll('[data-chart-tick] line'),
+        )
+        const left = Math.min(...tickLabels.map((label) => label.getBBox().x))
+        const right = Math.max(
+          ...plotLines.map((line) => Number(line.getAttribute('x2'))),
+        )
+        return { left, right, width: element.viewBox.baseVal.width }
+      })
+      expect(
+        Math.abs(plotMetrics.left - (plotMetrics.width - plotMetrics.right)),
+      ).toBeLessThanOrEqual(3)
+      const sliderBox = await sliderTrack.boundingBox()
+      expect(sliderBox).not.toBeNull()
+      const expectedSliderLeft =
+        chartBox!.x + (plotMetrics.left / plotMetrics.width) * chartBox!.width
+      const expectedSliderRight =
+        chartBox!.x + (plotMetrics.right / plotMetrics.width) * chartBox!.width
+      expect(Math.abs(sliderBox!.x - expectedSliderLeft)).toBeLessThan(2)
+      expect(
+        Math.abs(sliderBox!.x + sliderBox!.width - expectedSliderRight),
+      ).toBeLessThan(2)
+      const dateRangeLabel = await rangeControls
+        .getByText('Date range', { exact: true })
+        .boundingBox()
+      expect(dateRangeLabel).not.toBeNull()
+      expect(dateRangeLabel!.y).toBeLessThan(
+        (await rangeControls
+          .getByRole('button', { name: 'Show last 1 week' })
+          .boundingBox())!.y,
+      )
+      const presetBoxes = await rangeControls
+        .getByRole('button')
+        .evaluateAll((buttons) =>
+          buttons.map((button) => button.getBoundingClientRect().y),
+        )
+      expect(Math.max(...presetBoxes) - Math.min(...presetBoxes)).toBeLessThan(
+        1,
+      )
+      const controlBox = (await rangeControls.boundingBox())!
+      expect(
+        Math.abs(
+          dateRangeLabel!.x +
+            dateRangeLabel!.width / 2 -
+            (controlBox.x + controlBox.width / 2),
+        ),
+      ).toBeLessThan(2)
     }
 
     for (const name of [
