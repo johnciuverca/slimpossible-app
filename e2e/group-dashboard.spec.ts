@@ -1318,7 +1318,7 @@ for (const viewport of [
       'Ava (member 2)',
     ])
     const chartRegion = page.getByRole('region', {
-      name: 'Scrollable group comparison chart',
+      name: 'Group comparison chart',
     })
     const expectLegendCentered = async () => {
       const [legendBox, chartRegionBox] = await Promise.all([
@@ -1377,11 +1377,30 @@ for (const viewport of [
     const chartBounds = await chart.boundingBox()
     expect(quickRangeLabel).not.toBeNull()
     expect(chartBounds).not.toBeNull()
-    expect(
-      Math.abs(
-        quickRangeLabel!.x - (chartBounds!.x + (64 / 760) * chartBounds!.width),
-      ),
-    ).toBeLessThan(2)
+    if (viewport.width <= 600) {
+      expect(
+        Math.abs(
+          quickRangeLabel!.x +
+            quickRangeLabel!.width / 2 -
+            chartBounds!.x -
+            chartBounds!.width / 2,
+        ),
+      ).toBeLessThan(2)
+      await expect(rangeControls.getByRole('button')).toHaveCount(5)
+      await expect(chartControlsTrack.getByRole('slider')).toHaveCount(2)
+      for (const control of await rangeControls.getByRole('button').all())
+        await expect(control).toBeVisible()
+      const regionBounds = await chartRegion.boundingBox()
+      expect(regionBounds).not.toBeNull()
+      expect(chartBounds!.width).toBeLessThanOrEqual(regionBounds!.width + 1)
+    } else {
+      expect(
+        Math.abs(
+          quickRangeLabel!.x -
+            (chartBounds!.x + (64 / 760) * chartBounds!.width),
+        ),
+      ).toBeLessThan(2)
+    }
     const initialChartPoints = await chart.locator('circle[data-date]').count()
     const groupStartSlider = chartControlsTrack.getByRole('slider', {
       name: 'Visible range start',
@@ -2636,8 +2655,11 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
       expect(edges.plot.height).toBeCloseTo(429.421875, 0)
     }
     if (width === 390) {
-      expect(edges.plot.width).toBeCloseTo(600, 0)
-      expect(edges.plot.height).toBeCloseTo(219.46875, 0)
+      expect(edges.plot.width).toBeLessThan(600)
+      expect(edges.plot.width).toBeLessThanOrEqual(
+        edges.chart.right - edges.chart.left,
+      )
+      expect(edges.plot.width).toBeGreaterThan(300)
     }
     const manage = page.getByRole('link', {
       name: 'Manage',

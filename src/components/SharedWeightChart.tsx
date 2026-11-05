@@ -25,6 +25,7 @@ export type SharedChartSeries = {
   connectGaps?: boolean
   dashed?: boolean
   title?: string
+  extremeLabelPrefix?: string
 }
 
 export type SharedChartLine = {
@@ -72,6 +73,9 @@ export function SharedWeightChart({
   adaptiveWeightTicks = false,
   floorAtZero = false,
   includeZero = false,
+  fitContainer = false,
+  labelExtremesOnly = false,
+  labelSeriesExtremesOnly = false,
   className = 'block h-auto w-full min-w-[600px]',
   viewBox = '0 0 760 266',
 }: {
@@ -89,9 +93,43 @@ export function SharedWeightChart({
   adaptiveWeightTicks?: boolean
   floorAtZero?: boolean
   includeZero?: boolean
+  fitContainer?: boolean
+  labelExtremesOnly?: boolean
+  labelSeriesExtremesOnly?: boolean
   className?: string
   viewBox?: string
 }) {
+  const [compactFitLayout, setCompactFitLayout] = useState(
+    () =>
+      fitContainer && typeof window !== 'undefined' && window.innerWidth <= 600,
+  )
+  useEffect(() => {
+    if (!fitContainer) {
+      setCompactFitLayout(false)
+      return
+    }
+    const media = window.matchMedia?.('(max-width: 600px)')
+    const update = () =>
+      setCompactFitLayout(media?.matches ?? window.innerWidth <= 600)
+    update()
+    if (media) {
+      media.addEventListener('change', update)
+      return () => media.removeEventListener('change', update)
+    }
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [fitContainer])
+  const compactLayout = fitContainer && compactFitLayout
+  const chartLeft = compactLayout ? 48 : left
+  let chartRight = compactLayout ? 312 : right
+  const chartTop = top
+  const chartViewBox = compactLayout ? '0 0 320 266' : viewBox
+  const chartClassName = fitContainer
+    ? className.replace('min-w-[600px]', 'min-w-0')
+    : className
+  const chartFrameClassName = fitContainer
+    ? 'w-full min-w-0 pt-2'
+    : 'w-full min-w-[600px] pt-2'
   const rangeId = useId()
   const tooltipId = useId()
   const rangeTrackRef = useRef<HTMLDivElement>(null)
@@ -153,14 +191,67 @@ export function SharedWeightChart({
   const span = endDay - startDay
   const x = (date: string) =>
     span
-      ? left + ((day(date) - startDay) / span) * (right - left)
-      : (left + right) / 2
+      ? chartLeft + ((day(date) - startDay) / span) * (chartRight - chartLeft)
+      : (chartLeft + chartRight) / 2
   const inRange = (date: string) => day(date) >= startDay && day(date) <= endDay
   const visiblePoints = points.filter((point) => inRange(point.date))
+  const extremeLabelPointIds = new Set<string>()
+  if (labelExtremesOnly && visiblePoints.length) {
+    const values = visiblePoints.map((point) => point.value)
+    const minimumValue = Math.min(...values)
+    const maximumValue = Math.max(...values)
+    const minimumIndex = values.indexOf(minimumValue)
+    const maximumIndex = values.indexOf(maximumValue)
+    extremeLabelPointIds.add(
+      `point:${visiblePoints[minimumIndex].date}:${minimumIndex}`,
+    )
+    if (maximumValue !== minimumValue) {
+      extremeLabelPointIds.add(
+        `point:${visiblePoints[maximumIndex].date}:${maximumIndex}`,
+      )
+    }
+  }
+  const pointLabelX = (point: SharedChartPoint) => {
+    const pointX = x(point.date)
+    if (!labelExtremesOnly || !compactLayout || !point.label) return pointX
+    const halfLabelWidth = (point.label.length * 5.4) / 2
+    return Math.max(
+      chartLeft + halfLabelWidth + 2,
+      Math.min(pointX, chartRight - halfLabelWidth - 2),
+    )
+  }
+  const seriesLabelX = (item: SharedChartSeries, point: SharedChartPoint) => {
+    const pointX = x(point.date)
+    if (!labelSeriesExtremesOnly || !point.label) return pointX
+    const text = item.extremeLabelPrefix
+      ? `${item.extremeLabelPrefix}: ${point.label}`
+      : point.label
+    const halfLabelWidth = (text.length * (compactLayout ? 5.4 : 4.2)) / 2
+    return Math.max(
+      chartLeft + halfLabelWidth + 2,
+      Math.min(pointX, chartRight - halfLabelWidth - 2),
+    )
+  }
   const visibleSeries = series.map((item) => ({
     ...item,
     points: item.points.filter((point) => inRange(point.date)),
   }))
+  const extremeSeriesPointIds = new Set<string>()
+  if (labelSeriesExtremesOnly) {
+    visibleSeries.forEach((item) => {
+      if (!item.points.length) return
+      const values = item.points.map((point) => point.value)
+      const minimumIndex = values.indexOf(Math.min(...values))
+      const maximumIndex = values.indexOf(Math.max(...values))
+      extremeSeriesPointIds.add(
+        `series:${item.id}:${item.points[minimumIndex].date}:${minimumIndex}`,
+      )
+      if (values[minimumIndex] !== values[maximumIndex])
+        extremeSeriesPointIds.add(
+          `series:${item.id}:${item.points[maximumIndex].date}:${maximumIndex}`,
+        )
+    })
+  }
   const visibleLines = lines.flatMap((line) => {
     const lineStart = day(line.from.date)
     const lineEnd = day(line.to.date)
@@ -233,36 +324,66 @@ export function SharedWeightChart({
     yMaximum = Math.ceil(yMaximum / 5) * 5
     if (yMaximum <= yMinimum) yMaximum = yMinimum + 5
   }
-  const viewBoxParts = viewBox.trim().split(/\s+/).map(Number)
+  const tickStep = useFiveKgTicks
+    ? 5
+    : Math.max(
+        1,
+        Math.ceil((yMaximum - yMinimum) / (compactLayout ? 8 : maxTicks)),
+      )
+  const firstTick = Math.ceil(yMinimum / tickStep) * tickStep
+  const ticks = Array.from(
+    {
+      length: Math.max(
+        0,
+        Math.floor((yMaximum - firstTick + Number.EPSILON) / tickStep) + 1,
+      ),
+    },
+    (_, index) => firstTick + index * tickStep,
+  )
+  const viewBoxParts = chartViewBox.trim().split(/\s+/).map(Number)
   const viewBoxWidth = viewBoxParts[2] || 760
   const viewBoxHeight = viewBoxParts[3] || 266
+  const compactYAxisLabelWidth = compactLayout
+    ? Math.max(0, ...ticks.map((value) => format(value).length * 7.2))
+    : 0
+  if (compactLayout) {
+    chartRight = viewBoxWidth - (chartLeft - 10 - compactYAxisLabelWidth)
+  }
   const plotBottom = viewBoxHeight - 52
   const y = (value: number) =>
     plotBottom -
-    ((value - yMinimum) / (yMaximum - yMinimum)) * (plotBottom - top)
-  const chartValueLabelY = new Map(
+    ((value - yMinimum) / (yMaximum - yMinimum)) * (plotBottom - chartTop)
+  const chartValueLabelPositions = new Map(
     layoutChartValueLabels(
       [
         ...visibleSeries.flatMap((item) =>
           item.points.flatMap((point, index) =>
-            point.label
+            point.label &&
+            (!labelSeriesExtremesOnly ||
+              extremeSeriesPointIds.has(
+                `series:${item.id}:${point.date}:${index}`,
+              ))
               ? [
                   {
                     id: `series:${item.id}:${point.date}:${index}`,
-                    x: x(point.date),
+                    x: seriesLabelX(item, point),
                     pointY: y(point.value),
-                    text: point.label,
+                    text: item.extremeLabelPrefix
+                      ? `${item.extremeLabelPrefix}: ${point.label}`
+                      : point.label,
                   },
                 ]
               : [],
           ),
         ),
         ...visiblePoints.flatMap((point, index) =>
-          point.label
+          point.label &&
+          (!labelExtremesOnly ||
+            extremeLabelPointIds.has(`point:${point.date}:${index}`))
             ? [
                 {
                   id: `point:${point.date}:${index}`,
-                  x: x(point.date),
+                  x: pointLabelX(point),
                   pointY: y(point.value),
                   text: point.label,
                 },
@@ -272,8 +393,14 @@ export function SharedWeightChart({
       ],
       viewBoxWidth,
       viewBoxHeight,
-    ).map(({ id, y: labelY }) => [id, labelY]),
+      labelExtremesOnly && compactLayout ? 5.4 : undefined,
+    ).map(({ id, x: labelX, y: labelY }) => [id, { x: labelX, y: labelY }]),
   )
+  const valueLabelPosition = (
+    pointId: string,
+    pointX: number,
+    pointY: number,
+  ) => chartValueLabelPositions.get(pointId) ?? { x: pointX, y: pointY - 12 }
   const referenceLinesOutsideRange = adaptiveWeightTicks
     ? visibleLines.filter(
         (line) =>
@@ -286,19 +413,6 @@ export function SharedWeightChart({
     : []
   const renderedLines = visibleLines.filter(
     (line) => !referenceLinesOutsideRange.includes(line),
-  )
-  const tickStep = useFiveKgTicks
-    ? 5
-    : Math.max(1, Math.ceil((yMaximum - yMinimum) / maxTicks))
-  const firstTick = Math.ceil(yMinimum / tickStep) * tickStep
-  const ticks = Array.from(
-    {
-      length: Math.max(
-        0,
-        Math.floor((yMaximum - firstTick + Number.EPSILON) / tickStep) + 1,
-      ),
-    },
-    (_, index) => firstTick + index * tickStep,
   )
   const minorTicks = useFiveKgTicks
     ? Array.from(
@@ -313,13 +427,13 @@ export function SharedWeightChart({
       }
     : null
   const tooltipAlignment = tooltipPosition
-    ? tooltipPosition.x < left + 110
+    ? tooltipPosition.x < chartLeft + (compactLayout ? 56 : 110)
       ? 'start'
-      : tooltipPosition.x > right - 110
+      : tooltipPosition.x > chartRight - (compactLayout ? 56 : 110)
         ? 'end'
         : 'center'
     : 'center'
-  const tooltipTransform = `translate(${tooltipAlignment === 'start' ? '0' : tooltipAlignment === 'end' ? '-100%' : '-50%'}, ${tooltipPosition && tooltipPosition.y < top + 52 ? '10px' : 'calc(-100% - 10px)'})`
+  const tooltipTransform = `translate(${tooltipAlignment === 'start' ? '0' : tooltipAlignment === 'end' ? '-100%' : '-50%'}, ${tooltipPosition && tooltipPosition.y < chartTop + 52 ? '10px' : 'calc(-100% - 10px)'})`
   const setPointSource = (
     event: ReactPointerEvent<SVGCircleElement>,
     id: string,
@@ -335,10 +449,17 @@ export function SharedWeightChart({
   ) => {
     if (event.pointerType === 'touch') setActivePoint({ id, source: 'touch' })
   }
-  const dates = Array.from(
-    { length: span ? Math.floor(span / 7) + 1 : 1 },
-    (_, index) => startDay + index * 7,
-  )
+  const compactDateTickCount = Math.min(4, Math.ceil(span / 120) + 1)
+  const dates = compactLayout
+    ? Array.from({ length: span ? compactDateTickCount : 1 }, (_, index) =>
+        compactDateTickCount === 1
+          ? startDay
+          : Math.round(startDay + (span * index) / (compactDateTickCount - 1)),
+      ).filter((date, index, allDates) => allDates.indexOf(date) === index)
+    : Array.from(
+        { length: span ? Math.floor(span / 7) + 1 : 1 },
+        (_, index) => startDay + index * 7,
+      )
   const pathFor = (items: SharedChartPoint[]) =>
     items
       .map(
@@ -368,8 +489,11 @@ export function SharedWeightChart({
               : 'All recorded dates'
   const rangePercent = (value: number) =>
     span === 0 ? 0 : ((value - firstDay) / (lastDay - firstDay)) * 100
-  const plotStartPercent = (left / viewBoxWidth) * 100
-  const plotWidthPercent = ((right - left) / viewBoxWidth) * 100
+  const plotStartPercent = (chartLeft / viewBoxWidth) * 100
+  const plotWidthPercent = ((chartRight - chartLeft) / viewBoxWidth) * 100
+  const compactContentInsetPercent =
+    ((chartLeft - 10 - compactYAxisLabelWidth) / viewBoxWidth) * 100 + 0.5
+  const compactContentWidthPercent = 100 - compactContentInsetPercent * 2
   const setThumbValue = (thumb: 'start' | 'end', value: number) => {
     if (thumb === 'start') {
       setSelectedRange({ start: Math.min(value, endDay), end: endDay })
@@ -450,7 +574,7 @@ export function SharedWeightChart({
   }
   return (
     <div
-      className="w-full min-w-[600px] pt-2"
+      className={chartFrameClassName}
       onKeyDown={(event) => {
         if (event.key === 'Escape') setActivePoint(null)
       }}
@@ -462,11 +586,17 @@ export function SharedWeightChart({
       >
         <div
           role="group"
-          className="mb-3 flex w-full flex-wrap items-center gap-2"
+          className={`mb-3 flex w-full flex-wrap items-center gap-2 ${compactLayout ? 'justify-center' : ''}`}
           aria-label="Quick date ranges"
-          style={{ paddingLeft: `${plotStartPercent}%` }}
+          style={
+            compactLayout ? undefined : { paddingLeft: `${plotStartPercent}%` }
+          }
         >
-          <span className="mr-1 font-semibold text-ink">Date range</span>
+          <span
+            className={`${compactLayout ? 'w-full text-center' : 'mr-1'} font-semibold text-ink`}
+          >
+            Date range
+          </span>
           <button
             type="button"
             aria-label="Show last 1 week"
@@ -531,12 +661,12 @@ export function SharedWeightChart({
           aria-description={
             typeof description === 'string' ? description : undefined
           }
-          className={className}
-          viewBox={viewBox}
+          className={chartClassName}
+          viewBox={chartViewBox}
         >
           <title>{title}</title>
           <desc>{description}</desc>
-          <text x={left} y="17" className="chart-axis" fontSize="13">
+          <text x={chartLeft} y="17" className="chart-axis" fontSize="13">
             {yLabel}
           </text>
           {minorTicks.map((value) => (
@@ -544,8 +674,8 @@ export function SharedWeightChart({
               key={value}
               data-chart-minor-tick={value}
               aria-hidden="true"
-              x1={left}
-              x2={right}
+              x1={chartLeft}
+              x2={chartRight}
               y1={y(value)}
               y2={y(value)}
               stroke="var(--color-line, #cbd5e1)"
@@ -556,18 +686,18 @@ export function SharedWeightChart({
           {ticks.map((value) => (
             <g key={value} data-chart-tick={value}>
               <line
-                x1={left}
-                x2={right}
+                x1={chartLeft}
+                x2={chartRight}
                 y1={y(value)}
                 y2={y(value)}
                 stroke="var(--color-line, #cbd5e1)"
               />
               <text
-                x={left - 10}
+                x={chartLeft - 10}
                 y={y(value) + 4}
                 textAnchor="end"
                 className="chart-axis"
-                fontSize="12"
+                fontSize={compactLayout ? '13' : '12'}
               >
                 {format(value)}
               </text>
@@ -637,6 +767,13 @@ export function SharedWeightChart({
               ) : null}
               {item.points.map((point, index) => {
                 const pointId = `series:${item.id}:${point.date}:${index}`
+                const labelPosition = valueLabelPosition(
+                  pointId,
+                  seriesLabelX(item, point),
+                  y(point.value),
+                )
+                const showSeriesLabel =
+                  !labelSeriesExtremesOnly || extremeSeriesPointIds.has(pointId)
                 return (
                   <g key={`${point.date}-${index}`}>
                     <circle
@@ -683,18 +820,20 @@ export function SharedWeightChart({
                     >
                       <title>{point.title}</title>
                     </circle>
-                    {point.label ? (
+                    {point.label && showSeriesLabel ? (
                       <text
-                        x={x(point.date)}
-                        y={chartValueLabelY.get(pointId) ?? y(point.value) - 12}
+                        x={labelPosition.x}
+                        y={labelPosition.y}
                         textAnchor="middle"
                         className="chart-value"
-                        fontSize="6.6"
+                        fontSize={compactLayout ? '9' : '6.6'}
                         fontWeight="700"
                         data-date={point.date}
                         data-value={point.value}
                       >
-                        {point.label}
+                        {item.extremeLabelPrefix
+                          ? `${item.extremeLabelPrefix}: ${point.label}`
+                          : point.label}
                       </text>
                     ) : null}
                   </g>
@@ -704,6 +843,11 @@ export function SharedWeightChart({
           ))}
           {visiblePoints.map((point, index) => {
             const pointId = `point:${point.date}:${index}`
+            const labelPosition = valueLabelPosition(
+              pointId,
+              pointLabelX(point),
+              y(point.value),
+            )
             return (
               <g key={`${point.date}-${index}`}>
                 <circle
@@ -748,13 +892,14 @@ export function SharedWeightChart({
                 >
                   <title>{point.title}</title>
                 </circle>
-                {point.label ? (
+                {point.label &&
+                (!labelExtremesOnly || extremeLabelPointIds.has(pointId)) ? (
                   <text
-                    x={x(point.date)}
-                    y={chartValueLabelY.get(pointId) ?? y(point.value) - 12}
+                    x={labelPosition.x}
+                    y={labelPosition.y}
                     textAnchor="middle"
                     className="chart-value"
-                    fontSize="6.6"
+                    fontSize={compactLayout ? '9' : '6.6'}
                     fontWeight="700"
                     data-date={point.date}
                     data-weight-kg={point.value}
@@ -780,7 +925,7 @@ export function SharedWeightChart({
                       : 'middle'
               }
               className="chart-axis"
-              fontSize="6.5"
+              fontSize={compactLayout ? '10' : '6.5'}
               data-chart-date-tick={dateAtDay(date)}
             >
               {formatChartDate(dateAtDay(date))}
@@ -803,10 +948,10 @@ export function SharedWeightChart({
         ) : null}
       </div>
       <div
-        className="mt-2 px-2"
+        className={`mt-2 ${compactLayout ? '' : 'px-2'}`}
         style={{
-          marginLeft: `${plotStartPercent}%`,
-          width: `${plotWidthPercent}%`,
+          marginLeft: `${compactLayout ? compactContentInsetPercent : plotStartPercent}%`,
+          width: `${compactLayout ? compactContentWidthPercent : plotWidthPercent}%`,
         }}
       >
         <output
