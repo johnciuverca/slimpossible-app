@@ -25,6 +25,7 @@ export type SharedChartSeries = {
   connectGaps?: boolean
   dashed?: boolean
   title?: string
+  extremeLabelPrefix?: string
 }
 
 export type SharedChartLine = {
@@ -74,6 +75,7 @@ export function SharedWeightChart({
   includeZero = false,
   fitContainer = false,
   labelExtremesOnly = false,
+  labelSeriesExtremesOnly = false,
   className = 'block h-auto w-full min-w-[600px]',
   viewBox = '0 0 760 266',
 }: {
@@ -93,6 +95,7 @@ export function SharedWeightChart({
   includeZero?: boolean
   fitContainer?: boolean
   labelExtremesOnly?: boolean
+  labelSeriesExtremesOnly?: boolean
   className?: string
   viewBox?: string
 }) {
@@ -217,10 +220,39 @@ export function SharedWeightChart({
       Math.min(pointX, chartRight - halfLabelWidth - 2),
     )
   }
+  const seriesLabelX = (item: SharedChartSeries, point: SharedChartPoint) => {
+    const pointX = x(point.date)
+    if (!labelSeriesExtremesOnly || !compactLayout || !point.label)
+      return pointX
+    const text = item.extremeLabelPrefix
+      ? `${item.extremeLabelPrefix}: ${point.label}`
+      : point.label
+    const halfLabelWidth = (text.length * 5.4) / 2
+    return Math.max(
+      chartLeft + halfLabelWidth + 2,
+      Math.min(pointX, chartRight - halfLabelWidth - 2),
+    )
+  }
   const visibleSeries = series.map((item) => ({
     ...item,
     points: item.points.filter((point) => inRange(point.date)),
   }))
+  const extremeSeriesPointIds = new Set<string>()
+  if (labelSeriesExtremesOnly) {
+    visibleSeries.forEach((item) => {
+      if (!item.points.length) return
+      const values = item.points.map((point) => point.value)
+      const minimumIndex = values.indexOf(Math.min(...values))
+      const maximumIndex = values.indexOf(Math.max(...values))
+      extremeSeriesPointIds.add(
+        `series:${item.id}:${item.points[minimumIndex].date}:${minimumIndex}`,
+      )
+      if (values[minimumIndex] !== values[maximumIndex])
+        extremeSeriesPointIds.add(
+          `series:${item.id}:${item.points[maximumIndex].date}:${maximumIndex}`,
+        )
+    })
+  }
   const visibleLines = lines.flatMap((line) => {
     const lineStart = day(line.from.date)
     const lineEnd = day(line.to.date)
@@ -327,13 +359,19 @@ export function SharedWeightChart({
       [
         ...visibleSeries.flatMap((item) =>
           item.points.flatMap((point, index) =>
-            point.label
+            point.label &&
+            (!labelSeriesExtremesOnly ||
+              extremeSeriesPointIds.has(
+                `series:${item.id}:${point.date}:${index}`,
+              ))
               ? [
                   {
                     id: `series:${item.id}:${point.date}:${index}`,
-                    x: x(point.date),
+                    x: seriesLabelX(item, point),
                     pointY: y(point.value),
-                    text: point.label,
+                    text: item.extremeLabelPrefix
+                      ? `${item.extremeLabelPrefix}: ${point.label}`
+                      : point.label,
                   },
                 ]
               : [],
@@ -732,9 +770,11 @@ export function SharedWeightChart({
                 const pointId = `series:${item.id}:${point.date}:${index}`
                 const labelPosition = valueLabelPosition(
                   pointId,
-                  x(point.date),
+                  seriesLabelX(item, point),
                   y(point.value),
                 )
+                const showSeriesLabel =
+                  !labelSeriesExtremesOnly || extremeSeriesPointIds.has(pointId)
                 return (
                   <g key={`${point.date}-${index}`}>
                     <circle
@@ -781,7 +821,7 @@ export function SharedWeightChart({
                     >
                       <title>{point.title}</title>
                     </circle>
-                    {point.label ? (
+                    {point.label && showSeriesLabel ? (
                       <text
                         x={labelPosition.x}
                         y={labelPosition.y}
@@ -792,7 +832,9 @@ export function SharedWeightChart({
                         data-date={point.date}
                         data-value={point.value}
                       >
-                        {point.label}
+                        {item.extremeLabelPrefix
+                          ? `${item.extremeLabelPrefix}: ${point.label}`
+                          : point.label}
                       </text>
                     ) : null}
                   </g>
