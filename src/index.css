@@ -672,6 +672,11 @@ body {
   .page-title-row {
     align-items: flex-start;
   }
+  .dashboard-shell
+    .dashboard-workspace
+    .dashboard-save-confirmation-slot:empty {
+    display: none;
+  }
   .dashboard-save-confirmation-slot {
     flex-basis: 100%;
   }
@@ -709,6 +714,24 @@ body {
   border-radius: 0.65rem;
   padding: 0.5rem 0.75rem;
   font-size: 0.875rem;
+}
+@media (min-width: 420px) and (max-width: 600px) {
+  .dashboard-actions-compact {
+    padding: 0.25rem;
+  }
+  .dashboard-actions-compact .dashboard-action-grid-compact {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.25rem;
+  }
+  .dashboard-actions-compact .dashboard-action-grid-compact > a,
+  .dashboard-actions-compact .dashboard-action-grid-compact > button {
+    width: 100%;
+    padding-inline: 0;
+    font-size: 0.6875rem;
+    line-height: 1.1;
+    white-space: nowrap;
+  }
 }
 .dashboard-action {
   display: flex;

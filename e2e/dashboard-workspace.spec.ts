@@ -49,6 +49,70 @@ for (const viewport of [
   })
 }
 
+for (const width of [320, 390, 430]) {
+  test(`mobile Dashboard heading spacing and action wrapping at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto(fixture())
+    const dashboardHeader = page.locator('.dashboard-workspace > header')
+    const latestCard = page.locator('.dashboard-latest')
+    const emptyConfirmation = page.locator(
+      '.dashboard-save-confirmation-slot:empty',
+    )
+    const actionCard = page.locator('.dashboard-actions-compact')
+    const actionGrid = actionCard.locator('.dashboard-action-grid')
+    await expect(emptyConfirmation).toBeHidden()
+    const [headerBox, latestBox] = await Promise.all([
+      dashboardHeader.boundingBox(),
+      latestCard.boundingBox(),
+    ])
+    expect(headerBox).not.toBeNull()
+    expect(latestBox).not.toBeNull()
+    expect(latestBox!.y - headerBox!.y - headerBox!.height).toBeLessThanOrEqual(
+      24,
+    )
+
+    const actionBoxes = await actionGrid
+      .locator(':scope > a, :scope > button')
+      .evaluateAll((actions) =>
+        actions.map((action) => {
+          const { y, height, x, width } = action.getBoundingClientRect()
+          return {
+            y,
+            height,
+            x,
+            width,
+            clientWidth: action.clientWidth,
+            scrollWidth: action.scrollWidth,
+          }
+        }),
+      )
+    expect(actionBoxes).toHaveLength(4)
+    expect(actionBoxes.every(({ height }) => height >= 44)).toBe(true)
+    expect(
+      actionBoxes.every(
+        ({ clientWidth, scrollWidth }) => scrollWidth <= clientWidth,
+      ),
+      `Action labels should fit inside their buttons: ${JSON.stringify(actionBoxes)}`,
+    ).toBe(true)
+    const rows = new Set(actionBoxes.map(({ y }) => Math.round(y)))
+    if (width === 430) expect(rows.size).toBe(1)
+    else expect(rows.size).toBeGreaterThan(1)
+    if (width === 430) {
+      await page.screenshot({
+        path: test.info().outputPath('dashboard-actions-430.png'),
+        fullPage: true,
+      })
+    }
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true)
+  })
+}
+
 test('Dashboard Overview combines progress with latest weight at 390px', async ({
   page,
 }) => {
