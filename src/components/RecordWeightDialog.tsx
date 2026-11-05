@@ -151,11 +151,21 @@ export function RecordWeightDialog({
           viewport.scale > 1.05)
       if ((!isCompact && !compactVisualViewport) || !viewport) {
         element.removeAttribute('data-compact-viewport')
+        element.removeAttribute('data-narrow-fields')
         element.style.removeProperty('--record-weight-available-height')
         element.style.removeProperty('bottom')
         return
       }
       element.setAttribute('data-compact-viewport', '')
+      const stackFields =
+        window.innerWidth < 400 ||
+        window.innerHeight <= 500 ||
+        (!!viewport &&
+          (viewport.width < 400 ||
+            viewport.height <= 500 ||
+            viewport.scale > 1.05))
+      if (stackFields) element.setAttribute('data-narrow-fields', '')
+      else element.removeAttribute('data-narrow-fields')
       const visibleBottom = viewport.offsetTop + viewport.height
       const keyboardInset = Math.max(0, window.innerHeight - visibleBottom)
       element.style.setProperty(
