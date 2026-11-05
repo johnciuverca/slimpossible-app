@@ -222,12 +222,11 @@ export function SharedWeightChart({
   }
   const seriesLabelX = (item: SharedChartSeries, point: SharedChartPoint) => {
     const pointX = x(point.date)
-    if (!labelSeriesExtremesOnly || !compactLayout || !point.label)
-      return pointX
+    if (!labelSeriesExtremesOnly || !point.label) return pointX
     const text = item.extremeLabelPrefix
       ? `${item.extremeLabelPrefix}: ${point.label}`
       : point.label
-    const halfLabelWidth = (text.length * 5.4) / 2
+    const halfLabelWidth = (text.length * (compactLayout ? 5.4 : 4.2)) / 2
     return Math.max(
       chartLeft + halfLabelWidth + 2,
       Math.min(pointX, chartRight - halfLabelWidth - 2),

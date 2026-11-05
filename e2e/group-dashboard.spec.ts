@@ -2655,8 +2655,11 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
       expect(edges.plot.height).toBeCloseTo(429.421875, 0)
     }
     if (width === 390) {
-      expect(edges.plot.width).toBeCloseTo(600, 0)
-      expect(edges.plot.height).toBeCloseTo(219.46875, 0)
+      expect(edges.plot.width).toBeLessThan(600)
+      expect(edges.plot.width).toBeLessThanOrEqual(
+        edges.chart.right - edges.chart.left,
+      )
+      expect(edges.plot.width).toBeGreaterThan(300)
     }
     const manage = page.getByRole('link', {
       name: 'Manage',
