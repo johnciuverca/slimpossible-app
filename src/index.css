@@ -739,6 +739,27 @@ body {
     white-space: normal;
   }
 }
+@media (min-width: 420px) and (max-width: 600px) {
+  .dashboard-actions-compact .dashboard-action-grid-compact {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 0.25rem;
+  }
+  .dashboard-actions-compact .dashboard-action-grid-compact > a,
+  .dashboard-actions-compact .dashboard-action-grid-compact > button {
+    width: 100%;
+    padding-inline: 0.625rem;
+    word-break: break-word;
+  }
+  .dashboard-actions-compact .dashboard-action-grid-compact > a > span,
+  .dashboard-actions-compact .dashboard-action-grid-compact > button > span {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+}
 .dashboard-action {
   display: flex;
   align-items: center;

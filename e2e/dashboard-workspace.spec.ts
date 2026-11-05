@@ -91,16 +91,31 @@ for (const width of [320, 390, 430]) {
           actions.map((action) => {
             const box = action.getBoundingClientRect()
             const style = getComputedStyle(action)
-            const range = document.createRange()
-            range.selectNodeContents(action)
-            const labelRects = Array.from(range.getClientRects()).map(
-              ({ left, right, top, bottom }) => ({
-                left,
-                right,
-                top,
-                bottom,
-              }),
+            const label = action.querySelector('span') ?? action
+            const textWalker = document.createTreeWalker(
+              label,
+              NodeFilter.SHOW_TEXT,
             )
+            const labelRects: Array<{
+              left: number
+              right: number
+              top: number
+              bottom: number
+            }> = []
+            while (textWalker.nextNode()) {
+              const range = document.createRange()
+              range.selectNodeContents(textWalker.currentNode)
+              labelRects.push(
+                ...Array.from(range.getClientRects()).map(
+                  ({ left, right, top, bottom }) => ({
+                    left,
+                    right,
+                    top,
+                    bottom,
+                  }),
+                ),
+              )
+            }
             return {
               label: action.textContent?.trim(),
               x: box.x,
@@ -169,7 +184,15 @@ for (const width of [320, 390, 430]) {
         `Labels must remain inside padded button bounds: ${JSON.stringify(actionMetrics)}`,
       ).toBe(true)
       const rows = new Set(actionMetrics.map(({ y }) => Math.round(y)))
-      expect(rows.size).toBeGreaterThan(1)
+      if (width === 430 && textSize === 'normal') {
+        expect(rows.size).toBe(1)
+        expect(
+          new Set(actionMetrics.map(({ height }) => Math.round(height))).size,
+        ).toBe(1)
+        expect(longestLabel!.labelRects.length).toBeGreaterThan(1)
+      } else if (width < 430) {
+        expect(rows.size).toBeGreaterThan(1)
+      }
       expect(rows.size).toBeLessThanOrEqual(4)
       expect(
         await page.evaluate(
