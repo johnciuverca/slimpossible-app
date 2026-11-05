@@ -715,22 +715,28 @@ body {
   padding: 0.5rem 0.75rem;
   font-size: 0.875rem;
 }
-@media (min-width: 420px) and (max-width: 600px) {
+@media (max-width: 600px) {
   .dashboard-actions-compact {
-    padding: 0.25rem;
+    padding: 0.5rem;
   }
   .dashboard-actions-compact .dashboard-action-grid-compact {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.25rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    justify-content: center;
+    gap: 0.5rem;
   }
   .dashboard-actions-compact .dashboard-action-grid-compact > a,
   .dashboard-actions-compact .dashboard-action-grid-compact > button {
-    width: 100%;
-    padding-inline: 0;
-    font-size: 0.6875rem;
-    line-height: 1.1;
-    white-space: nowrap;
+    flex: 0 0 auto;
+    width: auto;
+    max-width: 100%;
+    min-width: 0;
+    padding: 0.5rem 0.625rem;
+    font-size: clamp(0.75rem, 3vw, 0.875rem);
+    line-height: 1.2;
+    text-align: center;
+    white-space: normal;
   }
 }
 .dashboard-action {

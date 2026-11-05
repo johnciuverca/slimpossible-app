@@ -50,67 +50,139 @@ for (const viewport of [
 }
 
 for (const width of [320, 390, 430]) {
-  test(`mobile Dashboard heading spacing and action wrapping at ${width}px`, async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width, height: 900 })
-    await page.goto(fixture())
-    const dashboardHeader = page.locator('.dashboard-workspace > header')
-    const latestCard = page.locator('.dashboard-latest')
-    const emptyConfirmation = page.locator(
-      '.dashboard-save-confirmation-slot:empty',
-    )
-    const actionCard = page.locator('.dashboard-actions-compact')
-    const actionGrid = actionCard.locator('.dashboard-action-grid')
-    await expect(emptyConfirmation).toBeHidden()
-    const [headerBox, latestBox] = await Promise.all([
-      dashboardHeader.boundingBox(),
-      latestCard.boundingBox(),
-    ])
-    expect(headerBox).not.toBeNull()
-    expect(latestBox).not.toBeNull()
-    expect(latestBox!.y - headerBox!.y - headerBox!.height).toBeLessThanOrEqual(
-      24,
-    )
-
-    const actionBoxes = await actionGrid
-      .locator(':scope > a, :scope > button')
-      .evaluateAll((actions) =>
-        actions.map((action) => {
-          const { y, height, x, width } = action.getBoundingClientRect()
-          return {
-            y,
-            height,
-            x,
-            width,
-            clientWidth: action.clientWidth,
-            scrollWidth: action.scrollWidth,
-          }
-        }),
+  for (const textSize of ['normal', 'increased']) {
+    test(`mobile Dashboard spacing and contained actions at ${width}px with ${textSize} text`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto(fixture())
+      if (textSize === 'increased') {
+        await page.addStyleTag({
+          content: `
+            .dashboard-actions-compact .dashboard-action-grid-compact > a,
+            .dashboard-actions-compact .dashboard-action-grid-compact > button {
+              font-size: 20px !important;
+              line-height: 1.2 !important;
+            }
+          `,
+        })
+      }
+      const dashboardHeader = page.locator('.dashboard-workspace > header')
+      const latestCard = page.locator('.dashboard-latest')
+      const emptyConfirmation = page.locator(
+        '.dashboard-save-confirmation-slot:empty',
       )
-    expect(actionBoxes).toHaveLength(4)
-    expect(actionBoxes.every(({ height }) => height >= 44)).toBe(true)
-    expect(
-      actionBoxes.every(
-        ({ clientWidth, scrollWidth }) => scrollWidth <= clientWidth,
-      ),
-      `Action labels should fit inside their buttons: ${JSON.stringify(actionBoxes)}`,
-    ).toBe(true)
-    const rows = new Set(actionBoxes.map(({ y }) => Math.round(y)))
-    if (width === 430) expect(rows.size).toBe(1)
-    else expect(rows.size).toBeGreaterThan(1)
-    if (width === 430) {
-      await page.screenshot({
-        path: test.info().outputPath('dashboard-actions-430.png'),
-        fullPage: true,
-      })
-    }
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= window.innerWidth,
-      ),
-    ).toBe(true)
-  })
+      const actionCard = page.locator('.dashboard-actions-compact')
+      const actionGrid = actionCard.locator('.dashboard-action-grid')
+      await expect(emptyConfirmation).toBeHidden()
+      const [headerBox, latestBox] = await Promise.all([
+        dashboardHeader.boundingBox(),
+        latestCard.boundingBox(),
+      ])
+      expect(headerBox).not.toBeNull()
+      expect(latestBox).not.toBeNull()
+      expect(
+        latestBox!.y - headerBox!.y - headerBox!.height,
+      ).toBeLessThanOrEqual(24)
+
+      const actionMetrics = await actionGrid
+        .locator(':scope > a, :scope > button')
+        .evaluateAll((actions) =>
+          actions.map((action) => {
+            const box = action.getBoundingClientRect()
+            const style = getComputedStyle(action)
+            const range = document.createRange()
+            range.selectNodeContents(action)
+            const labelRects = Array.from(range.getClientRects()).map(
+              ({ left, right, top, bottom }) => ({
+                left,
+                right,
+                top,
+                bottom,
+              }),
+            )
+            return {
+              label: action.textContent?.trim(),
+              x: box.x,
+              y: box.y,
+              right: box.right,
+              bottom: box.bottom,
+              height: box.height,
+              paddingLeft: Number.parseFloat(style.paddingLeft),
+              paddingRight: Number.parseFloat(style.paddingRight),
+              paddingTop: Number.parseFloat(style.paddingTop),
+              paddingBottom: Number.parseFloat(style.paddingBottom),
+              borderLeft: Number.parseFloat(style.borderLeftWidth),
+              borderRight: Number.parseFloat(style.borderRightWidth),
+              borderTop: Number.parseFloat(style.borderTopWidth),
+              borderBottom: Number.parseFloat(style.borderBottomWidth),
+              fontSize: Number.parseFloat(style.fontSize),
+              labelRects,
+            }
+          }),
+        )
+      expect(actionMetrics).toHaveLength(4)
+      const longestLabel = actionMetrics.find(
+        ({ label }) => label === 'Create challenge',
+      )
+      expect(longestLabel).toBeDefined()
+      expect(actionMetrics.every(({ height }) => height >= 44)).toBe(true)
+      expect(
+        actionMetrics.every(
+          ({ paddingLeft, paddingRight }) =>
+            paddingLeft >= 10 && paddingRight >= 10,
+        ),
+      ).toBe(true)
+      expect(
+        actionMetrics.every(({ fontSize }) =>
+          textSize === 'increased'
+            ? fontSize === 20
+            : fontSize >= 12 && fontSize <= 14,
+        ),
+      ).toBe(true)
+      expect(
+        actionMetrics.every(
+          ({
+            x,
+            right,
+            y,
+            bottom,
+            paddingLeft,
+            paddingRight,
+            paddingTop,
+            paddingBottom,
+            borderLeft,
+            borderRight,
+            borderTop,
+            borderBottom,
+            labelRects,
+          }) =>
+            labelRects.length > 0 &&
+            labelRects.every(
+              ({ left, right: labelRight, top, bottom: labelBottom }) =>
+                left >= x + borderLeft + paddingLeft - 0.5 &&
+                labelRight <= right - borderRight - paddingRight + 0.5 &&
+                top >= y + borderTop + paddingTop - 0.5 &&
+                labelBottom <= bottom - borderBottom - paddingBottom + 0.5,
+            ),
+        ),
+        `Labels must remain inside padded button bounds: ${JSON.stringify(actionMetrics)}`,
+      ).toBe(true)
+      const rows = new Set(actionMetrics.map(({ y }) => Math.round(y)))
+      expect(rows.size).toBeGreaterThan(1)
+      expect(rows.size).toBeLessThanOrEqual(4)
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+      ).toBe(true)
+      if (width === 430 && textSize === 'normal') {
+        await page.screenshot({
+          path: test.info().outputPath('dashboard-actions-430.png'),
+        })
+      }
+    })
+  }
 }
 
 test('Dashboard Overview combines progress with latest weight at 390px', async ({
