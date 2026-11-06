@@ -4,7 +4,7 @@ const day = (date: string) => Date.parse(`${date}T00:00:00Z`) / 86_400_000
 const dateAt = (dayNumber: number) =>
   new Date(dayNumber * 86_400_000).toISOString().slice(0, 10)
 const roundWeightKg = (weightKg: number) =>
-  Math.round((weightKg + Number.EPSILON) * 100) / 100
+  Math.round((weightKg + Number.EPSILON) * 20) / 20
 
 /** Creates display-only daily values strictly between saved date/weight pairs. */
 export function interpolateMissingWeights<T extends DatedWeight>(

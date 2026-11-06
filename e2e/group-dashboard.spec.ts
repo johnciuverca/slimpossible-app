@@ -48,8 +48,8 @@ async function installGroupFixtures(
     const finalWeight = ownWeight ?? (differentWeights ? 95.1 : 88.5)
     return (
       Math.round(
-        (firstWeight + (finalWeight - firstWeight) / 2 + Number.EPSILON) * 100,
-      ) / 100
+        (firstWeight + (finalWeight - firstWeight) / 2 + Number.EPSILON) * 20,
+      ) / 20
     )
   }
   page.on('request', (request) => requests.push(request.url()))
@@ -2772,12 +2772,12 @@ test.describe('group chart weigh-in dots', () => {
       `circle[data-series-id="${memberKey(ownGroupId, viewerId)}"][data-date="2026-09-21"][data-point-kind="estimated"]`,
     )
     await expect(ownEstimate).toBeVisible()
-    await expect(ownEstimate).toHaveAttribute('data-value', '-0.74')
-    await expect(ownEstimate.locator('title')).toContainText('89.26 kg')
+    await expect(ownEstimate).toHaveAttribute('data-value', '-0.75')
+    await expect(ownEstimate.locator('title')).toContainText('89.25 kg')
     await ownEstimate.focus()
     await page.keyboard.press('Enter')
     const create = page.getByRole('dialog', { name: 'Record weight' })
-    await expect(create.getByLabel('Weight in kg')).toHaveValue('89.26')
+    await expect(create.getByLabel('Weight in kg')).toHaveValue('89.25')
     await create.getByLabel('E2E authorized group').check()
     await create.getByRole('button', { name: 'Save weight' }).click()
 

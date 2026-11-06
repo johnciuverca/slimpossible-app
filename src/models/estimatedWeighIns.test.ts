@@ -15,29 +15,35 @@ describe('interpolateMissingWeights', () => {
     ])
   })
 
-  it('rounds nonterminating estimates to the nearest hundredth without tails', () => {
+  it('rounds nonterminating estimates to the nearest 0.05 kg without tails', () => {
     expect(
       interpolateMissingWeights([
         { date: '2026-01-01', weightKg: 90 },
         { date: '2026-01-07', weightKg: 89 },
       ]),
     ).toEqual([
-      { date: '2026-01-02', weightKg: 89.83 },
-      { date: '2026-01-03', weightKg: 89.67 },
+      { date: '2026-01-02', weightKg: 89.85 },
+      { date: '2026-01-03', weightKg: 89.65 },
       { date: '2026-01-04', weightKg: 89.5 },
-      { date: '2026-01-05', weightKg: 89.33 },
-      { date: '2026-01-06', weightKg: 89.17 },
+      { date: '2026-01-05', weightKg: 89.35 },
+      { date: '2026-01-06', weightKg: 89.15 },
     ])
   })
 
-  it('rounds a half hundredth upward using standard positive-weight rounding', () => {
-    expect(
-      interpolateMissingWeights([
-        { date: '2026-01-01', weightKg: 90 },
-        { date: '2026-01-03', weightKg: 89.99 },
-      ]),
-    ).toEqual([{ date: '2026-01-02', weightKg: 90 }])
-  })
+  it.each([
+    [89.54, 90, 89.75],
+    [89.56, 90, 89.8],
+  ])(
+    'rounds the midpoint between %s kg and %s kg to the nearest 0.05 kg',
+    (start, end, expected) => {
+      expect(
+        interpolateMissingWeights([
+          { date: '2026-01-01', weightKg: start },
+          { date: '2026-01-03', weightKg: end },
+        ]),
+      ).toEqual([{ date: '2026-01-02', weightKg: expected }])
+    },
+  )
 
   it.each([2, 3, 10, 15])('fills a gap of %i days without endpoints', (gap) => {
     const expectedCount = gap - 1
