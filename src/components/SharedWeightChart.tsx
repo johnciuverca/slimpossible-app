@@ -122,7 +122,8 @@ export function SharedWeightChart({
     return () => window.removeEventListener('resize', update)
   }, [fitContainer])
   const compactLayout = fitContainer && compactFitLayout
-  const chartLeft = compactLayout ? 48 : left
+  // The smaller mobile axis type frees left-side room for the plot.
+  const chartLeft = compactLayout ? 42 : left
   let chartRight = compactLayout ? 312 : right
   const chartTop = top
   const chartViewBox = compactLayout ? '0 0 320 266' : viewBox
@@ -348,7 +349,7 @@ export function SharedWeightChart({
   const viewBoxWidth = viewBoxParts[2] || 760
   const viewBoxHeight = viewBoxParts[3] || 266
   const compactYAxisLabelWidth = compactLayout
-    ? Math.max(0, ...ticks.map((value) => format(value).length * 7.2))
+    ? Math.max(0, ...ticks.map((value) => format(value).length * 5.4))
     : 0
   if (compactLayout) {
     chartRight = viewBoxWidth - (chartLeft - 10 - compactYAxisLabelWidth)
@@ -496,7 +497,7 @@ export function SharedWeightChart({
   const plotStartPercent = (chartLeft / viewBoxWidth) * 100
   const plotWidthPercent = ((chartRight - chartLeft) / viewBoxWidth) * 100
   const compactContentInsetPercent =
-    ((chartLeft - 10 - compactYAxisLabelWidth) / viewBoxWidth) * 100 + 0.5
+    ((chartLeft - 10 - compactYAxisLabelWidth) / viewBoxWidth) * 100 + 1.5
   const compactContentWidthPercent = 100 - compactContentInsetPercent * 2
   const setThumbValue = (thumb: 'start' | 'end', value: number) => {
     if (thumb === 'start') {
@@ -670,7 +671,7 @@ export function SharedWeightChart({
         >
           <title>{title}</title>
           <desc>{description}</desc>
-          <text x={chartLeft} y="17" className="chart-axis" fontSize="13">
+          <text x={chartLeft} y="17" className="chart-axis" fontSize="9.75">
             {yLabel}
           </text>
           {minorTicks.map((value) => (
@@ -701,7 +702,7 @@ export function SharedWeightChart({
                 y={y(value) + 4}
                 textAnchor="end"
                 className="chart-axis"
-                fontSize={compactLayout ? '13' : '12'}
+                fontSize={compactLayout ? '9.75' : '9'}
               >
                 {format(value)}
               </text>
@@ -865,7 +866,7 @@ export function SharedWeightChart({
                           y={labelPosition.y}
                           textAnchor="middle"
                           className="chart-value"
-                          fontSize={compactLayout ? '9' : '6.6'}
+                          fontSize={compactLayout ? '7.425' : '5.445'}
                           fontWeight="700"
                           data-date={point.date}
                           data-value={point.value}
@@ -955,7 +956,7 @@ export function SharedWeightChart({
                       y={labelPosition.y}
                       textAnchor="middle"
                       className="chart-value"
-                      fontSize={compactLayout ? '9' : '6.6'}
+                      fontSize={compactLayout ? '7.425' : '5.445'}
                       fontWeight="700"
                       data-date={point.date}
                       data-weight-kg={point.value}
@@ -981,7 +982,7 @@ export function SharedWeightChart({
                       : 'middle'
               }
               className="chart-axis"
-              fontSize={compactLayout ? '10' : '6.5'}
+              fontSize={compactLayout ? '7.5' : '4.875'}
               data-chart-date-tick={dateAtDay(date)}
             >
               {formatChartDate(dateAtDay(date))}

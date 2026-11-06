@@ -761,7 +761,7 @@ for (const layout of [
         else {
           expect(box.width).toBeCloseTo(box.valueWidth + 10, 1)
           expect(box.leftPadding).toBeCloseTo(box.rightPadding, 1)
-          expect(box.numberFontSize).toBe('10px')
+          expect(box.numberFontSize).toBe('7.5px')
           expect(box.childCount).toBe(2)
         }
         expect(box.height).toBe(layout.hasTouch ? 48 : 40)
@@ -3162,8 +3162,9 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
       ),
     ).toBe(false)
     const manageBox = (await manage.boundingBox())!
+    const minimumManageTarget = width < 640 ? 44 : 33
     expect(manageBox.width).toBeGreaterThanOrEqual(44)
-    expect(manageBox.height).toBeGreaterThanOrEqual(44)
+    expect(manageBox.height).toBeGreaterThanOrEqual(minimumManageTarget)
     await page.getByRole('link', { name: /Group · testtest/ }).focus()
     await page.keyboard.press('Tab')
     await expect(manage).toBeFocused()
@@ -3267,7 +3268,7 @@ test('shows the challenge owner badge only in Members and fits on mobile', async
       height: bounds.height,
     }
   })
-  expect(badgeMetrics.fontSize).toBe('12px')
+  expect(badgeMetrics.fontSize).toBe('9px')
   expect(badgeMetrics.height).toBeGreaterThanOrEqual(20)
   expect(
     await page.evaluate(

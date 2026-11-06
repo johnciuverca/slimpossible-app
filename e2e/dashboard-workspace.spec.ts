@@ -30,18 +30,64 @@ for (const viewport of [
     await expect(
       actionGrid.getByRole('link', { name: 'My progress', exact: true }),
     ).toBeVisible()
-    const [cardBox, gridBox] = await Promise.all([
+    const [cardBox, actionCardBox, gridBox] = await Promise.all([
       latestCard.boundingBox(),
       actionCard.boundingBox(),
+      actionGrid.boundingBox(),
     ])
     expect(cardBox).not.toBeNull()
+    expect(actionCardBox).not.toBeNull()
     expect(gridBox).not.toBeNull()
+    const actionCardStyle = await actionCard.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return {
+        gridAlignItems: getComputedStyle(element.parentElement!).alignItems,
+        paddingTop: Number.parseFloat(style.paddingTop),
+        paddingRight: Number.parseFloat(style.paddingRight),
+        paddingBottom: Number.parseFloat(style.paddingBottom),
+        paddingLeft: Number.parseFloat(style.paddingLeft),
+      }
+    })
+    expect(actionCardStyle).toEqual({
+      gridAlignItems: 'start',
+      paddingTop: 8,
+      paddingRight: 8,
+      paddingBottom: 8,
+      paddingLeft: 8,
+    })
+    const contentInsets = await actionCard.evaluate((card) => {
+      const grid = card.querySelector('.dashboard-action-grid')
+      if (!grid) throw new Error('Expected the Dashboard action row')
+      const actions = Array.from(grid.children)
+      const actionBounds = actions.map((action) =>
+        action.getBoundingClientRect(),
+      )
+      const cardBounds = card.getBoundingClientRect()
+      const style = getComputedStyle(card)
+      const borderTop = Number.parseFloat(style.borderTopWidth)
+      const borderBottom = Number.parseFloat(style.borderBottomWidth)
+      return {
+        top:
+          Math.min(...actionBounds.map(({ top }) => top)) -
+          cardBounds.top -
+          borderTop -
+          Number.parseFloat(style.paddingTop),
+        bottom:
+          cardBounds.bottom -
+          borderBottom -
+          Number.parseFloat(style.paddingBottom) -
+          Math.max(...actionBounds.map(({ bottom }) => bottom)),
+      }
+    })
+    expect(contentInsets.top).toBeLessThanOrEqual(1)
+    expect(contentInsets.bottom).toBeLessThanOrEqual(1)
+    await actionCard.screenshot({
+      path: test.info().outputPath(`dashboard-actions-${viewport.label}.png`),
+    })
 
     if (viewport.width >= 1100) {
-      expect(Math.abs(cardBox!.y - gridBox!.y)).toBeLessThanOrEqual(1)
-      expect(
-        Math.abs(cardBox!.y + cardBox!.height - gridBox!.y - gridBox!.height),
-      ).toBeLessThanOrEqual(1)
+      expect(Math.abs(cardBox!.y - actionCardBox!.y)).toBeLessThanOrEqual(1)
+      expect(actionCardBox!.height).toBeLessThan(cardBox!.height)
     } else {
       expect(gridBox!.y).toBeGreaterThanOrEqual(cardBox!.y + cardBox!.height)
       expect(Math.abs(cardBox!.height - gridBox!.height)).toBeGreaterThan(1)
@@ -152,7 +198,7 @@ for (const width of [320, 390, 430]) {
         actionMetrics.every(({ fontSize }) =>
           textSize === 'increased'
             ? fontSize === 20
-            : fontSize >= 12 && fontSize <= 14,
+            : fontSize >= 9 && fontSize <= 11,
         ),
       ).toBe(true)
       expect(

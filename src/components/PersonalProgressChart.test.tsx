@@ -79,8 +79,8 @@ it('fits a Dashboard personal trend inside its card while keeping range controls
   ).toEqual([100, 93])
   for (const label of extremeLabels) {
     const x = Number(label.getAttribute('x'))
-    const halfWidth = (label.textContent!.length * 5.4) / 2
-    expect(x - halfWidth).toBeGreaterThanOrEqual(48)
+    const halfWidth = (label.textContent!.length * 4.455) / 2
+    expect(x - halfWidth).toBeGreaterThanOrEqual(42)
     expect(x + halfWidth).toBeLessThanOrEqual(312)
   }
   const dateTicks = Array.from(
@@ -222,8 +222,8 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
   const labels = Array.from(chart.querySelectorAll('.chart-value'))
   expect(labels.map((label) => label.textContent)).toEqual(['100', '90'])
   expect(labels.map((label) => label.getAttribute('font-size'))).toEqual([
-    '6.6',
-    '6.6',
+    '5.445',
+    '5.445',
   ])
   const weights = Array.from(
     chart.querySelectorAll('[data-chart-tick]'),
@@ -239,7 +239,7 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
     Array.from(chart.querySelectorAll('[data-chart-date-tick]'), (tick) =>
       tick.getAttribute('font-size'),
     ),
-  ).toEqual(['6.5', '6.5'])
+  ).toEqual(['4.875', '4.875'])
   expect(chart).toHaveAttribute('viewBox', '0 0 760 266')
   expect(chart).toHaveClass('block', 'h-auto', 'w-full', 'min-w-[600px]')
   expect(chart.querySelector('path:not([data-chart-trend])')).toHaveAttribute(
@@ -435,10 +435,10 @@ it('labels every saved weigh-in with only its numeric value', () => {
       label.getAttribute('font-size'),
     ]),
   ).toEqual([
-    ['2026-10-01', '90', '90', '6.6'],
-    ['2026-10-08', '89.5', '89.5', '6.6'],
-    ['2026-10-15', '88.5', '88.5', '6.6'],
-    ['2026-10-22', '87', '87', '6.6'],
+    ['2026-10-01', '90', '90', '5.445'],
+    ['2026-10-08', '89.5', '89.5', '5.445'],
+    ['2026-10-15', '88.5', '88.5', '5.445'],
+    ['2026-10-22', '87', '87', '5.445'],
   ])
 })
 

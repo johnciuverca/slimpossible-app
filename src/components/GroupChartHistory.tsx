@@ -431,7 +431,7 @@ export function GroupChartHistory({
                       only consecutive days. The table below provides every
                       exact recorded weight.
                     </desc>
-                    <text x={plotLeft} y={14} fontSize={12}>
+                    <text x={plotLeft} y={14} fontSize={9}>
                       Weight (kg)
                     </text>
                     {ticks.map((value) => (
@@ -447,7 +447,7 @@ export function GroupChartHistory({
                           x={plotLeft - 5}
                           y={y(value) + 4}
                           textAnchor="end"
-                          fontSize={12}
+                          fontSize={9}
                         >
                           {`${Math.round(value * 100) / 100} kg`}
                         </text>
@@ -551,12 +551,12 @@ export function GroupChartHistory({
                         })}
                       </g>
                     ))}
-                    <text x={plotLeft} y={242} fontSize={12}>
+                    <text x={plotLeft} y={242} fontSize={9}>
                       {formatChartDate(
                         new Date(start * 86400000).toISOString().slice(0, 10),
                       )}
                     </text>
-                    <text x={675} y={242} textAnchor="end" fontSize={12}>
+                    <text x={675} y={242} textAnchor="end" fontSize={9}>
                       {formatChartDate(
                         new Date(end * 86400000).toISOString().slice(0, 10),
                       )}
@@ -669,7 +669,7 @@ export function GroupChartHistory({
                                         />
                                       ) : null}
                                     </WeightEntryCard>{' '}
-                                    <span className="block text-[10px] text-ink-muted">
+                                    <span className="block text-[7.5px] text-ink-muted">
                                       Previous shared entry:{' '}
                                       {point.previousSharedChangeKg === null
                                         ? '—'

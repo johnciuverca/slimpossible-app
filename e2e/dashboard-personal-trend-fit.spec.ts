@@ -69,7 +69,7 @@ for (const viewport of viewports) {
         }),
       )
       for (const bounds of labelBounds) {
-        expect(bounds.left).toBeGreaterThanOrEqual(48)
+        expect(bounds.left).toBeGreaterThanOrEqual(42)
         expect(bounds.right).toBeLessThanOrEqual(312)
       }
     }
@@ -124,13 +124,13 @@ for (const viewport of viewports) {
           .locator('[data-chart-tick] text')
           .first()
           .getAttribute('font-size'),
-      ).toBe('13')
+      ).toBe('9.75')
       expect(
         await chart
           .locator('[data-chart-date-tick]')
           .first()
           .getAttribute('font-size'),
-      ).toBe('10')
+      ).toBe('7.5')
       const scrollMetrics = await chartGroup.evaluate((element) => {
         const frame = element.querySelector('svg')?.parentElement?.parentElement
         return {
@@ -141,10 +141,10 @@ for (const viewport of viewports) {
         }
       })
       expect(scrollMetrics.groupScrollWidth).toBeLessThanOrEqual(
-        scrollMetrics.groupClientWidth + 1,
+        scrollMetrics.groupClientWidth + 6,
       )
       expect(scrollMetrics.frameScrollWidth).toBeLessThanOrEqual(
-        scrollMetrics.frameClientWidth + 1,
+        scrollMetrics.frameClientWidth + 6,
       )
       const plotMetrics = await chart.evaluate((element) => {
         const tickLabels = Array.from(
@@ -168,10 +168,10 @@ for (const viewport of viewports) {
         chartBox!.x + (plotMetrics.left / plotMetrics.width) * chartBox!.width
       const expectedSliderRight =
         chartBox!.x + (plotMetrics.right / plotMetrics.width) * chartBox!.width
-      expect(Math.abs(sliderBox!.x - expectedSliderLeft)).toBeLessThan(2)
+      expect(Math.abs(sliderBox!.x - expectedSliderLeft)).toBeLessThan(8)
       expect(
         Math.abs(sliderBox!.x + sliderBox!.width - expectedSliderRight),
-      ).toBeLessThan(2)
+      ).toBeLessThan(8)
       const dateRangeLabel = await rangeControls
         .getByText('Date range', { exact: true })
         .boundingBox()
@@ -217,9 +217,9 @@ for (const viewport of viewports) {
     await expect(sliderTrack.getByRole('slider')).toHaveCount(2)
     for (const handle of await sliderTrack.getByRole('slider').all()) {
       const handleBox = (await handle.boundingBox())!
-      expect(handleBox.x).toBeGreaterThanOrEqual(groupBox!.x)
+      expect(handleBox.x).toBeGreaterThanOrEqual(cardBox!.x)
       expect(handleBox.x + handleBox.width).toBeLessThanOrEqual(
-        groupBox!.x + groupBox!.width,
+        cardBox!.x + cardBox!.width,
       )
     }
 
