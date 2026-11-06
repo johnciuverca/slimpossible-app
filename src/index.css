@@ -1236,7 +1236,7 @@ body {
   }
   .dashboard-top-grid {
     grid-template-columns: minmax(220px, 0.85fr) minmax(0, 1.6fr);
-    align-items: stretch;
+    align-items: start;
   }
   .dashboard-actions-region .dashboard-action-grid {
     flex: 1;

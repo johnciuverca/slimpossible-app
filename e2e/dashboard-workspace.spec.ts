@@ -55,9 +55,39 @@ for (const viewport of [
       paddingBottom: 8,
       paddingLeft: 8,
     })
+    const contentInsets = await actionCard.evaluate((card) => {
+      const grid = card.querySelector('.dashboard-action-grid')
+      if (!grid) throw new Error('Expected the Dashboard action row')
+      const actions = Array.from(grid.children)
+      const actionBounds = actions.map((action) =>
+        action.getBoundingClientRect(),
+      )
+      const cardBounds = card.getBoundingClientRect()
+      const style = getComputedStyle(card)
+      const borderTop = Number.parseFloat(style.borderTopWidth)
+      const borderBottom = Number.parseFloat(style.borderBottomWidth)
+      return {
+        top:
+          Math.min(...actionBounds.map(({ top }) => top)) -
+          cardBounds.top -
+          borderTop -
+          Number.parseFloat(style.paddingTop),
+        bottom:
+          cardBounds.bottom -
+          borderBottom -
+          Number.parseFloat(style.paddingBottom) -
+          Math.max(...actionBounds.map(({ bottom }) => bottom)),
+      }
+    })
+    expect(contentInsets.top).toBeLessThanOrEqual(1)
+    expect(contentInsets.bottom).toBeLessThanOrEqual(1)
+    await actionCard.screenshot({
+      path: test.info().outputPath(`dashboard-actions-${viewport.label}.png`),
+    })
 
     if (viewport.width >= 1100) {
-      expect(Math.abs(cardBox!.y - gridBox!.y)).toBeLessThanOrEqual(1)
+      expect(Math.abs(cardBox!.y - actionCardBox!.y)).toBeLessThanOrEqual(1)
+      expect(actionCardBox!.height).toBeLessThan(cardBox!.height)
     } else {
       expect(gridBox!.y).toBeGreaterThanOrEqual(cardBox!.y + cardBox!.height)
       expect(Math.abs(cardBox!.height - gridBox!.height)).toBeGreaterThan(1)
