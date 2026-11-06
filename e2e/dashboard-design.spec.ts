@@ -60,7 +60,9 @@ for (const width of [1280, 390]) {
     const chart = page.getByRole('img', {
       name: /^Personal weight history chart/,
     })
-    await expect(chart.locator('circle[data-date]')).toHaveCount(5)
+    await expect(
+      chart.locator('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveCount(5)
     await expect(chart.locator('[data-chart-trend]')).toHaveCount(1)
     await expect(chart.locator('[data-chart-reference]')).toHaveCount(1)
     await expect(chart.locator('[data-chart-trend]')).toHaveAttribute(
@@ -68,9 +70,17 @@ for (const width of [1280, 390]) {
       '0.35',
     )
     await expect(chart.locator('.chart-legend')).toHaveCount(0)
-    await expect(chart).toHaveAccessibleDescription(/least-squares fit/)
-    await expect(chart.locator('.chart-value')).toHaveCount(5)
-    const firstPoint = chart.locator('circle[data-chart-point]').first()
+    await expect(chart).toHaveAccessibleDescription(
+      /The trend uses only saved records/,
+    )
+    await expect(chart.locator('.chart-value')).toHaveCount(2)
+    await expect(chart).toHaveAttribute(
+      'viewBox',
+      width <= 600 ? '0 0 320 266' : '0 0 760 266',
+    )
+    const firstPoint = chart
+      .locator('circle[data-point-kind="recorded"][data-chart-point]')
+      .first()
     await firstPoint.hover()
     const pointTooltip = page.getByRole('tooltip')
     await expect(pointTooltip).toBeVisible()
@@ -83,8 +93,17 @@ for (const width of [1280, 390]) {
     )
     await page.keyboard.press('Escape')
     await expect(pointTooltip).toHaveCount(0)
+    if (width <= 600) {
+      await firstPoint.dispatchEvent('pointerdown', { pointerType: 'touch' })
+      await expect(pointTooltip).toBeVisible()
+      await expect(pointTooltip).toContainText(/\d{2}\.\d{2}\.\d{4}: 80\.3 kg/)
+      await page.keyboard.press('Escape')
+    }
     for (const label of await chart.locator('.chart-value').all())
-      await expect(label).toHaveAttribute('font-size', '6.6')
+      await expect(label).toHaveAttribute(
+        'font-size',
+        width <= 600 ? '9' : '6.6',
+      )
     const yTicks = await chart
       .locator('[data-chart-tick]')
       .evaluateAll((ticks) =>
@@ -94,7 +113,7 @@ for (const width of [1280, 390]) {
     await expect(chart.locator('[data-chart-minor-tick]')).not.toHaveCount(0)
     await expect(
       chart.locator('[data-chart-date-tick]').first(),
-    ).toHaveAttribute('font-size', '6.5')
+    ).toHaveAttribute('font-size', width <= 600 ? '10' : '6.5')
     await expect(page.getByText('Weight (kg)', { exact: true })).toHaveCount(1)
     await chart.screenshot({
       path: test.info().outputPath('personal-chart-narrow-preview.png'),
@@ -109,26 +128,64 @@ for (const width of [1280, 390]) {
     const chartBox = await chart.boundingBox()
     expect(dateRangeLabel).not.toBeNull()
     expect(chartBox).not.toBeNull()
-    expect(
-      Math.abs(
-        dateRangeLabel!.x - (chartBox!.x + (64 / 760) * chartBox!.width),
-      ),
-    ).toBeLessThan(2)
+    if (width <= 600) {
+      expect(
+        Math.abs(
+          dateRangeLabel!.x +
+            dateRangeLabel!.width / 2 -
+            (chartBox!.x + chartBox!.width / 2),
+        ),
+      ).toBeLessThan(2)
+      const presetButtons = await dateControls
+        .getByRole('button')
+        .evaluateAll((buttons) =>
+          buttons.map((button) => button.getBoundingClientRect().y),
+        )
+      expect(
+        Math.max(...presetButtons) - Math.min(...presetButtons),
+      ).toBeLessThan(1)
+    } else {
+      const plotStart = 64 / 760
+      expect(
+        Math.abs(
+          dateRangeLabel!.x - (chartBox!.x + plotStart * chartBox!.width),
+        ),
+      ).toBeLessThan(2)
+    }
+    for (const name of [
+      'Show last 1 week',
+      'Show last 2 weeks',
+      'Show last 1 month',
+      'Show last 3 months',
+      'Show all dates',
+    ])
+      await expect(dateControls.getByRole('button', { name })).toBeVisible()
     const sliderTrack = page.getByRole('group', {
       name: 'Adjust visible date range',
     })
     await expect(sliderTrack.getByRole('slider')).toHaveCount(2)
+    const sliderHandles = await sliderTrack.getByRole('slider').all()
+    for (const handle of sliderHandles) {
+      const handleBox = await handle.boundingBox()
+      expect(handleBox).not.toBeNull()
+      expect(handleBox!.x).toBeGreaterThanOrEqual(chartBox!.x)
+      expect(handleBox!.x + handleBox!.width).toBeLessThanOrEqual(
+        chartBox!.x + chartBox!.width,
+      )
+    }
     await dateControls
       .getByRole('button', { name: 'Show last 1 month' })
       .click()
-    await expect(chart.locator('circle[data-date]')).toHaveCount(4)
+    await expect(
+      chart.locator('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveCount(4)
     const recentTicks = await chart
       .locator('[data-chart-tick]')
       .evaluateAll((ticks) =>
         ticks.map((tick) => Number(tick.getAttribute('data-chart-tick'))),
       )
-    expect(recentTicks.every((tick) => tick % 5 === 0)).toBe(false)
-    await expect(chart.locator('[data-chart-minor-tick]')).toHaveCount(0)
+    expect(recentTicks.every((tick) => tick % 5 === 0)).toBe(true)
+    await expect(chart.locator('[data-chart-minor-tick]')).not.toHaveCount(0)
     const startSlider = sliderTrack.getByRole('slider', {
       name: 'Visible range start',
     })
@@ -140,7 +197,9 @@ for (const width of [1280, 390]) {
       originalStart!,
     )
     await dateControls.getByRole('button', { name: 'Show all dates' }).click()
-    await expect(chart.locator('circle[data-date]')).toHaveCount(5)
+    await expect(
+      chart.locator('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveCount(5)
     const endSlider = sliderTrack.getByRole('slider', {
       name: 'Visible range end',
     })
@@ -148,7 +207,9 @@ for (const width of [1280, 390]) {
     await endSlider.focus()
     await page.keyboard.press('ArrowLeft')
     await expect(endSlider).not.toHaveAttribute('aria-valuetext', originalEnd!)
-    await expect(chart.locator('circle[data-date]')).toHaveCount(4)
+    await expect(
+      chart.locator('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveCount(4)
     await chart.scrollIntoViewIfNeeded()
     const chartBottomBox = await chart.boundingBox()
     const sliderBox = await sliderTrack.boundingBox()
@@ -158,7 +219,9 @@ for (const width of [1280, 390]) {
       chartBottomBox!.y + chartBottomBox!.height - 1,
     )
     await dateControls.getByRole('button', { name: 'Show all dates' }).click()
-    await expect(chart.locator('circle[data-date]')).toHaveCount(5)
+    await expect(
+      chart.locator('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveCount(5)
     await expect(
       dateControls.getByRole('button', { name: 'Show all dates' }),
     ).toHaveAttribute('aria-pressed', 'true')
@@ -187,6 +250,8 @@ for (const width of [1280, 390]) {
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await expect(account).toBeFocused()
 
-    await expect(chart.locator('circle[data-date]')).toHaveCount(5)
+    await expect(
+      chart.locator('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveCount(5)
   })
 }

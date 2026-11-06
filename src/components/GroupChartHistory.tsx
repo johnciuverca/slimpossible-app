@@ -14,12 +14,19 @@ import { WeightEntryCard } from './WeightEntryCard'
 import { deriveGroupChartTrend } from '../models/groupChartTrend'
 import type { GroupMemberProgress } from '../models/groupMemberProgress'
 import { SharedWeightChart } from './SharedWeightChart'
+import { interpolateMissingWeights } from '../models/estimatedWeighIns'
+import {
+  ChartWeightPointEditor,
+  type ChartWeightPointSelection,
+} from './ChartWeightPointEditor'
 
 const colors = ['#31dbb0', '#67a5ff', '#ff8ba7', '#c49cff', '#ffc164']
 const trendColor = '#ffbf69'
 const referenceColor = '#c49cff'
 const day = (date: string) => Date.parse(`${date}T00:00:00Z`) / 86400000
 const signed = (value: number) => `${value > 0 ? '+' : ''}${value} kg`
+const weightCents = (weightKg: number) => Math.round(weightKg * 100)
+const fromWeightCents = (cents: number) => cents / 100
 const formatWeight = (value: number) =>
   new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value)
 
@@ -48,7 +55,8 @@ export function GroupChartHistory({
   const personalWorkspace = usePersonalWorkspace({
     enabled: enabled && ownMemberKey !== null,
   })
-  const key = `${viewerId}:${challengeId}:${refreshVersion}:${persistence.mode}`
+  const [localHistoryRefresh, setLocalHistoryRefresh] = useState(0)
+  const key = `${viewerId}:${challengeId}:${refreshVersion}:${localHistoryRefresh}:${persistence.mode}`
   const context = `${viewerId}:${challengeId}:${persistence.mode}`
   const [selection, setSelection] = useState({ context, memberKey: '' })
   const tabs = useRef<HTMLDivElement>(null)
@@ -60,6 +68,11 @@ export function GroupChartHistory({
     state: 'success' | 'error'
     entries: GroupChartEntry[]
   } | null>(null)
+  const [chartAction, setChartAction] = useState<
+    (ChartWeightPointSelection & { context: string }) | null
+  >(null)
+  const activeChartAction =
+    chartAction?.context === context ? chartAction : null
   useEffect(() => {
     let current = true
     if (!enabled) return
@@ -298,21 +311,22 @@ export function GroupChartHistory({
               <>
                 <p className="sr-only">
                   {absolute ? (
-                    'Missing dates are gaps, not estimated weights. Each member starts at their first explicitly shared weight; unshared starting values are not added. Corrections and removed shares update this chart on refresh.'
+                    'Hollow points estimate missing dates only between a member’s explicitly shared entries. Each member starts at their first explicitly shared weight; unshared starting values are not added. Estimates are visual only. Corrections and removed shares update this chart on refresh.'
                   ) : (
                     <>
-                      Missing dates are gaps, not estimated weights. A single
-                      shared entry establishes a zero-change baseline. Late
-                      entries, corrections and removed shares recalculate the
-                      baseline on refresh.
+                      Hollow points estimate missing dates only between a
+                      member’s explicitly shared entries. A single shared entry
+                      establishes a zero-change baseline. Estimates are visual
+                      only. Late entries, corrections and removed shares
+                      recalculate the baseline on refresh.
                     </>
                   )}
                 </p>
                 <div
                   role="region"
-                  aria-label="Scrollable group comparison chart"
+                  aria-label="Group comparison chart"
                   tabIndex={0}
-                  className="mt-4 overflow-x-auto focus-visible:outline-2 focus-visible:outline-emerald-700"
+                  className="mt-4 min-w-0 focus-visible:outline-2 focus-visible:outline-emerald-700"
                 >
                   <SharedWeightChart
                     title={
@@ -333,23 +347,78 @@ export function GroupChartHistory({
                     paddingMinimum={0.5}
                     floorAtZero={absolute}
                     includeZero={!absolute}
-                    className="w-full min-w-[36rem]"
+                    className="w-full min-w-0"
                     viewBox={`0 0 760 ${chartViewBoxHeight}`}
+                    fitContainer
+                    labelSeriesExtremesOnly
                     series={series.map((member, index) => ({
                       id: member.memberKey,
                       color: colors[index % colors.length],
                       title: `${member.label} recorded shared weights`,
-                      points: member.points.map((point) => ({
-                        date: point.date,
-                        value: pointValue(point),
-                        label: absolute
-                          ? String(point.weightKg)
-                          : `${point.changeKg > 0 ? '+' : ''}${point.changeKg}`,
-                        title: `${member.label}: ${formatChartDate(point.date)}, ${absolute ? `${point.weightKg} kg` : signed(point.changeKg)}`,
-                        markerLabel: `Recorded weight for ${member.label} on ${formatChartDate(point.date)}`,
-                        tooltip: `${member.label} — ${formatChartDate(point.date)}: ${formatWeight(point.weightKg)} kg`,
-                      })),
+                      points: [
+                        ...member.points.map((point) => ({
+                          date: point.date,
+                          value: pointValue(point),
+                          label: absolute
+                            ? String(point.weightKg)
+                            : `${point.changeKg > 0 ? '+' : ''}${point.changeKg}`,
+                          title: `${member.label}: ${formatChartDate(point.date)}, ${absolute ? `${point.weightKg} kg` : signed(point.changeKg)}`,
+                          markerLabel: `Recorded weight for ${member.label} on ${formatChartDate(point.date)}`,
+                          tooltip: `${member.label} — ${formatChartDate(point.date)}: ${formatWeight(point.weightKg)} kg`,
+                        })),
+                        ...interpolateMissingWeights(
+                          member.points.map((point) => ({
+                            date: point.date,
+                            weightKg: point.weightKg,
+                          })),
+                        ).map((point) => ({
+                          date: point.date,
+                          value: absolute
+                            ? point.weightKg
+                            : fromWeightCents(
+                                weightCents(point.weightKg) -
+                                  weightCents(
+                                    member.points[0]?.weightKg ??
+                                      point.weightKg,
+                                  ),
+                              ),
+                          estimated: true,
+                          title: `${member.label}: Estimated ${formatChartDate(point.date)}, ${formatWeight(point.weightKg)} kg`,
+                          markerLabel: `Estimated weight for ${member.label} on ${formatChartDate(point.date)}`,
+                          tooltip: `${member.label} — Estimated ${formatChartDate(point.date)}: ${formatWeight(point.weightKg)} kg`,
+                        })),
+                      ].sort((a, b) => a.date.localeCompare(b.date)),
                     }))}
+                    onPointActivate={(point, memberKey) => {
+                      if (
+                        memberKey !== ownMemberKey ||
+                        personalWorkspace.userId !== viewerId.toLowerCase()
+                      )
+                        return
+                      if (point.estimated) {
+                        const baseline =
+                          series.find(
+                            (member) => member.memberKey === ownMemberKey,
+                          )?.points[0]?.weightKg ?? 0
+                        setChartAction({
+                          context,
+                          date: point.date,
+                          value: absolute
+                            ? point.value
+                            : fromWeightCents(
+                                weightCents(baseline) +
+                                  weightCents(point.value),
+                              ),
+                          estimated: true,
+                        })
+                      } else
+                        setChartAction({
+                          context,
+                          date: point.date,
+                          value: point.value,
+                          estimated: false,
+                        })
+                    }}
                     lines={[
                       ...series.flatMap((member) => {
                         const target = memberProgress.find(
@@ -698,6 +767,22 @@ export function GroupChartHistory({
           </section>
         </div>
       ) : null}
+      <ChartWeightPointEditor
+        workspace={personalWorkspace}
+        point={activeChartAction}
+        requiredSharedChallengeId={challengeId}
+        scopeKey={`group-chart:${challengeId}:${viewerId}`}
+        onClose={() => setChartAction(null)}
+        onSaved={() => {
+          setChartAction(null)
+          personalWorkspace.refresh()
+          setLocalHistoryRefresh((version) => version + 1)
+        }}
+        onDuplicateDate={() => {
+          personalWorkspace.refresh()
+          setLocalHistoryRefresh((version) => version + 1)
+        }}
+      />
     </div>
   )
 }

@@ -314,12 +314,13 @@ test('localized date and weight controls fit narrow, landscape, zoomed, and wide
     { width: 320, height: 720 },
     { width: 360, height: 720 },
     { width: 390, height: 844 },
+    { width: 430, height: 932 },
     { width: 767, height: 390 },
     { width: 844, height: 390 },
     { width: 1024, height: 768 },
   ]) {
     await page.setViewportSize(viewport)
-    const stacked = viewport.width < 768 || viewport.height <= 500
+    const stacked = viewport.width < 400
     await expect
       .poll(async () => {
         const [dateBox, weightBox] = await Promise.all([
@@ -369,6 +370,57 @@ test('localized date and weight controls fit narrow, landscape, zoomed, and wide
       expect(dateBox!.x + dateBox!.width).toBeLessThanOrEqual(weightBox!.x)
       expect(weightBox!.x - (dateBox!.x + dateBox!.width)).toBeGreaterThan(0)
     }
+    if (viewport.width === 430) {
+      await expect(dialog).toHaveAttribute('data-compact-viewport', '')
+      await expect(dialog).not.toHaveAttribute('data-narrow-fields', '')
+      const [dateShellBox, weightShellBox, dateShellStyle, weightShellStyle] =
+        await Promise.all([
+          dialog.locator('.record-weight-field-shell').nth(0).boundingBox(),
+          dialog.locator('.record-weight-field-shell').nth(1).boundingBox(),
+          dialog
+            .locator('.record-weight-field-shell')
+            .nth(0)
+            .evaluate((element) => {
+              const style = getComputedStyle(element)
+              return {
+                height: style.height,
+                paddingLeft: style.paddingLeft,
+                paddingRight: style.paddingRight,
+              }
+            }),
+          dialog
+            .locator('.record-weight-field-shell')
+            .nth(1)
+            .evaluate((element) => {
+              const style = getComputedStyle(element)
+              return {
+                height: style.height,
+                paddingLeft: style.paddingLeft,
+                paddingRight: style.paddingRight,
+              }
+            }),
+        ])
+      expect(dateShellBox).not.toBeNull()
+      expect(weightShellBox).not.toBeNull()
+      expect(dateShellStyle).toEqual(weightShellStyle)
+      expect(Number.parseFloat(dateShellStyle.height)).toBeGreaterThanOrEqual(
+        44,
+      )
+      expect(dateShellBox!.height).toBeCloseTo(weightShellBox!.height, 1)
+      expect(dateShellBox!.x + dateShellBox!.width).toBeLessThanOrEqual(
+        weightShellBox!.x,
+      )
+      expect(dateBox!.x).toBeGreaterThanOrEqual(dateShellBox!.x)
+      expect(dateBox!.x + dateBox!.width).toBeLessThanOrEqual(
+        dateShellBox!.x + dateShellBox!.width,
+      )
+      expect(weightBox!.x).toBeGreaterThanOrEqual(weightShellBox!.x)
+      expect(weightBox!.x + weightBox!.width).toBeLessThanOrEqual(
+        weightShellBox!.x + weightShellBox!.width,
+      )
+      expect(Number.parseFloat(dateShellStyle.paddingLeft)).toBeGreaterThan(0)
+      expect(Number.parseFloat(dateShellStyle.paddingRight)).toBeGreaterThan(0)
+    }
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth),
     ).toBe(viewport.width)
@@ -384,6 +436,7 @@ test('localized date and weight controls fit narrow, landscape, zoomed, and wide
     viewport.dispatchEvent(new Event('resize'))
   })
   await expect(dialog).toHaveAttribute('data-compact-viewport', '')
+  await expect(dialog).toHaveAttribute('data-narrow-fields', '')
   await expect(
     dialog.getByRole('button', { name: /Private note/ }),
   ).toHaveAttribute('aria-expanded', 'false')
@@ -395,7 +448,15 @@ test('localized date and weight controls fit narrow, landscape, zoomed, and wide
     zoomedWeightBox!.y,
   )
 
-  await page.setViewportSize({ width: 844, height: 390 })
+  await page.evaluate(() => {
+    const viewport = window.visualViewport as
+      (VisualViewport & { width?: number; scale?: number }) | null
+    if (!viewport) throw new Error('VisualViewport is unavailable')
+    delete viewport.width
+    delete viewport.scale
+    viewport.dispatchEvent(new Event('resize'))
+  })
+  await page.setViewportSize({ width: 430, height: 932 })
   const noteToggle = dialog.getByRole('button', { name: /Private note/ })
   await expect(noteToggle).toHaveAttribute('aria-expanded', 'false')
   await expect(
@@ -407,23 +468,51 @@ test('localized date and weight controls fit narrow, landscape, zoomed, and wide
   await page.evaluate(() => {
     const viewport = window.visualViewport
     if (!viewport) throw new Error('VisualViewport is unavailable')
-    Object.defineProperty(viewport, 'height', {
-      configurable: true,
-      value: 180,
+    Object.defineProperties(viewport, {
+      height: { configurable: true, value: 320 },
+      offsetTop: { configurable: true, value: 24 },
     })
     viewport.dispatchEvent(new Event('resize'))
   })
+  await expect(dialog).not.toHaveAttribute('data-narrow-fields', '')
+  const [
+    keyboardDateBox,
+    keyboardWeightBox,
+    keyboardDateShell,
+    keyboardWeightShell,
+  ] = await Promise.all([
+    date.boundingBox(),
+    weight.boundingBox(),
+    dialog.locator('.record-weight-field-shell').nth(0).boundingBox(),
+    dialog.locator('.record-weight-field-shell').nth(1).boundingBox(),
+  ])
+  expect(keyboardDateShell).not.toBeNull()
+  expect(keyboardWeightShell).not.toBeNull()
+  expect(keyboardDateShell!.x + keyboardDateShell!.width).toBeLessThanOrEqual(
+    keyboardWeightShell!.x,
+  )
+  expect(keyboardDateShell!.y).toBeCloseTo(keyboardWeightShell!.y, 0)
+  expect(keyboardDateBox!.y).toBeCloseTo(keyboardWeightBox!.y, 0)
+  expect(keyboardDateBox!.x).toBeGreaterThanOrEqual(keyboardDateShell!.x)
+  expect(keyboardDateBox!.x + keyboardDateBox!.width).toBeLessThanOrEqual(
+    keyboardDateShell!.x + keyboardDateShell!.width,
+  )
+  expect(keyboardWeightBox!.x).toBeGreaterThanOrEqual(keyboardWeightShell!.x)
+  expect(keyboardWeightBox!.x + keyboardWeightBox!.width).toBeLessThanOrEqual(
+    keyboardWeightShell!.x + keyboardWeightShell!.width,
+  )
   await expect
     .poll(() => dialog.evaluate((element) => element.style.bottom))
-    .toBe('210px')
+    .toBe('588px')
   await save.scrollIntoViewIfNeeded()
   const saveBox = (await save.boundingBox())!
-  expect(saveBox.y + saveBox.height).toBeLessThanOrEqual(180)
+  expect(saveBox.y).toBeGreaterThanOrEqual(24)
+  expect(saveBox.y + saveBox.height).toBeLessThanOrEqual(344)
 
   await context.close()
 })
 
-for (const width of [1280, 390]) {
+for (const width of [1280, 390, 430]) {
   test(`shared recording action preserves today's canonical note and shares across pages at ${width}px`, async ({
     page,
   }) => {

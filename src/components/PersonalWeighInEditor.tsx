@@ -229,8 +229,9 @@ export function PersonalWeighInEditor({
         ) : (
           <>
             <p className="mb-3 text-xs leading-5 text-ink-muted">
-              Nothing is selected by default. Choose each group separately; your
-              note is never shared.
+              {values.sharedChallengeIds.length
+                ? 'Selected groups receive the date and weight only. Change the selection before saving if needed; your note stays private.'
+                : 'Nothing is selected by default. Choose each group separately; your note stays private.'}
             </p>
             <div className="space-y-3">
               {groups.map((group) => (

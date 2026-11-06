@@ -189,6 +189,12 @@ body {
   gap: 1rem;
 }
 
+.record-weight-dialog[data-compact-viewport]:not([data-narrow-fields])
+  .record-weight-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
 .record-weight-dialog[data-compact-viewport] .record-weight-note-toggle {
   display: flex;
 }
@@ -672,6 +678,11 @@ body {
   .page-title-row {
     align-items: flex-start;
   }
+  .dashboard-shell
+    .dashboard-workspace
+    .dashboard-save-confirmation-slot:empty {
+    display: none;
+  }
   .dashboard-save-confirmation-slot {
     flex-basis: 100%;
   }
@@ -709,6 +720,51 @@ body {
   border-radius: 0.65rem;
   padding: 0.5rem 0.75rem;
   font-size: 0.875rem;
+}
+@media (max-width: 600px) {
+  .dashboard-actions-compact {
+    padding: 0.5rem;
+  }
+  .dashboard-actions-compact .dashboard-action-grid-compact {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+  .dashboard-actions-compact .dashboard-action-grid-compact > a,
+  .dashboard-actions-compact .dashboard-action-grid-compact > button {
+    flex: 0 0 auto;
+    width: auto;
+    max-width: 100%;
+    min-width: 0;
+    padding: 0.5rem 0.625rem;
+    font-size: clamp(0.75rem, 3vw, 0.875rem);
+    line-height: 1.2;
+    text-align: center;
+    white-space: normal;
+  }
+}
+@media (min-width: 420px) and (max-width: 600px) {
+  .dashboard-actions-compact .dashboard-action-grid-compact {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 0.25rem;
+  }
+  .dashboard-actions-compact .dashboard-action-grid-compact > a,
+  .dashboard-actions-compact .dashboard-action-grid-compact > button {
+    width: 100%;
+    padding-inline: 0.625rem;
+    word-break: break-word;
+  }
+  .dashboard-actions-compact .dashboard-action-grid-compact > a > span,
+  .dashboard-actions-compact .dashboard-action-grid-compact > button > span {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
 }
 .dashboard-action {
   display: flex;
