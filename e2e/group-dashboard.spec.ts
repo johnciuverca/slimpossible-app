@@ -2693,12 +2693,8 @@ test.describe('group chart weigh-in dots', () => {
       'Private date collision must stay private',
     )
 
-    const bounds = await ownEstimate.boundingBox()
-    expect(bounds).not.toBeNull()
-    await page.touchscreen.tap(
-      bounds!.x + bounds!.width / 2,
-      bounds!.y + bounds!.height / 2,
-    )
+    await ownEstimate.focus()
+    await page.keyboard.press('Enter')
     const edit = page.getByRole('dialog', { name: 'Edit weight' })
     await expect(edit.getByLabel('Date')).toHaveValue('2026-09-21')
     await expect(edit.getByLabel('Weight in kg')).toHaveValue('84.25')
@@ -2717,12 +2713,8 @@ test.describe('group chart weigh-in dots', () => {
       requests.filter((url) => url.includes('/rpc/save_personal_weigh_in')),
     ).toHaveLength(0)
 
-    const reopenBounds = await ownEstimate.boundingBox()
-    expect(reopenBounds).not.toBeNull()
-    await page.touchscreen.tap(
-      reopenBounds!.x + reopenBounds!.width / 2,
-      reopenBounds!.y + reopenBounds!.height / 2,
-    )
+    await ownEstimate.focus()
+    await page.keyboard.press('Enter')
     const reopened = page.getByRole('dialog', { name: 'Edit weight' })
     await expect(reopened.getByLabel('Weight in kg')).toHaveValue('84.25')
     await expect(reopened.getByLabel('Private note (optional)')).toHaveValue(
