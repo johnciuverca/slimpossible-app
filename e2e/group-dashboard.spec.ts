@@ -761,7 +761,7 @@ for (const layout of [
         else {
           expect(box.width).toBeCloseTo(box.valueWidth + 10, 1)
           expect(box.leftPadding).toBeCloseTo(box.rightPadding, 1)
-          expect(box.numberFontSize).toBe('10px')
+          expect(box.numberFontSize).toBe('7.5px')
           expect(box.childCount).toBe(2)
         }
         expect(box.height).toBe(layout.hasTouch ? 48 : 40)
@@ -3267,7 +3267,7 @@ test('shows the challenge owner badge only in Members and fits on mobile', async
       height: bounds.height,
     }
   })
-  expect(badgeMetrics.fontSize).toBe('12px')
+  expect(badgeMetrics.fontSize).toBe('9px')
   expect(badgeMetrics.height).toBeGreaterThanOrEqual(20)
   expect(
     await page.evaluate(

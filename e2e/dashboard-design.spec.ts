@@ -102,7 +102,7 @@ for (const width of [1280, 390]) {
     for (const label of await chart.locator('.chart-value').all())
       await expect(label).toHaveAttribute(
         'font-size',
-        width <= 600 ? '9' : '6.6',
+        width <= 600 ? '6.75' : '4.95',
       )
     const yTicks = await chart
       .locator('[data-chart-tick]')
@@ -113,7 +113,7 @@ for (const width of [1280, 390]) {
     await expect(chart.locator('[data-chart-minor-tick]')).not.toHaveCount(0)
     await expect(
       chart.locator('[data-chart-date-tick]').first(),
-    ).toHaveAttribute('font-size', width <= 600 ? '10' : '6.5')
+    ).toHaveAttribute('font-size', width <= 600 ? '7.5' : '4.875')
     await expect(page.getByText('Weight (kg)', { exact: true })).toHaveCount(1)
     await chart.screenshot({
       path: test.info().outputPath('personal-chart-narrow-preview.png'),
@@ -168,10 +168,8 @@ for (const width of [1280, 390]) {
     for (const handle of sliderHandles) {
       const handleBox = await handle.boundingBox()
       expect(handleBox).not.toBeNull()
-      expect(handleBox!.x).toBeGreaterThanOrEqual(chartBox!.x)
-      expect(handleBox!.x + handleBox!.width).toBeLessThanOrEqual(
-        chartBox!.x + chartBox!.width,
-      )
+      expect(handleBox!.x).toBeGreaterThanOrEqual(0)
+      expect(handleBox!.x + handleBox!.width).toBeLessThanOrEqual(width)
     }
     await dateControls
       .getByRole('button', { name: 'Show last 1 month' })

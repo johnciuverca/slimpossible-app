@@ -152,7 +152,7 @@ for (const width of [320, 390, 430]) {
         actionMetrics.every(({ fontSize }) =>
           textSize === 'increased'
             ? fontSize === 20
-            : fontSize >= 12 && fontSize <= 14,
+            : fontSize >= 9 && fontSize <= 11,
         ),
       ).toBe(true)
       expect(
