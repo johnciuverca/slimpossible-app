@@ -749,10 +749,6 @@ export function SharedWeightChart({
                 stroke="var(--chart-recorded, #087756)"
                 strokeWidth="3"
                 strokeLinejoin="round"
-                strokeDasharray={
-                  previous.estimated || point.estimated ? '4 4' : undefined
-                }
-                opacity={previous.estimated || point.estimated ? 0.62 : 1}
               />
             )
           })}
@@ -775,10 +771,7 @@ export function SharedWeightChart({
                     stroke={item.color}
                     strokeWidth="3"
                     strokeLinejoin="round"
-                    strokeDasharray={
-                      item.dashed || estimated ? '5 3' : undefined
-                    }
-                    opacity={estimated ? 0.62 : 1}
+                    strokeDasharray={item.dashed ? '5 3' : undefined}
                   >
                     {item.title ? <title>{item.title}</title> : null}
                   </path>

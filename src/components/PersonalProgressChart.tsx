@@ -117,7 +117,7 @@ export function PersonalProgressChart({
       >
         <SharedWeightChart
           title={`Personal weight history chart. ${points.length} saved weigh-ins, from ${rangeDescription}. Hollow points are daily estimates between saved entries.`}
-          description={`Solid points show saved dates and weights. Hollow points are estimates between saved entries and are not saved or used in the trend. Dashed segments connect estimated dates; solid segments connect adjacent saved dates. The trend uses only saved records.${referenceDescription} Private notes are never plotted.`}
+          description={`Solid points show saved dates and weights. Hollow points are estimates between saved entries and are not saved or used in the trend. Solid connecting lines show the interpolated daily path; estimated markers remain hollow. The trend uses only saved records.${referenceDescription} Private notes are never plotted.`}
           points={plottedPoints}
           onPointActivate={(point) => onPointActivate?.(point)}
           lines={lines}

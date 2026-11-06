@@ -51,6 +51,15 @@ it('marks estimates as hollow, labels them accessibly, and activates their date/
   ).toEqual(['estimated', 'recorded', 'recorded'])
   expect(estimate).toHaveAttribute('data-point-kind', 'estimated')
   expect(estimate).toHaveAttribute('fill', 'var(--color-panel, white)')
+  const chart = screen.getByRole('img', { name: /Estimated history/ })
+  const connections = chart.querySelectorAll('path[data-series$="connection"]')
+  expect(connections).toHaveLength(2)
+  for (const connection of connections) {
+    expect(connection).not.toHaveAttribute('stroke-dasharray')
+    expect(connection).not.toHaveAttribute('opacity')
+  }
+  expect(estimate).toHaveAttribute('opacity', '0.72')
+  expect(estimate.querySelector('title')).toHaveTextContent('Estimated')
   fireEvent.keyDown(estimate, { key: 'Enter' })
   expect(onPointActivate).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -103,6 +112,49 @@ it('shares axis, weekly date ticks, numeric labels and exact tooltips without br
   )
   expect(chart.querySelector('[data-series="recorded-connection"]')).toBeNull()
   expect(chart.querySelector('circle title')).toHaveTextContent('Member: 90 kg')
+})
+
+it('keeps member-series connections solid and fully opaque through estimates', () => {
+  render(
+    <SharedWeightChart
+      title="Estimated member series"
+      description="Recorded and estimated member weights."
+      yLabel="Weight (kg)"
+      min={80}
+      max={90}
+      series={[
+        {
+          id: 'member-a',
+          color: '#31dbb0',
+          points: [
+            { date: '2026-11-01', value: 90, title: 'Saved' },
+            {
+              date: '2026-11-02',
+              value: 89.75,
+              estimated: true,
+              title: 'Estimated — 89.75 kg',
+              tooltip: 'Estimated — 89.75 kg',
+            },
+            { date: '2026-11-03', value: 89.5, title: 'Saved again' },
+          ],
+        },
+      ]}
+    />,
+  )
+
+  const chart = screen.getByRole('img', { name: 'Estimated member series' })
+  const connections = chart.querySelectorAll('path[data-series$="connection"]')
+  expect(connections).toHaveLength(2)
+  for (const connection of connections) {
+    expect(connection).not.toHaveAttribute('stroke-dasharray')
+    expect(connection).not.toHaveAttribute('opacity')
+  }
+  const estimate = chart.querySelector('circle[data-point-kind="estimated"]')
+  expect(estimate).toHaveAttribute('fill', 'var(--color-panel, white)')
+  expect(estimate).toHaveAttribute('opacity', '0.72')
+  expect(estimate?.querySelector('title')).toHaveTextContent(
+    'Estimated — 89.75 kg',
+  )
 })
 
 it('centers endpoint values on their own dots and staggers a crowded run vertically', () => {
