@@ -49,7 +49,9 @@ for (const viewport of viewports) {
     })
     await expect(chart).toBeVisible()
     await chart.scrollIntoViewIfNeeded()
-    await expect(chart.locator('circle[data-date]')).toHaveCount(13)
+    await expect(
+      chart.locator('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveCount(13)
     const valueLabels = chart.locator('.chart-value')
     await expect(valueLabels).toHaveCount(2)
     expect(
@@ -221,7 +223,9 @@ for (const viewport of viewports) {
       )
     }
 
-    const point = chart.locator('circle[data-chart-point]').first()
+    const point = chart
+      .locator('circle[data-point-kind="recorded"][data-chart-point]')
+      .first()
     const exactDetail = (await point.locator('title').textContent())!.replace(
       / recorded$/,
       '',
@@ -232,7 +236,9 @@ for (const viewport of viewports) {
     await rangeControls
       .getByRole('button', { name: 'Show last 1 month' })
       .click()
-    await expect(chart.locator('circle[data-date]')).toHaveCount(2)
+    await expect(
+      chart.locator('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveCount(2)
     expect(
       await valueLabels.evaluateAll((labels) =>
         labels
@@ -241,7 +247,9 @@ for (const viewport of viewports) {
       ),
     ).toEqual([104.5, 105])
     await rangeControls.getByRole('button', { name: 'Show all dates' }).click()
-    await expect(chart.locator('circle[data-date]')).toHaveCount(13)
+    await expect(
+      chart.locator('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveCount(13)
 
     expect(
       await page.evaluate(

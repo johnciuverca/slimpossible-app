@@ -64,11 +64,19 @@ function lockPageScroll() {
 export function RecordWeightDialog({
   workspace,
   entry,
+  initialValues,
+  preselectSharedChallengeId,
+  estimateNotice,
+  onDuplicateDate,
   onClose,
   onSaved,
 }: {
   workspace: PersonalWorkspace
   entry?: PersonalWeighIn
+  initialValues?: Partial<PersonalWeighInFormValues>
+  preselectSharedChallengeId?: string
+  estimateNotice?: string
+  onDuplicateDate?: (date: string) => void
   onClose: () => void
   onSaved: () => void
 }) {
@@ -83,10 +91,20 @@ export function RecordWeightDialog({
   const blocked =
     workspace.contexts.state !== 'ready' && !!entry?.sharedChallengeIds.length
   const [values, setValues] = useState<PersonalWeighInFormValues>({
-    date: entry?.date ?? personalWeighInToday(),
-    weightKg: entry ? String(entry.weightKg) : '',
-    note: entry?.note ?? '',
-    sharedChallengeIds: entry?.sharedChallengeIds ?? [],
+    date: entry?.date ?? initialValues?.date ?? personalWeighInToday(),
+    weightKg: entry ? String(entry.weightKg) : (initialValues?.weightKg ?? ''),
+    note: entry?.note ?? initialValues?.note ?? '',
+    sharedChallengeIds: [
+      ...new Set([
+        ...(entry?.sharedChallengeIds ??
+          initialValues?.sharedChallengeIds ??
+          []),
+        ...(preselectSharedChallengeId &&
+        eligibleIds.has(preselectSharedChallengeId)
+          ? [preselectSharedChallengeId]
+          : []),
+      ]),
+    ],
   })
   const [errors, setErrors] = useState<
     Partial<Record<keyof PersonalWeighInFormValues, string>>
@@ -159,11 +177,7 @@ export function RecordWeightDialog({
       element.setAttribute('data-compact-viewport', '')
       const stackFields =
         window.innerWidth < 400 ||
-        window.innerHeight <= 500 ||
-        (!!viewport &&
-          (viewport.width < 400 ||
-            viewport.height <= 500 ||
-            viewport.scale > 1.05))
+        (!!viewport && (viewport.width < 400 || viewport.scale > 1.05))
       if (stackFields) element.setAttribute('data-narrow-fields', '')
       else element.removeAttribute('data-narrow-fields')
       const visibleBottom = viewport.offsetTop + viewport.height
@@ -221,9 +235,8 @@ export function RecordWeightDialog({
       !entry &&
       workspace.personal.data.some((saved) => saved.date === values.date)
     ) {
-      setError(
-        'An entry already exists for that date. Edit it from My Progress instead; its sharing has not changed.',
-      )
+      setError('A saved entry already uses that date. It has not been changed.')
+      onDuplicateDate?.(values.date)
       return
     }
     const validation = validatePersonalWeighIn({
@@ -260,11 +273,14 @@ export function RecordWeightDialog({
         )
       if (!active.current) return
       if (result.state !== 'success') {
-        setError(
+        const duplicateDate =
           result.state === 'error' && result.error.code === '23505'
-            ? 'Another entry already uses that date. Choose an unused date.'
+        setError(
+          duplicateDate
+            ? 'A saved entry now uses that date. It has not been changed.'
             : 'Your weigh-in could not be saved. No successful save was confirmed; try again.',
         )
+        if (duplicateDate) onDuplicateDate?.(values.date)
         setSaving(false)
         return
       }
@@ -323,6 +339,23 @@ export function RecordWeightDialog({
         {workspace.contexts.state === 'loading' ? (
           <p role="status" className="mb-4">
             Loading optional group choices…
+          </p>
+        ) : null}
+        {estimateNotice ? (
+          <p
+            className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"
+            role="status"
+          >
+            {estimateNotice} Review the date and weight, then save explicitly.
+            {preselectSharedChallengeId ? (
+              <>
+                {' '}
+                The current group is selected; uncheck it to keep this entry
+                private. This change is saved only when you explicitly save.
+              </>
+            ) : (
+              <> Sharing is optional and off by default.</>
+            )}
           </p>
         ) : null}
         {workspace.contexts.error ? (

@@ -26,6 +26,10 @@ import { DashboardChallengeActions } from '../components/DashboardChallengeActio
 import { GroupActionsPopover } from '../components/GroupActionsPopover'
 import { WeightEntryActions } from '../components/WeightEntryActions'
 import { WeightEntryCard } from '../components/WeightEntryCard'
+import {
+  ChartWeightPointEditor,
+  type ChartWeightPointSelection,
+} from '../components/ChartWeightPointEditor'
 import type { PersonalWorkspace } from '../data/usePersonalWorkspace'
 import { usePersonalWorkspace } from '../data/usePersonalWorkspace'
 import { ownGroupMemberKey } from '../models/ownGroupMemberKey'
@@ -2511,6 +2515,11 @@ export function ProgressPage({
 }: { personalHeader?: boolean } = {}) {
   const { data, isLoading, message, messageTone } = usePersonalDashboard()
   const { state: authState } = useOptionalAuth()
+  const [chartPointSelection, setChartPointSelection] =
+    useState<ChartWeightPointSelection | null>(null)
+  const personalWorkspace = usePersonalWorkspace({
+    enabled: Boolean(authState.user?.id && chartPointSelection),
+  })
   const persistence = useMemo(() => createPersistence(authState), [authState])
   const [provisionalSummary, setProvisionalSummary] =
     useState<ProvisionalGroupLeaderSummary | null>(null)
@@ -2816,6 +2825,13 @@ export function ProgressPage({
                 ) : (
                   <PersonalProgressChart
                     weighIns={data.flow.historyTrend.history}
+                    onPointActivate={(point) =>
+                      setChartPointSelection({
+                        date: point.date,
+                        value: point.value,
+                        estimated: !!point.estimated,
+                      })
+                    }
                   />
                 )}
                 {data.flow.historyTrend.trendChangeKg !== null ? (
@@ -3008,6 +3024,17 @@ export function ProgressPage({
           ) : null}
         </DashboardState>
       </Card>
+      <ChartWeightPointEditor
+        workspace={personalWorkspace}
+        point={chartPointSelection}
+        scopeKey="progress-chart"
+        onClose={() => setChartPointSelection(null)}
+        onSaved={() => {
+          setChartPointSelection(null)
+          personalWorkspace.refresh()
+          setRefreshVersion((version) => version + 1)
+        }}
+      />
     </section>
   )
 }

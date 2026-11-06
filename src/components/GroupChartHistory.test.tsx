@@ -82,11 +82,15 @@ describe('Group chart history', () => {
     expect(
       chart.querySelector('[data-series="derived-trend"]'),
     ).toHaveAttribute('stroke-dasharray', '3 6')
-    expect(chart.querySelectorAll('circle')).toHaveLength(3)
+    expect(
+      chart.querySelectorAll('circle[data-point-kind="recorded"]'),
+    ).toHaveLength(3)
     expect(
       chart.querySelectorAll('[data-chart-date-tick]')[0],
     ).toHaveTextContent('01.09.2026')
-    const firstPoint = chart.querySelector('circle[data-chart-point]')!
+    const firstPoint = chart.querySelector(
+      'circle[data-point-kind="recorded"][data-chart-point]',
+    )!
     fireEvent.focus(firstPoint)
     expect(screen.getByRole('tooltip')).toHaveTextContent('01.09.2026')
     const legend = screen.getByRole('list', { name: 'Group chart legend' })
@@ -138,14 +142,24 @@ describe('Group chart history', () => {
     const chart = await screen.findByRole('img', {
       name: 'Weight (kg) — shared group history',
     })
-    expect(chart.querySelectorAll('circle[data-date]')).toHaveLength(5)
+    expect(
+      chart.querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveLength(5)
     expect(chart.querySelectorAll('text.chart-value')).toHaveLength(2)
-    expect(chart.querySelectorAll('text.chart-value')[0]).toHaveTextContent(
-      'Ava: 90',
-    )
-    expect(chart.querySelectorAll('text.chart-value')[1]).toHaveTextContent(
-      'Ava: 86',
-    )
+    expect(
+      Array.from(chart.querySelectorAll('text.chart-value'), (label) =>
+        label.textContent?.trim(),
+      ),
+    ).toEqual(['90', '86'])
+    const firstPoint = chart.querySelector(
+      'circle[data-point-kind="recorded"][data-chart-point]',
+    )!
+    fireEvent.focus(firstPoint)
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Ava —')
+    expect(firstPoint.querySelector('title')).toHaveTextContent('Ava:')
+    expect(
+      screen.getByRole('list', { name: 'Group chart legend' }),
+    ).toHaveTextContent('Ava')
     expect(
       screen.getByRole('region', { name: 'Group comparison chart' }),
     ).toBeInTheDocument()
@@ -155,10 +169,14 @@ describe('Group chart history', () => {
       }),
     ).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Show last 1 month' }))
-    expect(chart.querySelectorAll('circle[data-date]')).toHaveLength(2)
+    expect(
+      chart.querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveLength(2)
     expect(chart.querySelector('[data-chart-reference]')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Show last 3 months' }))
-    expect(chart.querySelectorAll('circle[data-date]')).toHaveLength(4)
+    expect(
+      chart.querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveLength(4)
     const allMembersTrack = screen.getByRole('group', {
       name: 'Adjust visible date range',
     })
@@ -169,13 +187,19 @@ describe('Group chart history', () => {
         key: 'ArrowLeft',
       },
     )
-    expect(chart.querySelectorAll('circle[data-date]')).toHaveLength(3)
+    expect(
+      chart.querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveLength(3)
     fireEvent.click(screen.getByRole('button', { name: 'Show all dates' }))
     fireEvent.click(screen.getByRole('tab', { name: 'Ava' }))
     const individual = screen.getByRole('img', {
       name: /Change from first shared weight \(kg\)/,
     })
-    expect(individual.querySelectorAll('circle[data-date]')).toHaveLength(5)
+    expect(
+      individual.querySelectorAll(
+        'circle[data-point-kind="recorded"][data-date]',
+      ),
+    ).toHaveLength(5)
     const individualLegend = screen.getByRole('list', {
       name: 'Group chart legend',
     })
@@ -199,9 +223,17 @@ describe('Group chart history', () => {
         key: 'ArrowLeft',
       },
     )
-    expect(individual.querySelectorAll('circle[data-date]')).toHaveLength(4)
+    expect(
+      individual.querySelectorAll(
+        'circle[data-point-kind="recorded"][data-date]',
+      ),
+    ).toHaveLength(4)
     fireEvent.click(screen.getByRole('button', { name: 'Show all dates' }))
-    expect(individual.querySelectorAll('circle[data-date]')).toHaveLength(5)
+    expect(
+      individual.querySelectorAll(
+        'circle[data-point-kind="recorded"][data-date]',
+      ),
+    ).toHaveLength(5)
     expect(load).toHaveBeenCalledTimes(1)
     expect(load).toHaveBeenCalledWith('group')
   })
@@ -240,20 +272,18 @@ describe('Group chart history', () => {
     })
     expect(chart).toHaveAttribute('viewBox', '0 0 760 302')
     expect(chart).toHaveTextContent('Weight (kg)')
-    const circles = Array.from(chart.querySelectorAll('circle'))
+    const circles = Array.from(
+      chart.querySelectorAll('circle[data-point-kind="recorded"]'),
+    )
     const extremaLabels = Array.from(
       chart.querySelectorAll<SVGTextElement>('text.chart-value'),
       (label) => label.textContent,
     )
     expect(extremaLabels).toEqual(
-      expect.arrayContaining([
-        'Member 0: 80',
-        'Member 0: 79',
-        'Member 1: 100',
-        'Member 1: 98',
-        'Member 2: 90',
-        'Member 3: 110',
-      ]),
+      expect.arrayContaining(['80', '79', '100', '98', '90', '110']),
+    )
+    expect(extremaLabels.every((label) => !label?.includes('Member'))).toBe(
+      true,
     )
     const plotBottom =
       Number(chart.getAttribute('viewBox')?.split(/\s+/)[3]) - 52
@@ -274,13 +304,16 @@ describe('Group chart history', () => {
     expect(
       chart.querySelectorAll('[data-series="recorded-connection"]'),
     ).toHaveLength(1)
+    expect(
+      chart.querySelectorAll('[data-series="estimated-connection"]').length,
+    ).toBeGreaterThan(0)
     fireEvent.click(screen.getByRole('tab', { name: 'Member 0' }))
     const individual = screen.getByRole('img', {
       name: 'Change from first shared weight (kg)',
     })
-    expect(individual.querySelector('circle title')).toHaveTextContent(
-      'Member 0: 01.09.2026, 0 kg',
-    )
+    expect(
+      individual.querySelector('circle[data-point-kind="recorded"] title'),
+    ).toHaveTextContent('Member 0: 01.09.2026, 0 kg')
     expect(individual).toHaveTextContent('-1 kg')
   })
   it('shows a date/member matrix and keyboard-selects only one duplicate-name member without fetching personal data', async () => {
@@ -333,7 +366,11 @@ describe('Group chart history', () => {
     ).toHaveAttribute('aria-selected', 'true')
     expect(table).not.toHaveTextContent('88.50 kg')
     expect(table).toHaveTextContent('70.25 kg')
-    expect(screen.getByRole('img').querySelectorAll('circle')).toHaveLength(1)
+    expect(
+      screen
+        .getByRole('img')
+        .querySelectorAll('circle[data-point-kind="recorded"]'),
+    ).toHaveLength(1)
     expect(screen.getByRole('tabpanel')).toHaveAccessibleName(
       'Same name (member 2)',
     )
@@ -441,12 +478,17 @@ describe('Group chart history', () => {
       screen.getByText(/Explicitly shared dates and weights only/),
     ).toHaveClass('sr-only')
     expect(
-      screen.getByText(/Missing dates are gaps, not estimated weights/),
+      screen.getByText(/Hollow points estimate missing dates/),
     ).toHaveClass('sr-only')
-    expect(chart.querySelectorAll('circle')).toHaveLength(2)
+    expect(
+      chart.querySelectorAll('circle[data-point-kind="recorded"]'),
+    ).toHaveLength(2)
     expect(
       chart.querySelectorAll('[data-series="recorded-connection"]'),
     ).toHaveLength(0)
+    expect(
+      chart.querySelectorAll('[data-series="estimated-connection"]'),
+    ).toHaveLength(2)
     expect(
       screen.getByRole('region', { name: 'Scrollable shared group weights' }),
     ).toHaveAttribute('tabindex', '0')
