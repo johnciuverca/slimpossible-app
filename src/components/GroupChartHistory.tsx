@@ -13,6 +13,7 @@ import { formatChartDate } from '../models/chartDate'
 import { WeightEntryCard } from './WeightEntryCard'
 import { deriveGroupChartTrend } from '../models/groupChartTrend'
 import type { GroupMemberProgress } from '../models/groupMemberProgress'
+import { createGroupMemberChartColorMap } from '../models/groupMemberChartColors'
 import { SharedWeightChart } from './SharedWeightChart'
 import { interpolateMissingWeights } from '../models/estimatedWeighIns'
 import {
@@ -20,7 +21,6 @@ import {
   type ChartWeightPointSelection,
 } from './ChartWeightPointEditor'
 
-const colors = ['#31dbb0', '#67a5ff', '#ff8ba7', '#c49cff', '#ffc164']
 const trendColor = '#ffbf69'
 const referenceColor = '#c49cff'
 const day = (date: string) => Date.parse(`${date}T00:00:00Z`) / 86400000
@@ -101,6 +101,9 @@ export function GroupChartHistory({
   const allSeries = createGroupChartHistory(
     enabled ? (data?.entries ?? []) : [],
     localDateOnly(),
+  )
+  const memberColors = createGroupMemberChartColorMap(
+    allSeries.map((member) => member.memberKey),
   )
   const selectedKey =
     selection.context === context &&
@@ -351,9 +354,9 @@ export function GroupChartHistory({
                     viewBox={`0 0 760 ${chartViewBoxHeight}`}
                     fitContainer
                     labelSeriesExtremesOnly
-                    series={series.map((member, index) => ({
+                    series={series.map((member) => ({
                       id: member.memberKey,
-                      color: colors[index % colors.length],
+                      color: memberColors.get(member.memberKey)!,
                       title: `${member.label} recorded shared weights`,
                       points: [
                         ...member.points.map((point) => ({
@@ -545,11 +548,11 @@ export function GroupChartHistory({
                         </line>
                       )
                     })}
-                    {series.map((member, index) => (
+                    {series.map((member) => (
                       <g
                         key={member.memberKey}
-                        stroke={colors[index % colors.length]}
-                        fill={colors[index % colors.length]}
+                        stroke={memberColors.get(member.memberKey)}
+                        fill={memberColors.get(member.memberKey)}
                       >
                         {trends.find(
                           (item) => item.memberKey === member.memberKey,
@@ -606,9 +609,6 @@ export function GroupChartHistory({
                                   x2={x(point.date)}
                                   y2={y(pointValue(point))}
                                   strokeWidth={2}
-                                  strokeDasharray={
-                                    index % 2 ? '5 3' : undefined
-                                  }
                                 />
                               ) : null}
                               <circle
@@ -644,7 +644,7 @@ export function GroupChartHistory({
                   aria-label="Group chart legend"
                   className="mt-3 flex w-full flex-wrap justify-center gap-x-5 gap-y-2 text-sm"
                 >
-                  {series.map((member, index) => (
+                  {series.map((member) => (
                     <li
                       key={member.memberKey}
                       className="flex items-center gap-2"
@@ -652,7 +652,9 @@ export function GroupChartHistory({
                       <span
                         aria-hidden="true"
                         className="inline-block w-6 border-t-2"
-                        style={{ borderColor: colors[index % colors.length] }}
+                        style={{
+                          borderColor: memberColors.get(member.memberKey),
+                        }}
                       />
                       {member.label}
                     </li>
