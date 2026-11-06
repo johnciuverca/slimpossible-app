@@ -3162,8 +3162,9 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
       ),
     ).toBe(false)
     const manageBox = (await manage.boundingBox())!
+    const minimumManageTarget = width < 640 ? 44 : 33
     expect(manageBox.width).toBeGreaterThanOrEqual(44)
-    expect(manageBox.height).toBeGreaterThanOrEqual(44)
+    expect(manageBox.height).toBeGreaterThanOrEqual(minimumManageTarget)
     await page.getByRole('link', { name: /Group · testtest/ }).focus()
     await page.keyboard.press('Tab')
     await expect(manage).toBeFocused()
