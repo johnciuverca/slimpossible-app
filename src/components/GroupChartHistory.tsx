@@ -13,6 +13,7 @@ import { formatChartDate } from '../models/chartDate'
 import { WeightEntryCard } from './WeightEntryCard'
 import { deriveGroupChartTrend } from '../models/groupChartTrend'
 import type { GroupMemberProgress } from '../models/groupMemberProgress'
+import { createGroupMemberChartColorMap } from '../models/groupMemberChartColors'
 import { SharedWeightChart } from './SharedWeightChart'
 import { interpolateMissingWeights } from '../models/estimatedWeighIns'
 import {
@@ -20,13 +21,10 @@ import {
   type ChartWeightPointSelection,
 } from './ChartWeightPointEditor'
 
-const colors = ['#31dbb0', '#67a5ff', '#ff8ba7', '#c49cff', '#ffc164']
 const trendColor = '#ffbf69'
 const referenceColor = '#c49cff'
 const day = (date: string) => Date.parse(`${date}T00:00:00Z`) / 86400000
 const signed = (value: number) => `${value > 0 ? '+' : ''}${value} kg`
-const weightCents = (weightKg: number) => Math.round(weightKg * 100)
-const fromWeightCents = (cents: number) => cents / 100
 const formatWeight = (value: number) =>
   new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value)
 
@@ -102,6 +100,9 @@ export function GroupChartHistory({
     enabled ? (data?.entries ?? []) : [],
     localDateOnly(),
   )
+  const memberColors = createGroupMemberChartColorMap(
+    allSeries.map((member) => member.memberKey),
+  )
   const selectedKey =
     selection.context === context &&
     allSeries.some((member) => member.memberKey === selection.memberKey)
@@ -152,44 +153,29 @@ export function GroupChartHistory({
   const dates = points.map((point) => day(point.date))
   const start = Math.min(...dates)
   const end = Math.max(...dates)
-  const changes = points.map((point) => point.changeKg)
-  const absolute = !selectedKey
   const weights = points.map((point) => point.weightKg)
-  const chartValue = (memberKey: string, weightKg: number) => {
-    if (absolute) return weightKg
-    const baseline = series.find((member) => member.memberKey === memberKey)
-      ?.points[0]?.weightKg
-    return baseline === undefined ? weightKg : weightKg - baseline
-  }
+  const chartValue = (weightKg: number) => weightKg
   const targetWeights = series.flatMap((member) => {
     const target = memberProgress.find(
       (candidate) => candidate.memberKey === member.memberKey,
     )?.targetWeightKg
     return target !== null && target !== undefined && Number.isFinite(target)
-      ? [chartValue(member.memberKey, target)]
+      ? [chartValue(target)]
       : []
   })
-  const trendWeights = trends.flatMap(({ memberKey, trend }) =>
+  const trendWeights = trends.flatMap(({ trend }) =>
     trend
-      ? [
-          chartValue(memberKey, trend.startWeightKg),
-          chartValue(memberKey, trend.endWeightKg),
-        ]
+      ? [chartValue(trend.startWeightKg), chartValue(trend.endWeightKg)]
       : [],
   )
   const weightMin = Math.min(...weights, ...targetWeights, ...trendWeights)
   const weightMax = Math.max(...weights, ...targetWeights, ...trendWeights)
   const padding = Math.max(0.5, (weightMax - weightMin) * 0.05)
-  const min = absolute
-    ? Math.max(0, weightMin - padding)
-    : Math.min(0, ...changes, ...targetWeights, ...trendWeights) - 0.5
-  const max = absolute
-    ? weightMax + padding
-    : Math.max(0, ...changes, ...targetWeights, ...trendWeights) + 0.5
-  const ticks = absolute ? [min, (min + max) / 2, max] : [min, 0, max]
-  const pointValue = (point: (typeof points)[number]) =>
-    absolute ? point.weightKg : point.changeKg
-  const plotLeft = absolute ? 100 : 65
+  const min = Math.max(0, weightMin - padding)
+  const max = weightMax + padding
+  const ticks = [min, (min + max) / 2, max]
+  const pointValue = (point: (typeof points)[number]) => point.weightKg
+  const plotLeft = 100
   const x = (date: string) =>
     plotLeft +
     ((day(date) - start) / Math.max(1, end - start)) * (675 - plotLeft)
@@ -282,17 +268,10 @@ export function GroupChartHistory({
               </p>
             ) : null}
             <p className="sr-only">
-              Explicitly shared dates and weights only.{' '}
-              {absolute ? (
-                'All members plots actual shared Weight (kg), not change from zero. A lower absolute weight is not a winner ranking. Notes and emails are never included.'
-              ) : (
-                <>
-                  Change is measured in kg from each member’s first shared
-                  entry, not their private starting weight. Negative means loss;
-                  positive means gain. This chart is not a winner ranking. Notes
-                  and emails are never included.
-                </>
-              )}
+              Explicitly shared dates and weights only. All members and
+              individual charts plot actual shared Weight (kg). A lower absolute
+              weight is not a winner ranking. Notes and emails are never
+              included.
             </p>
             {!data ? (
               <p role="status" className="mt-4">
@@ -310,17 +289,11 @@ export function GroupChartHistory({
             ) : (
               <>
                 <p className="sr-only">
-                  {absolute ? (
-                    'Hollow points estimate missing dates only between a member’s explicitly shared entries. Each member starts at their first explicitly shared weight; unshared starting values are not added. Estimates are visual only. Corrections and removed shares update this chart on refresh.'
-                  ) : (
-                    <>
-                      Hollow points estimate missing dates only between a
-                      member’s explicitly shared entries. A single shared entry
-                      establishes a zero-change baseline. Estimates are visual
-                      only. Late entries, corrections and removed shares
-                      recalculate the baseline on refresh.
-                    </>
-                  )}
+                  Hollow points estimate missing dates only between a member’s
+                  explicitly shared entries. Each member starts at their first
+                  explicitly shared weight; unshared starting values are not
+                  added. Estimates are visual only. Corrections and removed
+                  shares update this chart on refresh.
                 </p>
                 <div
                   role="region"
@@ -329,40 +302,30 @@ export function GroupChartHistory({
                   className="mt-4 min-w-0 focus-visible:outline-2 focus-visible:outline-emerald-700"
                 >
                   <SharedWeightChart
-                    title={
-                      absolute
-                        ? 'Weight (kg) — shared group history'
-                        : 'Change from first shared weight (kg)'
-                    }
-                    description={
-                      absolute
-                        ? `Each member is plotted at their actual shared weight in kilograms, not a common zero baseline. Points represent shared dates; lines connect only consecutive days.${compactOverview ? '' : ' The table below provides every exact recorded weight.'}`
-                        : `Each member has their own zero baseline. Points represent shared recorded dates. Lines connect only consecutive days.${compactOverview ? '' : ' The table below provides every date, exact weight and kg change.'}`
-                    }
-                    yLabel={absolute ? 'Weight (kg)' : 'Change (kg)'}
+                    title="Weight (kg) — shared group history"
+                    description={`Each member is plotted at their actual shared weight in kilograms. Points represent shared dates; lines connect only consecutive days.${compactOverview ? '' : ' The table below provides every exact recorded weight.'}`}
+                    yLabel="Weight (kg)"
                     min={min}
                     max={max}
                     maxTicks={8}
-                    paddingRatio={absolute ? 0.05 : 0}
+                    paddingRatio={0.05}
                     paddingMinimum={0.5}
-                    floorAtZero={absolute}
-                    includeZero={!absolute}
+                    floorAtZero
+                    includeZero={false}
                     className="w-full min-w-0"
                     viewBox={`0 0 760 ${chartViewBoxHeight}`}
                     fitContainer
                     labelSeriesExtremesOnly
-                    series={series.map((member, index) => ({
+                    series={series.map((member) => ({
                       id: member.memberKey,
-                      color: colors[index % colors.length],
+                      color: memberColors.get(member.memberKey)!,
                       title: `${member.label} recorded shared weights`,
                       points: [
                         ...member.points.map((point) => ({
                           date: point.date,
                           value: pointValue(point),
-                          label: absolute
-                            ? String(point.weightKg)
-                            : `${point.changeKg > 0 ? '+' : ''}${point.changeKg}`,
-                          title: `${member.label}: ${formatChartDate(point.date)}, ${absolute ? `${point.weightKg} kg` : signed(point.changeKg)}`,
+                          label: String(point.weightKg),
+                          title: `${member.label}: ${formatChartDate(point.date)}, ${point.weightKg} kg`,
                           markerLabel: `Recorded weight for ${member.label} on ${formatChartDate(point.date)}`,
                           tooltip: `${member.label} — ${formatChartDate(point.date)}: ${formatWeight(point.weightKg)} kg`,
                         })),
@@ -373,15 +336,7 @@ export function GroupChartHistory({
                           })),
                         ).map((point) => ({
                           date: point.date,
-                          value: absolute
-                            ? point.weightKg
-                            : fromWeightCents(
-                                weightCents(point.weightKg) -
-                                  weightCents(
-                                    member.points[0]?.weightKg ??
-                                      point.weightKg,
-                                  ),
-                              ),
+                          value: point.weightKg,
                           estimated: true,
                           title: `${member.label}: Estimated ${formatChartDate(point.date)}, ${formatWeight(point.weightKg)} kg`,
                           markerLabel: `Estimated weight for ${member.label} on ${formatChartDate(point.date)}`,
@@ -396,19 +351,10 @@ export function GroupChartHistory({
                       )
                         return
                       if (point.estimated) {
-                        const baseline =
-                          series.find(
-                            (member) => member.memberKey === ownMemberKey,
-                          )?.points[0]?.weightKg ?? 0
                         setChartAction({
                           context,
                           date: point.date,
-                          value: absolute
-                            ? point.value
-                            : fromWeightCents(
-                                weightCents(baseline) +
-                                  weightCents(point.value),
-                              ),
+                          value: point.value,
                           estimated: true,
                         })
                       } else
@@ -434,11 +380,11 @@ export function GroupChartHistory({
                                 id: `target:${member.memberKey}`,
                                 from: {
                                   date: member.points[0].date,
-                                  value: chartValue(member.memberKey, target),
+                                  value: chartValue(target),
                                 },
                                 to: {
                                   date: member.points.at(-1)!.date,
-                                  value: chartValue(member.memberKey, target),
+                                  value: chartValue(target),
                                 },
                                 color: referenceColor,
                                 title: `${member.label} target reference: ${target} kg`,
@@ -453,17 +399,11 @@ export function GroupChartHistory({
                                 id: `trend:${memberKey}`,
                                 from: {
                                   date: trend.startDate,
-                                  value: chartValue(
-                                    memberKey,
-                                    trend.startWeightKg,
-                                  ),
+                                  value: chartValue(trend.startWeightKg),
                                 },
                                 to: {
                                   date: trend.endDate,
-                                  value: chartValue(
-                                    memberKey,
-                                    trend.endWeightKg,
-                                  ),
+                                  value: chartValue(trend.endWeightKg),
                                 },
                                 color: trendColor,
                                 title: `${series.find((member) => member.memberKey === memberKey)?.label ?? 'Member'} derived trend from displayed shared points`,
@@ -483,24 +423,16 @@ export function GroupChartHistory({
                     className="hidden"
                   >
                     <title id={`${id}-chart-title`}>
-                      {absolute
-                        ? 'Weight (kg) — shared group history'
-                        : 'Change from first shared weight (kg)'}
+                      Weight (kg) — shared group history
                     </title>
                     <desc id={`${id}-chart-description`}>
-                      {absolute ? (
-                        'Each member is plotted at their actual shared weight in kilograms, not a common zero baseline. Points represent shared dates; lines connect only consecutive days. The table below provides every exact recorded weight.'
-                      ) : (
-                        <>
-                          Each member has their own zero baseline. Points
-                          represent shared recorded dates. Lines connect only
-                          consecutive days. The table below provides every date,
-                          exact weight and kg change.
-                        </>
-                      )}
+                      Each member is plotted at their actual shared weight in
+                      kilograms. Points represent shared dates; lines connect
+                      only consecutive days. The table below provides every
+                      exact recorded weight.
                     </desc>
                     <text x={plotLeft} y={14} fontSize={12}>
-                      {absolute ? 'Weight (kg)' : 'Change (kg)'}
+                      Weight (kg)
                     </text>
                     {ticks.map((value) => (
                       <g key={value}>
@@ -517,9 +449,7 @@ export function GroupChartHistory({
                           textAnchor="end"
                           fontSize={12}
                         >
-                          {absolute
-                            ? `${Math.round(value * 100) / 100} kg`
-                            : signed(Math.round(value * 100) / 100)}
+                          {`${Math.round(value * 100) / 100} kg`}
                         </text>
                       </g>
                     ))}
@@ -533,8 +463,8 @@ export function GroupChartHistory({
                           data-series="target-reference"
                           x1={plotLeft}
                           x2={675}
-                          y1={y(chartValue(member.memberKey, target))}
-                          y2={y(chartValue(member.memberKey, target))}
+                          y1={y(chartValue(target))}
+                          y2={y(chartValue(target))}
                           stroke={referenceColor}
                           strokeWidth={2}
                           strokeDasharray="8 5"
@@ -545,11 +475,11 @@ export function GroupChartHistory({
                         </line>
                       )
                     })}
-                    {series.map((member, index) => (
+                    {series.map((member) => (
                       <g
                         key={member.memberKey}
-                        stroke={colors[index % colors.length]}
-                        fill={colors[index % colors.length]}
+                        stroke={memberColors.get(member.memberKey)}
+                        fill={memberColors.get(member.memberKey)}
                       >
                         {trends.find(
                           (item) => item.memberKey === member.memberKey,
@@ -563,7 +493,6 @@ export function GroupChartHistory({
                             )}
                             y1={y(
                               chartValue(
-                                member.memberKey,
                                 trends.find(
                                   (item) => item.memberKey === member.memberKey,
                                 )!.trend!.startWeightKg,
@@ -576,7 +505,6 @@ export function GroupChartHistory({
                             )}
                             y2={y(
                               chartValue(
-                                member.memberKey,
                                 trends.find(
                                   (item) => item.memberKey === member.memberKey,
                                 )!.trend!.endWeightKg,
@@ -606,9 +534,6 @@ export function GroupChartHistory({
                                   x2={x(point.date)}
                                   y2={y(pointValue(point))}
                                   strokeWidth={2}
-                                  strokeDasharray={
-                                    index % 2 ? '5 3' : undefined
-                                  }
                                 />
                               ) : null}
                               <circle
@@ -618,9 +543,7 @@ export function GroupChartHistory({
                               >
                                 <title>
                                   {member.label}: {formatChartDate(point.date)},{' '}
-                                  {absolute
-                                    ? `${point.weightKg} kg`
-                                    : signed(point.changeKg)}
+                                  {point.weightKg} kg
                                 </title>
                               </circle>
                             </g>
@@ -644,7 +567,7 @@ export function GroupChartHistory({
                   aria-label="Group chart legend"
                   className="mt-3 flex w-full flex-wrap justify-center gap-x-5 gap-y-2 text-sm"
                 >
-                  {series.map((member, index) => (
+                  {series.map((member) => (
                     <li
                       key={member.memberKey}
                       className="flex items-center gap-2"
@@ -652,7 +575,9 @@ export function GroupChartHistory({
                       <span
                         aria-hidden="true"
                         className="inline-block w-6 border-t-2"
-                        style={{ borderColor: colors[index % colors.length] }}
+                        style={{
+                          borderColor: memberColors.get(member.memberKey),
+                        }}
                       />
                       {member.label}
                     </li>
