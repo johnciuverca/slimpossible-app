@@ -350,7 +350,6 @@ export function GroupChartHistory({
                       id: member.memberKey,
                       color: colors[index % colors.length],
                       title: `${member.label} recorded shared weights`,
-                      extremeLabelPrefix: member.label,
                       points: [
                         ...member.points.map((point) => ({
                           date: point.date,
@@ -390,7 +389,8 @@ export function GroupChartHistory({
                       const entry = personalWorkspace.personal.data.find(
                         (item) =>
                           item.date === point.date &&
-                          item.sharedChallengeIds.includes(challengeId),
+                          (point.estimated ||
+                            item.sharedChallengeIds.includes(challengeId)),
                       )
                       if (point.estimated) {
                         const baseline =
@@ -761,13 +761,12 @@ export function GroupChartHistory({
       ) : null}
       {chartAction && personalWorkspace.personal.state === 'ready'
         ? (() => {
-            const entry = chartAction.estimated
-              ? undefined
-              : personalWorkspace.personal.data.find(
-                  (item) =>
-                    item.date === chartAction.date &&
-                    item.sharedChallengeIds.includes(challengeId),
-                )
+            const entry = personalWorkspace.personal.data.find(
+              (item) =>
+                item.date === chartAction.date &&
+                (chartAction.estimated ||
+                  item.sharedChallengeIds.includes(challengeId)),
+            )
             return entry || chartAction.estimated ? (
               <RecordWeightDialog
                 key={`group-chart:${chartAction.date}:${entry?.id ?? 'new'}`}
@@ -782,13 +781,17 @@ export function GroupChartHistory({
                       }
                 }
                 estimateNotice={
-                  chartAction.estimated
+                  chartAction.estimated && !entry
                     ? 'This group-chart value is a display-only estimate.'
                     : undefined
                 }
                 onClose={() => setChartAction(null)}
                 onSaved={() => {
                   setChartAction(null)
+                  personalWorkspace.refresh()
+                  setLocalHistoryRefresh((version) => version + 1)
+                }}
+                onDuplicateDate={() => {
                   personalWorkspace.refresh()
                   setLocalHistoryRefresh((version) => version + 1)
                 }}

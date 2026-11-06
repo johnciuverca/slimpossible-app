@@ -146,12 +146,20 @@ describe('Group chart history', () => {
       chart.querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
     ).toHaveLength(5)
     expect(chart.querySelectorAll('text.chart-value')).toHaveLength(2)
-    expect(chart.querySelectorAll('text.chart-value')[0]).toHaveTextContent(
-      'Ava: 90',
-    )
-    expect(chart.querySelectorAll('text.chart-value')[1]).toHaveTextContent(
-      'Ava: 86',
-    )
+    expect(
+      Array.from(chart.querySelectorAll('text.chart-value'), (label) =>
+        label.textContent?.trim(),
+      ),
+    ).toEqual(['90', '86'])
+    const firstPoint = chart.querySelector(
+      'circle[data-point-kind="recorded"][data-chart-point]',
+    )!
+    fireEvent.focus(firstPoint)
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Ava —')
+    expect(firstPoint.querySelector('title')).toHaveTextContent('Ava:')
+    expect(
+      screen.getByRole('list', { name: 'Group chart legend' }),
+    ).toHaveTextContent('Ava')
     expect(
       screen.getByRole('region', { name: 'Group comparison chart' }),
     ).toBeInTheDocument()
@@ -272,14 +280,10 @@ describe('Group chart history', () => {
       (label) => label.textContent,
     )
     expect(extremaLabels).toEqual(
-      expect.arrayContaining([
-        'Member 0: 80',
-        'Member 0: 79',
-        'Member 1: 100',
-        'Member 1: 98',
-        'Member 2: 90',
-        'Member 3: 110',
-      ]),
+      expect.arrayContaining(['80', '79', '100', '98', '90', '110']),
+    )
+    expect(extremaLabels.every((label) => !label?.includes('Member'))).toBe(
+      true,
     )
     const plotBottom =
       Number(chart.getAttribute('viewBox')?.split(/\s+/)[3]) - 52

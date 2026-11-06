@@ -27,6 +27,10 @@ async function installGroupFixtures(
   targetChangeControl?: TargetChangeControl,
   startingWeightCorrectionControl?: StartingWeightCorrectionControl,
   challengeOwnerId = 'e2e-owner',
+  options: {
+    privateEntryAtEstimatedDate?: boolean
+    duplicateEstimateOnSave?: boolean
+  } = {},
 ) {
   const challengeId = ownEntries ? ownGroupId : 'e2e-challenge'
   const secondId = ownEntries ? secondGroupId : 'e2e-second-group'
@@ -35,6 +39,7 @@ async function installGroupFixtures(
     initialOwnWeight ?? (differentWeights ? 95.1 : 88.5)
   let ownEstimatedSaved = false
   let ownEstimatedSharedChallengeIds: string[] = []
+  let privateEntryAtEstimatedDate = options.privateEntryAtEstimatedDate ?? false
   let ownTarget = 80
   let ownStartingWeight = 100
   page.on('request', (request) => requests.push(request.url()))
@@ -92,6 +97,17 @@ async function installGroupFixtures(
             ? []
             : [
                 ownRow(),
+                ...(privateEntryAtEstimatedDate
+                  ? [
+                      {
+                        id: 'disposable-own-private-entry',
+                        recorded_date: '2026-09-21',
+                        weight_kg: 84.25,
+                        note: 'Private date collision must stay private',
+                        shared_challenge_ids: [],
+                      },
+                    ]
+                  : []),
                 ...(ownEstimatedSaved
                   ? [
                       {
@@ -194,6 +210,18 @@ async function installGroupFixtures(
         expect(body.target_weight_kg).toBeCloseTo(89.25)
         expect(body.target_note).toBeNull()
         expect(body.target_shared_challenge_ids).toEqual([challengeId])
+        if (options.duplicateEstimateOnSave && !privateEntryAtEstimatedDate) {
+          privateEntryAtEstimatedDate = true
+          await route.fulfill({
+            status: 409,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              code: '23505',
+              message: 'duplicate key value violates unique constraint',
+            }),
+          })
+          return
+        }
         ownEstimatedSaved = true
         ownEstimatedSharedChallengeIds = body.target_shared_challenge_ids
         await route.fulfill({
@@ -2630,6 +2658,145 @@ test('archived groups leave normal navigation and remain accessible as read-only
 
 test.describe('group chart weigh-in dots', () => {
   test.use({ hasTouch: true, viewport: { width: 1280, height: 900 } })
+
+  test('opens a private date collision as an edit and keeps it out of the Group chart', async ({
+    page,
+  }) => {
+    const requests = await installGroupFixtures(
+      page,
+      true,
+      true,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'e2e-owner',
+      { privateEntryAtEstimatedDate: true },
+    )
+    await page.goto(
+      `/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
+    )
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Charts', exact: true })
+      .click()
+    const chart = page.getByRole('img', {
+      name: 'Weight (kg) — shared group history',
+    })
+    const ownEstimate = chart.locator(
+      `circle[data-series-id="${memberKey(ownGroupId, viewerId)}"][data-date="2026-09-21"][data-point-kind="estimated"]`,
+    )
+    await expect(ownEstimate).toHaveAttribute('data-value', '89.25')
+    await expect(chart).not.toContainText('84.25')
+    await expect(chart).not.toContainText(
+      'Private date collision must stay private',
+    )
+
+    const bounds = await ownEstimate.boundingBox()
+    expect(bounds).not.toBeNull()
+    await page.touchscreen.tap(
+      bounds!.x + bounds!.width / 2,
+      bounds!.y + bounds!.height / 2,
+    )
+    const edit = page.getByRole('dialog', { name: 'Edit weight' })
+    await expect(edit.getByLabel('Date')).toHaveValue('2026-09-21')
+    await expect(edit.getByLabel('Weight in kg')).toHaveValue('84.25')
+    await expect(edit.getByLabel('Private note (optional)')).toHaveValue(
+      'Private date collision must stay private',
+    )
+    await expect(edit.getByLabel('E2E authorized group')).not.toBeChecked()
+    await expect(edit.getByText(/display-only estimate/)).toHaveCount(0)
+
+    await edit.getByLabel('Weight in kg').fill('84.5')
+    await edit.getByRole('button', { name: 'Close' }).click()
+    const discard = page.getByRole('dialog', { name: 'Discard unsaved input?' })
+    await discard.getByRole('button', { name: 'Discard and leave' }).click()
+    await expect(edit).toHaveCount(0)
+    expect(
+      requests.filter((url) => url.includes('/rpc/save_personal_weigh_in')),
+    ).toHaveLength(0)
+
+    const reopenBounds = await ownEstimate.boundingBox()
+    expect(reopenBounds).not.toBeNull()
+    await page.touchscreen.tap(
+      reopenBounds!.x + reopenBounds!.width / 2,
+      reopenBounds!.y + reopenBounds!.height / 2,
+    )
+    const reopened = page.getByRole('dialog', { name: 'Edit weight' })
+    await expect(reopened.getByLabel('Weight in kg')).toHaveValue('84.25')
+    await expect(reopened.getByLabel('Private note (optional)')).toHaveValue(
+      'Private date collision must stay private',
+    )
+    await reopened.getByRole('button', { name: 'Close' }).click()
+    await expect(reopened).toHaveCount(0)
+    expect(
+      requests.filter((url) => url.includes('/rpc/save_personal_weigh_in')),
+    ).toHaveLength(0)
+    await expect(chart).not.toContainText('84.25')
+    await expect(chart).not.toContainText(
+      'Private date collision must stay private',
+    )
+  })
+
+  test('recovers into the saved editor when an estimate create hits a date conflict', async ({
+    page,
+  }) => {
+    const requests = await installGroupFixtures(
+      page,
+      true,
+      true,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'e2e-owner',
+      { duplicateEstimateOnSave: true },
+    )
+    await page.goto(
+      `/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
+    )
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Charts', exact: true })
+      .click()
+    const chart = page.getByRole('img', {
+      name: 'Weight (kg) — shared group history',
+    })
+    const ownEstimate = chart.locator(
+      `circle[data-series-id="${memberKey(ownGroupId, viewerId)}"][data-date="2026-09-21"][data-point-kind="estimated"]`,
+    )
+    await expect(ownEstimate).toBeVisible()
+    await ownEstimate.focus()
+    await page.keyboard.press('Enter')
+    const create = page.getByRole('dialog', { name: 'Record weight' })
+    await expect(create.getByLabel('Weight in kg')).toHaveValue('89.25')
+    await create.getByLabel('E2E authorized group').check()
+    await create.getByRole('button', { name: 'Save weight' }).click()
+
+    const recoveredEdit = page.getByRole('dialog', { name: 'Edit weight' })
+    await expect(recoveredEdit.getByLabel('Date')).toHaveValue('2026-09-21')
+    await expect(recoveredEdit.getByLabel('Weight in kg')).toHaveValue('84.25')
+    await expect(
+      recoveredEdit.getByLabel('Private note (optional)'),
+    ).toHaveValue('Private date collision must stay private')
+    await expect(
+      recoveredEdit.getByLabel('E2E authorized group'),
+    ).not.toBeChecked()
+    await expect(recoveredEdit.getByText(/display-only estimate/)).toHaveCount(
+      0,
+    )
+    await recoveredEdit.getByRole('button', { name: 'Close' }).click()
+    await expect(recoveredEdit).toHaveCount(0)
+    expect(
+      requests.filter((url) => url.includes('/rpc/save_personal_weigh_in')),
+    ).toHaveLength(1)
+    await expect(chart).not.toContainText('84.25')
+    await expect(chart).not.toContainText(
+      'Private date collision must stay private',
+    )
+  })
 
   test('own points edit/create through explicit save; another member remains read-only', async ({
     page,

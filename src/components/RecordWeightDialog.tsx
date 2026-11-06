@@ -66,6 +66,7 @@ export function RecordWeightDialog({
   entry,
   initialValues,
   estimateNotice,
+  onDuplicateDate,
   onClose,
   onSaved,
 }: {
@@ -73,6 +74,7 @@ export function RecordWeightDialog({
   entry?: PersonalWeighIn
   initialValues?: Partial<PersonalWeighInFormValues>
   estimateNotice?: string
+  onDuplicateDate?: (date: string) => void
   onClose: () => void
   onSaved: () => void
 }) {
@@ -226,9 +228,8 @@ export function RecordWeightDialog({
       !entry &&
       workspace.personal.data.some((saved) => saved.date === values.date)
     ) {
-      setError(
-        'An entry already exists for that date. Edit it from My Progress instead; its sharing has not changed.',
-      )
+      setError('A saved entry already uses that date. It has not been changed.')
+      onDuplicateDate?.(values.date)
       return
     }
     const validation = validatePersonalWeighIn({
@@ -265,11 +266,14 @@ export function RecordWeightDialog({
         )
       if (!active.current) return
       if (result.state !== 'success') {
-        setError(
+        const duplicateDate =
           result.state === 'error' && result.error.code === '23505'
-            ? 'Another entry already uses that date. Choose an unused date.'
+        setError(
+          duplicateDate
+            ? 'A saved entry now uses that date. It has not been changed.'
             : 'Your weigh-in could not be saved. No successful save was confirmed; try again.',
         )
+        if (duplicateDate) onDuplicateDate?.(values.date)
         setSaving(false)
         return
       }

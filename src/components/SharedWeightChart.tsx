@@ -26,7 +26,6 @@ export type SharedChartSeries = {
   connectGaps?: boolean
   dashed?: boolean
   title?: string
-  extremeLabelPrefix?: string
 }
 
 export type SharedChartLine = {
@@ -226,13 +225,11 @@ export function SharedWeightChart({
       Math.min(pointX, chartRight - halfLabelWidth - 2),
     )
   }
-  const seriesLabelX = (item: SharedChartSeries, point: SharedChartPoint) => {
+  const seriesLabelX = (point: SharedChartPoint) => {
     const pointX = x(point.date)
     if (!labelSeriesExtremesOnly || !point.label) return pointX
-    const text = item.extremeLabelPrefix
-      ? `${item.extremeLabelPrefix}: ${point.label}`
-      : point.label
-    const halfLabelWidth = (text.length * (compactLayout ? 5.4 : 4.2)) / 2
+    const halfLabelWidth =
+      (point.label.length * (compactLayout ? 5.4 : 4.2)) / 2
     return Math.max(
       chartLeft + halfLabelWidth + 2,
       Math.min(pointX, chartRight - halfLabelWidth - 2),
@@ -373,11 +370,9 @@ export function SharedWeightChart({
               ? [
                   {
                     id: `series:${item.id}:${point.date}:${index}`,
-                    x: seriesLabelX(item, point),
+                    x: seriesLabelX(point),
                     pointY: y(point.value),
-                    text: item.extremeLabelPrefix
-                      ? `${item.extremeLabelPrefix}: ${point.label}`
-                      : point.label,
+                    text: point.label,
                   },
                 ]
               : [],
@@ -800,7 +795,7 @@ export function SharedWeightChart({
                   const pointId = `series:${item.id}:${point.date}:${index}`
                   const labelPosition = valueLabelPosition(
                     pointId,
-                    seriesLabelX(item, point),
+                    seriesLabelX(point),
                     y(point.value),
                   )
                   const showSeriesLabel =
@@ -882,9 +877,7 @@ export function SharedWeightChart({
                           data-date={point.date}
                           data-value={point.value}
                         >
-                          {item.extremeLabelPrefix
-                            ? `${item.extremeLabelPrefix}: ${point.label}`
-                            : point.label}
+                          {point.label}
                         </text>
                       ) : null}
                     </g>
