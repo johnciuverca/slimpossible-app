@@ -866,7 +866,7 @@ export function SharedWeightChart({
                           y={labelPosition.y}
                           textAnchor="middle"
                           className="chart-value"
-                          fontSize={compactLayout ? '6.75' : '4.95'}
+                          fontSize={compactLayout ? '7.425' : '5.445'}
                           fontWeight="700"
                           data-date={point.date}
                           data-value={point.value}
@@ -956,7 +956,7 @@ export function SharedWeightChart({
                       y={labelPosition.y}
                       textAnchor="middle"
                       className="chart-value"
-                      fontSize={compactLayout ? '6.75' : '4.95'}
+                      fontSize={compactLayout ? '7.425' : '5.445'}
                       fontWeight="700"
                       data-date={point.date}
                       data-weight-kg={point.value}

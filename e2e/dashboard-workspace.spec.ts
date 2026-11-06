@@ -30,18 +30,20 @@ for (const viewport of [
     await expect(
       actionGrid.getByRole('link', { name: 'My progress', exact: true }),
     ).toBeVisible()
-    const [cardBox, gridBox] = await Promise.all([
+    const [cardBox, actionCardBox, gridBox] = await Promise.all([
       latestCard.boundingBox(),
       actionCard.boundingBox(),
+      actionGrid.boundingBox(),
     ])
     expect(cardBox).not.toBeNull()
+    expect(actionCardBox).not.toBeNull()
     expect(gridBox).not.toBeNull()
+    expect(actionCardBox!.height).toBeGreaterThan(gridBox!.height)
+    expect(actionCardBox!.height - gridBox!.height).toBeLessThanOrEqual(20)
 
     if (viewport.width >= 1100) {
       expect(Math.abs(cardBox!.y - gridBox!.y)).toBeLessThanOrEqual(1)
-      expect(
-        Math.abs(cardBox!.y + cardBox!.height - gridBox!.y - gridBox!.height),
-      ).toBeLessThanOrEqual(1)
+      expect(actionCardBox!.height).toBeLessThan(cardBox!.height)
     } else {
       expect(gridBox!.y).toBeGreaterThanOrEqual(cardBox!.y + cardBox!.height)
       expect(Math.abs(cardBox!.height - gridBox!.height)).toBeGreaterThan(1)

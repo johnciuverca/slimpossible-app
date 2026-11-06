@@ -79,7 +79,7 @@ it('fits a Dashboard personal trend inside its card while keeping range controls
   ).toEqual([100, 93])
   for (const label of extremeLabels) {
     const x = Number(label.getAttribute('x'))
-    const halfWidth = (label.textContent!.length * 4.05) / 2
+    const halfWidth = (label.textContent!.length * 4.455) / 2
     expect(x - halfWidth).toBeGreaterThanOrEqual(42)
     expect(x + halfWidth).toBeLessThanOrEqual(312)
   }
@@ -222,8 +222,8 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
   const labels = Array.from(chart.querySelectorAll('.chart-value'))
   expect(labels.map((label) => label.textContent)).toEqual(['100', '90'])
   expect(labels.map((label) => label.getAttribute('font-size'))).toEqual([
-    '4.95',
-    '4.95',
+    '5.445',
+    '5.445',
   ])
   const weights = Array.from(
     chart.querySelectorAll('[data-chart-tick]'),
@@ -435,10 +435,10 @@ it('labels every saved weigh-in with only its numeric value', () => {
       label.getAttribute('font-size'),
     ]),
   ).toEqual([
-    ['2026-10-01', '90', '90', '4.95'],
-    ['2026-10-08', '89.5', '89.5', '4.95'],
-    ['2026-10-15', '88.5', '88.5', '4.95'],
-    ['2026-10-22', '87', '87', '4.95'],
+    ['2026-10-01', '90', '90', '5.445'],
+    ['2026-10-08', '89.5', '89.5', '5.445'],
+    ['2026-10-15', '88.5', '88.5', '5.445'],
+    ['2026-10-22', '87', '87', '5.445'],
   ])
 })
 

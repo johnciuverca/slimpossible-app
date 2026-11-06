@@ -673,6 +673,9 @@ body {
   border-radius: 0.75rem;
   padding: 0.5rem 0.75rem;
 }
+.dashboard-save-confirmation-slot:empty {
+  display: none;
+}
 .dashboard-save-confirmation {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -710,6 +713,7 @@ body {
 .dashboard-top-grid {
   display: grid;
   gap: 1rem;
+  align-items: start;
 }
 .dashboard-actions-region {
   display: flex;

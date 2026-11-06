@@ -102,7 +102,7 @@ for (const width of [1280, 390]) {
     for (const label of await chart.locator('.chart-value').all())
       await expect(label).toHaveAttribute(
         'font-size',
-        width <= 600 ? '6.75' : '4.95',
+        width <= 600 ? '7.425' : '5.445',
       )
     const yTicks = await chart
       .locator('[data-chart-tick]')

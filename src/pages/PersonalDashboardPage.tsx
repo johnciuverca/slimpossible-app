@@ -146,7 +146,7 @@ export function PersonalDashboardWorkspace({
     <section
       data-weight-page-header
       aria-labelledby="dashboard-title"
-      className="dashboard-workspace mx-auto w-full max-w-6xl space-y-4"
+      className="dashboard-workspace mx-auto w-full max-w-6xl space-y-3"
     >
       <header>
         <PageHeader
@@ -181,9 +181,9 @@ export function PersonalDashboardWorkspace({
         />
       </header>
       {section === 'overview' ? (
-        <div id="dashboard-overview-panel" className="space-y-4">
+        <div id="dashboard-overview-panel" className="space-y-3">
           <div className="dashboard-top-grid">
-            <Card className="dashboard-latest p-4">
+            <Card className="dashboard-latest p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   {workspace.personal.state === 'loading' ? (
