@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { interpolateMissingWeights } from './estimatedWeighIns'
 
 describe('interpolateMissingWeights', () => {
-  it('fills each missing calendar date with full-precision linear values', () => {
+  it('fills each missing calendar date with linearly interpolated values', () => {
     expect(
       interpolateMissingWeights([
         { date: '2026-11-05', weightKg: 89 },
@@ -13,6 +13,30 @@ describe('interpolateMissingWeights', () => {
       { date: '2026-11-03', weightKg: 89.5 },
       { date: '2026-11-04', weightKg: 89.25 },
     ])
+  })
+
+  it('rounds nonterminating estimates to the nearest hundredth without tails', () => {
+    expect(
+      interpolateMissingWeights([
+        { date: '2026-01-01', weightKg: 90 },
+        { date: '2026-01-07', weightKg: 89 },
+      ]),
+    ).toEqual([
+      { date: '2026-01-02', weightKg: 89.83 },
+      { date: '2026-01-03', weightKg: 89.67 },
+      { date: '2026-01-04', weightKg: 89.5 },
+      { date: '2026-01-05', weightKg: 89.33 },
+      { date: '2026-01-06', weightKg: 89.17 },
+    ])
+  })
+
+  it('rounds a half hundredth upward using standard positive-weight rounding', () => {
+    expect(
+      interpolateMissingWeights([
+        { date: '2026-01-01', weightKg: 90 },
+        { date: '2026-01-03', weightKg: 89.99 },
+      ]),
+    ).toEqual([{ date: '2026-01-02', weightKg: 90 }])
   })
 
   it.each([2, 3, 10, 15])('fills a gap of %i days without endpoints', (gap) => {

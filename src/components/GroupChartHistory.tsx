@@ -22,6 +22,8 @@ const trendColor = '#ffbf69'
 const referenceColor = '#c49cff'
 const day = (date: string) => Date.parse(`${date}T00:00:00Z`) / 86400000
 const signed = (value: number) => `${value > 0 ? '+' : ''}${value} kg`
+const weightCents = (weightKg: number) => Math.round(weightKg * 100)
+const fromWeightCents = (cents: number) => cents / 100
 const formatWeight = (value: number) =>
   new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value)
 
@@ -370,8 +372,13 @@ export function GroupChartHistory({
                           date: point.date,
                           value: absolute
                             ? point.weightKg
-                            : point.weightKg -
-                              (member.points[0]?.weightKg ?? point.weightKg),
+                            : fromWeightCents(
+                                weightCents(point.weightKg) -
+                                  weightCents(
+                                    member.points[0]?.weightKg ??
+                                      point.weightKg,
+                                  ),
+                              ),
                           estimated: true,
                           title: `${member.label}: Estimated ${formatChartDate(point.date)}, ${formatWeight(point.weightKg)} kg`,
                           markerLabel: `Estimated weight for ${member.label} on ${formatChartDate(point.date)}`,
@@ -401,7 +408,10 @@ export function GroupChartHistory({
                           date: point.date,
                           weightKg: absolute
                             ? point.value
-                            : baseline + point.value,
+                            : fromWeightCents(
+                                weightCents(baseline) +
+                                  weightCents(point.value),
+                              ),
                           estimated: true,
                         })
                       } else if (entry)

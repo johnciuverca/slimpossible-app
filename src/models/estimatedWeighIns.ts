@@ -3,6 +3,8 @@ export type DatedWeight = { date: string; weightKg: number }
 const day = (date: string) => Date.parse(`${date}T00:00:00Z`) / 86_400_000
 const dateAt = (dayNumber: number) =>
   new Date(dayNumber * 86_400_000).toISOString().slice(0, 10)
+const roundWeightKg = (weightKg: number) =>
+  Math.round((weightKg + Number.EPSILON) * 100) / 100
 
 /** Creates display-only daily values strictly between saved date/weight pairs. */
 export function interpolateMissingWeights<T extends DatedWeight>(
@@ -19,9 +21,10 @@ export function interpolateMissingWeights<T extends DatedWeight>(
     for (let offset = 1; offset < gap; offset += 1) {
       estimates.push({
         date: dateAt(firstDay + offset),
-        weightKg:
+        weightKg: roundWeightKg(
           previous.weightKg +
-          ((next.weightKg - previous.weightKg) * offset) / gap,
+            ((next.weightKg - previous.weightKg) * offset) / gap,
+        ),
       })
     }
   }

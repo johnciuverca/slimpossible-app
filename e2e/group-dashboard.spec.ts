@@ -38,10 +38,20 @@ async function installGroupFixtures(
   let ownWeight: number | null =
     initialOwnWeight ?? (differentWeights ? 95.1 : 88.5)
   let ownEstimatedSaved = false
+  let ownEstimatedSavedWeight: number | null = null
   let ownEstimatedSharedChallengeIds: string[] = []
   let privateEntryAtEstimatedDate = options.privateEntryAtEstimatedDate ?? false
   let ownTarget = 80
   let ownStartingWeight = 100
+  const estimatedOwnWeight = () => {
+    const firstWeight = differentWeights ? 9 : 90
+    const finalWeight = ownWeight ?? (differentWeights ? 95.1 : 88.5)
+    return (
+      Math.round(
+        (firstWeight + (finalWeight - firstWeight) / 2 + Number.EPSILON) * 100,
+      ) / 100
+    )
+  }
   page.on('request', (request) => requests.push(request.url()))
 
   await page.route(`${supabaseRestUrl}/**`, async (route) => {
@@ -113,7 +123,7 @@ async function installGroupFixtures(
                       {
                         id: 'disposable-own-estimated-entry',
                         recorded_date: '2026-09-21',
-                        weight_kg: 89.25,
+                        weight_kg: ownEstimatedSavedWeight,
                         note: '',
                         shared_challenge_ids: ownEstimatedSharedChallengeIds,
                       },
@@ -207,7 +217,7 @@ async function installGroupFixtures(
       }
       if (body.target_weigh_in_id === null) {
         expect(body.target_recorded_date).toBe('2026-09-21')
-        expect(body.target_weight_kg).toBeCloseTo(89.25)
+        expect(body.target_weight_kg).toBeCloseTo(estimatedOwnWeight())
         expect(body.target_note).toBeNull()
         expect(body.target_shared_challenge_ids).toEqual([challengeId])
         if (options.duplicateEstimateOnSave && !privateEntryAtEstimatedDate) {
@@ -223,6 +233,7 @@ async function installGroupFixtures(
           return
         }
         ownEstimatedSaved = true
+        ownEstimatedSavedWeight = body.target_weight_kg
         ownEstimatedSharedChallengeIds = body.target_shared_challenge_ids
         await route.fulfill({
           contentType: 'application/json',
@@ -230,7 +241,7 @@ async function installGroupFixtures(
             {
               id: 'disposable-own-estimated-entry',
               recorded_date: '2026-09-21',
-              weight_kg: 89.25,
+              weight_kg: ownEstimatedSavedWeight,
               note: '',
               shared_challenge_ids: ownEstimatedSharedChallengeIds,
             },
@@ -299,7 +310,7 @@ async function installGroupFixtures(
                         member_key: ownKey,
                         display_name: name,
                         recorded_date: '2026-09-21',
-                        weight_kg: 89.25,
+                        weight_kg: estimatedOwnWeight(),
                       },
                     ]
                   : []),
@@ -2739,7 +2750,7 @@ test.describe('group chart weigh-in dots', () => {
       true,
       true,
       false,
-      undefined,
+      88.51,
       undefined,
       undefined,
       undefined,
@@ -2753,17 +2764,20 @@ test.describe('group chart weigh-in dots', () => {
       .getByRole('navigation', { name: 'Group sections' })
       .getByRole('link', { name: 'Charts', exact: true })
       .click()
+    await page.getByRole('tab', { name: 'Ava (member 1)' }).click()
     const chart = page.getByRole('img', {
-      name: 'Weight (kg) — shared group history',
+      name: 'Change from first shared weight (kg)',
     })
     const ownEstimate = chart.locator(
       `circle[data-series-id="${memberKey(ownGroupId, viewerId)}"][data-date="2026-09-21"][data-point-kind="estimated"]`,
     )
     await expect(ownEstimate).toBeVisible()
+    await expect(ownEstimate).toHaveAttribute('data-value', '-0.74')
+    await expect(ownEstimate.locator('title')).toContainText('89.26 kg')
     await ownEstimate.focus()
     await page.keyboard.press('Enter')
     const create = page.getByRole('dialog', { name: 'Record weight' })
-    await expect(create.getByLabel('Weight in kg')).toHaveValue('89.25')
+    await expect(create.getByLabel('Weight in kg')).toHaveValue('89.26')
     await create.getByLabel('E2E authorized group').check()
     await create.getByRole('button', { name: 'Save weight' }).click()
 
