@@ -29,7 +29,10 @@ async function installGroupFixtures(
   challengeOwnerId = 'e2e-owner',
   options: {
     privateEntryAtEstimatedDate?: boolean
+    privateEntrySharedWithOtherGroup?: boolean
     duplicateEstimateOnSave?: boolean
+    holdPersonalContexts?: boolean
+    holdPersonalHistory?: boolean
   } = {},
 ) {
   const challengeId = ownEntries ? ownGroupId : 'e2e-challenge'
@@ -41,6 +44,14 @@ async function installGroupFixtures(
   let ownEstimatedSavedWeight: number | null = null
   let ownEstimatedSharedChallengeIds: string[] = []
   let privateEntryAtEstimatedDate = options.privateEntryAtEstimatedDate ?? false
+  let privateEntryWeight = 84.25
+  const privateEntryNote = 'Private date collision must stay private'
+  let privateEntrySharedChallengeIds: string[] =
+    options.privateEntrySharedWithOtherGroup ? [secondId] : []
+  const releasePersonalContexts: (() => void)[] = []
+  const releasePersonalHistory: (() => void)[] = []
+  let personalContextsHeld = false
+  let personalHistoryHeld = false
   let ownTarget = 80
   let ownStartingWeight = 100
   const estimatedOwnWeight = () => {
@@ -52,12 +63,28 @@ async function installGroupFixtures(
       ) / 20
     )
   }
+  const privateEntry = () => ({
+    id: 'disposable-own-private-entry',
+    recorded_date: '2026-09-21',
+    weight_kg: privateEntryWeight,
+    note: privateEntryNote,
+    shared_challenge_ids: privateEntrySharedChallengeIds,
+  })
   page.on('request', (request) => requests.push(request.url()))
 
   await page.route(`${supabaseRestUrl}/**`, async (route) => {
     const request = route.request()
     const url = new URL(request.url())
     if (ownEntries && url.pathname === '/rest/v1/participants') {
+      if (
+        options.holdPersonalContexts &&
+        url.searchParams.get('user_id') === `eq.${viewerId}`
+      ) {
+        personalContextsHeld = true
+        await new Promise<void>((resolve) => {
+          releasePersonalContexts.push(resolve)
+        })
+      }
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify([
@@ -100,6 +127,12 @@ async function installGroupFixtures(
       ownEntries &&
       url.pathname === '/rest/v1/rpc/list_my_personal_weigh_ins'
     ) {
+      if (options.holdPersonalHistory) {
+        personalHistoryHeld = true
+        await new Promise<void>((resolve) => {
+          releasePersonalHistory.push(resolve)
+        })
+      }
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify(
@@ -107,17 +140,7 @@ async function installGroupFixtures(
             ? []
             : [
                 ownRow(),
-                ...(privateEntryAtEstimatedDate
-                  ? [
-                      {
-                        id: 'disposable-own-private-entry',
-                        recorded_date: '2026-09-21',
-                        weight_kg: 84.25,
-                        note: 'Private date collision must stay private',
-                        shared_challenge_ids: [],
-                      },
-                    ]
-                  : []),
+                ...(privateEntryAtEstimatedDate ? [privateEntry()] : []),
                 ...(ownEstimatedSaved
                   ? [
                       {
@@ -249,7 +272,25 @@ async function installGroupFixtures(
         })
         return
       }
+      if (body.target_weigh_in_id === 'disposable-own-private-entry') {
+        expect(body.target_recorded_date).toBe('2026-09-21')
+        expect(body.target_weight_kg).toBe(84.5)
+        expect(body.target_note).toBe(privateEntryNote)
+        expect(body.target_shared_challenge_ids).toEqual(
+          options.privateEntrySharedWithOtherGroup
+            ? [secondId, challengeId]
+            : [challengeId],
+        )
+        privateEntryWeight = body.target_weight_kg
+        privateEntrySharedChallengeIds = body.target_shared_challenge_ids
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify([privateEntry()]),
+        })
+        return
+      }
       expect(body.target_weigh_in_id).toBe('disposable-own-entry')
+      expect(body.target_recorded_date).toBe('2026-09-22')
       expect(body.target_note).toBe('Author-only disposable private note')
       expect(body.target_shared_challenge_ids).toEqual([challengeId, secondId])
       ownWeight = body.target_weight_kg
@@ -311,6 +352,18 @@ async function installGroupFixtures(
                         display_name: name,
                         recorded_date: '2026-09-21',
                         weight_kg: estimatedOwnWeight(),
+                      },
+                    ]
+                  : []),
+                ...(ownEntries &&
+                privateEntryAtEstimatedDate &&
+                privateEntrySharedChallengeIds.includes(target_challenge_id)
+                  ? [
+                      {
+                        member_key: ownKey,
+                        display_name: name,
+                        recorded_date: '2026-09-21',
+                        weight_kg: privateEntryWeight,
                       },
                     ]
                   : []),
@@ -581,7 +634,14 @@ async function installGroupFixtures(
 
     await route.fulfill({ status: 404, body: 'Unexpected fixture request' })
   })
-  return requests
+  return Object.assign(requests, {
+    personalContextsHeld: () => personalContextsHeld,
+    personalHistoryHeld: () => personalHistoryHeld,
+    releasePersonalContexts: () =>
+      releasePersonalContexts.splice(0).forEach((release) => release()),
+    releasePersonalHistory: () =>
+      releasePersonalHistory.splice(0).forEach((release) => release()),
+  })
 }
 
 for (const layout of [
@@ -2670,7 +2730,7 @@ test('archived groups leave normal navigation and remain accessible as read-only
 test.describe('group chart weigh-in dots', () => {
   test.use({ hasTouch: true, viewport: { width: 1280, height: 900 } })
 
-  test('opens a private date collision as an edit and keeps it out of the Group chart', async ({
+  test('adds the current Group share to an estimate-resolved entry while preserving its other share', async ({
     page,
   }) => {
     const requests = await installGroupFixtures(
@@ -2683,7 +2743,10 @@ test.describe('group chart weigh-in dots', () => {
       undefined,
       undefined,
       'e2e-owner',
-      { privateEntryAtEstimatedDate: true },
+      {
+        privateEntryAtEstimatedDate: true,
+        privateEntrySharedWithOtherGroup: true,
+      },
     )
     await page.goto(
       `/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
@@ -2712,8 +2775,9 @@ test.describe('group chart weigh-in dots', () => {
     await expect(edit.getByLabel('Private note (optional)')).toHaveValue(
       'Private date collision must stay private',
     )
-    await expect(edit.getByLabel('E2E authorized group')).not.toBeChecked()
-    await expect(edit.getByText(/display-only estimate/)).toHaveCount(0)
+    await expect(edit.getByLabel('E2E authorized group')).toBeChecked()
+    await expect(edit.getByLabel('Second authorized group')).toBeChecked()
+    await expect(edit.getByText(/matches a saved personal entry/)).toBeVisible()
 
     await edit.getByLabel('Weight in kg').fill('84.5')
     await edit.getByRole('button', { name: 'Close' }).click()
@@ -2731,15 +2795,77 @@ test.describe('group chart weigh-in dots', () => {
     await expect(reopened.getByLabel('Private note (optional)')).toHaveValue(
       'Private date collision must stay private',
     )
-    await reopened.getByRole('button', { name: 'Close' }).click()
+    await expect(reopened.getByLabel('E2E authorized group')).toBeChecked()
+    await expect(reopened.getByLabel('Second authorized group')).toBeChecked()
+    await reopened.getByLabel('Weight in kg').fill('84.5')
+    await reopened.getByRole('button', { name: 'Update weight' }).click()
     await expect(reopened).toHaveCount(0)
     expect(
       requests.filter((url) => url.includes('/rpc/save_personal_weigh_in')),
-    ).toHaveLength(0)
-    await expect(chart).not.toContainText('84.25')
+    ).toHaveLength(1)
+    const collisionRecorded = chart.locator(
+      `circle[data-series-id="${memberKey(ownGroupId, viewerId)}"][data-date="2026-09-21"][data-point-kind="recorded"]`,
+    )
+    await expect(collisionRecorded).toBeVisible()
+    await expect(collisionRecorded).toHaveAttribute('data-value', '84.5')
+    await expect(collisionRecorded.locator('title')).toContainText('84.5 kg')
     await expect(chart).not.toContainText(
       'Private date collision must stay private',
     )
+  })
+
+  test('waits for eligible sharing contexts before mounting an estimate-resolved editor', async ({
+    page,
+  }) => {
+    const fixture = await installGroupFixtures(
+      page,
+      true,
+      true,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'e2e-owner',
+      {
+        privateEntryAtEstimatedDate: true,
+        privateEntrySharedWithOtherGroup: true,
+        holdPersonalContexts: true,
+        holdPersonalHistory: true,
+      },
+    )
+    await page.goto(
+      `/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
+    )
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Charts', exact: true })
+      .click()
+    await expect.poll(fixture.personalContextsHeld).toBe(true)
+    await expect.poll(fixture.personalHistoryHeld).toBe(true)
+    const chart = page.getByRole('img', {
+      name: 'Weight (kg) — shared group history',
+    })
+    const estimate = chart.locator(
+      `circle[data-series-id="${memberKey(ownGroupId, viewerId)}"][data-date="2026-09-21"][data-point-kind="estimated"]`,
+    )
+    await estimate.focus()
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+
+    fixture.releasePersonalHistory()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    fixture.releasePersonalContexts()
+    const edit = page.getByRole('dialog', { name: 'Edit weight' })
+    await expect(edit.getByLabel('Date')).toHaveValue('2026-09-21')
+    await expect(edit.getByLabel('Weight in kg')).toHaveValue('84.25')
+    await expect(edit.getByLabel('E2E authorized group')).toBeChecked()
+    await expect(edit.getByLabel('Second authorized group')).toBeChecked()
+    await edit.getByRole('button', { name: 'Close' }).click()
+    await expect(edit).toHaveCount(0)
+    expect(
+      fixture.filter((url) => url.includes('/rpc/save_personal_weigh_in')),
+    ).toHaveLength(0)
   })
 
   test('recovers into the saved editor when an estimate create hits a date conflict', async ({
@@ -2778,7 +2904,7 @@ test.describe('group chart weigh-in dots', () => {
     await page.keyboard.press('Enter')
     const create = page.getByRole('dialog', { name: 'Record weight' })
     await expect(create.getByLabel('Weight in kg')).toHaveValue('89.25')
-    await create.getByLabel('E2E authorized group').check()
+    await expect(create.getByLabel('E2E authorized group')).toBeChecked()
     await create.getByRole('button', { name: 'Save weight' }).click()
 
     const recoveredEdit = page.getByRole('dialog', { name: 'Edit weight' })
@@ -2787,18 +2913,26 @@ test.describe('group chart weigh-in dots', () => {
     await expect(
       recoveredEdit.getByLabel('Private note (optional)'),
     ).toHaveValue('Private date collision must stay private')
+    await expect(recoveredEdit.getByLabel('E2E authorized group')).toBeChecked()
     await expect(
-      recoveredEdit.getByLabel('E2E authorized group'),
-    ).not.toBeChecked()
-    await expect(recoveredEdit.getByText(/display-only estimate/)).toHaveCount(
-      0,
-    )
-    await recoveredEdit.getByRole('button', { name: 'Close' }).click()
+      recoveredEdit.getByText(/matches a saved personal entry/),
+    ).toBeVisible()
+    await recoveredEdit.getByLabel('Weight in kg').fill('84.5')
+    await recoveredEdit.getByRole('button', { name: 'Update weight' }).click()
     await expect(recoveredEdit).toHaveCount(0)
     expect(
       requests.filter((url) => url.includes('/rpc/save_personal_weigh_in')),
-    ).toHaveLength(1)
-    await expect(chart).not.toContainText('84.25')
+    ).toHaveLength(2)
+    await expect(
+      chart.locator(
+        `circle[data-series-id="${memberKey(ownGroupId, viewerId)}"][data-date="2026-09-21"][data-point-kind="recorded"]`,
+      ),
+    ).toBeVisible()
+    const recoveredRecorded = chart.locator(
+      `circle[data-series-id="${memberKey(ownGroupId, viewerId)}"][data-date="2026-09-21"][data-point-kind="recorded"]`,
+    )
+    await expect(recoveredRecorded).toHaveAttribute('data-value', '-5.5')
+    await expect(recoveredRecorded.locator('title')).toContainText('-5.5 kg')
     await expect(chart).not.toContainText(
       'Private date collision must stay private',
     )
@@ -2843,11 +2977,15 @@ test.describe('group chart weigh-in dots', () => {
     await expect(edit.getByLabel('Private note (optional)')).toHaveValue(
       'Author-only disposable private note',
     )
-    await edit.getByRole('button', { name: 'Close' }).click()
+    await expect(edit.getByLabel('E2E authorized group')).toBeChecked()
+    await expect(edit.getByLabel('Second authorized group')).toBeChecked()
+    await edit.getByLabel('Weight in kg').fill('88.75')
+    await edit.getByRole('button', { name: 'Update weight' }).click()
     await expect(edit).toHaveCount(0)
+    await expect(ownRecorded).toHaveAttribute('data-value', '88.75')
     expect(
       requests.filter((url) => url.includes('/rpc/save_personal_weigh_in')),
-    ).toHaveLength(0)
+    ).toHaveLength(1)
 
     const tapEstimate = async () => {
       const bounds = await ownEstimate.boundingBox()
@@ -2860,19 +2998,27 @@ test.describe('group chart weigh-in dots', () => {
     await tapEstimate()
     const create = page.getByRole('dialog', { name: 'Record weight' })
     await expect(create.getByLabel('Date')).toHaveValue('2026-09-21')
-    await expect(create.getByLabel('Weight in kg')).toHaveValue('89.25')
+    await expect(create.getByLabel('Weight in kg')).toHaveValue('89.4')
     await expect(create.getByText(/display-only estimate/)).toBeVisible()
     const groupShare = create.getByLabel('E2E authorized group')
-    await expect(groupShare).not.toBeChecked()
+    await expect(groupShare).toBeChecked()
+    const saveRequestsBeforeCancel = requests.filter((url) =>
+      url.includes('/rpc/save_personal_weigh_in'),
+    ).length
+    await groupShare.uncheck()
     await create.getByRole('button', { name: 'Close' }).click()
+    const discard = page.getByRole('dialog', { name: 'Discard unsaved input?' })
+    await discard.getByRole('button', { name: 'Discard and leave' }).click()
     await expect(create).toHaveCount(0)
     expect(
       requests.filter((url) => url.includes('/rpc/save_personal_weigh_in')),
-    ).toHaveLength(0)
+    ).toHaveLength(saveRequestsBeforeCancel)
 
     await tapEstimate()
     const confirmedCreate = page.getByRole('dialog', { name: 'Record weight' })
-    await confirmedCreate.getByLabel('E2E authorized group').check()
+    await expect(
+      confirmedCreate.getByLabel('E2E authorized group'),
+    ).toBeChecked()
     await confirmedCreate.getByRole('button', { name: 'Save weight' }).click()
     await expect(confirmedCreate).toHaveCount(0)
     await expect(
@@ -2887,7 +3033,7 @@ test.describe('group chart weigh-in dots', () => {
     ).toHaveCount(0)
     expect(
       requests.filter((url) => url.includes('/rpc/save_personal_weigh_in')),
-    ).toHaveLength(1)
+    ).toHaveLength(saveRequestsBeforeCancel + 1)
     await expect(
       page.getByText('Author-only disposable private note'),
     ).toHaveCount(0)

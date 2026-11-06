@@ -3024,7 +3024,9 @@ export function ProgressPage({
           ) : null}
         </DashboardState>
       </Card>
-      {chartPointSelection && personalWorkspace.personal.state === 'ready'
+      {chartPointSelection &&
+      personalWorkspace.personal.state === 'ready' &&
+      personalWorkspace.contexts.state === 'ready'
         ? (() => {
             const entry = chartPointSelection.estimated
               ? undefined

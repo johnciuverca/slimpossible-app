@@ -65,6 +65,7 @@ export function RecordWeightDialog({
   workspace,
   entry,
   initialValues,
+  preselectSharedChallengeId,
   estimateNotice,
   onDuplicateDate,
   onClose,
@@ -73,6 +74,7 @@ export function RecordWeightDialog({
   workspace: PersonalWorkspace
   entry?: PersonalWeighIn
   initialValues?: Partial<PersonalWeighInFormValues>
+  preselectSharedChallengeId?: string
   estimateNotice?: string
   onDuplicateDate?: (date: string) => void
   onClose: () => void
@@ -92,8 +94,17 @@ export function RecordWeightDialog({
     date: entry?.date ?? initialValues?.date ?? personalWeighInToday(),
     weightKg: entry ? String(entry.weightKg) : (initialValues?.weightKg ?? ''),
     note: entry?.note ?? initialValues?.note ?? '',
-    sharedChallengeIds:
-      entry?.sharedChallengeIds ?? initialValues?.sharedChallengeIds ?? [],
+    sharedChallengeIds: [
+      ...new Set([
+        ...(entry?.sharedChallengeIds ??
+          initialValues?.sharedChallengeIds ??
+          []),
+        ...(preselectSharedChallengeId &&
+        eligibleIds.has(preselectSharedChallengeId)
+          ? [preselectSharedChallengeId]
+          : []),
+      ]),
+    ],
   })
   const [errors, setErrors] = useState<
     Partial<Record<keyof PersonalWeighInFormValues, string>>
@@ -166,11 +177,7 @@ export function RecordWeightDialog({
       element.setAttribute('data-compact-viewport', '')
       const stackFields =
         window.innerWidth < 400 ||
-        window.innerHeight <= 500 ||
-        (!!viewport &&
-          (viewport.width < 400 ||
-            viewport.height <= 500 ||
-            viewport.scale > 1.05))
+        (!!viewport && (viewport.width < 400 || viewport.scale > 1.05))
       if (stackFields) element.setAttribute('data-narrow-fields', '')
       else element.removeAttribute('data-narrow-fields')
       const visibleBottom = viewport.offsetTop + viewport.height
@@ -340,7 +347,15 @@ export function RecordWeightDialog({
             role="status"
           >
             {estimateNotice} Review the date and weight, then save explicitly.
-            Sharing is optional and off by default.
+            {preselectSharedChallengeId ? (
+              <>
+                {' '}
+                The current group is selected; uncheck it to keep this entry
+                private. This change is saved only when you explicitly save.
+              </>
+            ) : (
+              <> Sharing is optional and off by default.</>
+            )}
           </p>
         ) : null}
         {workspace.contexts.error ? (

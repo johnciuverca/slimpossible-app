@@ -73,7 +73,9 @@ export function PersonalHistoryContent({
         </Card>
       )}
       {children}
-      {selectedChartPoint && workspace.personal.state === 'ready'
+      {selectedChartPoint &&
+      workspace.personal.state === 'ready' &&
+      workspace.contexts.state === 'ready'
         ? (() => {
             const selectedChartDate = selectedChartPoint.date
             const entry = workspace.personal.data.find(

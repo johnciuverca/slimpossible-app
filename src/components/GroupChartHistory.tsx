@@ -66,10 +66,13 @@ export function GroupChartHistory({
     entries: GroupChartEntry[]
   } | null>(null)
   const [chartAction, setChartAction] = useState<{
+    context: string
     date: string
     weightKg: number
     estimated: boolean
   } | null>(null)
+  const activeChartAction =
+    chartAction?.context === context ? chartAction : null
   useEffect(() => {
     let current = true
     if (!enabled) return
@@ -389,22 +392,16 @@ export function GroupChartHistory({
                     onPointActivate={(point, memberKey) => {
                       if (
                         memberKey !== ownMemberKey ||
-                        personalWorkspace.userId !== viewerId.toLowerCase() ||
-                        personalWorkspace.personal.state !== 'ready'
+                        personalWorkspace.userId !== viewerId.toLowerCase()
                       )
                         return
-                      const entry = personalWorkspace.personal.data.find(
-                        (item) =>
-                          item.date === point.date &&
-                          (point.estimated ||
-                            item.sharedChallengeIds.includes(challengeId)),
-                      )
                       if (point.estimated) {
                         const baseline =
                           series.find(
                             (member) => member.memberKey === ownMemberKey,
                           )?.points[0]?.weightKg ?? 0
                         setChartAction({
+                          context,
                           date: point.date,
                           weightKg: absolute
                             ? point.value
@@ -414,10 +411,11 @@ export function GroupChartHistory({
                               ),
                           estimated: true,
                         })
-                      } else if (entry)
+                      } else
                         setChartAction({
+                          context,
                           date: point.date,
-                          weightKg: entry.weightKg,
+                          weightKg: point.value,
                           estimated: false,
                         })
                     }}
@@ -769,30 +767,37 @@ export function GroupChartHistory({
           </section>
         </div>
       ) : null}
-      {chartAction && personalWorkspace.personal.state === 'ready'
+      {activeChartAction &&
+      personalWorkspace.personal.state === 'ready' &&
+      personalWorkspace.contexts.state === 'ready'
         ? (() => {
             const entry = personalWorkspace.personal.data.find(
               (item) =>
-                item.date === chartAction.date &&
-                (chartAction.estimated ||
+                item.date === activeChartAction.date &&
+                (activeChartAction.estimated ||
                   item.sharedChallengeIds.includes(challengeId)),
             )
-            return entry || chartAction.estimated ? (
+            return entry || activeChartAction.estimated ? (
               <RecordWeightDialog
-                key={`group-chart:${chartAction.date}:${entry?.id ?? 'new'}`}
+                key={`group-chart:${activeChartAction.date}:${entry?.id ?? 'new'}`}
                 workspace={personalWorkspace}
                 entry={entry}
+                preselectSharedChallengeId={
+                  activeChartAction.estimated ? challengeId : undefined
+                }
                 initialValues={
                   entry
                     ? undefined
                     : {
-                        date: chartAction.date,
-                        weightKg: String(chartAction.weightKg),
+                        date: activeChartAction.date,
+                        weightKg: String(activeChartAction.weightKg),
                       }
                 }
                 estimateNotice={
-                  chartAction.estimated && !entry
-                    ? 'This group-chart value is a display-only estimate.'
+                  activeChartAction.estimated
+                    ? entry
+                      ? 'This estimated Group chart date matches a saved personal entry.'
+                      : 'This Group chart value is a display-only estimate.'
                     : undefined
                 }
                 onClose={() => setChartAction(null)}
