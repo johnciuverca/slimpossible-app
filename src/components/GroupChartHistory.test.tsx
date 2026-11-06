@@ -184,12 +184,26 @@ describe('Group chart history', () => {
     for (const [name, color] of initialColors) {
       fireEvent.click(screen.getByRole('tab', { name }))
       const individual = screen.getByRole('img', {
-        name: 'Change from first shared weight (kg)',
+        name: 'Weight (kg) — shared group history',
       })
       const line = individual.querySelector(
         'path[data-series="recorded-connection"]',
       )
       expect(line).toHaveAttribute('stroke', color)
+      if (name === 'Bea') {
+        const points = Array.from(
+          individual.querySelectorAll(
+            'circle[data-point-kind="recorded"][data-value]',
+          ),
+        )
+        expect(points.map((point) => point.getAttribute('data-value'))).toEqual(
+          ['90', '89'],
+        )
+        expect(individual).toHaveTextContent('Weight (kg)')
+        expect(points[0].querySelector('title')).toHaveTextContent('90 kg')
+        fireEvent.focus(points[1])
+        expect(screen.getByRole('tooltip')).toHaveTextContent('89 kg')
+      }
       const item = within(legend).getByText(name).closest('li')!
       expect(item.querySelector('span')).toHaveStyle({ borderColor: color })
     }
@@ -282,7 +296,7 @@ describe('Group chart history', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show all dates' }))
     fireEvent.click(screen.getByRole('tab', { name: 'Ava' }))
     const individual = screen.getByRole('img', {
-      name: /Change from first shared weight \(kg\)/,
+      name: 'Weight (kg) — shared group history',
     })
     expect(
       individual.querySelectorAll(
@@ -326,7 +340,7 @@ describe('Group chart history', () => {
     expect(load).toHaveBeenCalledTimes(1)
     expect(load).toHaveBeenCalledWith('group')
   })
-  it('plots four actual-kg member series with padded axes, preserves gaps and keeps individual change view', async () => {
+  it('plots actual kg for all and individual member views with padded axes and preserves gaps', async () => {
     const records = [80, 100, 90, 110].map((weightKg, index) => ({
       memberKey: String(index),
       displayName: `Member ${index}`,
@@ -398,12 +412,12 @@ describe('Group chart history', () => {
     ).toBeGreaterThan(0)
     fireEvent.click(screen.getByRole('tab', { name: 'Member 0' }))
     const individual = screen.getByRole('img', {
-      name: 'Change from first shared weight (kg)',
+      name: 'Weight (kg) — shared group history',
     })
     expect(
       individual.querySelector('circle[data-point-kind="recorded"] title'),
-    ).toHaveTextContent('Member 0: 01.09.2026, 0 kg')
-    expect(individual).toHaveTextContent('-1 kg')
+    ).toHaveTextContent('Member 0: 01.09.2026, 80 kg')
+    expect(individual).toHaveTextContent('79 kg')
   })
   it('shows a date/member matrix and keyboard-selects only one duplicate-name member without fetching personal data', async () => {
     const load = vi.fn().mockResolvedValue({

@@ -1616,7 +1616,7 @@ for (const viewport of [
     await expect(all).toBeFocused()
     await tabs.getByRole('tab', { name: 'Ava (member 2)' }).click()
     const individualChart = page.getByRole('img', {
-      name: /Change from first shared weight \(kg\)/,
+      name: 'Weight (kg) — shared group history',
     })
     await individualChart
       .locator('circle[data-point-kind="recorded"][data-chart-point]')
@@ -2886,13 +2886,13 @@ test.describe('group chart weigh-in dots', () => {
       .click()
     await page.getByRole('tab', { name: 'Ava (member 1)' }).click()
     const chart = page.getByRole('img', {
-      name: 'Change from first shared weight (kg)',
+      name: 'Weight (kg) — shared group history',
     })
     const ownEstimate = chart.locator(
       `circle[data-series-id="${memberKey(ownGroupId, viewerId)}"][data-date="2026-09-21"][data-point-kind="estimated"]`,
     )
     await expect(ownEstimate).toBeVisible()
-    await expect(ownEstimate).toHaveAttribute('data-value', '-0.75')
+    await expect(ownEstimate).toHaveAttribute('data-value', '89.25')
     await expect(ownEstimate.locator('title')).toContainText('89.25 kg')
     await ownEstimate.focus()
     await page.keyboard.press('Enter')
@@ -2925,8 +2925,8 @@ test.describe('group chart weigh-in dots', () => {
     const recoveredRecorded = chart.locator(
       `circle[data-series-id="${memberKey(ownGroupId, viewerId)}"][data-date="2026-09-21"][data-point-kind="recorded"]`,
     )
-    await expect(recoveredRecorded).toHaveAttribute('data-value', '-5.5')
-    await expect(recoveredRecorded.locator('title')).toContainText('-5.5 kg')
+    await expect(recoveredRecorded).toHaveAttribute('data-value', '84.5')
+    await expect(recoveredRecorded.locator('title')).toContainText('84.5 kg')
     await expect(chart).not.toContainText(
       'Private date collision must stay private',
     )
