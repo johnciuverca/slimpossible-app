@@ -83,7 +83,7 @@ function OwnedGroupActions({
     <Card
       className={
         compact
-          ? 'dashboard-actions-compact space-y-2 p-2'
+          ? 'dashboard-actions-compact p-2'
           : recordAction
             ? 'dashboard-actions-region'
             : 'space-y-4 p-6'
