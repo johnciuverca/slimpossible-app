@@ -15,7 +15,10 @@ import { deriveGroupChartTrend } from '../models/groupChartTrend'
 import type { GroupMemberProgress } from '../models/groupMemberProgress'
 import { SharedWeightChart } from './SharedWeightChart'
 import { interpolateMissingWeights } from '../models/estimatedWeighIns'
-import { RecordWeightDialog } from './RecordWeightDialog'
+import {
+  ChartWeightPointEditor,
+  type ChartWeightPointSelection,
+} from './ChartWeightPointEditor'
 
 const colors = ['#31dbb0', '#67a5ff', '#ff8ba7', '#c49cff', '#ffc164']
 const trendColor = '#ffbf69'
@@ -65,12 +68,9 @@ export function GroupChartHistory({
     state: 'success' | 'error'
     entries: GroupChartEntry[]
   } | null>(null)
-  const [chartAction, setChartAction] = useState<{
-    context: string
-    date: string
-    weightKg: number
-    estimated: boolean
-  } | null>(null)
+  const [chartAction, setChartAction] = useState<
+    (ChartWeightPointSelection & { context: string }) | null
+  >(null)
   const activeChartAction =
     chartAction?.context === context ? chartAction : null
   useEffect(() => {
@@ -403,7 +403,7 @@ export function GroupChartHistory({
                         setChartAction({
                           context,
                           date: point.date,
-                          weightKg: absolute
+                          value: absolute
                             ? point.value
                             : fromWeightCents(
                                 weightCents(baseline) +
@@ -415,7 +415,7 @@ export function GroupChartHistory({
                         setChartAction({
                           context,
                           date: point.date,
-                          weightKg: point.value,
+                          value: point.value,
                           estimated: false,
                         })
                     }}
@@ -767,53 +767,22 @@ export function GroupChartHistory({
           </section>
         </div>
       ) : null}
-      {activeChartAction &&
-      personalWorkspace.personal.state === 'ready' &&
-      personalWorkspace.contexts.state === 'ready'
-        ? (() => {
-            const entry = personalWorkspace.personal.data.find(
-              (item) =>
-                item.date === activeChartAction.date &&
-                (activeChartAction.estimated ||
-                  item.sharedChallengeIds.includes(challengeId)),
-            )
-            return entry || activeChartAction.estimated ? (
-              <RecordWeightDialog
-                key={`group-chart:${activeChartAction.date}:${entry?.id ?? 'new'}`}
-                workspace={personalWorkspace}
-                entry={entry}
-                preselectSharedChallengeId={
-                  activeChartAction.estimated ? challengeId : undefined
-                }
-                initialValues={
-                  entry
-                    ? undefined
-                    : {
-                        date: activeChartAction.date,
-                        weightKg: String(activeChartAction.weightKg),
-                      }
-                }
-                estimateNotice={
-                  activeChartAction.estimated
-                    ? entry
-                      ? 'This estimated Group chart date matches a saved personal entry.'
-                      : 'This Group chart value is a display-only estimate.'
-                    : undefined
-                }
-                onClose={() => setChartAction(null)}
-                onSaved={() => {
-                  setChartAction(null)
-                  personalWorkspace.refresh()
-                  setLocalHistoryRefresh((version) => version + 1)
-                }}
-                onDuplicateDate={() => {
-                  personalWorkspace.refresh()
-                  setLocalHistoryRefresh((version) => version + 1)
-                }}
-              />
-            ) : null
-          })()
-        : null}
+      <ChartWeightPointEditor
+        workspace={personalWorkspace}
+        point={activeChartAction}
+        requiredSharedChallengeId={challengeId}
+        scopeKey={`group-chart:${challengeId}:${viewerId}`}
+        onClose={() => setChartAction(null)}
+        onSaved={() => {
+          setChartAction(null)
+          personalWorkspace.refresh()
+          setLocalHistoryRefresh((version) => version + 1)
+        }}
+        onDuplicateDate={() => {
+          personalWorkspace.refresh()
+          setLocalHistoryRefresh((version) => version + 1)
+        }}
+      />
     </div>
   )
 }

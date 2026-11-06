@@ -3,11 +3,14 @@ import type { PersonalWorkspace } from '../data/usePersonalWorkspace'
 import { Button, Card, FeedbackPanel } from '../components/ui'
 import { PersonalProgressChart } from '../components/PersonalProgressChart'
 import {
+  ChartWeightPointEditor,
+  type ChartWeightPointSelection,
+} from '../components/ChartWeightPointEditor'
+import {
   personalHistory,
   formatPersonalChange,
 } from '../models/personalHistory'
 import { personalWeighInToday } from '../models/personalWeighIn'
-import { RecordWeightDialog } from '../components/RecordWeightDialog'
 
 export function PersonalHistoryContent({
   workspace,
@@ -20,11 +23,8 @@ export function PersonalHistoryContent({
   referenceLabel?: string
   children?: ReactNode
 }) {
-  const [selectedChartPoint, setSelectedChartPoint] = useState<{
-    date: string
-    value: number
-    estimated?: boolean
-  } | null>(null)
+  const [selectedChartPoint, setSelectedChartPoint] =
+    useState<ChartWeightPointSelection | null>(null)
   const { history, changeKg } = personalHistory(
     workspace.personal.data,
     personalWeighInToday(),
@@ -57,7 +57,12 @@ export function PersonalHistoryContent({
                 weightKg: entry.weightKg,
                 participantId: workspace.userId,
               }))}
-              onPointActivate={(point) => setSelectedChartPoint(point)}
+              onPointActivate={(point) =>
+                setSelectedChartPoint({
+                  ...point,
+                  estimated: Boolean(point.estimated),
+                })
+              }
             />
           ) : (
             <FeedbackPanel className="mt-4" tone="empty">
@@ -73,40 +78,15 @@ export function PersonalHistoryContent({
         </Card>
       )}
       {children}
-      {selectedChartPoint &&
-      workspace.personal.state === 'ready' &&
-      workspace.contexts.state === 'ready'
-        ? (() => {
-            const selectedChartDate = selectedChartPoint.date
-            const entry = workspace.personal.data.find(
-              (item) => item.date === selectedChartDate,
-            )
-            const estimated = selectedChartPoint.estimated
-            return entry || estimated ? (
-              <RecordWeightDialog
-                key={`chart:${selectedChartDate}:${entry?.id ?? 'new'}`}
-                workspace={workspace}
-                entry={entry}
-                initialValues={
-                  entry
-                    ? undefined
-                    : {
-                        date: selectedChartDate,
-                        weightKg: String(selectedChartPoint.value),
-                      }
-                }
-                estimateNotice={
-                  entry ? undefined : 'This is a display-only estimate.'
-                }
-                onClose={() => setSelectedChartPoint(null)}
-                onSaved={() => {
-                  setSelectedChartPoint(null)
-                  workspace.refresh()
-                }}
-              />
-            ) : null
-          })()
-        : null}
+      <ChartWeightPointEditor
+        workspace={workspace}
+        point={selectedChartPoint}
+        onClose={() => setSelectedChartPoint(null)}
+        onSaved={() => {
+          setSelectedChartPoint(null)
+          workspace.refresh()
+        }}
+      />
       <Button variant="secondary" onClick={workspace.refresh}>
         Refresh Dashboard
       </Button>

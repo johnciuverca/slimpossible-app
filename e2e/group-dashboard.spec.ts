@@ -32,7 +32,6 @@ async function installGroupFixtures(
     privateEntrySharedWithOtherGroup?: boolean
     duplicateEstimateOnSave?: boolean
     holdPersonalContexts?: boolean
-    holdPersonalHistory?: boolean
   } = {},
 ) {
   const challengeId = ownEntries ? ownGroupId : 'e2e-challenge'
@@ -49,9 +48,7 @@ async function installGroupFixtures(
   let privateEntrySharedChallengeIds: string[] =
     options.privateEntrySharedWithOtherGroup ? [secondId] : []
   const releasePersonalContexts: (() => void)[] = []
-  const releasePersonalHistory: (() => void)[] = []
   let personalContextsHeld = false
-  let personalHistoryHeld = false
   let ownTarget = 80
   let ownStartingWeight = 100
   const estimatedOwnWeight = () => {
@@ -127,12 +124,6 @@ async function installGroupFixtures(
       ownEntries &&
       url.pathname === '/rest/v1/rpc/list_my_personal_weigh_ins'
     ) {
-      if (options.holdPersonalHistory) {
-        personalHistoryHeld = true
-        await new Promise<void>((resolve) => {
-          releasePersonalHistory.push(resolve)
-        })
-      }
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify(
@@ -636,11 +627,8 @@ async function installGroupFixtures(
   })
   return Object.assign(requests, {
     personalContextsHeld: () => personalContextsHeld,
-    personalHistoryHeld: () => personalHistoryHeld,
     releasePersonalContexts: () =>
       releasePersonalContexts.splice(0).forEach((release) => release()),
-    releasePersonalHistory: () =>
-      releasePersonalHistory.splice(0).forEach((release) => release()),
   })
 }
 
@@ -2831,8 +2819,10 @@ test.describe('group chart weigh-in dots', () => {
         privateEntryAtEstimatedDate: true,
         privateEntrySharedWithOtherGroup: true,
         holdPersonalContexts: true,
-        holdPersonalHistory: true,
       },
+    )
+    const personalHistoryResponse = page.waitForResponse((response) =>
+      response.url().includes('/rpc/list_my_personal_weigh_ins'),
     )
     await page.goto(
       `/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
@@ -2842,19 +2832,23 @@ test.describe('group chart weigh-in dots', () => {
       .getByRole('link', { name: 'Charts', exact: true })
       .click()
     await expect.poll(fixture.personalContextsHeld).toBe(true)
-    await expect.poll(fixture.personalHistoryHeld).toBe(true)
+    await personalHistoryResponse
     const chart = page.getByRole('img', {
       name: 'Weight (kg) — shared group history',
     })
     const estimate = chart.locator(
       `circle[data-series-id="${memberKey(ownGroupId, viewerId)}"][data-date="2026-09-21"][data-point-kind="estimated"]`,
     )
+    await expect(estimate).toBeVisible()
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
+    )
     await estimate.focus()
+    await expect(estimate).toBeFocused()
     await page.keyboard.press('Enter')
     await expect(page.getByRole('dialog')).toHaveCount(0)
 
-    fixture.releasePersonalHistory()
-    await expect(page.getByRole('dialog')).toHaveCount(0)
     fixture.releasePersonalContexts()
     const edit = page.getByRole('dialog', { name: 'Edit weight' })
     await expect(edit.getByLabel('Date')).toHaveValue('2026-09-21')
