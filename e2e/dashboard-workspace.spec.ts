@@ -38,12 +38,26 @@ for (const viewport of [
     expect(cardBox).not.toBeNull()
     expect(actionCardBox).not.toBeNull()
     expect(gridBox).not.toBeNull()
-    expect(actionCardBox!.height).toBeGreaterThan(gridBox!.height)
-    expect(actionCardBox!.height - gridBox!.height).toBeLessThanOrEqual(20)
+    const actionCardStyle = await actionCard.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return {
+        gridAlignItems: getComputedStyle(element.parentElement!).alignItems,
+        paddingTop: Number.parseFloat(style.paddingTop),
+        paddingRight: Number.parseFloat(style.paddingRight),
+        paddingBottom: Number.parseFloat(style.paddingBottom),
+        paddingLeft: Number.parseFloat(style.paddingLeft),
+      }
+    })
+    expect(actionCardStyle).toEqual({
+      gridAlignItems: 'start',
+      paddingTop: 8,
+      paddingRight: 8,
+      paddingBottom: 8,
+      paddingLeft: 8,
+    })
 
     if (viewport.width >= 1100) {
       expect(Math.abs(cardBox!.y - gridBox!.y)).toBeLessThanOrEqual(1)
-      expect(actionCardBox!.height).toBeLessThan(cardBox!.height)
     } else {
       expect(gridBox!.y).toBeGreaterThanOrEqual(cardBox!.y + cardBox!.height)
       expect(Math.abs(cardBox!.height - gridBox!.height)).toBeGreaterThan(1)
