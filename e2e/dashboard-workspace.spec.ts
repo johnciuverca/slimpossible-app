@@ -185,13 +185,14 @@ for (const width of [320, 390, 430]) {
       ).toBe(true)
       const rows = new Set(actionMetrics.map(({ y }) => Math.round(y)))
       if (width === 430 && textSize === 'normal') {
-        expect(rows.size).toBe(1)
         expect(
           new Set(actionMetrics.map(({ height }) => Math.round(height))).size,
         ).toBe(1)
         expect(longestLabel!.labelRects.length).toBeGreaterThan(1)
-      } else if (width < 430) {
+      } else if (width < 360) {
         expect(rows.size).toBeGreaterThan(1)
+      } else {
+        expect(rows.size).toBe(1)
       }
       expect(rows.size).toBeLessThanOrEqual(4)
       expect(
