@@ -995,7 +995,12 @@ export function SharedWeightChart({
           {dates.map((date, index) => (
             <text
               key={date}
-              x={x(dateAtDay(date))}
+              x={
+                x(dateAtDay(date)) -
+                (compactLayout && dates.length > 1 && index === dates.length - 1
+                  ? 1
+                  : 0)
+              }
               y={viewBoxHeight - 19}
               textAnchor={
                 dates.length === 1
