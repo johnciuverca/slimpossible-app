@@ -91,6 +91,11 @@ for (const width of [320, 390, 430]) {
           actions.map((action) => {
             const box = action.getBoundingClientRect()
             const style = getComputedStyle(action)
+            const grid = action.parentElement!
+            const gridStyle = getComputedStyle(grid)
+            const card = grid.closest('.dashboard-actions-compact')!
+            const cardBox = card.getBoundingClientRect()
+            const cardStyle = getComputedStyle(card)
             const label = action.querySelector('span') ?? action
             const textWalker = document.createTreeWalker(
               label,
@@ -131,6 +136,24 @@ for (const width of [320, 390, 430]) {
               borderRight: Number.parseFloat(style.borderRightWidth),
               borderTop: Number.parseFloat(style.borderTopWidth),
               borderBottom: Number.parseFloat(style.borderBottomWidth),
+              cardContentLeft:
+                cardBox.left +
+                Number.parseFloat(cardStyle.borderLeftWidth) +
+                Number.parseFloat(cardStyle.paddingLeft),
+              cardContentRight:
+                cardBox.right -
+                Number.parseFloat(cardStyle.borderRightWidth) -
+                Number.parseFloat(cardStyle.paddingRight),
+              cardInnerBorderLeft:
+                cardBox.left + Number.parseFloat(cardStyle.borderLeftWidth),
+              cardInnerBorderRight:
+                cardBox.right - Number.parseFloat(cardStyle.borderRightWidth),
+              cardPaddingLeft: Number.parseFloat(cardStyle.paddingLeft),
+              cardPaddingRight: Number.parseFloat(cardStyle.paddingRight),
+              cardPaddingTop: Number.parseFloat(cardStyle.paddingTop),
+              cardPaddingBottom: Number.parseFloat(cardStyle.paddingBottom),
+              gridColumnGap: Number.parseFloat(gridStyle.columnGap),
+              gridRowGap: Number.parseFloat(gridStyle.rowGap),
               fontSize: Number.parseFloat(style.fontSize),
               labelRects,
             }
@@ -142,6 +165,59 @@ for (const width of [320, 390, 430]) {
       )
       expect(longestLabel).toBeDefined()
       expect(actionMetrics.every(({ height }) => height >= 44)).toBe(true)
+      expect(
+        actionMetrics.every(
+          ({ x, right, cardContentLeft, cardContentRight }) =>
+            x >= cardContentLeft - 0.5 && right <= cardContentRight + 0.5,
+        ),
+      ).toBe(true)
+      const borderInsets = actionMetrics.flatMap(
+        ({ x, right, cardInnerBorderLeft, cardInnerBorderRight }) => [
+          x - cardInnerBorderLeft,
+          cardInnerBorderRight - right,
+        ],
+      )
+      const actionRows = new Map<number, typeof actionMetrics>()
+      for (const action of actionMetrics) {
+        const row = Math.round(action.y)
+        actionRows.set(row, [...(actionRows.get(row) ?? []), action])
+      }
+      const measuredGaps = [...actionRows.values()].flatMap((row) =>
+        row
+          .sort((left, right) => left.x - right.x)
+          .slice(1)
+          .map((action, index) => action.x - row[index].right),
+      )
+      const minimumButtonInset = Math.min(...borderInsets)
+      const minimumButtonGap = Math.min(...measuredGaps)
+      console.log('dashboard-action-containment', {
+        width,
+        textSize,
+        minimumButtonInset,
+        minimumButtonGap,
+      })
+      expect(minimumButtonInset).toBeGreaterThanOrEqual(8)
+      expect(minimumButtonGap).toBeGreaterThanOrEqual(4)
+      expect(
+        actionMetrics.every(
+          ({
+            cardPaddingLeft,
+            cardPaddingRight,
+            cardPaddingTop,
+            cardPaddingBottom,
+          }) =>
+            cardPaddingLeft >= 8 &&
+            cardPaddingRight >= 8 &&
+            cardPaddingTop >= 1 &&
+            cardPaddingBottom >= 1,
+        ),
+      ).toBe(true)
+      expect(
+        actionMetrics.every(
+          ({ gridColumnGap, gridRowGap }) =>
+            gridColumnGap >= 4 && gridRowGap >= 4,
+        ),
+      ).toBe(true)
       expect(
         actionMetrics.every(
           ({ paddingLeft, paddingRight }) =>
@@ -185,13 +261,14 @@ for (const width of [320, 390, 430]) {
       ).toBe(true)
       const rows = new Set(actionMetrics.map(({ y }) => Math.round(y)))
       if (width === 430 && textSize === 'normal') {
-        expect(rows.size).toBe(1)
         expect(
           new Set(actionMetrics.map(({ height }) => Math.round(height))).size,
         ).toBe(1)
         expect(longestLabel!.labelRects.length).toBeGreaterThan(1)
-      } else if (width < 430) {
+      } else if (width < 360) {
         expect(rows.size).toBeGreaterThan(1)
+      } else {
+        expect(rows.size).toBe(1)
       }
       expect(rows.size).toBeLessThanOrEqual(4)
       expect(
