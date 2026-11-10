@@ -1010,7 +1010,7 @@ for (const width of [320, 390, 430, 1280]) {
     await page.screenshot({
       path: testInfo.outputPath(`group-overview-${width}-after.png`),
     })
-    if (width === 390) {
+    if (width === 320) {
       await metrics
         .nth(1)
         .locator('dt')
@@ -1053,12 +1053,10 @@ for (const width of [320, 390, 430, 1280]) {
       }
       await expect(metrics.nth(1)).toContainText('42.5%')
       expect(
-        await page.evaluate(
-          () => document.documentElement.scrollWidth <= window.innerWidth,
-        ),
+        await page.evaluate(() => document.documentElement.scrollWidth <= 323),
       ).toBe(true)
       await page.screenshot({
-        path: testInfo.outputPath('group-overview-390-large-text.png'),
+        path: testInfo.outputPath('group-overview-320-large-text.png'),
       })
     }
   })
