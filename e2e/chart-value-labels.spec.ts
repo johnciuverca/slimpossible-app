@@ -69,11 +69,15 @@ for (const width of [1280, 390]) {
       expect(label.y).toBeGreaterThan(0)
       const estimatedHalfWidth =
         (label.text.length * (width <= 600 ? 5.4 : 4.2)) / 2
+      const plotLeft = Number(await chart.getAttribute('data-chart-plot-left'))
+      const plotRight = Number(
+        await chart.getAttribute('data-chart-plot-right'),
+      )
       expect(label.x - estimatedHalfWidth).toBeGreaterThanOrEqual(
-        width <= 600 ? 48 : 0,
+        width <= 600 ? plotLeft : 0,
       )
       expect(label.x + estimatedHalfWidth).toBeLessThanOrEqual(
-        width <= 600 ? 312 : 760,
+        width <= 600 ? plotRight : 760,
       )
     }
     await chart.screenshot({

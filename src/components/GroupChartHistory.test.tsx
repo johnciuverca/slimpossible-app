@@ -389,7 +389,7 @@ describe('Group chart history', () => {
       true,
     )
     const plotBottom =
-      Number(chart.getAttribute('viewBox')?.split(/\s+/)[3]) - 52
+      Number(chart.getAttribute('viewBox')?.split(/\s+/)[3]) - 36
     const eighty = circles.find(
       (circle) => circle.textContent === 'Member 0: 01.09.2026, 80 kg',
     )!
@@ -399,9 +399,9 @@ describe('Group chart history', () => {
     expect(Number(hundred.getAttribute('cy'))).toBeLessThan(
       Number(eighty.getAttribute('cy')),
     )
-    expect(Number(eighty.getAttribute('cy'))).toBeGreaterThan(36)
+    expect(Number(eighty.getAttribute('cy'))).toBeGreaterThan(27)
     for (const circle of circles) {
-      expect(Number(circle.getAttribute('cy'))).toBeGreaterThan(25)
+      expect(Number(circle.getAttribute('cy'))).toBeGreaterThan(27)
       expect(Number(circle.getAttribute('cy'))).toBeLessThanOrEqual(plotBottom)
     }
     expect(

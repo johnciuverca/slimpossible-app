@@ -2824,6 +2824,7 @@ export function ProgressPage({
                   </FeedbackPanel>
                 ) : (
                   <PersonalProgressChart
+                    fitContainer
                     weighIns={data.flow.historyTrend.history}
                     onPointActivate={(point) =>
                       setChartPointSelection({

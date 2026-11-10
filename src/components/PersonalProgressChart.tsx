@@ -102,11 +102,11 @@ export function PersonalProgressChart({
       : ` ${referenceLabel ?? 'The selected goal target'} is ${formatWeight(reference)} kilograms. Its reference line is shown only when it fits within the data-scaled chart range; otherwise its value is noted below the chart.`
   return (
     <figure
-      className="personal-weight-chart mt-5"
+      className="personal-weight-chart mt-5 w-full min-w-0"
       aria-labelledby={`${id}-caption`}
     >
       <div
-        className={fitContainer ? 'min-w-0' : 'overflow-x-auto'}
+        className={fitContainer ? 'w-full min-w-0' : 'overflow-x-auto'}
         role="group"
         aria-label={
           fitContainer

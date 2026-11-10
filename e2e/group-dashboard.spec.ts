@@ -669,12 +669,15 @@ for (const layout of [
       const viewBoxHeight = await comparison.evaluate((element) =>
         Number(element.getAttribute('viewBox')?.trim().split(/\s+/)[3]),
       )
+      const plotRight = Number(
+        await comparison.getAttribute('data-chart-plot-right'),
+      )
       const outOfBoundsLabels = await comparison.locator('text').evaluateAll(
-        (elements, chartHeight) =>
+        (elements, { chartHeight, plotRight }) =>
           elements.flatMap((element) => {
             const box = (element as SVGGraphicsElement).getBBox()
             return box.x >= 0 &&
-              box.x + box.width <= 720 &&
+              box.x + box.width <= plotRight &&
               box.y >= 0 &&
               box.y + box.height <= chartHeight
               ? []
@@ -688,7 +691,7 @@ for (const layout of [
                   },
                 ]
           }),
-        viewBoxHeight,
+        { chartHeight: viewBoxHeight, plotRight },
       )
       expect(outOfBoundsLabels).toEqual([])
       expect(
@@ -1441,6 +1444,23 @@ for (const viewport of [
       name: 'Weight (kg) — shared group history',
     })
     await expect(chart).toBeVisible()
+    await expect(chart.locator('.chart-axis-tick').first()).toHaveCSS(
+      'font-size',
+      '10.2px',
+    )
+    await expect(chart.locator('.chart-axis-title')).toHaveCSS(
+      'font-size',
+      '12px',
+    )
+    await expect(chart).toHaveAttribute(
+      'data-chart-plot-left',
+      viewport.width <= 600 ? '32' : '44',
+    )
+    await expect(chart).toHaveAttribute(
+      'data-chart-plot-right',
+      viewport.width <= 600 ? '304' : '736',
+    )
+    await expect(chart).toHaveAttribute('data-chart-plot-top', '27')
     const firstChartPoint = chart
       .locator('circle[data-point-kind="recorded"][data-chart-point]')
       .first()
@@ -1461,6 +1481,19 @@ for (const viewport of [
     const chartRegion = page.getByRole('region', {
       name: 'Group comparison chart',
     })
+    const expectChartFrameInsideCard = async (targetChart: typeof chart) => {
+      const [sectionBounds, frameBounds] = await Promise.all([
+        targetChart.locator('xpath=ancestor::section[1]').boundingBox(),
+        targetChart.locator('xpath=../..').boundingBox(),
+      ])
+      expect(sectionBounds).not.toBeNull()
+      expect(frameBounds).not.toBeNull()
+      expect(frameBounds!.x).toBeGreaterThanOrEqual(sectionBounds!.x)
+      expect(frameBounds!.x + frameBounds!.width).toBeLessThanOrEqual(
+        sectionBounds!.x + sectionBounds!.width,
+      )
+    }
+    await expectChartFrameInsideCard(chart)
     const expectLegendCentered = async () => {
       const [legendBox, chartRegionBox] = await Promise.all([
         groupLegend.boundingBox(),
@@ -1494,11 +1527,11 @@ for (const viewport of [
     )!
     const plotBottom = await chart.evaluate(
       (element) =>
-        Number(element.getAttribute('viewBox')?.trim().split(/\s+/)[3]) - 52,
+        Number(element.getAttribute('viewBox')?.trim().split(/\s+/)[3]) - 36,
     )
     expect(heavier.y).toBeLessThan(lighter.y)
     for (const point of originalPoints) {
-      expect(point.y).toBeGreaterThan(25)
+      expect(point.y).toBeGreaterThan(27)
       expect(point.y).toBeLessThanOrEqual(plotBottom)
     }
     await expect(chart).toContainText('Weight (kg)')
@@ -1529,16 +1562,19 @@ for (const viewport of [
       ).toBeLessThan(2)
       await expect(rangeControls.getByRole('button')).toHaveCount(5)
       await expect(chartControlsTrack.getByRole('slider')).toHaveCount(2)
-      for (const control of await rangeControls.getByRole('button').all())
+      for (const control of await rangeControls.getByRole('button').all()) {
         await expect(control).toBeVisible()
+        const controlBounds = (await control.boundingBox())!
+        expect(controlBounds.height).toBeGreaterThanOrEqual(44)
+      }
       const regionBounds = await chartRegion.boundingBox()
       expect(regionBounds).not.toBeNull()
-      expect(chartBounds!.width).toBeLessThanOrEqual(regionBounds!.width + 1)
+      await expectChartFrameInsideCard(chart)
     } else {
       expect(
         Math.abs(
           quickRangeLabel!.x -
-            (chartBounds!.x + (64 / 760) * chartBounds!.width),
+            (chartBounds!.x + (44 / 760) * chartBounds!.width),
         ),
       ).toBeLessThan(2)
     }
@@ -1618,6 +1654,19 @@ for (const viewport of [
     const individualChart = page.getByRole('img', {
       name: 'Weight (kg) — shared group history',
     })
+    await expectChartFrameInsideCard(individualChart)
+    await expect(individualChart.locator('.chart-axis-tick').first()).toHaveCSS(
+      'font-size',
+      '10.2px',
+    )
+    await expect(individualChart).toHaveAttribute(
+      'data-chart-plot-left',
+      viewport.width <= 600 ? '32' : '44',
+    )
+    await expect(individualChart).toHaveAttribute(
+      'data-chart-plot-right',
+      viewport.width <= 600 ? '304' : '736',
+    )
     await individualChart
       .locator('circle[data-point-kind="recorded"][data-chart-point]')
       .first()
@@ -1630,6 +1679,9 @@ for (const viewport of [
     await expect(
       individualChart.locator('circle[data-point-kind="recorded"][data-date]'),
     ).toHaveCount(2)
+    await individualChart.screenshot({
+      path: test.info().outputPath(`group-individual-${viewport.width}.png`),
+    })
     const individualTrack = page.getByRole('group', {
       name: 'Adjust visible date range',
     })
@@ -3065,6 +3117,35 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
     await expect(
       page.locator('.group-history-workspace svg').first(),
     ).toBeVisible()
+    const overviewChart = page
+      .locator('.group-history-workspace svg[role="img"]')
+      .first()
+    await expect(overviewChart).toHaveAttribute(
+      'data-chart-plot-left',
+      width <= 600 ? '32' : '44',
+    )
+    await expect(overviewChart).toHaveAttribute(
+      'data-chart-plot-right',
+      width <= 600 ? '304' : '736',
+    )
+    const [overviewCardBounds, overviewFrameBounds] = await Promise.all([
+      overviewChart.locator('xpath=ancestor::section[1]').boundingBox(),
+      overviewChart.locator('xpath=../..').boundingBox(),
+    ])
+    expect(overviewCardBounds).not.toBeNull()
+    expect(overviewFrameBounds).not.toBeNull()
+    expect(overviewFrameBounds!.x).toBeGreaterThanOrEqual(overviewCardBounds!.x)
+    expect(
+      overviewFrameBounds!.x + overviewFrameBounds!.width,
+    ).toBeLessThanOrEqual(overviewCardBounds!.x + overviewCardBounds!.width)
+    await expect(overviewChart).toHaveAttribute('data-chart-plot-top', '27')
+    const overviewViewBoxHeight = await overviewChart.evaluate((chart) =>
+      Number(chart.getAttribute('viewBox')?.trim().split(/\s+/)[3]),
+    )
+    await expect(overviewChart).toHaveAttribute(
+      'data-chart-plot-bottom',
+      String(overviewViewBoxHeight - 36),
+    )
     const nav = page.getByRole('navigation', { name: 'Group sections' })
     for (const name of [
       'Record weight',
@@ -3136,8 +3217,8 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
         expect(side.color).toBe('rgb(53, 67, 83)')
       }
     if (width === 1440) {
-      expect(edges.plot.width).toBeCloseTo(1174, 0)
-      expect(edges.plot.height).toBeCloseTo(429.421875, 0)
+      expect(edges.plot.width).toBeCloseTo(1206, 0)
+      expect(edges.plot.height).toBeCloseTo(441.140625, 0)
     }
     if (width === 390) {
       expect(edges.plot.width).toBeLessThan(600)

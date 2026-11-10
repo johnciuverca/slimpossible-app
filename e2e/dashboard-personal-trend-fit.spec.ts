@@ -48,6 +48,17 @@ for (const viewport of viewports) {
       name: /^Personal weight history chart/,
     })
     await expect(chart).toBeVisible()
+    const axisTickSizes = await chart.evaluate((element) =>
+      Array.from(element.querySelectorAll('.chart-axis-tick')).map(
+        (tick) => getComputedStyle(tick).fontSize,
+      ),
+    )
+    expect(axisTickSizes.length).toBeGreaterThan(0)
+    expect(new Set(axisTickSizes)).toEqual(new Set(['10.2px']))
+    await expect(chart.locator('.chart-axis-title')).toHaveCSS(
+      'font-size',
+      '12px',
+    )
     await chart.scrollIntoViewIfNeeded()
     await expect(
       chart.locator('circle[data-point-kind="recorded"][data-date]'),
@@ -68,9 +79,13 @@ for (const viewport of viewports) {
           return { left: bounds.x, right: bounds.x + bounds.width }
         }),
       )
+      const plotLeft = Number(await chart.getAttribute('data-chart-plot-left'))
+      const plotRight = Number(
+        await chart.getAttribute('data-chart-plot-right'),
+      )
       for (const bounds of labelBounds) {
-        expect(bounds.left).toBeGreaterThanOrEqual(48)
-        expect(bounds.right).toBeLessThanOrEqual(312)
+        expect(bounds.left).toBeGreaterThanOrEqual(plotLeft)
+        expect(bounds.right).toBeLessThanOrEqual(plotRight)
       }
     }
 
@@ -86,16 +101,57 @@ for (const viewport of viewports) {
     expect(groupBox!.x + groupBox!.width).toBeLessThanOrEqual(
       cardBox!.x + cardBox!.width,
     )
-    expect(chartBox!.x).toBeGreaterThanOrEqual(groupBox!.x)
-    expect(chartBox!.x + chartBox!.width).toBeLessThanOrEqual(
-      groupBox!.x + groupBox!.width,
-    )
+    const frameBox = await chart.locator('xpath=../..').boundingBox()
+    expect(frameBox).not.toBeNull()
+    expect(frameBox!.x).toBeGreaterThanOrEqual(cardBox!.x)
+    expect(
+      cardBox!.x + cardBox!.width - frameBox!.x - frameBox!.width,
+    ).toBeGreaterThanOrEqual(0)
 
     const compact = viewport.width <= 600
     await expect(chart).toHaveAttribute(
       'viewBox',
       compact ? '0 0 320 266' : '0 0 760 266',
     )
+    await expect(chart).toHaveAttribute(
+      'data-chart-plot-left',
+      compact ? '32' : '44',
+    )
+    await expect(chart).toHaveAttribute(
+      'data-chart-plot-right',
+      compact ? '304' : '736',
+    )
+    await expect(chart).toHaveAttribute('data-chart-plot-top', '27')
+    await expect(chart).toHaveAttribute('data-chart-plot-bottom', '230')
+    if (!compact) {
+      const dateLabelBounds = await chart
+        .locator('[data-chart-date-tick]')
+        .evaluateAll((labels) =>
+          labels
+            .map((label) => {
+              const bounds = (label as SVGTextElement).getBBox()
+              return { left: bounds.x, right: bounds.x + bounds.width }
+            })
+            .sort((first, second) => first.left - second.left),
+        )
+      expect(dateLabelBounds.length).toBeLessThanOrEqual(11)
+      for (let index = 1; index < dateLabelBounds.length; index++)
+        expect(dateLabelBounds[index - 1].right).toBeLessThanOrEqual(
+          dateLabelBounds[index].left,
+        )
+      const desktopDateTicks = await chart
+        .locator('[data-chart-date-tick]')
+        .evaluateAll((labels) =>
+          labels.map((label) => label.getAttribute('data-chart-date-tick')!),
+        )
+      for (let index = 1; index < desktopDateTicks.length; index++) {
+        const distance =
+          (Date.parse(`${desktopDateTicks[index]}T00:00:00Z`) -
+            Date.parse(`${desktopDateTicks[index - 1]}T00:00:00Z`)) /
+          86400000
+        expect(distance % 7).toBe(0)
+      }
+    }
     const [rangeTicks, rangeControls, sliderTrack] = await Promise.all([
       chart
         .locator('[data-chart-date-tick]')
@@ -119,33 +175,6 @@ for (const viewport of viewports) {
       )
       expect(rangeTicks[0]).toBe(savedDates[0])
       expect(rangeTicks.at(-1)).toBe(savedDates.at(-1))
-      expect(
-        await chart
-          .locator('[data-chart-tick] text')
-          .first()
-          .getAttribute('font-size'),
-      ).toBe('13')
-      expect(
-        await chart
-          .locator('[data-chart-date-tick]')
-          .first()
-          .getAttribute('font-size'),
-      ).toBe('10')
-      const scrollMetrics = await chartGroup.evaluate((element) => {
-        const frame = element.querySelector('svg')?.parentElement?.parentElement
-        return {
-          groupClientWidth: element.clientWidth,
-          groupScrollWidth: element.scrollWidth,
-          frameClientWidth: frame?.clientWidth ?? 0,
-          frameScrollWidth: frame?.scrollWidth ?? 0,
-        }
-      })
-      expect(scrollMetrics.groupScrollWidth).toBeLessThanOrEqual(
-        scrollMetrics.groupClientWidth + 1,
-      )
-      expect(scrollMetrics.frameScrollWidth).toBeLessThanOrEqual(
-        scrollMetrics.frameClientWidth + 1,
-      )
       const plotMetrics = await chart.evaluate((element) => {
         const tickLabels = Array.from(
           element.querySelectorAll('[data-chart-tick] text'),
@@ -153,15 +182,31 @@ for (const viewport of viewports) {
         const plotLines = Array.from(
           element.querySelectorAll('[data-chart-tick] line'),
         )
-        const left = Math.min(...tickLabels.map((label) => label.getBBox().x))
+        const labelLeft = Math.min(
+          ...tickLabels.map((label) => label.getBBox().x),
+        )
+        const labelRight = Math.max(
+          ...tickLabels.map((label) => {
+            const bounds = label.getBBox()
+            return bounds.x + bounds.width
+          }),
+        )
+        const left = Math.min(
+          ...plotLines.map((line) => Number(line.getAttribute('x1'))),
+        )
         const right = Math.max(
           ...plotLines.map((line) => Number(line.getAttribute('x2'))),
         )
-        return { left, right, width: element.viewBox.baseVal.width }
+        return {
+          labelLeft,
+          labelRight,
+          left,
+          right,
+          width: element.viewBox.baseVal.width,
+        }
       })
-      expect(
-        Math.abs(plotMetrics.left - (plotMetrics.width - plotMetrics.right)),
-      ).toBeLessThanOrEqual(3)
+      expect(plotMetrics.labelLeft).toBeGreaterThanOrEqual(0)
+      expect(plotMetrics.labelRight).toBeLessThanOrEqual(plotMetrics.left)
       const sliderBox = await sliderTrack.boundingBox()
       expect(sliderBox).not.toBeNull()
       const expectedSliderLeft =
@@ -217,10 +262,18 @@ for (const viewport of viewports) {
     await expect(sliderTrack.getByRole('slider')).toHaveCount(2)
     for (const handle of await sliderTrack.getByRole('slider').all()) {
       const handleBox = (await handle.boundingBox())!
-      expect(handleBox.x).toBeGreaterThanOrEqual(groupBox!.x)
+      if (viewport.width <= 600)
+        expect(handleBox.height).toBeGreaterThanOrEqual(44)
+      expect(handleBox.x).toBeGreaterThanOrEqual(cardBox!.x)
       expect(handleBox.x + handleBox.width).toBeLessThanOrEqual(
-        groupBox!.x + groupBox!.width,
+        cardBox!.x + cardBox!.width,
       )
+    }
+    if (viewport.width <= 600) {
+      for (const button of await rangeControls.getByRole('button').all()) {
+        const box = (await button.boundingBox())!
+        expect(box.height).toBeGreaterThanOrEqual(44)
+      }
     }
 
     const point = chart

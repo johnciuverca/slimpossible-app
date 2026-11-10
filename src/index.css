@@ -229,6 +229,13 @@ body {
   touch-action: none;
 }
 
+@media (max-width: 639px) {
+  .date-range-handle {
+    width: 44px;
+    height: 44px;
+  }
+}
+
 .date-range-handle::before {
   position: absolute;
   inset: 0.3125rem;
@@ -865,9 +872,14 @@ body {
   justify-content: center;
   transform: translateY(1.5px);
 }
-.chart-axis {
+/* Axis colors and slider handle geometry are CSS tokens; sizes and plot spacing
+   are centralized in components/sharedChartTheme.ts. */
+.chart-axis-title {
   fill: var(--color-ink-muted);
   font-size: 12px;
+}
+.chart-axis-tick {
+  fill: var(--color-ink-muted);
 }
 .chart-value {
   fill: var(--color-ink);
