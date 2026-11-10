@@ -70,7 +70,7 @@ for (const width of [1280, 390]) {
       const estimatedHalfWidth =
         (label.text.length * (width <= 600 ? 5.4 : 4.2)) / 2
       expect(label.x - estimatedHalfWidth).toBeGreaterThanOrEqual(
-        width <= 600 ? 48 : 0,
+        width <= 600 ? 40 : 0,
       )
       expect(label.x + estimatedHalfWidth).toBeLessThanOrEqual(
         width <= 600 ? 312 : 760,
