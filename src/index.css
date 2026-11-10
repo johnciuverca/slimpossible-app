@@ -797,10 +797,10 @@ body {
     font-size: 0.75rem;
   }
   .dashboard-shell .dashboard-actions-compact {
-    padding: 0 0.25rem;
+    padding: 0.0625rem 0.5rem;
   }
   .dashboard-shell .dashboard-actions-compact .dashboard-action-grid-compact {
-    gap: 0.125rem;
+    gap: 0.25rem;
   }
   .dashboard-shell
     .dashboard-actions-compact

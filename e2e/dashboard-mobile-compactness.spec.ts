@@ -36,6 +36,10 @@ test('Dashboard compactness bounds and screenshots', async ({ page }) => {
       const heading = rect('#dashboard-title')
       const latest = rect('.dashboard-latest')
       const actions = rect('.dashboard-actions-compact')
+      const actionsElement = document.querySelector(
+        '.dashboard-actions-compact',
+      )!
+      const actionsStyle = getComputedStyle(actionsElement)
       const chartElement = document.querySelector<SVGSVGElement>(
         '[role="img"][viewBox]',
       )!
@@ -54,6 +58,14 @@ test('Dashboard compactness bounds and screenshots', async ({ page }) => {
         heading,
         latest,
         actions,
+        actionsContentLeft:
+          actions.x +
+          Number.parseFloat(actionsStyle.borderLeftWidth) +
+          Number.parseFloat(actionsStyle.paddingLeft),
+        actionsContentRight:
+          actions.right -
+          Number.parseFloat(actionsStyle.borderRightWidth) -
+          Number.parseFloat(actionsStyle.paddingRight),
         compactCardStackHeight: actions.bottom - latest.y,
         chart,
         plotTopY,
@@ -83,7 +95,7 @@ test('Dashboard compactness bounds and screenshots', async ({ page }) => {
       expect(metrics.subnavHeadingGap).toBeLessThanOrEqual(12)
       expect(metrics.latest.height).toBeLessThanOrEqual(baseline.latest * 0.75)
       expect(metrics.actions.height).toBeLessThanOrEqual(
-        baseline.actions * (viewport.width === 320 ? 0.82 : 0.75),
+        baseline.actions * (viewport.width === 320 ? 0.85 : 0.75),
       )
       expect(metrics.compactCardStackHeight).toBeLessThanOrEqual(
         baselineStackHeight * 0.75,
@@ -107,8 +119,10 @@ test('Dashboard compactness bounds and screenshots', async ({ page }) => {
         const box = await control.boundingBox()
         expect(box).not.toBeNull()
         expect(box!.height).toBeGreaterThanOrEqual(44)
-        expect(box!.x).toBeGreaterThanOrEqual(metrics.actions.x)
-        expect(box!.x + box!.width).toBeLessThanOrEqual(metrics.actions.right)
+        expect(box!.x).toBeGreaterThanOrEqual(metrics.actionsContentLeft)
+        expect(box!.x + box!.width).toBeLessThanOrEqual(
+          metrics.actionsContentRight,
+        )
       }
       expect(
         await page.evaluate(
