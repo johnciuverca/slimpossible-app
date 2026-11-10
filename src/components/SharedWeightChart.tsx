@@ -8,6 +8,7 @@ import {
 } from 'react'
 import { layoutChartValueLabels } from '../models/chartValueLabelLayout'
 import { formatChartDate } from '../models/chartDate'
+import { compactWeeklyHistory } from '../models/weeklyChartHistory'
 import { sharedChartAxisTickPx, sharedChartTheme } from './sharedChartTheme'
 
 export type SharedChartPoint = {
@@ -18,6 +19,7 @@ export type SharedChartPoint = {
   label?: string
   markerLabel?: string
   estimated?: boolean
+  weeklySummary?: string
 }
 
 export type SharedChartSeries = {
@@ -78,6 +80,7 @@ export function SharedWeightChart({
   fitContainer = false,
   labelExtremesOnly = false,
   labelSeriesExtremesOnly = false,
+  compactOlderHistory = false,
   className = 'block h-auto w-full min-w-[600px]',
   viewBox = '0 0 760 266',
 }: {
@@ -99,6 +102,7 @@ export function SharedWeightChart({
   fitContainer?: boolean
   labelExtremesOnly?: boolean
   labelSeriesExtremesOnly?: boolean
+  compactOlderHistory?: boolean
   className?: string
   viewBox?: string
 }) {
@@ -163,7 +167,20 @@ export function SharedWeightChart({
   const [selectedPreset, setSelectedPreset] = useState<
     '1w' | '2w' | '1m' | '3m' | 'all' | 'custom'
   >('all')
-  const plotted = [...(points ?? []), ...series.flatMap((item) => item.points)]
+  const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set())
+  const sourceSeries = series
+  if (compactOlderHistory)
+    series = compactWeeklyHistory(sourceSeries, expandedWeeks)
+  const activatePoint = (point: SharedChartPoint, seriesId?: string) => {
+    if (point.weeklySummary) {
+      setExpandedWeeks((current) => new Set([...current, point.weeklySummary!]))
+      setActivePoint(null)
+    } else onPointActivate?.(point, seriesId)
+  }
+  const plotted = [
+    ...(points ?? []),
+    ...sourceSeries.flatMap((item) => item.points),
+  ]
   if (!plotted.length) return null
   const firstDay = Math.min(...plotted.map((point) => day(point.date)))
   const lastDay = Math.max(...plotted.map((point) => day(point.date)))
@@ -484,21 +501,23 @@ export function SharedWeightChart({
     : weeklyDates.filter((_, index) => index % weeklyTickStride === 0)
   const visibleCount =
     visiblePoints.filter((point) => !point.estimated).length +
-    visibleSeries.reduce(
+    sourceSeries.reduce(
       (sum, item) =>
-        sum + item.points.filter((point) => !point.estimated).length,
+        sum +
+        item.points.filter((point) => !point.estimated && inRange(point.date))
+          .length,
       0,
     )
   const totalCount =
     points.filter((point) => !point.estimated).length +
-    series.reduce(
+    sourceSeries.reduce(
       (sum, item) =>
         sum + item.points.filter((point) => !point.estimated).length,
       0,
     )
   const chartTitle = fullRange
     ? title
-    : `${title}. Showing ${visibleCount} of ${totalCount} recorded entries from ${formatChartDate(dateAtDay(startDay))} to ${formatChartDate(dateAtDay(endDay))}.`
+    : `${title}. ${compactOlderHistory ? 'Range contains' : 'Showing'} ${visibleCount} of ${totalCount} recorded entries from ${formatChartDate(dateAtDay(startDay))} to ${formatChartDate(dateAtDay(endDay))}.`
   const selectedRangeLabel =
     selectedPreset === '1w'
       ? 'Last 7 days'
@@ -600,6 +619,18 @@ export function SharedWeightChart({
         if (event.key === 'Escape') setActivePoint(null)
       }}
     >
+      {compactOlderHistory && expandedWeeks.size > 0 ? (
+        <button
+          type="button"
+          className="min-h-11 rounded-lg border px-3 py-2 text-sm"
+          onClick={() => {
+            setExpandedWeeks(new Set())
+            setActivePoint(null)
+          }}
+        >
+          Collapse expanded weeks
+        </button>
+      ) : null}
       <div
         role="group"
         aria-label="Chart date range controls"
@@ -825,7 +856,7 @@ export function SharedWeightChart({
                       <circle
                         cx={x(point.date)}
                         cy={y(point.value)}
-                        r="5"
+                        r={point.weeklySummary ? 7 : 5}
                         fill={
                           point.estimated
                             ? 'var(--color-panel, white)'
@@ -838,7 +869,11 @@ export function SharedWeightChart({
                         }
                         strokeWidth="2"
                         data-point-kind={
-                          point.estimated ? 'estimated' : 'recorded'
+                          point.weeklySummary
+                            ? 'weekly-summary'
+                            : point.estimated
+                              ? 'estimated'
+                              : 'recorded'
                         }
                         data-series-id={item.id}
                         opacity={point.estimated ? 0.72 : 1}
@@ -878,10 +913,10 @@ export function SharedWeightChart({
                           else if (event.key === 'Enter' || event.key === ' ') {
                             event.preventDefault()
                             setActivePoint({ id: pointId, source: 'focus' })
-                            onPointActivate?.(point, item.id)
+                            activatePoint(point, item.id)
                           }
                         }}
-                        onClick={() => onPointActivate?.(point, item.id)}
+                        onClick={() => activatePoint(point, item.id)}
                       >
                         <title>{point.title}</title>
                       </circle>

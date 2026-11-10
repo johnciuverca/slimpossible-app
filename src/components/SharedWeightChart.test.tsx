@@ -4,6 +4,54 @@ import { SharedWeightChart } from './SharedWeightChart'
 
 afterEach(cleanup)
 
+it('expands weekly summaries accessibly, preserves daily activation, and collapses them', () => {
+  const activate = vi.fn()
+  render(
+    <SharedWeightChart
+      title="Weekly history"
+      description="History"
+      yLabel="kg"
+      min={70}
+      max={90}
+      compactOlderHistory
+      onPointActivate={activate}
+      series={[
+        {
+          id: 'owner',
+          color: 'green',
+          points: [
+            {
+              date: '2026-09-01',
+              value: 80,
+              title: 'First',
+              markerLabel: 'Original own point',
+            },
+            { date: '2026-09-02', value: 82, title: 'Second' },
+            { date: '2026-11-10', value: 75, title: 'Newest' },
+          ],
+        },
+      ]}
+    />,
+  )
+  const summary = screen.getByRole('button', {
+    name: /Weekly average 81 kg/,
+  })
+  expect(summary).toHaveAttribute('data-point-kind', 'weekly-summary')
+  fireEvent.keyDown(summary, { key: 'Enter' })
+  expect(activate).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Original own point' }))
+  expect(activate).toHaveBeenCalledWith(
+    expect.objectContaining({ date: '2026-09-01', value: 80 }),
+    'owner',
+  )
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Collapse expanded weeks' }),
+  )
+  expect(
+    screen.getByRole('button', { name: /Weekly average 81 kg/ }),
+  ).toBeInTheDocument()
+})
+
 it('marks estimates as hollow, labels them accessibly, and activates their date/value', () => {
   const onPointActivate = vi.fn()
   render(

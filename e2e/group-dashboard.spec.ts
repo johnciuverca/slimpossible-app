@@ -926,6 +926,67 @@ test('selected Group sections retain readable contrast in both color schemes', a
 })
 
 for (const width of [320, 390, 430, 1280]) {
+  test(`weekly Group history expands and collapses at ${width}px`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 })
+    await installGroupFixtures(page, true)
+    await page.route(
+      `${supabaseRestUrl}/rpc/get_group_chart_history`,
+      async (route) => {
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify([
+            {
+              member_key: 'opaque-member-a',
+              display_name: 'Ava',
+              recorded_date: '2026-09-01',
+              weight_kg: 90,
+            },
+            {
+              member_key: 'opaque-member-a',
+              display_name: 'Ava',
+              recorded_date: '2026-09-02',
+              weight_kg: 88,
+            },
+            {
+              member_key: 'opaque-member-a',
+              display_name: 'Ava',
+              recorded_date: '2026-09-22',
+              weight_kg: 87,
+            },
+          ]),
+        })
+      },
+    )
+    await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    const summary = page.locator('circle[data-point-kind="weekly-summary"]')
+    await expect(summary).toHaveCount(1)
+    await expect(summary).toHaveAttribute(
+      'aria-label',
+      /Weekly average 89 kg.*2 recorded weigh-ins/,
+    )
+    await summary.focus()
+    await page.keyboard.press('Enter')
+    await expect(summary).toHaveCount(0)
+    await expect(
+      page.locator(
+        'circle[data-point-kind="recorded"][data-date="2026-09-01"]',
+      ),
+    ).toHaveCount(1)
+    await page.getByRole('button', { name: 'Collapse expanded weeks' }).click()
+    await expect(summary).toHaveCount(1)
+    const box = await summary.boundingBox()
+    expect(box!.x).toBeGreaterThanOrEqual(0)
+    expect(box!.x + box!.width).toBeLessThanOrEqual(width)
+    await page.screenshot({
+      path: testInfo.outputPath(`weekly-history-${width}.png`),
+      fullPage: true,
+    })
+  })
+}
+
+for (const width of [320, 390, 430, 1280]) {
   test(`Group overview summary row geometry at ${width}px`, async ({
     page,
   }, testInfo) => {
