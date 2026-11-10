@@ -669,12 +669,15 @@ for (const layout of [
       const viewBoxHeight = await comparison.evaluate((element) =>
         Number(element.getAttribute('viewBox')?.trim().split(/\s+/)[3]),
       )
+      const plotRight = Number(
+        await comparison.getAttribute('data-chart-plot-right'),
+      )
       const outOfBoundsLabels = await comparison.locator('text').evaluateAll(
-        (elements, chartHeight) =>
+        (elements, { chartHeight, plotRight }) =>
           elements.flatMap((element) => {
             const box = (element as SVGGraphicsElement).getBBox()
             return box.x >= 0 &&
-              box.x + box.width <= 720 &&
+              box.x + box.width <= plotRight &&
               box.y >= 0 &&
               box.y + box.height <= chartHeight
               ? []
@@ -688,7 +691,7 @@ for (const layout of [
                   },
                 ]
           }),
-        viewBoxHeight,
+        { chartHeight: viewBoxHeight, plotRight },
       )
       expect(outOfBoundsLabels).toEqual([])
       expect(
