@@ -1010,12 +1010,15 @@ for (const width of [320, 390, 430, 1280]) {
     await page.screenshot({
       path: testInfo.outputPath(`group-overview-${width}-after.png`),
     })
-    if (width === 320) {
+    if (width < 640) {
+      await page.locator('#group-summary').evaluate((card) => {
+        ;(card as HTMLElement).style.fontSize = '20px'
+      })
       await metrics
         .nth(1)
         .locator('dt')
         .evaluate((label) => {
-          label.textContent = 'Durchschnittlicher Zielfortschritt'
+          label.textContent = 'Durchschnitt der Gruppenziele'
         })
       await metrics.locator('dt, dd').evaluateAll((texts) => {
         for (const text of texts) {
@@ -1052,11 +1055,17 @@ for (const width of [320, 390, 430, 1280]) {
         }
       }
       await expect(metrics.nth(1)).toContainText('42.5%')
-      expect(
-        await page.evaluate(() => document.documentElement.scrollWidth <= 323),
-      ).toBe(true)
+      const enlargedRows = await metrics.evaluateAll(
+        (cards) =>
+          new Set(cards.map((card) => card.getBoundingClientRect().top)).size,
+      )
+      expect(enlargedRows).toBe(2)
+      const pageWidth = await page.evaluate(
+        () => document.documentElement.scrollWidth,
+      )
+      expect(pageWidth).toBeLessThanOrEqual(width === 320 ? 323 : width)
       await page.screenshot({
-        path: testInfo.outputPath('group-overview-320-large-text.png'),
+        path: testInfo.outputPath(`group-overview-${width}-large-text.png`),
       })
     }
   })

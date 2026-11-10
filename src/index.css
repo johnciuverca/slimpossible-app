@@ -1440,6 +1440,10 @@ body {
 }
 
 @media (max-width: 639px) {
+  .group-workspace .group-overview-card.group-overview-compact {
+    container-name: group-overview;
+    container-type: inline-size;
+  }
   .group-workspace .group-overview-compact #group-progress-heading + dl {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0.25rem;
@@ -1471,6 +1475,12 @@ body {
 }
 
 @media (max-width: 359px) {
+  .group-workspace .group-overview-compact #group-progress-heading + dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container group-overview (max-width: 22em) {
   .group-workspace .group-overview-compact #group-progress-heading + dl {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
