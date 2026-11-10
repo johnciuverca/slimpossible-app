@@ -925,6 +925,152 @@ test('selected Group sections retain readable contrast in both color schemes', a
   }
 })
 
+for (const width of [320, 390, 430, 1280]) {
+  test(`Group overview summary row geometry at ${width}px`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 })
+    await installGroupFixtures(page, true)
+    await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    await expect(
+      page.getByRole('heading', { name: 'Group progress', exact: true }),
+    ).toBeVisible()
+    const metrics = page.locator('.group-overview-metric')
+    await expect(metrics).toHaveCount(4)
+    const chart = page
+      .locator('.group-history-workspace svg[role="img"]')
+      .first()
+    await expect(chart).toBeVisible()
+    const bounds = await page.evaluate(() => {
+      const rect = (element: Element) => {
+        const { x, y, width, height, right, bottom } =
+          element.getBoundingClientRect()
+        return { x, y, width, height, right, bottom }
+      }
+      const card = document.querySelector('#group-summary')!
+      const row = card.querySelector('dl')!
+      const chart = document.querySelector(
+        '.group-history-workspace svg[role="img"]',
+      )!
+      return {
+        card: rect(card),
+        row: rect(row),
+        metrics: Array.from(row.children, rect),
+        metricText: Array.from(row.children, (metric) => {
+          const label = metric.querySelector('dt')!
+          const value = metric.querySelector('dd')!
+          const rangeRect = (element: Element) => {
+            const range = document.createRange()
+            range.selectNodeContents(element)
+            const { x, y, width, height, right, bottom } =
+              range.getBoundingClientRect()
+            return { x, y, width, height, right, bottom }
+          }
+          return { label: rangeRect(label), value: rangeRect(value) }
+        }),
+        chart: rect(chart),
+        pageWidth: document.documentElement.scrollWidth,
+        viewportWidth: window.innerWidth,
+      }
+    })
+    console.log('group-overview-summary-bounds', width, bounds)
+    await expect(metrics.nth(0)).toContainText('Members')
+    await expect(metrics.nth(0)).toContainText('3')
+    await expect(metrics.nth(1)).toContainText('42.5%')
+    await expect(metrics.nth(2)).toContainText('Checked in')
+    await expect(metrics.nth(3)).toContainText('Goals reached')
+    if (width < 640) {
+      const row = bounds.row
+      for (const metric of bounds.metrics) {
+        expect(metric.x).toBeGreaterThanOrEqual(row.x)
+        expect(metric.right).toBeLessThanOrEqual(row.right)
+      }
+      for (const text of bounds.metricText) {
+        for (const box of [text.label, text.value]) {
+          expect(box.x).toBeGreaterThanOrEqual(row.x)
+          expect(box.right).toBeLessThanOrEqual(row.right)
+        }
+      }
+      if (width >= 390) {
+        expect(new Set(bounds.metrics.map((metric) => metric.y)).size).toBe(1)
+        expect(bounds.row.height).toBeLessThanOrEqual(60)
+        expect(bounds.chart.y).toBeLessThan(530)
+      } else {
+        expect(new Set(bounds.metrics.map((metric) => metric.y)).size).toBe(2)
+        expect(bounds.chart.y).toBeLessThan(665)
+      }
+    } else {
+      expect(bounds.card.height).toBeCloseTo(103.15625, 1)
+      expect(bounds.row.height).toBeCloseTo(67.1875, 1)
+      expect(bounds.chart.x).toBeCloseTo(37, 1)
+      expect(bounds.chart.y).toBeCloseTo(444.15625, 1)
+      expect(bounds.chart.width).toBeCloseTo(1206, 1)
+      expect(bounds.chart.height).toBeCloseTo(441.140625, 1)
+    }
+    await page.screenshot({
+      path: testInfo.outputPath(`group-overview-${width}-after.png`),
+    })
+    if (width < 640) {
+      await page.locator('#group-summary').evaluate((card) => {
+        ;(card as HTMLElement).style.fontSize = '20px'
+      })
+      await metrics
+        .nth(1)
+        .locator('dt')
+        .evaluate((label) => {
+          label.textContent = 'Durchschnitt der Gruppenziele'
+        })
+      await metrics.locator('dt, dd').evaluateAll((texts) => {
+        for (const text of texts) {
+          ;(text as HTMLElement).style.fontSize = '20px'
+          ;(text as HTMLElement).style.lineHeight = '1.2'
+        }
+      })
+      const enlarged = await metrics.evaluateAll((cards) =>
+        cards.map((card) => {
+          const cardBox = card.getBoundingClientRect()
+          const textBoxes = ['dt', 'dd'].flatMap((selector) => {
+            const range = document.createRange()
+            range.selectNodeContents(card.querySelector(selector)!)
+            return Array.from(range.getClientRects(), (rect) => ({
+              left: rect.left,
+              right: rect.right,
+              top: rect.top,
+              bottom: rect.bottom,
+              cardLeft: cardBox.left,
+              cardRight: cardBox.right,
+              cardTop: cardBox.top,
+              cardBottom: cardBox.bottom,
+            }))
+          })
+          return { textBoxes }
+        }),
+      )
+      for (const { textBoxes } of enlarged) {
+        for (const textBox of textBoxes) {
+          expect(textBox.left).toBeGreaterThanOrEqual(textBox.cardLeft)
+          expect(textBox.right).toBeLessThanOrEqual(textBox.cardRight)
+          expect(textBox.top).toBeGreaterThanOrEqual(textBox.cardTop)
+          expect(textBox.bottom).toBeLessThanOrEqual(textBox.cardBottom)
+        }
+      }
+      await expect(metrics.nth(1)).toContainText('42.5%')
+      const enlargedRows = await metrics.evaluateAll(
+        (cards) =>
+          new Set(cards.map((card) => card.getBoundingClientRect().top)).size,
+      )
+      expect(enlargedRows).toBe(2)
+      const pageWidth = await page.evaluate(
+        () => document.documentElement.scrollWidth,
+      )
+      expect(pageWidth).toBeLessThanOrEqual(width === 320 ? 323 : width)
+      await page.screenshot({
+        path: testInfo.outputPath(`group-overview-${width}-large-text.png`),
+      })
+    }
+  })
+}
+
 for (const width of [1280, 390]) {
   test(`Group top actions align and retain disclosure/refresh behavior at ${width}px`, async ({
     page,

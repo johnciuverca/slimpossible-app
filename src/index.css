@@ -1438,3 +1438,50 @@ body {
     font-size: 12px;
   }
 }
+
+@media (max-width: 639px) {
+  .group-workspace .group-overview-card.group-overview-compact {
+    container-name: group-overview;
+    container-type: inline-size;
+  }
+  .group-workspace .group-overview-compact #group-progress-heading + dl {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.25rem;
+  }
+  .group-workspace .group-overview-compact .group-overview-metric {
+    min-width: 0;
+    padding: 4px 5px;
+  }
+  .group-workspace .group-overview-compact .group-overview-metric dt {
+    font-size: 0.625rem;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+  .group-workspace .group-overview-compact .group-overview-metric dd {
+    margin-block-start: 2px;
+    font-size: 0.875rem;
+    line-height: 1.1;
+    overflow-wrap: anywhere;
+  }
+  .group-workspace
+    .group-overview-compact
+    [role='group'][aria-label='This week’s winners'] {
+    gap: 2px 0.5rem;
+    padding-inline: 0.25rem;
+    font-size: 0.75rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 359px) {
+  .group-workspace .group-overview-compact #group-progress-heading + dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container group-overview (max-width: 22em) {
+  .group-workspace .group-overview-compact #group-progress-heading + dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
