@@ -865,6 +865,8 @@ body {
   justify-content: center;
   transform: translateY(1.5px);
 }
+/* Axis colors and slider handle geometry are CSS tokens; sizes and plot spacing
+   are centralized in components/sharedChartTheme.ts. */
 .chart-axis-title {
   fill: var(--color-ink-muted);
   font-size: 12px;

@@ -1449,6 +1449,15 @@ for (const viewport of [
       'font-size',
       '12px',
     )
+    await expect(chart).toHaveAttribute(
+      'data-chart-plot-left',
+      viewport.width <= 600 ? '40' : '52',
+    )
+    await expect(chart).toHaveAttribute(
+      'data-chart-plot-right',
+      viewport.width <= 600 ? '302' : '708',
+    )
+    await expect(chart).toHaveAttribute('data-chart-plot-top', '27')
     const firstChartPoint = chart
       .locator('circle[data-point-kind="recorded"][data-chart-point]')
       .first()
@@ -1502,11 +1511,11 @@ for (const viewport of [
     )!
     const plotBottom = await chart.evaluate(
       (element) =>
-        Number(element.getAttribute('viewBox')?.trim().split(/\s+/)[3]) - 42,
+        Number(element.getAttribute('viewBox')?.trim().split(/\s+/)[3]) - 36,
     )
     expect(heavier.y).toBeLessThan(lighter.y)
     for (const point of originalPoints) {
-      expect(point.y).toBeGreaterThan(30)
+      expect(point.y).toBeGreaterThan(27)
       expect(point.y).toBeLessThanOrEqual(plotBottom)
     }
     await expect(chart).toContainText('Weight (kg)')
@@ -1546,7 +1555,7 @@ for (const viewport of [
       expect(
         Math.abs(
           quickRangeLabel!.x -
-            (chartBounds!.x + (64 / 760) * chartBounds!.width),
+            (chartBounds!.x + (52 / 760) * chartBounds!.width),
         ),
       ).toBeLessThan(2)
     }
@@ -1629,6 +1638,14 @@ for (const viewport of [
     await expect(individualChart.locator('.chart-axis-tick').first()).toHaveCSS(
       'font-size',
       '10.2px',
+    )
+    await expect(individualChart).toHaveAttribute(
+      'data-chart-plot-left',
+      viewport.width <= 600 ? '40' : '52',
+    )
+    await expect(individualChart).toHaveAttribute(
+      'data-chart-plot-right',
+      viewport.width <= 600 ? '302' : '708',
     )
     await individualChart
       .locator('circle[data-point-kind="recorded"][data-chart-point]')
@@ -3077,6 +3094,25 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
     await expect(
       page.locator('.group-history-workspace svg').first(),
     ).toBeVisible()
+    const overviewChart = page
+      .locator('.group-history-workspace svg[role="img"]')
+      .first()
+    await expect(overviewChart).toHaveAttribute(
+      'data-chart-plot-left',
+      width <= 600 ? '40' : '52',
+    )
+    await expect(overviewChart).toHaveAttribute(
+      'data-chart-plot-right',
+      width <= 600 ? '302' : '708',
+    )
+    await expect(overviewChart).toHaveAttribute('data-chart-plot-top', '27')
+    const overviewViewBoxHeight = await overviewChart.evaluate((chart) =>
+      Number(chart.getAttribute('viewBox')?.trim().split(/\s+/)[3]),
+    )
+    await expect(overviewChart).toHaveAttribute(
+      'data-chart-plot-bottom',
+      String(overviewViewBoxHeight - 36),
+    )
     const nav = page.getByRole('navigation', { name: 'Group sections' })
     for (const name of [
       'Record weight',

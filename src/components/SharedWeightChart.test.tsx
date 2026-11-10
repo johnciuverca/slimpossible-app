@@ -72,7 +72,7 @@ it('marks estimates as hollow, labels them accessibly, and activates their date/
   expect(onPointActivate).toHaveBeenCalledTimes(2)
 })
 
-it('shares axis, spaced date ticks, numeric labels and exact tooltips without bridging missing days', () => {
+it('shares axis, weekly date ticks, numeric labels and exact tooltips without bridging missing days', () => {
   render(
     <SharedWeightChart
       title="Shared weight chart"
@@ -106,12 +106,9 @@ it('shares axis, spaced date ticks, numeric labels and exact tooltips without br
   expect(chart.querySelectorAll('circle[data-date]')).toHaveLength(2)
   expect(chart.querySelectorAll('.chart-value')).toHaveLength(2)
   expect(chart.querySelectorAll('[data-chart-tick]')).toHaveLength(11)
-  expect(chart.querySelectorAll('[data-chart-date-tick]')).toHaveLength(2)
+  expect(chart.querySelectorAll('[data-chart-date-tick]')).toHaveLength(1)
   expect(chart.querySelector('[data-chart-date-tick]')).toHaveTextContent(
     '01.10.2026',
-  )
-  expect(chart.querySelectorAll('[data-chart-date-tick]')[1]).toHaveTextContent(
-    '03.10.2026',
   )
   expect(chart.querySelector('[data-series="recorded-connection"]')).toBeNull()
   expect(chart.querySelector('circle title')).toHaveTextContent('Member: 90 kg')
@@ -238,7 +235,7 @@ it('centers a one-point member label over its point at the shared chart edge', (
     'text[data-date="2026-10-03"][data-value="75"]',
   )
   expect(label).toHaveAttribute('text-anchor', 'middle')
-  expect(Number(label?.getAttribute('x'))).toBe(696)
+  expect(Number(label?.getAttribute('x'))).toBe(708)
 })
 
 it('shows an accessible themed point tooltip on hover, keyboard focus, and touch', () => {
@@ -341,7 +338,7 @@ it('applies quick ranges, adjustable date endpoints, clipped trend/reference lin
   expect(chart().querySelector('[data-chart-reference]')).toBeInTheDocument()
   expect(chart().querySelector('[data-chart-trend]')).toHaveAttribute(
     'x1',
-    '64',
+    '52',
   )
   expect(screen.getByLabelText('Visible date range')).toHaveTextContent(
     '01.04.2026 – 01.05.2026',

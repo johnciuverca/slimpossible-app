@@ -146,7 +146,7 @@ for (const width of [1280, 390]) {
         Math.max(...presetButtons) - Math.min(...presetButtons),
       ).toBeLessThan(1)
     } else {
-      const plotStart = 64 / 760
+      const plotStart = 52 / 760
       expect(
         Math.abs(
           dateRangeLabel!.x - (chartBox!.x + plotStart * chartBox!.width),

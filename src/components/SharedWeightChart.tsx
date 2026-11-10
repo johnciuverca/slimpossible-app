@@ -131,8 +131,8 @@ export function SharedWeightChart({
     ? className.replace('min-w-[600px]', 'min-w-0')
     : className
   const chartFrameClassName = fitContainer
-    ? 'w-full min-w-0 pt-0'
-    : 'w-full min-w-[600px] pt-0'
+    ? `w-full min-w-0 ${sharedChartTheme.spacing.framePaddingClass}`
+    : `w-full min-w-[600px] ${sharedChartTheme.spacing.framePaddingClass}`
   const rangeId = useId()
   const tooltipId = useId()
   const rangeTrackRef = useRef<HTMLDivElement>(null)
@@ -348,16 +348,8 @@ export function SharedWeightChart({
   const viewBoxParts = chartViewBox.trim().split(/\s+/).map(Number)
   const viewBoxWidth = viewBoxParts[2] || 760
   const viewBoxHeight = viewBoxParts[3] || 266
-  const compactYAxisLabelWidth = compactLayout
-    ? Math.max(
-        0,
-        ...ticks.map(
-          (value) => format(value).length * sharedChartAxisTickPx * 0.55,
-        ),
-      )
-    : 0
   if (compactLayout) {
-    chartRight = viewBoxWidth - (chartLeft - 10 - compactYAxisLabelWidth)
+    chartRight = viewBoxWidth - sharedChartTheme.plot.compactRightInset
   }
   const plotBottom = viewBoxHeight - sharedChartTheme.plot.bottomInset
   const y = (value: number) =>
@@ -457,19 +449,39 @@ export function SharedWeightChart({
   ) => {
     if (event.pointerType === 'touch') setActivePoint({ id, source: 'touch' })
   }
-  const compactDateTickCount = Math.min(4, Math.ceil(span / 120) + 1)
-  const desktopDateTickCount = Math.min(8, Math.ceil(span / 60) + 1)
+  const compactDateTickCount = Math.min(
+    sharedChartTheme.dates.compactMaximumTicks,
+    Math.ceil(span / sharedChartTheme.dates.compactIntervalDays) + 1,
+  )
+  const weeklyDates = Array.from(
+    {
+      length: span
+        ? Math.floor(span / sharedChartTheme.dates.weeklyIntervalDays) + 1
+        : 1,
+    },
+    (_, index) => startDay + index * sharedChartTheme.dates.weeklyIntervalDays,
+  )
+  const weeklyTickDistance = span
+    ? ((chartRight - chartLeft) * sharedChartTheme.dates.weeklyIntervalDays) /
+      span
+    : Infinity
+  const minimumDateLabelGap =
+    sharedChartAxisTickPx *
+      sharedChartTheme.dates.averageGlyphWidthEm *
+      sharedChartTheme.dates.labelCharacters *
+      sharedChartTheme.dates.edgeLabelWidthMultiplier +
+    sharedChartTheme.dates.labelGapPx
+  const weeklyTickStride = Math.max(
+    1,
+    Math.ceil(minimumDateLabelGap / weeklyTickDistance),
+  )
   const dates = compactLayout
     ? Array.from({ length: span ? compactDateTickCount : 1 }, (_, index) =>
         compactDateTickCount === 1
           ? startDay
           : Math.round(startDay + (span * index) / (compactDateTickCount - 1)),
       ).filter((date, index, allDates) => allDates.indexOf(date) === index)
-    : Array.from({ length: span ? desktopDateTickCount : 1 }, (_, index) =>
-        desktopDateTickCount === 1
-          ? startDay
-          : Math.round(startDay + (span * index) / (desktopDateTickCount - 1)),
-      ).filter((date, index, allDates) => allDates.indexOf(date) === index)
+    : weeklyDates.filter((_, index) => index % weeklyTickStride === 0)
   const visibleCount =
     visiblePoints.filter((point) => !point.estimated).length +
     visibleSeries.reduce(
@@ -503,9 +515,6 @@ export function SharedWeightChart({
     span === 0 ? 0 : ((value - firstDay) / (lastDay - firstDay)) * 100
   const plotStartPercent = (chartLeft / viewBoxWidth) * 100
   const plotWidthPercent = ((chartRight - chartLeft) / viewBoxWidth) * 100
-  const compactContentInsetPercent =
-    ((chartLeft - 10 - compactYAxisLabelWidth) / viewBoxWidth) * 100
-  const compactContentWidthPercent = 100 - compactContentInsetPercent * 2
   const setThumbValue = (thumb: 'start' | 'end', value: number) => {
     if (thumb === 'start') {
       setSelectedRange({ start: Math.min(value, endDay), end: endDay })
@@ -519,7 +528,7 @@ export function SharedWeightChart({
     )
   }
   const presetClass = (selected: boolean) =>
-    `min-h-9 rounded-full border px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:opacity-50 ${selected ? 'border-emerald-800 bg-emerald-800 font-semibold text-white shadow-sm hover:bg-emerald-900 dark:border-emerald-300 dark:bg-emerald-300 dark:text-emerald-950' : 'border-line bg-page text-ink hover:bg-panel'}`
+    `${sharedChartTheme.rangePreset.baseClass} ${selected ? sharedChartTheme.rangePreset.selectedClass : sharedChartTheme.rangePreset.idleClass}`
   const choosePreset = (preset: typeof selectedPreset, start: number) => {
     setSelectedPreset(preset)
     setSelectedRange({ start, end: lastDay })
@@ -598,7 +607,7 @@ export function SharedWeightChart({
       >
         <div
           role="group"
-          className={`mb-3 flex w-full flex-wrap items-center gap-2 ${compactLayout ? 'justify-center' : ''}`}
+          className={`${sharedChartTheme.spacing.quickRangesBottomClass} flex w-full flex-wrap items-center ${sharedChartTheme.spacing.quickRangesGapClass} ${compactLayout ? 'justify-center' : ''}`}
           aria-label="Quick date ranges"
           style={
             compactLayout ? undefined : { paddingLeft: `${plotStartPercent}%` }
@@ -675,10 +684,19 @@ export function SharedWeightChart({
           }
           className={chartClassName}
           viewBox={chartViewBox}
+          data-chart-plot-left={chartLeft}
+          data-chart-plot-right={chartRight}
+          data-chart-plot-top={chartTop}
+          data-chart-plot-bottom={plotBottom}
         >
           <title>{title}</title>
           <desc>{description}</desc>
-          <text x={chartLeft} y="17" className="chart-axis-title" fontSize="13">
+          <text
+            x={chartLeft}
+            y="17"
+            className="chart-axis-title"
+            style={{ fontSize: `${sharedChartTheme.axisTitlePx}px` }}
+          >
             {yLabel}
           </text>
           {minorTicks.map((value) => (
@@ -1012,16 +1030,16 @@ export function SharedWeightChart({
         ) : null}
       </div>
       <div
-        className={`mt-2 ${compactLayout ? '' : 'px-2'}`}
+        className={`${sharedChartTheme.spacing.chartToSliderClass} ${compactLayout ? '' : 'px-2'}`}
         style={{
-          marginLeft: `${compactLayout ? compactContentInsetPercent : plotStartPercent}%`,
-          width: `${compactLayout ? compactContentWidthPercent : plotWidthPercent}%`,
+          marginLeft: `${plotStartPercent}%`,
+          width: `${plotWidthPercent}%`,
         }}
       >
         <output
           aria-label="Visible date range"
           aria-live="polite"
-          className="mb-1 block text-center text-xs text-ink-muted"
+          className={sharedChartTheme.spacing.rangeOutputClass}
         >
           <span className="font-semibold text-ink">{selectedRangeLabel}</span>
           <span aria-hidden="true"> · </span>
@@ -1029,7 +1047,7 @@ export function SharedWeightChart({
           {formatChartDate(dateAtDay(endDay))}
         </output>
         <div
-          className="relative h-8 touch-none"
+          className={sharedChartTheme.spacing.sliderTrackClass}
           role="group"
           aria-label="Adjust visible date range"
         >
