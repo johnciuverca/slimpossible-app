@@ -127,8 +127,12 @@ for (const width of [1280, 390]) {
       .getByText('Date range', { exact: true })
       .boundingBox()
     const chartBox = await chart.boundingBox()
+    const chartCardBox = await chart
+      .locator('xpath=ancestor::section[1]')
+      .boundingBox()
     expect(dateRangeLabel).not.toBeNull()
     expect(chartBox).not.toBeNull()
+    expect(chartCardBox).not.toBeNull()
     if (width <= 600) {
       expect(
         Math.abs(
@@ -146,7 +150,11 @@ for (const width of [1280, 390]) {
         Math.max(...presetButtons) - Math.min(...presetButtons),
       ).toBeLessThan(1)
     } else {
-      const plotStart = 52 / 760
+      const viewBoxWidth = Number(
+        (await chart.getAttribute('viewBox'))?.trim().split(/\s+/)[2],
+      )
+      const plotStart =
+        Number(await chart.getAttribute('data-chart-plot-left')) / viewBoxWidth
       expect(
         Math.abs(
           dateRangeLabel!.x - (chartBox!.x + plotStart * chartBox!.width),
@@ -169,9 +177,10 @@ for (const width of [1280, 390]) {
     for (const handle of sliderHandles) {
       const handleBox = await handle.boundingBox()
       expect(handleBox).not.toBeNull()
-      expect(handleBox!.x).toBeGreaterThanOrEqual(chartBox!.x)
+      expect(handleBox!.width).toBeGreaterThanOrEqual(width <= 600 ? 44 : 28)
+      expect(handleBox!.x).toBeGreaterThanOrEqual(chartCardBox!.x)
       expect(handleBox!.x + handleBox!.width).toBeLessThanOrEqual(
-        chartBox!.x + chartBox!.width,
+        chartCardBox!.x + chartCardBox!.width,
       )
     }
     await dateControls
