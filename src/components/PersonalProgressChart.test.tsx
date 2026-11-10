@@ -80,8 +80,8 @@ it('fits a Dashboard personal trend inside its card while keeping range controls
   for (const label of extremeLabels) {
     const x = Number(label.getAttribute('x'))
     const halfWidth = (label.textContent!.length * 5.4) / 2
-    expect(x - halfWidth).toBeGreaterThanOrEqual(40)
-    expect(x + halfWidth).toBeLessThanOrEqual(302)
+    expect(x - halfWidth).toBeGreaterThanOrEqual(32)
+    expect(x + halfWidth).toBeLessThanOrEqual(304)
   }
   const dateTicks = Array.from(
     chart.querySelectorAll('[data-chart-date-tick]'),
@@ -259,7 +259,7 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
       chart.querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
       (point) => Number(point.getAttribute('cx')),
     ),
-  ).toEqual([52, 708])
+  ).toEqual([44, 736])
   expect(
     chart.querySelector('circle[data-point-kind="recorded"] title'),
   ).toHaveTextContent('01.10.2026: 100 kg recorded')

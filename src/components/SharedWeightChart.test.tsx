@@ -235,7 +235,7 @@ it('centers a one-point member label over its point at the shared chart edge', (
     'text[data-date="2026-10-03"][data-value="75"]',
   )
   expect(label).toHaveAttribute('text-anchor', 'middle')
-  expect(Number(label?.getAttribute('x'))).toBe(708)
+  expect(Number(label?.getAttribute('x'))).toBe(736)
 })
 
 it('shows an accessible themed point tooltip on hover, keyboard focus, and touch', () => {
@@ -338,7 +338,7 @@ it('applies quick ranges, adjustable date endpoints, clipped trend/reference lin
   expect(chart().querySelector('[data-chart-reference]')).toBeInTheDocument()
   expect(chart().querySelector('[data-chart-trend]')).toHaveAttribute(
     'x1',
-    '52',
+    '44',
   )
   expect(screen.getByLabelText('Visible date range')).toHaveTextContent(
     '01.04.2026 – 01.05.2026',

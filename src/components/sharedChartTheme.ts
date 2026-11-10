@@ -1,6 +1,6 @@
 /**
  * Shared chart presentation source of truth. Change axis sizes, SVG plot bounds,
- * and control spacing here. Axis colors and range-slider handle geometry live
+ * frame gutters, and control spacing here. Axis colors and range-slider handle geometry live
  * in the matching .chart-axis-* and .date-range-handle rules in index.css.
  */
 export const sharedChartTheme = {
@@ -8,12 +8,12 @@ export const sharedChartTheme = {
   axisTickScale: 0.85,
   axisTitlePx: 12,
   plot: {
-    left: 52,
-    right: 708,
+    left: 44,
+    right: 736,
     top: 27,
     bottomInset: 36,
-    compactLeft: 40,
-    compactRightInset: 18,
+    compactLeft: 32,
+    compactRightInset: 16,
   },
   dates: {
     weeklyIntervalDays: 7,
@@ -26,6 +26,8 @@ export const sharedChartTheme = {
   },
   spacing: {
     framePaddingClass: 'pt-0',
+    frameHorizontalExpansionClass:
+      '-mx-2 w-[calc(100%+1rem)] sm:-mx-4 sm:w-[calc(100%+2rem)]',
     quickRangesBottomClass: 'mb-2',
     quickRangesGapClass: 'gap-2',
     chartToSliderClass: 'mt-1',
@@ -34,7 +36,7 @@ export const sharedChartTheme = {
   },
   rangePreset: {
     baseClass:
-      'min-h-9 rounded-full border px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:opacity-50',
+      'min-h-11 rounded-full border px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:opacity-50 sm:min-h-9',
     selectedClass:
       'border-emerald-800 bg-emerald-800 font-semibold text-white shadow-sm hover:bg-emerald-900 dark:border-emerald-300 dark:bg-emerald-300 dark:text-emerald-950',
     idleClass: 'border-line bg-page text-ink hover:bg-panel',

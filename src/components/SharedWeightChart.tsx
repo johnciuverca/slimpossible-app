@@ -131,7 +131,7 @@ export function SharedWeightChart({
     ? className.replace('min-w-[600px]', 'min-w-0')
     : className
   const chartFrameClassName = fitContainer
-    ? `w-full min-w-0 ${sharedChartTheme.spacing.framePaddingClass}`
+    ? `min-w-0 ${sharedChartTheme.spacing.frameHorizontalExpansionClass} ${sharedChartTheme.spacing.framePaddingClass}`
     : `w-full min-w-[600px] ${sharedChartTheme.spacing.framePaddingClass}`
   const rangeId = useId()
   const tooltipId = useId()
