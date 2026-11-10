@@ -111,9 +111,10 @@ for (const width of [1280, 390]) {
       )
     expect(yTicks.every((tick) => tick % 5 === 0)).toBe(true)
     await expect(chart.locator('[data-chart-minor-tick]')).not.toHaveCount(0)
-    await expect(
-      chart.locator('[data-chart-date-tick]').first(),
-    ).toHaveAttribute('font-size', width <= 600 ? '10' : '6.5')
+    await expect(chart.locator('[data-chart-date-tick]').first()).toHaveCSS(
+      'font-size',
+      '10.2px',
+    )
     await expect(page.getByText('Weight (kg)', { exact: true })).toHaveCount(1)
     await chart.screenshot({
       path: test.info().outputPath('personal-chart-narrow-preview.png'),

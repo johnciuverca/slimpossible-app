@@ -8,6 +8,7 @@ import {
 } from 'react'
 import { layoutChartValueLabels } from '../models/chartValueLabelLayout'
 import { formatChartDate } from '../models/chartDate'
+import { sharedChartAxisTickPx, sharedChartTheme } from './sharedChartTheme'
 
 export type SharedChartPoint = {
   date: string
@@ -37,9 +38,9 @@ export type SharedChartLine = {
   kind: 'trend' | 'reference'
 }
 
-const left = 64
-const right = 696
-const top = 36
+const left = sharedChartTheme.plot.left
+const right = sharedChartTheme.plot.right
+const top = sharedChartTheme.plot.top
 const day = (date: string) => Date.parse(`${date}T00:00:00Z`) / 86400000
 const dateAtDay = (value: number) =>
   new Date(value * 86400000).toISOString().slice(0, 10)
@@ -122,7 +123,7 @@ export function SharedWeightChart({
     return () => window.removeEventListener('resize', update)
   }, [fitContainer])
   const compactLayout = fitContainer && compactFitLayout
-  const chartLeft = compactLayout ? 48 : left
+  const chartLeft = compactLayout ? sharedChartTheme.plot.compactLeft : left
   let chartRight = compactLayout ? 312 : right
   const chartTop = top
   const chartViewBox = compactLayout ? '0 0 320 266' : viewBox
@@ -130,8 +131,8 @@ export function SharedWeightChart({
     ? className.replace('min-w-[600px]', 'min-w-0')
     : className
   const chartFrameClassName = fitContainer
-    ? 'w-full min-w-0 pt-2'
-    : 'w-full min-w-[600px] pt-2'
+    ? 'w-full min-w-0 pt-0'
+    : 'w-full min-w-[600px] pt-0'
   const rangeId = useId()
   const tooltipId = useId()
   const rangeTrackRef = useRef<HTMLDivElement>(null)
@@ -348,12 +349,17 @@ export function SharedWeightChart({
   const viewBoxWidth = viewBoxParts[2] || 760
   const viewBoxHeight = viewBoxParts[3] || 266
   const compactYAxisLabelWidth = compactLayout
-    ? Math.max(0, ...ticks.map((value) => format(value).length * 7.2))
+    ? Math.max(
+        0,
+        ...ticks.map(
+          (value) => format(value).length * sharedChartAxisTickPx * 0.55,
+        ),
+      )
     : 0
   if (compactLayout) {
     chartRight = viewBoxWidth - (chartLeft - 10 - compactYAxisLabelWidth)
   }
-  const plotBottom = viewBoxHeight - 52
+  const plotBottom = viewBoxHeight - sharedChartTheme.plot.bottomInset
   const y = (value: number) =>
     plotBottom -
     ((value - yMinimum) / (yMaximum - yMinimum)) * (plotBottom - chartTop)
@@ -452,16 +458,18 @@ export function SharedWeightChart({
     if (event.pointerType === 'touch') setActivePoint({ id, source: 'touch' })
   }
   const compactDateTickCount = Math.min(4, Math.ceil(span / 120) + 1)
+  const desktopDateTickCount = Math.min(8, Math.ceil(span / 60) + 1)
   const dates = compactLayout
     ? Array.from({ length: span ? compactDateTickCount : 1 }, (_, index) =>
         compactDateTickCount === 1
           ? startDay
           : Math.round(startDay + (span * index) / (compactDateTickCount - 1)),
       ).filter((date, index, allDates) => allDates.indexOf(date) === index)
-    : Array.from(
-        { length: span ? Math.floor(span / 7) + 1 : 1 },
-        (_, index) => startDay + index * 7,
-      )
+    : Array.from({ length: span ? desktopDateTickCount : 1 }, (_, index) =>
+        desktopDateTickCount === 1
+          ? startDay
+          : Math.round(startDay + (span * index) / (desktopDateTickCount - 1)),
+      ).filter((date, index, allDates) => allDates.indexOf(date) === index)
   const visibleCount =
     visiblePoints.filter((point) => !point.estimated).length +
     visibleSeries.reduce(
@@ -496,7 +504,7 @@ export function SharedWeightChart({
   const plotStartPercent = (chartLeft / viewBoxWidth) * 100
   const plotWidthPercent = ((chartRight - chartLeft) / viewBoxWidth) * 100
   const compactContentInsetPercent =
-    ((chartLeft - 10 - compactYAxisLabelWidth) / viewBoxWidth) * 100 + 0.5
+    ((chartLeft - 10 - compactYAxisLabelWidth) / viewBoxWidth) * 100
   const compactContentWidthPercent = 100 - compactContentInsetPercent * 2
   const setThumbValue = (thumb: 'start' | 'end', value: number) => {
     if (thumb === 'start') {
@@ -670,7 +678,7 @@ export function SharedWeightChart({
         >
           <title>{title}</title>
           <desc>{description}</desc>
-          <text x={chartLeft} y="17" className="chart-axis" fontSize="13">
+          <text x={chartLeft} y="17" className="chart-axis-title" fontSize="13">
             {yLabel}
           </text>
           {minorTicks.map((value) => (
@@ -700,8 +708,8 @@ export function SharedWeightChart({
                 x={chartLeft - 10}
                 y={y(value) + 4}
                 textAnchor="end"
-                className="chart-axis"
-                fontSize={compactLayout ? '13' : '12'}
+                className="chart-axis-tick"
+                style={{ fontSize: `${sharedChartAxisTickPx}px` }}
               >
                 {format(value)}
               </text>
@@ -980,8 +988,8 @@ export function SharedWeightChart({
                       ? 'end'
                       : 'middle'
               }
-              className="chart-axis"
-              fontSize={compactLayout ? '10' : '6.5'}
+              className="chart-axis-tick"
+              style={{ fontSize: `${sharedChartAxisTickPx}px` }}
               data-chart-date-tick={dateAtDay(date)}
             >
               {formatChartDate(dateAtDay(date))}

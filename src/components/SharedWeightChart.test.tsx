@@ -72,7 +72,7 @@ it('marks estimates as hollow, labels them accessibly, and activates their date/
   expect(onPointActivate).toHaveBeenCalledTimes(2)
 })
 
-it('shares axis, weekly date ticks, numeric labels and exact tooltips without bridging missing days', () => {
+it('shares axis, spaced date ticks, numeric labels and exact tooltips without bridging missing days', () => {
   render(
     <SharedWeightChart
       title="Shared weight chart"
@@ -106,9 +106,12 @@ it('shares axis, weekly date ticks, numeric labels and exact tooltips without br
   expect(chart.querySelectorAll('circle[data-date]')).toHaveLength(2)
   expect(chart.querySelectorAll('.chart-value')).toHaveLength(2)
   expect(chart.querySelectorAll('[data-chart-tick]')).toHaveLength(11)
-  expect(chart.querySelectorAll('[data-chart-date-tick]')).toHaveLength(1)
+  expect(chart.querySelectorAll('[data-chart-date-tick]')).toHaveLength(2)
   expect(chart.querySelector('[data-chart-date-tick]')).toHaveTextContent(
     '01.10.2026',
+  )
+  expect(chart.querySelectorAll('[data-chart-date-tick]')[1]).toHaveTextContent(
+    '03.10.2026',
   )
   expect(chart.querySelector('[data-series="recorded-connection"]')).toBeNull()
   expect(chart.querySelector('circle title')).toHaveTextContent('Member: 90 kg')

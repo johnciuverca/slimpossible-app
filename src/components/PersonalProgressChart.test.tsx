@@ -234,12 +234,12 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
     chart.querySelectorAll('[data-chart-date-tick]'),
     (tick) => tick.getAttribute('data-chart-date-tick'),
   )
-  expect(dates).toEqual(['2026-10-01', '2026-10-08'])
+  expect(dates).toEqual(['2026-10-01', '2026-10-11'])
   expect(
     Array.from(chart.querySelectorAll('[data-chart-date-tick]'), (tick) =>
-      tick.getAttribute('font-size'),
+      tick.classList.contains('chart-axis-tick'),
     ),
-  ).toEqual(['6.5', '6.5'])
+  ).toEqual([true, true])
   expect(chart).toHaveAttribute('viewBox', '0 0 760 266')
   expect(chart).toHaveClass('block', 'h-auto', 'w-full', 'min-w-[600px]')
   expect(chart.querySelector('path:not([data-chart-trend])')).toHaveAttribute(

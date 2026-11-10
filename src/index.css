@@ -865,9 +865,12 @@ body {
   justify-content: center;
   transform: translateY(1.5px);
 }
-.chart-axis {
+.chart-axis-title {
   fill: var(--color-ink-muted);
   font-size: 12px;
+}
+.chart-axis-tick {
+  fill: var(--color-ink-muted);
 }
 .chart-value {
   fill: var(--color-ink);

@@ -1441,6 +1441,14 @@ for (const viewport of [
       name: 'Weight (kg) — shared group history',
     })
     await expect(chart).toBeVisible()
+    await expect(chart.locator('.chart-axis-tick').first()).toHaveCSS(
+      'font-size',
+      '10.2px',
+    )
+    await expect(chart.locator('.chart-axis-title')).toHaveCSS(
+      'font-size',
+      '12px',
+    )
     const firstChartPoint = chart
       .locator('circle[data-point-kind="recorded"][data-chart-point]')
       .first()
@@ -1494,11 +1502,11 @@ for (const viewport of [
     )!
     const plotBottom = await chart.evaluate(
       (element) =>
-        Number(element.getAttribute('viewBox')?.trim().split(/\s+/)[3]) - 52,
+        Number(element.getAttribute('viewBox')?.trim().split(/\s+/)[3]) - 42,
     )
     expect(heavier.y).toBeLessThan(lighter.y)
     for (const point of originalPoints) {
-      expect(point.y).toBeGreaterThan(25)
+      expect(point.y).toBeGreaterThan(30)
       expect(point.y).toBeLessThanOrEqual(plotBottom)
     }
     await expect(chart).toContainText('Weight (kg)')
@@ -1618,6 +1626,10 @@ for (const viewport of [
     const individualChart = page.getByRole('img', {
       name: 'Weight (kg) — shared group history',
     })
+    await expect(individualChart.locator('.chart-axis-tick').first()).toHaveCSS(
+      'font-size',
+      '10.2px',
+    )
     await individualChart
       .locator('circle[data-point-kind="recorded"][data-chart-point]')
       .first()

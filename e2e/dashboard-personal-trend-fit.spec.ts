@@ -48,6 +48,17 @@ for (const viewport of viewports) {
       name: /^Personal weight history chart/,
     })
     await expect(chart).toBeVisible()
+    const axisTickSizes = await chart.evaluate((element) =>
+      Array.from(element.querySelectorAll('.chart-axis-tick')).map(
+        (tick) => getComputedStyle(tick).fontSize,
+      ),
+    )
+    expect(axisTickSizes.length).toBeGreaterThan(0)
+    expect(new Set(axisTickSizes)).toEqual(new Set(['10.2px']))
+    await expect(chart.locator('.chart-axis-title')).toHaveCSS(
+      'font-size',
+      '12px',
+    )
     await chart.scrollIntoViewIfNeeded()
     await expect(
       chart.locator('circle[data-point-kind="recorded"][data-date]'),
@@ -96,6 +107,23 @@ for (const viewport of viewports) {
       'viewBox',
       compact ? '0 0 320 266' : '0 0 760 266',
     )
+    if (!compact) {
+      const dateLabelBounds = await chart
+        .locator('[data-chart-date-tick]')
+        .evaluateAll((labels) =>
+          labels
+            .map((label) => {
+              const bounds = (label as SVGTextElement).getBBox()
+              return { left: bounds.x, right: bounds.x + bounds.width }
+            })
+            .sort((first, second) => first.left - second.left),
+        )
+      expect(dateLabelBounds.length).toBeLessThanOrEqual(8)
+      for (let index = 1; index < dateLabelBounds.length; index++)
+        expect(dateLabelBounds[index - 1].right).toBeLessThanOrEqual(
+          dateLabelBounds[index].left,
+        )
+    }
     const [rangeTicks, rangeControls, sliderTrack] = await Promise.all([
       chart
         .locator('[data-chart-date-tick]')
@@ -119,18 +147,6 @@ for (const viewport of viewports) {
       )
       expect(rangeTicks[0]).toBe(savedDates[0])
       expect(rangeTicks.at(-1)).toBe(savedDates.at(-1))
-      expect(
-        await chart
-          .locator('[data-chart-tick] text')
-          .first()
-          .getAttribute('font-size'),
-      ).toBe('13')
-      expect(
-        await chart
-          .locator('[data-chart-date-tick]')
-          .first()
-          .getAttribute('font-size'),
-      ).toBe('10')
       const scrollMetrics = await chartGroup.evaluate((element) => {
         const frame = element.querySelector('svg')?.parentElement?.parentElement
         return {
