@@ -20,6 +20,8 @@ export type SharedChartPoint = {
   markerLabel?: string
   estimated?: boolean
   weeklySummary?: string
+  weeklyStart?: string
+  weeklyEnd?: string
 }
 
 export type SharedChartSeries = {
@@ -255,7 +257,21 @@ export function SharedWeightChart({
   }
   const visibleSeries = series.map((item) => ({
     ...item,
-    points: item.points.filter((point) => inRange(point.date)),
+    points: item.points.flatMap((point) => {
+      if (point.weeklySummary && point.weeklyStart && point.weeklyEnd) {
+        if (day(point.weeklyEnd) < startDay || day(point.weeklyStart) > endDay)
+          return []
+        return [
+          {
+            ...point,
+            date: dateAtDay(
+              Math.max(startDay, Math.min(endDay, day(point.date))),
+            ),
+          },
+        ]
+      }
+      return inRange(point.date) ? [point] : []
+    }),
   }))
   const extremeSeriesPointIds = new Set<string>()
   if (labelSeriesExtremesOnly) {
@@ -814,14 +830,21 @@ export function SharedWeightChart({
               {item.points.slice(1).map((point, index) => {
                 const previous = item.points[index]
                 const connected =
-                  item.connectGaps || day(point.date) - day(previous.date) === 1
+                  point.weeklySummary ||
+                  previous.weeklySummary ||
+                  item.connectGaps ||
+                  day(point.date) - day(previous.date) === 1
                 if (!connected) return null
                 const estimated = previous.estimated || point.estimated
                 return (
                   <path
                     key={`line-${previous.date}-${point.date}`}
                     data-series={
-                      estimated ? 'estimated-connection' : 'recorded-connection'
+                      point.weeklySummary || previous.weeklySummary
+                        ? 'weekly-summary-connection'
+                        : estimated
+                          ? 'estimated-connection'
+                          : 'recorded-connection'
                     }
                     d={`M ${x(previous.date)} ${y(previous.value)} L ${x(point.date)} ${y(point.value)}`}
                     fill="none"

@@ -967,6 +967,15 @@ for (const width of [320, 390, 430, 1280]) {
       /Weekly average 89 kg.*2 recorded weigh-ins/,
     )
     await summary.focus()
+    const details = page.getByRole('tooltip')
+    await expect(details).toContainText('2 recorded weigh-ins')
+    const detailsBox = await details.boundingBox()
+    expect(detailsBox!.x).toBeGreaterThanOrEqual(0)
+    expect(detailsBox!.x + detailsBox!.width).toBeLessThanOrEqual(width)
+    await page.screenshot({
+      path: testInfo.outputPath(`weekly-details-${width}.png`),
+      fullPage: true,
+    })
     await page.keyboard.press('Enter')
     await expect(summary).toHaveCount(0)
     await expect(
@@ -981,6 +990,36 @@ for (const width of [320, 390, 430, 1280]) {
     expect(box!.x + box!.width).toBeLessThanOrEqual(width)
     await page.screenshot({
       path: testInfo.outputPath(`weekly-history-${width}.png`),
+      fullPage: true,
+    })
+    await page.getByRole('link', { name: 'Charts', exact: true }).click()
+    await expect(
+      page.getByRole('tab', { name: 'All members', exact: true }),
+    ).toHaveAttribute('aria-selected', 'true')
+    await expect(summary).toHaveCount(1)
+    await expect(
+      page.locator('path[data-series="weekly-summary-connection"]'),
+    ).not.toHaveCount(0)
+    await page
+      .getByRole('slider', { name: 'Visible range start' })
+      .press('ArrowRight')
+    await expect(summary).toHaveAttribute('data-date', '2026-09-02')
+    await expect(summary).toHaveAttribute('data-value', '89')
+    await summary.focus()
+    await expect(page.getByRole('tooltip')).toContainText(
+      '01.09.2026 to 02.09.2026',
+    )
+    await page.keyboard.press('Enter')
+    await expect(summary).toHaveCount(0)
+    await expect(
+      page.locator(
+        'circle[data-point-kind="recorded"][data-date="2026-09-02"]',
+      ),
+    ).toHaveCount(1)
+    await page.getByRole('button', { name: 'Collapse expanded weeks' }).click()
+    await expect(summary).toHaveAttribute('data-value', '89')
+    await page.screenshot({
+      path: testInfo.outputPath(`weekly-charts-range-${width}.png`),
       fullPage: true,
     })
   })

@@ -30,7 +30,7 @@ it('uses a common inclusive fourteen-day cutoff and excludes estimated weights',
   expect(result[0].points.map((point) => point.value)).toEqual([80, 82, 84])
   expect(result[0].points[1].weeklySummary).toBe('owner:2026-10-26')
   expect(result[0].points[2].weeklySummary).toBeUndefined()
-  expect(result[0].points[1].tooltip).toContain('2026-10-26 to 2026-10-27')
+  expect(result[0].points[1].tooltip).toContain('26.10.2026 to 27.10.2026')
   expect(input[0].points).toHaveLength(4)
 })
 

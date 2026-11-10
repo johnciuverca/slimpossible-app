@@ -4,6 +4,59 @@ import { SharedWeightChart } from './SharedWeightChart'
 
 afterEach(cleanup)
 
+it('retains overlapping weekly means in narrow ranges and connects summaries to recent daily points', () => {
+  const { container } = render(
+    <SharedWeightChart
+      title="Ranges"
+      description="History"
+      yLabel="kg"
+      min={70}
+      max={90}
+      compactOlderHistory
+      series={[
+        {
+          id: 'a',
+          color: 'green',
+          points: [
+            { date: '2026-09-01', value: 80, title: 'First' },
+            {
+              date: '2026-09-03',
+              value: 82,
+              title: 'Second',
+              markerLabel: 'Original September third',
+            },
+            { date: '2026-09-08', value: 79, title: 'Boundary week' },
+            { date: '2026-09-09', value: 78, title: 'Recent boundary' },
+            { date: '2026-09-22', value: 77, title: 'Newest' },
+          ],
+        },
+      ]}
+    />,
+  )
+  expect(
+    container.querySelectorAll('path[data-series="weekly-summary-connection"]'),
+  ).toHaveLength(2)
+  const start = screen.getByRole('slider', { name: 'Visible range start' })
+  fireEvent.keyDown(start, { key: 'ArrowRight' })
+  fireEvent.keyDown(start, { key: 'ArrowRight' })
+  const summary = screen.getByRole('button', { name: /Weekly average 81 kg/ })
+  expect(summary).toHaveAttribute('data-date', '2026-09-03')
+  expect(summary).toHaveAttribute(
+    'aria-label',
+    expect.stringContaining('01.09.2026 to 03.09.2026'),
+  )
+  fireEvent.click(summary)
+  expect(
+    screen.getByRole('button', { name: 'Original September third' }),
+  ).toHaveAttribute('data-value', '82')
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Collapse expanded weeks' }),
+  )
+  expect(
+    screen.getByRole('button', { name: /Weekly average 81 kg/ }),
+  ).toHaveAttribute('data-value', '81')
+})
+
 it('expands weekly summaries accessibly, preserves daily activation, and collapses them', () => {
   const activate = vi.fn()
   render(
