@@ -1941,6 +1941,44 @@ for (const viewport of [
     })
     await page.mouse.move(8, 8)
     await expect(pointTooltip).toHaveCount(0)
+    await firstChartPoint.click()
+    const pointDetails = page.getByRole('group', {
+      name: /Chart point details/,
+    })
+    await expect(pointDetails).toBeVisible()
+    const firstPointDetails = await pointDetails.getAttribute('aria-label')
+    const anotherChartPoint = chart
+      .locator('circle[data-point-kind="recorded"][data-chart-point]')
+      .last()
+    await anotherChartPoint.click()
+    await expect(pointDetails).toBeVisible()
+    await expect(pointDetails).not.toHaveAttribute(
+      'aria-label',
+      firstPointDetails!,
+    )
+    const chartBox = (await chart.boundingBox())!
+    await page.mouse.click(chartBox.x + chartBox.width / 2, chartBox.y + 4)
+    await expect(pointDetails).toHaveCount(0)
+
+    await firstChartPoint.focus()
+    await page.keyboard.press('Enter')
+    await expect(pointDetails).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(pointDetails).toHaveCount(0)
+    await expect(firstChartPoint).toBeFocused()
+
+    const memberNavigation = page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Members', exact: true })
+    await firstChartPoint.click()
+    await expect(pointDetails).toBeVisible()
+    await memberNavigation.click()
+    await expect(memberNavigation).toHaveAttribute('aria-current', 'page')
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Charts', exact: true })
+      .click()
+    await expect(chart).toBeVisible()
     const groupLegend = page.getByRole('list', {
       name: 'Group chart legend',
     })
@@ -2973,8 +3011,21 @@ test('the shared chart range handles respond to mobile touch dragging', async ({
     await expect(page.getByRole('tooltip')).toContainText(
       /Ava \(member 1\).*20\.09\.2026.*90 kg/,
     )
+    const pointDetails = page.getByRole('group', {
+      name: /Chart point details/,
+    })
+    const chartBox = (await chart.boundingBox())!
+    await page.touchscreen.tap(chartBox.x + chartBox.width / 2, chartBox.y + 4)
+    await expect(pointDetails).toHaveCount(0)
+
+    const reopenedPointBounds = (await firstPoint.boundingBox())!
+    await page.touchscreen.tap(
+      reopenedPointBounds.x + reopenedPointBounds.width / 2,
+      reopenedPointBounds.y + reopenedPointBounds.height / 2,
+    )
+    await expect(pointDetails).toBeVisible()
     await page.touchscreen.tap(5, 5)
-    await expect(page.getByRole('tooltip')).toHaveCount(0)
+    await expect(pointDetails).toHaveCount(0)
     const controls = page.getByRole('group', {
       name: 'Chart date range controls',
     })
