@@ -105,6 +105,138 @@ describe('Group chart history', () => {
     )
     expect(screen.getByRole('rowheader', { name: '2026-09-03' })).toBeVisible()
   })
+  it('toggles comparison series without changing axes, dates, or source history', async () => {
+    const entries: GroupChartEntry[] = [
+      {
+        memberKey: 'member-a',
+        displayName: 'Ava',
+        date: '2026-08-01',
+        weightKg: 91,
+      },
+      {
+        memberKey: 'member-a',
+        displayName: 'Ava',
+        date: '2026-09-01',
+        weightKg: 90,
+      },
+      {
+        memberKey: 'member-a',
+        displayName: 'Ava',
+        date: '2026-09-03',
+        weightKg: 88,
+      },
+      {
+        memberKey: 'member-b',
+        displayName: 'Nora',
+        date: '2026-08-01',
+        weightKg: 71,
+      },
+      {
+        memberKey: 'member-b',
+        displayName: 'Nora',
+        date: '2026-09-01',
+        weightKg: 70,
+      },
+      {
+        memberKey: 'member-b',
+        displayName: 'Nora',
+        date: '2026-09-03',
+        weightKg: 72,
+      },
+    ]
+    render(
+      <GroupChartHistory
+        challengeId="group"
+        viewerId="viewer"
+        persistence={persistence(
+          vi.fn().mockResolvedValue({ state: 'success', data: entries }),
+        )}
+        refreshVersion={0}
+      />,
+    )
+
+    const chart = await screen.findByRole('img', {
+      name: 'Weight (kg) — shared group history',
+    })
+    const sharedHistory = screen.getByRole('table', {
+      name: 'Shared group weight history',
+    })
+    const sourceHistoryBefore = sharedHistory.textContent
+    const legend = screen.getByRole('list', { name: 'Group chart legend' })
+    const avaToggle = within(legend).getByRole('button', {
+      name: 'Ava chart series, currently visible',
+    })
+    const noraToggle = within(legend).getByRole('button', {
+      name: 'Nora chart series, currently visible',
+    })
+    const weeklySummary = chart.querySelector(
+      'circle[data-point-kind="weekly-summary"][data-chart-point]',
+    )!
+    fireEvent.click(weeklySummary)
+    fireEvent.click(screen.getByRole('button', { name: 'Expand week' }))
+    const backToAverages = screen.getByRole('button', {
+      name: 'Back to weekly averages',
+    })
+    expect(backToAverages).toBeVisible()
+    const ticksBefore = Array.from(
+      chart.querySelectorAll('[data-chart-tick]'),
+      (tick) => tick.getAttribute('data-chart-tick'),
+    )
+    const datesBefore = Array.from(
+      chart.querySelectorAll('[data-chart-date-tick]'),
+      (tick) => tick.getAttribute('data-chart-date-tick'),
+    )
+    const avaPoints = chart.querySelectorAll(
+      '[data-series-id="member-a"][data-chart-point]',
+    )
+    expect(avaPoints.length).toBeGreaterThan(0)
+    fireEvent.focus(avaPoints[0])
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Ava —')
+
+    fireEvent.click(avaToggle)
+    expect(avaToggle).toHaveAttribute('aria-pressed', 'false')
+    expect(
+      chart.querySelectorAll('[data-chart-series-id="member-a"]'),
+    ).toHaveLength(0)
+    expect(chart.querySelectorAll('[data-series-id="member-a"]')).toHaveLength(
+      0,
+    )
+    expect(
+      chart.querySelectorAll('[data-series-id="member-b"]'),
+    ).not.toHaveLength(0)
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    expect(backToAverages).toBeVisible()
+    expect(
+      Array.from(chart.querySelectorAll('[data-chart-tick]'), (tick) =>
+        tick.getAttribute('data-chart-tick'),
+      ),
+    ).toEqual(ticksBefore)
+    expect(
+      Array.from(chart.querySelectorAll('[data-chart-date-tick]'), (tick) =>
+        tick.getAttribute('data-chart-date-tick'),
+      ),
+    ).toEqual(datesBefore)
+
+    fireEvent.click(noraToggle)
+    expect(noraToggle).toHaveAttribute('aria-pressed', 'false')
+    expect(
+      screen.getByRole('status', { name: 'Chart visibility status' }),
+    ).toHaveTextContent('All participants are hidden')
+    expect(sharedHistory.textContent).toBe(sourceHistoryBefore)
+    expect(legend).toBeVisible()
+    expect(avaToggle).toBeVisible()
+    fireEvent.click(avaToggle)
+    expect(avaToggle).toHaveAttribute('aria-pressed', 'true')
+    expect(
+      screen.queryByRole('status', { name: 'Chart visibility status' }),
+    ).not.toBeInTheDocument()
+    expect(
+      chart.querySelectorAll('[data-series-id="member-a"]'),
+    ).not.toHaveLength(0)
+    expect(chart.querySelectorAll('[data-series-id="member-b"]')).toHaveLength(
+      0,
+    )
+  })
   it('keeps each identity color aligned across comparison, legend, member selection, and date filters', async () => {
     const entries: GroupChartEntry[] = [
       {

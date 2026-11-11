@@ -40,6 +40,7 @@ export type SharedChartSeries = {
 
 export type SharedChartLine = {
   id: string
+  seriesId?: string
   from: { date: string; value: number }
   to: { date: string; value: number }
   color: string
@@ -76,6 +77,7 @@ export function SharedWeightChart({
   points = [],
   series = [],
   lines = [],
+  hiddenSeriesIds,
   onPointActivate,
   canEditPoint,
   yLabel,
@@ -99,6 +101,7 @@ export function SharedWeightChart({
   points?: SharedChartPoint[]
   series?: SharedChartSeries[]
   lines?: SharedChartLine[]
+  hiddenSeriesIds?: ReadonlySet<string>
   onPointActivate?: (point: SharedChartPoint, seriesId?: string) => void
   canEditPoint?: (point: SharedChartPoint, seriesId?: string) => boolean
   yLabel: string
@@ -424,6 +427,11 @@ export function SharedWeightChart({
       return inRange(point.date) ? [point] : []
     }),
   }))
+  // Hidden members still define dates and axis bounds; only rendered content
+  // and interaction targets are filtered so comparisons do not jump.
+  const renderedSeries = visibleSeries.filter(
+    (item) => !hiddenSeriesIds?.has(item.id),
+  )
   const extremeSeriesPointIds = new Set<string>()
   if (labelSeriesExtremesOnly) {
     visibleSeries.forEach((item) => {
@@ -468,7 +476,7 @@ export function SharedWeightChart({
       point,
       seriesId: undefined as string | undefined,
     })),
-    ...visibleSeries.flatMap((item) =>
+    ...renderedSeries.flatMap((item) =>
       item.points.map((point, index) => ({
         id: `series:${item.id}:${point.date}:${index}`,
         point,
@@ -476,6 +484,17 @@ export function SharedWeightChart({
       })),
     ),
   ]
+  useEffect(() => {
+    const isHiddenSeriesPoint = (pointId: string | null) =>
+      pointId !== null &&
+      Array.from(hiddenSeriesIds ?? []).some((seriesId) =>
+        pointId.startsWith(`series:${seriesId}:`),
+      )
+    if (selectedPoint && isHiddenSeriesPoint(selectedPoint.id))
+      setSelectedPoint(null)
+    if (isHiddenSeriesPoint(hoveredPointId)) setHoveredPointId(null)
+    if (isHiddenSeriesPoint(focusedPointId)) setFocusedPointId(null)
+  }, [selectedPoint, hoveredPointId, focusedPointId, hiddenSeriesIds])
   const visiblePointId = selectedPoint?.id ?? hoveredPointId
   const highlightedPointId = visiblePointId ?? focusedPointId
   const visibleActivePoint = visiblePointId
@@ -604,7 +623,7 @@ export function SharedWeightChart({
   const chartValueLabelPositions = new Map(
     layoutChartValueLabels(
       [
-        ...visibleSeries.flatMap((item) =>
+        ...renderedSeries.flatMap((item) =>
           item.points.flatMap((point, index) =>
             point.label &&
             (!labelSeriesExtremesOnly ||
@@ -659,6 +678,7 @@ export function SharedWeightChart({
     : []
   const renderedLines = visibleLines
     .filter((line) => !referenceLinesOutsideRange.includes(line))
+    .filter((line) => !line.seriesId || !hiddenSeriesIds?.has(line.seriesId))
     .flatMap((line) => {
       if (!compactOlderHistory) return [line]
       const from = day(line.from.date)
@@ -1117,6 +1137,7 @@ export function SharedWeightChart({
                   line.kind === 'trend' ? 'derived-trend' : 'target-reference'
                 }
                 data-chart-line-kind={line.kind}
+                data-chart-series-id={line.seriesId}
                 data-chart-trend={line.kind === 'trend' ? '' : undefined}
                 data-chart-reference={
                   line.kind === 'reference' ? '' : undefined
@@ -1152,7 +1173,7 @@ export function SharedWeightChart({
               />
             )
           })}
-          {visibleSeries.map((item) => (
+          {renderedSeries.map((item) => (
             <g key={item.id}>
               {item.points.slice(1).map((point, index) => {
                 const previous = item.points[index]
@@ -1166,6 +1187,7 @@ export function SharedWeightChart({
                 return (
                   <path
                     key={`line-${previous.date}-${point.date}`}
+                    data-chart-series-id={item.id}
                     data-series={
                       point.weeklySummary || previous.weeklySummary
                         ? 'weekly-summary-connection'
@@ -1322,6 +1344,7 @@ export function SharedWeightChart({
                           className="chart-value"
                           fontSize={compactLayout ? '9' : '6.6'}
                           fontWeight="700"
+                          data-chart-series-id={item.id}
                           data-date={point.date}
                           data-value={point.value}
                         >
