@@ -585,7 +585,7 @@ describe('Group chart history', () => {
     expect(load).toHaveBeenCalledWith('group-a')
     const chart = screen.getByRole('img')
     expect(chart).toHaveAccessibleDescription(
-      /latest 14 calendar dates stay detailed/,
+      /latest 7 calendar dates stay detailed/,
     )
     expect(
       screen.getByText(/Explicitly shared dates and weights only/),

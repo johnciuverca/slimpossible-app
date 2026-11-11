@@ -13,6 +13,15 @@ it('retains overlapping weekly means in narrow ranges and connects summaries to 
       min={70}
       max={90}
       compactOlderHistory
+      lines={[
+        {
+          id: 'trend',
+          kind: 'trend',
+          color: 'orange',
+          from: { date: '2026-09-01', value: 80 },
+          to: { date: '2026-09-22', value: 77 },
+        },
+      ]}
       series={[
         {
           id: 'a',
@@ -36,6 +45,15 @@ it('retains overlapping weekly means in narrow ranges and connects summaries to 
   expect(
     container.querySelectorAll('path[data-series="weekly-summary-connection"]'),
   ).toHaveLength(2)
+  const trendSegments = Array.from(
+    container.querySelectorAll('line[data-chart-line-kind="trend"]'),
+  )
+  expect(trendSegments).toHaveLength(9)
+  const segmentWidths = trendSegments.map(
+    (line) => Number(line.getAttribute('x2')) - Number(line.getAttribute('x1')),
+  )
+  for (const width of segmentWidths)
+    expect(width).toBeCloseTo(segmentWidths[0], 4)
   const start = screen.getByRole('slider', { name: 'Visible range start' })
   fireEvent.keyDown(start, { key: 'ArrowRight' })
   fireEvent.keyDown(start, { key: 'ArrowRight' })

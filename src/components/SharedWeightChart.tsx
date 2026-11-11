@@ -8,6 +8,10 @@ import {
 } from 'react'
 import { layoutChartValueLabels } from '../models/chartValueLabelLayout'
 import { formatChartDate } from '../models/chartDate'
+import {
+  compressedChartSlots,
+  slotIndex,
+} from '../models/compressedChartTimeline'
 import { compactWeeklyHistory } from '../models/weeklyChartHistory'
 import { sharedChartAxisTickPx, sharedChartTheme } from './sharedChartTheme'
 
@@ -141,6 +145,22 @@ export function SharedWeightChart({
     : `w-full min-w-[600px] ${sharedChartTheme.spacing.framePaddingClass}`
   const rangeId = useId()
   const tooltipId = useId()
+  const plotRef = useRef<SVGSVGElement>(null)
+  const [pointScale, setPointScale] = useState(1)
+  useEffect(() => {
+    const plot = plotRef.current
+    if (!plot || !compactOlderHistory) return
+    const update = () =>
+      setPointScale(
+        plot.getBoundingClientRect().width /
+          (plot.viewBox?.baseVal?.width || 760) || 1,
+      )
+    update()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(update)
+    observer.observe(plot)
+    return () => observer.disconnect()
+  }, [compactOlderHistory, compactLayout, series.length])
   const rangeTrackRef = useRef<HTMLDivElement>(null)
   const [activePoint, setActivePoint] = useState<{
     id: string
@@ -209,12 +229,27 @@ export function SharedWeightChart({
               ? customStart
               : firstDay
   const endDay = selectedPreset === 'custom' ? customEnd : lastDay
+  const newestRecorded = Math.max(
+    ...plotted
+      .filter((point) => !point.estimated)
+      .map((point) => day(point.date)),
+  )
+  const fullSlots = compactOlderHistory
+    ? compressedChartSlots(firstDay, lastDay, newestRecorded, expandedWeeks)
+    : []
+  const displaySlots = fullSlots.filter(
+    (slot) => slot.end >= startDay && slot.start <= endDay,
+  )
   const fullRange = startDay === firstDay && endDay === lastDay
   const span = endDay - startDay
   const x = (date: string) =>
-    span
-      ? chartLeft + ((day(date) - startDay) / span) * (chartRight - chartLeft)
-      : (chartLeft + chartRight) / 2
+    compactOlderHistory
+      ? chartLeft +
+        ((slotIndex(displaySlots, day(date)) + 0.5) / displaySlots.length) *
+          (chartRight - chartLeft)
+      : span
+        ? chartLeft + ((day(date) - startDay) / span) * (chartRight - chartLeft)
+        : (chartLeft + chartRight) / 2
   const inRange = (date: string) => day(date) >= startDay && day(date) <= endDay
   const visiblePoints = points.filter((point) => inRange(point.date))
   const extremeLabelPointIds = new Set<string>()
@@ -315,11 +350,13 @@ export function SharedWeightChart({
     ...visiblePoints.map((point, index) => ({
       id: `point:${point.date}:${index}`,
       point,
+      seriesId: undefined as string | undefined,
     })),
     ...visibleSeries.flatMap((item) =>
       item.points.map((point, index) => ({
         id: `series:${item.id}:${point.date}:${index}`,
         point,
+        seriesId: item.id,
       })),
     ),
   ]
@@ -444,9 +481,31 @@ export function SharedWeightChart({
             line.to.value > yMaximum),
       )
     : []
-  const renderedLines = visibleLines.filter(
-    (line) => !referenceLinesOutsideRange.includes(line),
-  )
+  const renderedLines = visibleLines
+    .filter((line) => !referenceLinesOutsideRange.includes(line))
+    .flatMap((line) => {
+      if (!compactOlderHistory) return [line]
+      const from = day(line.from.date)
+      const to = day(line.to.date)
+      const samples = displaySlots
+        .filter((slot) => slot.end >= from && slot.start <= to)
+        .map((slot) => {
+          const date = Math.max(from, Math.min(to, (slot.start + slot.end) / 2))
+          return {
+            date: dateAtDay(Math.floor(date)),
+            value:
+              line.from.value +
+              (to === from ? 0 : (date - from) / (to - from)) *
+                (line.to.value - line.from.value),
+          }
+        })
+      return samples.slice(1).map((sample, index) => ({
+        ...line,
+        id: `${line.id}-slot-${index}`,
+        from: samples[index],
+        to: sample,
+      }))
+    })
   const minorTicks = useFiveKgTicks
     ? Array.from(
         { length: Math.max(0, Math.ceil(yMaximum - yMinimum) - 1) },
@@ -467,12 +526,36 @@ export function SharedWeightChart({
         : 'center'
     : 'center'
   const tooltipTransform = `translate(${tooltipAlignment === 'start' ? '0' : tooltipAlignment === 'end' ? '-100%' : '-50%'}, ${tooltipPosition && tooltipPosition.y < chartTop + 52 ? '10px' : 'calc(-100% - 10px)'})`
+  const nearestTarget = (
+    event: { clientX: number; clientY: number },
+    id: string,
+  ) => {
+    const fallback = tooltipTargets.find((target) => target.id === id)
+    const plot = plotRef.current
+    if (!compactOlderHistory || !plot || (!event.clientX && !event.clientY))
+      return fallback
+    const bounds = plot.getBoundingClientRect()
+    const distance = (target: (typeof tooltipTargets)[number]) =>
+      Math.hypot(
+        bounds.left +
+          (x(target.point.date) * bounds.width) / viewBoxWidth -
+          event.clientX,
+        bounds.top +
+          (y(target.point.value) * bounds.height) / viewBoxHeight -
+          event.clientY,
+      )
+    return tooltipTargets.reduce(
+      (best, target) =>
+        !best || distance(target) < distance(best) ? target : best,
+      fallback,
+    )
+  }
   const setPointSource = (
     event: ReactPointerEvent<SVGCircleElement>,
     id: string,
   ) => {
     setActivePoint({
-      id,
+      id: nearestTarget(event, id)?.id ?? id,
       source: event.pointerType === 'touch' ? 'touch' : 'pointer',
     })
   }
@@ -480,7 +563,11 @@ export function SharedWeightChart({
     event: ReactPointerEvent<SVGCircleElement>,
     id: string,
   ) => {
-    if (event.pointerType === 'touch') setActivePoint({ id, source: 'touch' })
+    if (event.pointerType === 'touch')
+      setActivePoint({
+        id: nearestTarget(event, id)?.id ?? id,
+        source: 'touch',
+      })
   }
   const compactDateTickCount = Math.min(
     sharedChartTheme.dates.compactMaximumTicks,
@@ -508,13 +595,26 @@ export function SharedWeightChart({
     1,
     Math.ceil(minimumDateLabelGap / weeklyTickDistance),
   )
-  const dates = compactLayout
-    ? Array.from({ length: span ? compactDateTickCount : 1 }, (_, index) =>
-        compactDateTickCount === 1
-          ? startDay
-          : Math.round(startDay + (span * index) / (compactDateTickCount - 1)),
-      ).filter((date, index, allDates) => allDates.indexOf(date) === index)
-    : weeklyDates.filter((_, index) => index % weeklyTickStride === 0)
+  const slotTickStride = Math.max(
+    1,
+    Math.ceil(
+      minimumDateLabelGap /
+        ((chartRight - chartLeft) / Math.max(1, displaySlots.length)),
+    ),
+  )
+  const dates = compactOlderHistory
+    ? displaySlots
+        .filter((_, index) => index % slotTickStride === 0)
+        .map((slot) => Math.max(startDay, slot.start))
+    : compactLayout
+      ? Array.from({ length: span ? compactDateTickCount : 1 }, (_, index) =>
+          compactDateTickCount === 1
+            ? startDay
+            : Math.round(
+                startDay + (span * index) / (compactDateTickCount - 1),
+              ),
+        ).filter((date, index, allDates) => allDates.indexOf(date) === index)
+      : weeklyDates.filter((_, index) => index % weeklyTickStride === 0)
   const visibleCount =
     visiblePoints.filter((point) => !point.estimated).length +
     sourceSeries.reduce(
@@ -546,8 +646,22 @@ export function SharedWeightChart({
             : selectedPreset === 'custom'
               ? 'Selected dates'
               : 'All recorded dates'
-  const rangePercent = (value: number) =>
-    span === 0 ? 0 : ((value - firstDay) / (lastDay - firstDay)) * 100
+  const rangePercent = (value: number) => {
+    if (compactOlderHistory) {
+      const index = slotIndex(fullSlots, value)
+      const slot = fullSlots[index]
+      const origin = 0.5 / (fullSlots[0].end - fullSlots[0].start + 1)
+      const limit = fullSlots.length - 0.5
+      const position =
+        index + (value - slot.start + 0.5) / (slot.end - slot.start + 1)
+      return limit === origin
+        ? 0
+        : ((position - origin) / (limit - origin)) * 100
+    }
+    return lastDay === firstDay
+      ? 0
+      : ((value - firstDay) / (lastDay - firstDay)) * 100
+  }
   const plotStartPercent = (chartLeft / viewBoxWidth) * 100
   const plotWidthPercent = ((chartRight - chartLeft) / viewBoxWidth) * 100
   const setThumbValue = (thumb: 'start' | 'end', value: number) => {
@@ -576,7 +690,25 @@ export function SharedWeightChart({
       0,
       Math.min(1, (clientX - bounds.left) / usableWidth),
     )
-    setThumbValue(thumb, Math.round(firstDay + percent * (lastDay - firstDay)))
+    if (compactOlderHistory) {
+      const origin = 0.5 / (fullSlots[0].end - fullSlots[0].start + 1)
+      const limit = fullSlots.length - 0.5
+      const position = origin + percent * (limit - origin)
+      const index = Math.min(fullSlots.length - 1, Math.floor(position))
+      const slot = fullSlots[index]
+      setThumbValue(
+        thumb,
+        Math.min(
+          slot.end,
+          slot.start +
+            Math.floor((position - index) * (slot.end - slot.start + 1)),
+        ),
+      )
+    } else
+      setThumbValue(
+        thumb,
+        Math.round(firstDay + percent * (lastDay - firstDay)),
+      )
   }
   const renderThumb = (thumb: 'start' | 'end') => {
     const isStart = thumb === 'start'
@@ -724,6 +856,7 @@ export function SharedWeightChart({
         }}
       >
         <svg
+          ref={plotRef}
           role="img"
           aria-label={chartTitle}
           aria-description={
@@ -876,19 +1009,42 @@ export function SharedWeightChart({
                     extremeSeriesPointIds.has(pointId)
                   return (
                     <g key={`${point.date}-${index}`}>
+                      {compactOlderHistory ? (
+                        <circle
+                          cx={x(point.date)}
+                          cy={y(point.value)}
+                          r={point.weeklySummary ? 7 : 3}
+                          fill={
+                            point.estimated
+                              ? 'var(--color-panel, white)'
+                              : item.color
+                          }
+                          stroke={item.color}
+                          strokeWidth="2"
+                          aria-hidden="true"
+                          pointerEvents="none"
+                          data-visual-marker={
+                            point.weeklySummary ? 'weekly' : 'daily'
+                          }
+                        />
+                      ) : null}
                       <circle
                         cx={x(point.date)}
                         cy={y(point.value)}
-                        r={point.weeklySummary ? 7 : 5}
+                        r={compactOlderHistory ? 22.1 / pointScale : 5}
                         fill={
-                          point.estimated
-                            ? 'var(--color-panel, white)'
-                            : item.color
+                          compactOlderHistory
+                            ? 'transparent'
+                            : point.estimated
+                              ? 'var(--color-panel, white)'
+                              : item.color
                         }
                         stroke={
-                          point.estimated
-                            ? item.color
-                            : 'var(--color-panel, white)'
+                          compactOlderHistory
+                            ? 'transparent'
+                            : point.estimated
+                              ? item.color
+                              : 'var(--color-panel, white)'
                         }
                         strokeWidth="2"
                         data-point-kind={
@@ -939,7 +1095,13 @@ export function SharedWeightChart({
                             activatePoint(point, item.id)
                           }
                         }}
-                        onClick={() => activatePoint(point, item.id)}
+                        onClick={(event) => {
+                          const target = nearestTarget(event, pointId)
+                          activatePoint(
+                            target?.point ?? point,
+                            target?.seriesId ?? item.id,
+                          )
+                        }}
                       >
                         <title>{point.title}</title>
                       </circle>

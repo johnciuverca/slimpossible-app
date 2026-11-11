@@ -16,21 +16,21 @@ const series = (
   })),
 })
 
-it('uses a common inclusive fourteen-day cutoff and excludes estimated weights', () => {
+it('uses a common inclusive seven-day cutoff and excludes estimated weights', () => {
   const input = [
     series([
-      ['2026-10-25', 80],
-      ['2026-10-26', 82],
-      ['2026-10-27', 200, true],
-      ['2026-10-28', 84],
+      ['2026-11-01', 80],
+      ['2026-11-02', 82],
+      ['2026-11-03', 200, true],
+      ['2026-11-04', 84],
     ]),
     series([['2026-11-10', 70]], 'member'),
   ]
   const result = compactWeeklyHistory(input, new Set())
   expect(result[0].points.map((point) => point.value)).toEqual([80, 82, 84])
-  expect(result[0].points[1].weeklySummary).toBe('owner:2026-10-26')
+  expect(result[0].points[1].weeklySummary).toBe('owner:2026-11-02')
   expect(result[0].points[2].weeklySummary).toBeUndefined()
-  expect(result[0].points[1].tooltip).toContain('26.10.2026 to 27.10.2026')
+  expect(result[0].points[1].tooltip).toContain('02.11.2026 to 03.11.2026')
   expect(input[0].points).toHaveLength(4)
 })
 

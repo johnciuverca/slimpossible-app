@@ -952,6 +952,30 @@ for (const width of [320, 390, 430, 1280]) {
             {
               member_key: 'opaque-member-a',
               display_name: 'Ava',
+              recorded_date: '2026-09-08',
+              weight_kg: 89,
+            },
+            {
+              member_key: 'opaque-member-a',
+              display_name: 'Ava',
+              recorded_date: '2026-09-15',
+              weight_kg: 88,
+            },
+            {
+              member_key: 'opaque-member-b',
+              display_name: 'Ben',
+              recorded_date: '2026-09-08',
+              weight_kg: 81,
+            },
+            {
+              member_key: 'opaque-member-b',
+              display_name: 'Ben',
+              recorded_date: '2026-09-22',
+              weight_kg: 80,
+            },
+            {
+              member_key: 'opaque-member-a',
+              display_name: 'Ava',
               recorded_date: '2026-09-22',
               weight_kg: 87,
             },
@@ -960,12 +984,57 @@ for (const width of [320, 390, 430, 1280]) {
       },
     )
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
-    const summary = page.locator('circle[data-point-kind="weekly-summary"]')
+    const summary = page.getByRole('button', {
+      name: /Weekly average 89 kg.*2 recorded weigh-ins/,
+    })
     await expect(summary).toHaveCount(1)
     await expect(summary).toHaveAttribute(
       'aria-label',
       /Weekly average 89 kg.*2 recorded weigh-ins/,
     )
+    await expect(
+      page.locator('circle[data-visual-marker="weekly"]').first(),
+    ).toHaveAttribute('r', '7')
+    await expect(
+      page.locator('circle[data-visual-marker="daily"]').first(),
+    ).toHaveAttribute('r', '3')
+    const geometry = await page
+      .locator('circle[data-series-id="opaque-member-a"][data-chart-point]')
+      .evaluateAll((markers) =>
+        markers.map((marker) => ({
+          date: marker.getAttribute('data-date'),
+          x:
+            marker.getBoundingClientRect().x +
+            marker.getBoundingClientRect().width / 2,
+          width: marker.getBoundingClientRect().width,
+        })),
+      )
+    const xs = [
+      '2026-09-01',
+      '2026-09-08',
+      '2026-09-15',
+      '2026-09-16',
+      '2026-09-17',
+    ].map((date) => geometry.find((marker) => marker.date === date)!.x)
+    const spacing = xs[1] - xs[0]
+    for (let index = 2; index < xs.length; index++)
+      expect(xs[index] - xs[index - 1]).toBeCloseTo(spacing, 3)
+    expect(
+      Math.min(...geometry.map((marker) => marker.width)),
+    ).toBeGreaterThanOrEqual(44)
+    const aligned = await page
+      .locator(
+        'circle[data-point-kind="weekly-summary"][data-date="2026-09-08"]',
+      )
+      .evaluateAll((markers) =>
+        markers.map((marker) => marker.getAttribute('cx')),
+      )
+    expect(new Set(aligned).size).toBe(1)
+    console.log('compressed-slot-bounds', width, {
+      xs,
+      spacing,
+      hitWidths: geometry.map((marker) => marker.width),
+    })
     await summary.focus()
     const details = page.getByRole('tooltip')
     await expect(details).toContainText('2 recorded weigh-ins')
@@ -992,6 +1061,26 @@ for (const width of [320, 390, 430, 1280]) {
       path: testInfo.outputPath(`weekly-history-${width}.png`),
       fullPage: true,
     })
+    const sharedWeek = page.locator(
+      'circle[data-point-kind="weekly-summary"][data-series-id="opaque-member-a"][data-date="2026-09-08"]',
+    )
+    await sharedWeek.press('Enter')
+    const expandedShared = page.locator(
+      'circle[data-point-kind="recorded"][data-date="2026-09-08"]',
+    )
+    await expect(expandedShared).toHaveCount(2)
+    expect(
+      new Set(
+        await expandedShared.evaluateAll((markers) =>
+          markers.map((marker) => marker.getAttribute('cx')),
+        ),
+      ).size,
+    ).toBe(1)
+    await page.screenshot({
+      path: testInfo.outputPath(`weekly-expanded-${width}.png`),
+      fullPage: true,
+    })
+    await page.getByRole('button', { name: 'Collapse expanded weeks' }).click()
     await page.getByRole('link', { name: 'Charts', exact: true }).click()
     await expect(
       page.getByRole('tab', { name: 'All members', exact: true }),

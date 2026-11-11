@@ -16,7 +16,7 @@ export function compactWeeklyHistory(
     member.points.filter((point) => !point.estimated),
   )
   if (!recorded.length) return series
-  const cutoff = Math.max(...recorded.map((point) => day(point.date))) - 13
+  const cutoff = Math.max(...recorded.map((point) => day(point.date))) - 6
   return series.map((member) => {
     const buckets = new Map<number, typeof member.points>()
     for (const point of member.points) {
@@ -26,7 +26,7 @@ export function compactWeeklyHistory(
     }
     const older = [...buckets].flatMap(([start, entries]) => {
       const key = `${member.id}:${dateAt(start)}`
-      if (expanded.has(key))
+      if ([...expanded].some((entry) => entry.endsWith(dateAt(start))))
         return member.points.filter(
           (point) =>
             monday(day(point.date)) === start && day(point.date) < cutoff,

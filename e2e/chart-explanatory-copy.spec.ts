@@ -75,7 +75,7 @@ for (const width of [1280, 390]) {
     await expect(chartRegion).toBeVisible()
     await expect(chart).toBeVisible()
     await expect(chart).toHaveAccessibleDescription(
-      /latest 14 calendar dates stay detailed.*Monday–Sunday averages/,
+      /latest 7 calendar dates stay detailed.*Monday–Sunday averages/,
     )
     await expect(
       page.getByText(/Explicitly shared dates and weights only/),
