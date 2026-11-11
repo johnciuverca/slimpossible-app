@@ -2814,7 +2814,7 @@ for (const viewport of [
       .locator('circle[data-chart-point]')
       .count()
     await expect(historyPanel.getByRole('button')).toHaveCount(
-      5 + chartPointCount,
+      7 + chartPointCount,
     )
 
     await expect(
