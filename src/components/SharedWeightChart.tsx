@@ -50,6 +50,8 @@ const left = sharedChartTheme.plot.left
 const right = sharedChartTheme.plot.right
 const top = sharedChartTheme.plot.top
 const day = (date: string) => Date.parse(`${date}T00:00:00Z`) / 86400000
+const monday = (value: number) =>
+  value - ((new Date(value * 86400000).getUTCDay() + 6) % 7)
 const dateAtDay = (value: number) =>
   new Date(value * 86400000).toISOString().slice(0, 10)
 const shiftMonths = (value: number, months: number) => {
@@ -74,6 +76,7 @@ export function SharedWeightChart({
   series = [],
   lines = [],
   onPointActivate,
+  canEditPoint,
   yLabel,
   min,
   max,
@@ -96,6 +99,7 @@ export function SharedWeightChart({
   series?: SharedChartSeries[]
   lines?: SharedChartLine[]
   onPointActivate?: (point: SharedChartPoint, seriesId?: string) => void
+  canEditPoint?: (point: SharedChartPoint, seriesId?: string) => boolean
   yLabel: string
   min: number
   max: number
@@ -162,6 +166,7 @@ export function SharedWeightChart({
     : `w-full min-w-[600px] ${sharedChartTheme.spacing.framePaddingClass}`
   const rangeId = useId()
   const tooltipId = useId()
+  const pointDetailsId = useId()
   const rangeControlsRef = useRef<HTMLDivElement>(null)
   const expandedOriginRef = useRef<string | null>(null)
   const [restoreWeeklyFocus, setRestoreWeeklyFocus] = useState(false)
@@ -182,26 +187,52 @@ export function SharedWeightChart({
     return () => observer.disconnect()
   }, [compactOlderHistory, compactLayout, series.length])
   const rangeTrackRef = useRef<HTMLDivElement>(null)
-  const [activePoint, setActivePoint] = useState<{
+  const [hoveredPointId, setHoveredPointId] = useState<string | null>(null)
+  const [focusedPointId, setFocusedPointId] = useState<string | null>(null)
+  const [selectedPoint, setSelectedPoint] = useState<{
     id: string
     source: 'pointer' | 'focus' | 'touch'
   } | null>(null)
+  const pointDetailsRef = useRef<HTMLDivElement>(null)
+  const focusActionAfterSelectionRef = useRef(false)
+  const focusExpandedWeekRef = useRef(false)
+  const restorePointFocusRef = useRef<string | null>(null)
+  const suppressPointFocusSelectionRef = useRef(false)
   useEffect(() => {
-    if (activePoint?.source !== 'touch') return
+    if (!selectedPoint) return
     const dismissOutsidePoint = (event: PointerEvent) => {
+      if (!(event.target instanceof Element)) return
       if (
-        event.pointerType === 'touch' &&
-        !(
-          event.target instanceof Element &&
-          event.target.closest('[data-chart-point]')
+        !event.target.closest(
+          '[data-chart-point], [data-chart-point-popover], [role="dialog"]',
         )
       )
-        setActivePoint(null)
+        setSelectedPoint(null)
     }
     document.addEventListener('pointerdown', dismissOutsidePoint)
     return () =>
       document.removeEventListener('pointerdown', dismissOutsidePoint)
-  }, [activePoint])
+  }, [selectedPoint])
+  useEffect(() => {
+    if (focusActionAfterSelectionRef.current && selectedPoint) {
+      focusActionAfterSelectionRef.current = false
+      pointDetailsRef.current
+        ?.querySelector<HTMLButtonElement>('button')
+        ?.focus()
+    }
+    if (!selectedPoint && restorePointFocusRef.current) {
+      const pointId = restorePointFocusRef.current
+      restorePointFocusRef.current = null
+      suppressPointFocusSelectionRef.current = true
+      Array.from(
+        plotRef.current?.querySelectorAll<SVGCircleElement>(
+          '[data-chart-point-id]',
+        ) ?? [],
+      )
+        .find((point) => point.dataset.chartPointId === pointId)
+        ?.focus()
+    }
+  }, [selectedPoint])
   const [selectedRange, setSelectedRange] = useState<{
     start: number
     end: number
@@ -211,17 +242,44 @@ export function SharedWeightChart({
   >('all')
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set())
   useEffect(() => {
-    if (!restoreWeeklyFocus) return
-    const summary = Array.from(
+    if (restoreWeeklyFocus) {
+      const summary = Array.from(
+        plotRef.current?.querySelectorAll<SVGCircleElement>(
+          '[data-weekly-summary]',
+        ) ?? [],
+      ).find(
+        (point) => point.dataset.weeklySummary === expandedOriginRef.current,
+      )
+      const fallback =
+        rangeControlsRef.current?.querySelector<HTMLButtonElement>(
+          'button[aria-pressed="true"]:not(:disabled), button:not(:disabled)',
+        )
+      ;(summary ?? fallback)?.focus()
+      setRestoreWeeklyFocus(false)
+      return
+    }
+    if (!focusExpandedWeekRef.current) return
+    focusExpandedWeekRef.current = false
+    const origin = expandedOriginRef.current ?? ''
+    const separator = origin.lastIndexOf(':')
+    const seriesId = origin.slice(0, separator)
+    const weekStart = origin.slice(separator + 1)
+    const expandedPoint = Array.from(
       plotRef.current?.querySelectorAll<SVGCircleElement>(
-        '[data-weekly-summary]',
+        '[data-point-kind="recorded"]',
       ) ?? [],
-    ).find((point) => point.dataset.weeklySummary === expandedOriginRef.current)
-    const fallback = rangeControlsRef.current?.querySelector<HTMLButtonElement>(
-      'button[aria-pressed="true"]:not(:disabled), button:not(:disabled)',
+    ).find(
+      (point) =>
+        point.dataset.seriesId === seriesId &&
+        point.dataset.date &&
+        monday(day(point.dataset.date)) === day(weekStart),
     )
-    ;(summary ?? fallback)?.focus()
-    setRestoreWeeklyFocus(false)
+    ;(
+      expandedPoint ??
+      rangeControlsRef.current?.querySelector<HTMLButtonElement>(
+        'button[aria-pressed="true"]:not(:disabled), button:not(:disabled)',
+      )
+    )?.focus()
   }, [restoreWeeklyFocus, expandedWeeks])
   const sourceSeries = series
   if (compactOlderHistory)
@@ -229,9 +287,19 @@ export function SharedWeightChart({
   const activatePoint = (point: SharedChartPoint, seriesId?: string) => {
     if (point.weeklySummary) {
       expandedOriginRef.current = point.weeklySummary
+      focusExpandedWeekRef.current = selectedPoint?.source === 'focus'
       setExpandedWeeks((current) => new Set([...current, point.weeklySummary!]))
-      setActivePoint(null)
+      setSelectedPoint(null)
+      setHoveredPointId(null)
     } else onPointActivate?.(point, seriesId)
+  }
+  const selectPoint = (
+    id: string,
+    source: 'pointer' | 'focus' | 'touch',
+    focusAction = false,
+  ) => {
+    focusActionAfterSelectionRef.current = focusAction
+    setSelectedPoint({ id, source })
   }
   const plotted = [
     ...(points ?? []),
@@ -394,8 +462,10 @@ export function SharedWeightChart({
       })),
     ),
   ]
-  const visibleActivePoint = activePoint
-    ? tooltipTargets.find((target) => target.id === activePoint.id)
+  const visiblePointId = selectedPoint?.id ?? hoveredPointId
+  const highlightedPointId = visiblePointId ?? focusedPointId
+  const visibleActivePoint = visiblePointId
+    ? tooltipTargets.find((target) => target.id === visiblePointId)
     : undefined
   let yMinimum = min
   let yMaximum = max
@@ -566,6 +636,13 @@ export function SharedWeightChart({
         : 'center'
     : 'center'
   const tooltipTransform = `translate(${tooltipAlignment === 'start' ? '0' : tooltipAlignment === 'end' ? '-100%' : '-50%'}, ${tooltipPosition && tooltipPosition.y < chartTop + 52 ? '10px' : 'calc(-100% - 10px)'})`
+  const activePointCanEdit = Boolean(
+    visibleActivePoint &&
+    !visibleActivePoint.point.weeklySummary &&
+    (canEditPoint
+      ? canEditPoint(visibleActivePoint.point, visibleActivePoint.seriesId)
+      : onPointActivate),
+  )
   const nearestTarget = (
     event: { clientX: number; clientY: number },
     id: string,
@@ -594,20 +671,14 @@ export function SharedWeightChart({
     event: ReactPointerEvent<SVGCircleElement>,
     id: string,
   ) => {
-    setActivePoint({
-      id: nearestTarget(event, id)?.id ?? id,
-      source: event.pointerType === 'touch' ? 'touch' : 'pointer',
-    })
+    setHoveredPointId(nearestTarget(event, id)?.id ?? id)
   }
   const selectTouchPoint = (
     event: ReactPointerEvent<SVGCircleElement>,
     id: string,
   ) => {
     if (event.pointerType === 'touch')
-      setActivePoint({
-        id: nearestTarget(event, id)?.id ?? id,
-        source: 'touch',
-      })
+      selectPoint(nearestTarget(event, id)?.id ?? id, 'touch')
   }
   const compactDateTickCount = Math.min(
     sharedChartTheme.dates.compactMaximumTicks,
@@ -804,7 +875,12 @@ export function SharedWeightChart({
     <div
       className={chartFrameClassName}
       onKeyDown={(event) => {
-        if (event.key === 'Escape') setActivePoint(null)
+        if (event.key !== 'Escape' || !selectedPoint) return
+        event.preventDefault()
+        event.stopPropagation()
+        restorePointFocusRef.current = selectedPoint.id
+        setSelectedPoint(null)
+        setHoveredPointId(null)
       }}
     >
       <div
@@ -887,7 +963,8 @@ export function SharedWeightChart({
               className={`${presetClass(true)} min-h-11 w-full px-3 sm:w-auto`}
               onClick={() => {
                 setExpandedWeeks(new Set())
-                setActivePoint(null)
+                setSelectedPoint(null)
+                setHoveredPointId(null)
                 setRestoreWeeklyFocus(true)
               }}
             >
@@ -899,7 +976,7 @@ export function SharedWeightChart({
       <div
         className="relative"
         onPointerLeave={() => {
-          if (activePoint?.source === 'pointer') setActivePoint(null)
+          setHoveredPointId(null)
         }}
       >
         <svg
@@ -1075,6 +1152,20 @@ export function SharedWeightChart({
                           }
                         />
                       ) : null}
+                      {highlightedPointId === pointId ? (
+                        <circle
+                          cx={x(point.date)}
+                          cy={y(point.value)}
+                          r={point.weeklySummary ? 11 : 7}
+                          fill="none"
+                          stroke={item.color}
+                          strokeWidth="1.5"
+                          opacity="0.55"
+                          aria-hidden="true"
+                          pointerEvents="none"
+                          data-point-highlight
+                        />
+                      ) : null}
                       <circle
                         cx={x(point.date)}
                         cy={y(point.value)}
@@ -1103,15 +1194,23 @@ export function SharedWeightChart({
                         }
                         data-weekly-summary={point.weeklySummary}
                         data-series-id={item.id}
+                        data-chart-point-id={pointId}
                         opacity={point.estimated ? 0.72 : 1}
                         data-date={point.date}
                         data-value={point.value}
                         aria-label={point.markerLabel}
                         aria-describedby={
-                          activePoint?.id === pointId ? tooltipId : undefined
+                          visiblePointId === pointId ? tooltipId : undefined
                         }
+                        aria-controls={
+                          visiblePointId === pointId
+                            ? pointDetailsId
+                            : undefined
+                        }
+                        aria-expanded={selectedPoint?.id === pointId}
                         role="button"
                         tabIndex={0}
+                        style={{ outline: 'none' }}
                         data-chart-point
                         onPointerEnter={(event) =>
                           setPointSource(event, pointId)
@@ -1119,36 +1218,28 @@ export function SharedWeightChart({
                         onPointerDown={(event) =>
                           selectTouchPoint(event, pointId)
                         }
-                        onFocus={() =>
-                          setActivePoint((current) =>
-                            current?.id === pointId &&
-                            current.source === 'touch'
-                              ? current
-                              : { id: pointId, source: 'focus' },
-                          )
-                        }
+                        onFocus={() => {
+                          setFocusedPointId(pointId)
+                          if (suppressPointFocusSelectionRef.current) {
+                            suppressPointFocusSelectionRef.current = false
+                            return
+                          }
+                          selectPoint(pointId, 'focus')
+                        }}
                         onBlur={() =>
-                          setActivePoint((current) =>
-                            current?.id === pointId &&
-                            current.source === 'focus'
-                              ? null
-                              : current,
+                          setFocusedPointId((current) =>
+                            current === pointId ? null : current,
                           )
                         }
                         onKeyDown={(event) => {
-                          if (event.key === 'Escape') setActivePoint(null)
-                          else if (event.key === 'Enter' || event.key === ' ') {
+                          if (event.key === 'Enter' || event.key === ' ') {
                             event.preventDefault()
-                            setActivePoint({ id: pointId, source: 'focus' })
-                            activatePoint(point, item.id)
+                            selectPoint(pointId, 'focus', true)
                           }
                         }}
                         onClick={(event) => {
                           const target = nearestTarget(event, pointId)
-                          activatePoint(
-                            target?.point ?? point,
-                            target?.seriesId ?? item.id,
-                          )
+                          selectPoint(target?.id ?? pointId, 'pointer')
                         }}
                       >
                         <title>{point.title}</title>
@@ -1188,11 +1279,26 @@ export function SharedWeightChart({
               )
               return (
                 <g key={`${point.date}-${index}`}>
+                  {highlightedPointId === pointId ? (
+                    <circle
+                      cx={x(point.date)}
+                      cy={y(point.value)}
+                      r="8"
+                      fill="none"
+                      stroke="var(--chart-recorded, #087756)"
+                      strokeWidth="1.5"
+                      opacity="0.55"
+                      aria-hidden="true"
+                      pointerEvents="none"
+                      data-point-highlight
+                    />
+                  ) : null}
                   <circle
                     tabIndex={0}
                     cx={x(point.date)}
                     cy={y(point.value)}
                     r="5"
+                    data-chart-point-id={pointId}
                     data-date={point.date}
                     data-weight-kg={point.value}
                     fill={
@@ -1210,35 +1316,40 @@ export function SharedWeightChart({
                     opacity={point.estimated ? 0.72 : 1}
                     aria-label={point.markerLabel ?? 'Recorded weight point'}
                     aria-describedby={
-                      activePoint?.id === pointId ? tooltipId : undefined
+                      visiblePointId === pointId ? tooltipId : undefined
                     }
+                    aria-controls={
+                      visiblePointId === pointId ? pointDetailsId : undefined
+                    }
+                    aria-expanded={selectedPoint?.id === pointId}
                     role="button"
+                    style={{ outline: 'none' }}
                     data-chart-point
                     onPointerEnter={(event) => setPointSource(event, pointId)}
                     onPointerDown={(event) => selectTouchPoint(event, pointId)}
-                    onFocus={() =>
-                      setActivePoint((current) =>
-                        current?.id === pointId && current.source === 'touch'
-                          ? current
-                          : { id: pointId, source: 'focus' },
-                      )
-                    }
+                    onFocus={() => {
+                      setFocusedPointId(pointId)
+                      if (suppressPointFocusSelectionRef.current) {
+                        suppressPointFocusSelectionRef.current = false
+                        return
+                      }
+                      selectPoint(pointId, 'focus')
+                    }}
                     onBlur={() =>
-                      setActivePoint((current) =>
-                        current?.id === pointId && current.source === 'focus'
-                          ? null
-                          : current,
+                      setFocusedPointId((current) =>
+                        current === pointId ? null : current,
                       )
                     }
                     onKeyDown={(event) => {
-                      if (event.key === 'Escape') setActivePoint(null)
-                      else if (event.key === 'Enter' || event.key === ' ') {
+                      if (event.key === 'Enter' || event.key === ' ') {
                         event.preventDefault()
-                        setActivePoint({ id: pointId, source: 'focus' })
-                        onPointActivate?.(point)
+                        selectPoint(pointId, 'focus', true)
                       }
                     }}
-                    onClick={() => onPointActivate?.(point)}
+                    onClick={(event) => {
+                      const target = nearestTarget(event, pointId)
+                      selectPoint(target?.id ?? pointId, 'pointer')
+                    }}
                   >
                     <title>{point.title}</title>
                   </circle>
@@ -1289,16 +1400,63 @@ export function SharedWeightChart({
         </svg>
         {visibleActivePoint && tooltipPosition ? (
           <div
-            id={tooltipId}
-            role="tooltip"
-            className="pointer-events-none absolute z-10 max-w-[min(14rem,90vw)] rounded-lg border border-line bg-panel px-3 py-2 text-xs font-semibold text-ink shadow-panel"
+            id={pointDetailsId}
+            ref={pointDetailsRef}
+            role="group"
+            aria-label={`Chart point details: ${visibleActivePoint.point.markerLabel ?? (typeof visibleActivePoint.point.title === 'string' ? visibleActivePoint.point.title : 'selected point')}`}
+            data-chart-point-popover
+            onPointerEnter={() => {
+              if (!selectedPoint)
+                setSelectedPoint({
+                  id: visibleActivePoint.id,
+                  source: 'pointer',
+                })
+            }}
+            className="pointer-events-auto absolute z-10 max-w-[min(14rem,90vw)] rounded-lg border border-line bg-panel px-3 py-2 text-xs font-semibold leading-4 text-ink shadow-panel"
             style={{
               left: `${(tooltipPosition.x / viewBoxWidth) * 100}%`,
               top: `${(tooltipPosition.y / viewBoxHeight) * 100}%`,
               transform: tooltipTransform,
             }}
           >
-            {visibleActivePoint.point.tooltip ?? visibleActivePoint.point.title}
+            <div id={tooltipId} role="tooltip" className="text-[0.6375rem]">
+              {visibleActivePoint.point.tooltip ??
+                visibleActivePoint.point.title}
+            </div>
+            {visibleActivePoint.point.weeklySummary || activePointCanEdit ? (
+              <button
+                type="button"
+                className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-forest-700 px-3 text-xs font-semibold text-forest-800 hover:bg-forest-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+                onClick={() =>
+                  activatePoint(
+                    visibleActivePoint.point,
+                    visibleActivePoint.seriesId,
+                  )
+                }
+              >
+                {visibleActivePoint.point.weeklySummary ? (
+                  'Expand week'
+                ) : visibleActivePoint.point.estimated ? (
+                  'Record weight'
+                ) : (
+                  <>
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 20 20"
+                      className="h-4 w-4 fill-none stroke-current"
+                    >
+                      <path
+                        d="m13.8 3.2 3 3M4 16l3.8-.8L17 6a2.12 2.12 0 0 0-3-3L4.8 13.2 4 16Z"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="1.7"
+                      />
+                    </svg>
+                    Edit
+                  </>
+                )}
+              </button>
+            ) : null}
           </div>
         ) : null}
       </div>

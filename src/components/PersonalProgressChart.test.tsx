@@ -45,9 +45,14 @@ it('reuses weekly compression for personal points with source counts and origina
   expect(summary).toHaveAttribute('data-date', '2026-09-02')
   fireEvent.keyDown(summary, { key: 'Enter' })
   expect(onPointActivate).not.toHaveBeenCalled()
-  fireEvent.click(
-    screen.getByRole('button', { name: 'Recorded weight on 02.09.2026' }),
-  )
+  expect(screen.getByRole('button', { name: /^Expand week$/ })).toHaveFocus()
+  fireEvent.click(screen.getByRole('button', { name: /^Expand week$/ }))
+  const daily = screen.getByRole('button', {
+    name: 'Recorded weight on 02.09.2026',
+  })
+  fireEvent.click(daily)
+  expect(onPointActivate).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: /^Edit$/ }))
   expect(onPointActivate).toHaveBeenCalledWith(
     expect.objectContaining({ date: '2026-09-02', value: 88 }),
   )

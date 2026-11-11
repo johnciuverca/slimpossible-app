@@ -1091,6 +1091,12 @@ for (const width of [320, 390, 430, 1280]) {
       fullPage: true,
     })
     await page.keyboard.press('Enter')
+    const expandOverviewWeek = page.getByRole('button', {
+      name: 'Expand week',
+      exact: true,
+    })
+    await expect(expandOverviewWeek).toBeFocused()
+    await page.keyboard.press('Enter')
     await expect(summary).toHaveCount(0)
     await expectVisibleCollapse('overview')
     await expect(
@@ -1120,6 +1126,7 @@ for (const width of [320, 390, 430, 1280]) {
       'circle[data-point-kind="weekly-summary"][data-series-id="opaque-member-a"][data-date="2026-09-08"]',
     )
     await sharedWeek.press('Enter')
+    await page.keyboard.press('Enter')
     await expectVisibleCollapse('overview-shared')
     const expandedShared = page.locator(
       'circle[data-point-kind="recorded"][data-date="2026-09-08"]',
@@ -1157,6 +1164,12 @@ for (const width of [320, 390, 430, 1280]) {
     await expect(page.getByRole('tooltip')).toContainText(
       '01.09.2026 to 02.09.2026',
     )
+    await page.keyboard.press('Enter')
+    const expandChartWeek = page.getByRole('button', {
+      name: 'Expand week',
+      exact: true,
+    })
+    await expect(expandChartWeek).toBeFocused()
     await page.keyboard.press('Enter')
     await expect(summary).toHaveCount(0)
     await expectVisibleCollapse('charts')
@@ -1868,6 +1881,7 @@ for (const viewport of [
     await expect(pointTooltip).toContainText(
       /Ava \(member 1\).*20\.09\.2026.*90 kg/,
     )
+    await expect(pointTooltip).toHaveCSS('font-size', '10.2px')
     await page.mouse.move(8, 8)
     await expect(pointTooltip).toHaveCount(0)
     const groupLegend = page.getByRole('list', {
@@ -3208,6 +3222,13 @@ test.describe('group chart weigh-in dots', () => {
 
     await ownEstimate.focus()
     await page.keyboard.press('Enter')
+    const recordEstimate = page
+      .getByRole('group', { name: /Chart point details/ })
+      .getByRole('button', { name: 'Record weight', exact: true })
+    await expect(recordEstimate).toBeFocused()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('dialog')).toBeVisible()
     const edit = page.getByRole('dialog', { name: 'Edit weight' })
     await expect(edit.getByLabel('Date')).toHaveValue('2026-09-21')
     await expect(edit.getByLabel('Weight in kg')).toHaveValue('84.25')
@@ -3228,6 +3249,7 @@ test.describe('group chart weigh-in dots', () => {
     ).toHaveLength(0)
 
     await ownEstimate.focus()
+    await page.keyboard.press('Enter')
     await page.keyboard.press('Enter')
     const reopened = page.getByRole('dialog', { name: 'Edit weight' })
     await expect(reopened.getByLabel('Weight in kg')).toHaveValue('84.25')
@@ -3298,6 +3320,7 @@ test.describe('group chart weigh-in dots', () => {
     await estimate.focus()
     await expect(estimate).toBeFocused()
     await page.keyboard.press('Enter')
+    await page.keyboard.press('Enter')
     await expect(page.getByRole('dialog')).toHaveCount(0)
 
     fixture.releasePersonalContexts()
@@ -3346,6 +3369,7 @@ test.describe('group chart weigh-in dots', () => {
     await expect(ownEstimate).toHaveAttribute('data-value', '89.25')
     await expect(ownEstimate.locator('title')).toContainText('89.25 kg')
     await ownEstimate.focus()
+    await page.keyboard.press('Enter')
     await page.keyboard.press('Enter')
     const create = page.getByRole('dialog', { name: 'Record weight' })
     await expect(create.getByLabel('Weight in kg')).toHaveValue('89.25')
@@ -3413,8 +3437,14 @@ test.describe('group chart weigh-in dots', () => {
     await expect(ownEstimate).toHaveAttribute('aria-label', /Estimated/)
     await otherRecorded.click()
     await expect(page.getByRole('dialog')).toHaveCount(0)
+    const otherDetails = page.getByRole('group', {
+      name: /Chart point details/,
+    })
+    await expect(otherDetails).toBeVisible()
+    await expect(otherDetails.getByRole('button')).toHaveCount(0)
 
     await ownRecorded.focus()
+    await page.keyboard.press('Enter')
     await page.keyboard.press('Enter')
     const edit = page.getByRole('dialog', { name: 'Edit weight' })
     await expect(edit.getByLabel('Date')).toHaveValue('2026-09-22')
@@ -3441,6 +3471,16 @@ test.describe('group chart weigh-in dots', () => {
       )
     }
     await tapEstimate()
+    const recordWeight = page
+      .getByRole('group', { name: /Chart point details/ })
+      .getByRole('button', { name: 'Record weight', exact: true })
+    await expect(recordWeight).toBeVisible()
+    const recordWeightBounds = await recordWeight.boundingBox()
+    expect(recordWeightBounds!.height).toBeGreaterThanOrEqual(44)
+    await page.touchscreen.tap(
+      recordWeightBounds!.x + recordWeightBounds!.width / 2,
+      recordWeightBounds!.y + recordWeightBounds!.height / 2,
+    )
     const create = page.getByRole('dialog', { name: 'Record weight' })
     await expect(create.getByLabel('Date')).toHaveValue('2026-09-21')
     await expect(create.getByLabel('Weight in kg')).toHaveValue('89.4')
@@ -3460,6 +3500,10 @@ test.describe('group chart weigh-in dots', () => {
     ).toHaveLength(saveRequestsBeforeCancel)
 
     await tapEstimate()
+    await page
+      .getByRole('group', { name: /Chart point details/ })
+      .getByRole('button', { name: 'Record weight', exact: true })
+      .click()
     const confirmedCreate = page.getByRole('dialog', { name: 'Record weight' })
     await expect(
       confirmedCreate.getByLabel('E2E authorized group'),

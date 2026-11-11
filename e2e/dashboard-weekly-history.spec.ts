@@ -43,6 +43,29 @@ test('Dashboard weekly chart opens recorded and estimated editors on touch', asy
     recentBox.x + recentBox.width / 2,
     recentBox.y + recentBox.height / 2,
   )
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  const pointDetails = page.getByRole('group', {
+    name: /Chart point details/,
+  })
+  await expect(pointDetails).toBeVisible()
+  const chartBox = (await chart.boundingBox())!
+  await page.touchscreen.tap(chartBox.x + 5, chartBox.y + 5)
+  await expect(pointDetails).toHaveCount(0)
+  const reopenedRecentBox = (await recent.boundingBox())!
+  await page.touchscreen.tap(
+    reopenedRecentBox.x + reopenedRecentBox.width / 2,
+    reopenedRecentBox.y + reopenedRecentBox.height / 2,
+  )
+  const recentEditAction = page.getByRole('button', {
+    name: 'Edit',
+    exact: true,
+  })
+  const recentEditBox = (await recentEditAction.boundingBox())!
+  expect(recentEditBox.height).toBeGreaterThanOrEqual(44)
+  await page.touchscreen.tap(
+    recentEditBox.x + recentEditBox.width / 2,
+    recentEditBox.y + recentEditBox.height / 2,
+  )
   const edit = page.getByRole('dialog', { name: 'Edit weight', exact: true })
   await expect(edit.getByLabel('Date')).toHaveValue(dates[4])
   await edit
@@ -56,6 +79,16 @@ test('Dashboard weekly chart opens recorded and estimated editors on touch', asy
     summaryBox.x + summaryBox.width / 2,
     summaryBox.y + summaryBox.height / 2,
   )
+  const expandAction = page
+    .getByRole('group', { name: /Chart point details/ })
+    .getByRole('button', { name: 'Expand week', exact: true })
+  await expect(expandAction).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  const expandBox = (await expandAction.boundingBox())!
+  await page.touchscreen.tap(
+    expandBox.x + expandBox.width / 2,
+    expandBox.y + expandBox.height / 2,
+  )
   const historical = chart.locator(
     `circle[data-point-kind="recorded"][data-date="${dates[0]}"]`,
   )
@@ -63,6 +96,16 @@ test('Dashboard weekly chart opens recorded and estimated editors on touch', asy
   await page.touchscreen.tap(
     historicalBox.x + historicalBox.width / 2,
     historicalBox.y + historicalBox.height / 2,
+  )
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  const historicalEditAction = page.getByRole('button', {
+    name: 'Edit',
+    exact: true,
+  })
+  const historicalEditBox = (await historicalEditAction.boundingBox())!
+  await page.touchscreen.tap(
+    historicalEditBox.x + historicalEditBox.width / 2,
+    historicalEditBox.y + historicalEditBox.height / 2,
   )
   const historicalEdit = page.getByRole('dialog', {
     name: 'Edit weight',
@@ -79,6 +122,15 @@ test('Dashboard weekly chart opens recorded and estimated editors on touch', asy
   await page.touchscreen.tap(
     estimateBox.x + estimateBox.width / 2,
     estimateBox.y + estimateBox.height / 2,
+  )
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  const recordAction = page
+    .getByRole('group', { name: /Chart point details/ })
+    .getByRole('button', { name: 'Record weight', exact: true })
+  const recordBox = (await recordAction.boundingBox())!
+  await page.touchscreen.tap(
+    recordBox.x + recordBox.width / 2,
+    recordBox.y + recordBox.height / 2,
   )
   const create = page.getByRole('dialog', {
     name: 'Record weight',
@@ -146,6 +198,14 @@ for (const width of [320, 390, 430, 1280]) {
       `circle[data-point-kind="recorded"][data-date="${dates[4]}"]`,
     )
     await recent.click()
+    const editAction = page.getByRole('button', { name: 'Edit', exact: true })
+    await expect(editAction).toBeVisible()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(recent).toHaveAttribute('style', 'outline: none;')
+    await expect(chart.locator('[data-point-highlight]')).toHaveCount(1)
+    const editActionBox = (await editAction.boundingBox())!
+    expect(editActionBox.height).toBeGreaterThanOrEqual(width < 640 ? 44 : 36)
+    await editAction.click()
     const edit = page.getByRole('dialog', { name: 'Edit weight', exact: true })
     await expect(edit.getByLabel('Date')).toHaveValue(dates[4])
     await edit
@@ -155,6 +215,11 @@ for (const width of [320, 390, 430, 1280]) {
       `circle[data-point-kind="estimated"][data-date="${dateAt(-1)}"]`,
     )
     await recentEstimate.click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await page
+      .getByRole('group', { name: /Chart point details/ })
+      .getByRole('button', { name: 'Record weight', exact: true })
+      .click()
     const estimateCreate = page.getByRole('dialog', {
       name: 'Record weight',
       exact: true,
@@ -172,6 +237,11 @@ for (const width of [320, 390, 430, 1280]) {
       fullPage: true,
     })
     await summary.click()
+    const expandWeek = page
+      .getByRole('group', { name: /Chart point details/ })
+      .getByRole('button', { name: 'Expand week', exact: true })
+    await expect(expandWeek).toBeVisible()
+    await expandWeek.click()
     const collapse = page
       .getByRole('group', { name: 'Chart date range controls', exact: true })
       .getByRole('button', { name: 'Back to weekly averages' })
@@ -188,6 +258,8 @@ for (const width of [320, 390, 430, 1280]) {
       `circle[data-point-kind="recorded"][data-date="${dates[0]}"]`,
     )
     await original.click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Edit', exact: true }).click()
     await expect(edit.getByLabel('Date')).toHaveValue(dates[0])
     await edit
       .getByRole('button', { name: 'Close weight editor', exact: true })
@@ -206,7 +278,12 @@ for (const width of [320, 390, 430, 1280]) {
       fullPage: true,
     })
     await summary.click()
+    await page
+      .getByRole('group', { name: /Chart point details/ })
+      .getByRole('button', { name: 'Expand week', exact: true })
+      .click()
     await original.click()
+    await page.getByRole('button', { name: 'Edit', exact: true }).click()
     await edit.getByLabel('Weight in kg').fill('91')
     await edit
       .getByRole('button', { name: 'Update weight', exact: true })
@@ -232,6 +309,11 @@ for (const width of [320, 390, 430, 1280]) {
       `circle[data-point-kind="estimated"][data-date="${dateAt(-1)}"]`,
     )
     await estimate.click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await page
+      .getByRole('group', { name: /Chart point details/ })
+      .getByRole('button', { name: 'Record weight', exact: true })
+      .click()
     const create = page.getByRole('dialog', {
       name: 'Record weight',
       exact: true,
@@ -242,6 +324,10 @@ for (const width of [320, 390, 430, 1280]) {
       .click()
     await expect(estimate).toHaveCount(1)
     await estimate.click()
+    await page
+      .getByRole('group', { name: /Chart point details/ })
+      .getByRole('button', { name: 'Record weight', exact: true })
+      .click()
     await create
       .getByRole('button', { name: 'Save weight', exact: true })
       .click()

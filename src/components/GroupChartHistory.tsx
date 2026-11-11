@@ -366,6 +366,10 @@ export function GroupChartHistory({
                           estimated: false,
                         })
                     }}
+                    canEditPoint={(_point, memberKey) =>
+                      memberKey === ownMemberKey &&
+                      personalWorkspace.userId === viewerId.toLowerCase()
+                    }
                     lines={[
                       ...series.flatMap((member) => {
                         const target = memberProgress.find(

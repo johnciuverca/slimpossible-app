@@ -111,7 +111,7 @@ for (const width of [1280, 390]) {
     const pointTooltip = page.getByRole('tooltip')
     await expect(pointTooltip).toBeVisible()
     await expect(pointTooltip).toContainText(/Weekly average 80.3 kg/)
-    await expect(pointTooltip).toHaveClass(/bg-panel/)
+    await expect(pointTooltip.locator('..')).toHaveClass(/bg-panel/)
     await firstPoint.focus()
     await expect(firstPoint).toHaveAttribute(
       'aria-describedby',

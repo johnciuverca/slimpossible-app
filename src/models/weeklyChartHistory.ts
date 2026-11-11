@@ -35,7 +35,7 @@ export function compactWeeklyHistory(
       const value =
         entries.reduce((sum, point) => sum + point.value, 0) / entries.length
       const coveredEnd = Math.min(start + 6, cutoff - 1)
-      const details = `${member.title ?? member.id}: Weekly average ${new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value)} kg; ${formatChartDate(dateAt(start))} to ${formatChartDate(dateAt(coveredEnd))}; recorded dates ${formatChartDate(sorted[0].date)} to ${formatChartDate(sorted.at(-1)!.date)}; ${entries.length} recorded weigh-ins. Activate to expand daily points.`
+      const details = `${member.title ?? member.id}: Weekly average ${new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value)} kg; ${formatChartDate(dateAt(start))} to ${formatChartDate(dateAt(coveredEnd))}; recorded dates ${formatChartDate(sorted[0].date)} to ${formatChartDate(sorted.at(-1)!.date)}; ${entries.length} recorded weigh-ins. Choose Expand week to view daily points.`
       return [
         {
           date: sorted[0].date,
