@@ -62,13 +62,17 @@ for (const viewport of viewports) {
     await chart.scrollIntoViewIfNeeded()
     await expect(
       chart.locator('circle[data-point-kind="recorded"][data-date]'),
-    ).toHaveCount(13)
+    ).toHaveCount(1)
+    await expect(chart).toHaveAccessibleName(/13 saved weigh-ins/)
+    await expect(
+      chart.locator('circle[data-point-kind="weekly-summary"]'),
+    ).toHaveCount(12)
     const valueLabels = chart.locator('.chart-value')
     await expect(valueLabels).toHaveCount(2)
     expect(
       await valueLabels.evaluateAll((labels) =>
         labels
-          .map((label) => Number(label.getAttribute('data-weight-kg')))
+          .map((label) => Number(label.getAttribute('data-value')))
           .sort((first, second) => first - second),
       ),
     ).toEqual([99, 105])
@@ -144,12 +148,21 @@ for (const viewport of viewports) {
         .evaluateAll((labels) =>
           labels.map((label) => label.getAttribute('data-chart-date-tick')!),
         )
+      const tickXs = await chart
+        .locator('[data-chart-date-tick]')
+        .evaluateAll((labels) =>
+          labels.map((label) => Number(label.getAttribute('x'))),
+        )
       for (let index = 1; index < desktopDateTicks.length; index++) {
         const distance =
           (Date.parse(`${desktopDateTicks[index]}T00:00:00Z`) -
             Date.parse(`${desktopDateTicks[index - 1]}T00:00:00Z`)) /
           86400000
-        expect(distance % 7).toBe(0)
+        expect(distance).toBeGreaterThan(0)
+        expect(tickXs[index] - tickXs[index - 1]).toBeCloseTo(
+          tickXs[1] - tickXs[0],
+          3,
+        )
       }
     }
     const [rangeTicks, rangeControls, sliderTrack] = await Promise.all([
@@ -174,7 +187,10 @@ for (const viewport of viewports) {
           .sort(),
       )
       expect(rangeTicks[0]).toBe(savedDates[0])
-      expect(rangeTicks.at(-1)).toBe(savedDates.at(-1))
+      expect(rangeTicks.at(-1)! <= savedDates.at(-1)!).toBe(true)
+      await expect(
+        page.getByRole('status', { name: 'Visible date range' }),
+      ).toContainText(savedDates.at(-1)!.split('-').reverse().join('.'))
       const plotMetrics = await chart.evaluate((element) => {
         const tickLabels = Array.from(
           element.querySelectorAll('[data-chart-tick] text'),
@@ -291,18 +307,21 @@ for (const viewport of viewports) {
       .click()
     await expect(
       chart.locator('circle[data-point-kind="recorded"][data-date]'),
-    ).toHaveCount(2)
+    ).toHaveCount(1)
+    await expect(
+      chart.locator('circle[data-point-kind="weekly-summary"]'),
+    ).toHaveCount(1)
     expect(
       await valueLabels.evaluateAll((labels) =>
         labels
-          .map((label) => Number(label.getAttribute('data-weight-kg')))
+          .map((label) => Number(label.getAttribute('data-value')))
           .sort((first, second) => first - second),
       ),
     ).toEqual([104.5, 105])
     await rangeControls.getByRole('button', { name: 'Show all dates' }).click()
     await expect(
       chart.locator('circle[data-point-kind="recorded"][data-date]'),
-    ).toHaveCount(13)
+    ).toHaveCount(1)
 
     expect(
       await page.evaluate(

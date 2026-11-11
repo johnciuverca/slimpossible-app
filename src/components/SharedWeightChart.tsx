@@ -112,6 +112,23 @@ export function SharedWeightChart({
   className?: string
   viewBox?: string
 }) {
+  const personalSourcePoints =
+    compactOlderHistory && points.length && !series.length ? points : null
+  // Normalize an opted-in personal chart into the same presentation pipeline.
+  // Source titles/counts and point callbacks remain owned by the caller.
+  if (compactOlderHistory && points.length && !series.length) {
+    series = [
+      {
+        id: 'personal-history',
+        color: 'var(--chart-recorded, #087756)',
+        points,
+        connectGaps: true,
+        title: 'Personal weight history',
+      },
+    ]
+    points = []
+    labelSeriesExtremesOnly = labelExtremesOnly
+  }
   const [compactFitLayout, setCompactFitLayout] = useState(
     () =>
       fitContainer && typeof window !== 'undefined' && window.innerWidth <= 600,
@@ -384,6 +401,9 @@ export function SharedWeightChart({
   let yMaximum = max
   if (!fullRange) {
     const viewValues = [
+      ...(personalSourcePoints
+        ?.filter((point) => inRange(point.date))
+        .map((point) => point.value) ?? []),
       ...visiblePoints.map((point) => point.value),
       ...visibleSeries.flatMap((item) =>
         item.points.map((point) => point.value),
@@ -404,6 +424,9 @@ export function SharedWeightChart({
     }
   }
   const visibleWeightValues = [
+    ...(personalSourcePoints
+      ?.filter((point) => inRange(point.date))
+      .map((point) => point.value) ?? []),
     ...visiblePoints.map((point) => point.value),
     ...visibleSeries.flatMap((item) => item.points.map((point) => point.value)),
   ]

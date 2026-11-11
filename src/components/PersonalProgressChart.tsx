@@ -14,6 +14,7 @@ export function PersonalProgressChart({
   referenceLabel,
   fitContainer = false,
   labelExtremesOnly = false,
+  compactOlderHistory = false,
   onPointActivate,
 }: {
   weighIns: readonly WeighIn[]
@@ -21,6 +22,7 @@ export function PersonalProgressChart({
   referenceLabel?: string
   fitContainer?: boolean
   labelExtremesOnly?: boolean
+  compactOlderHistory?: boolean
   onPointActivate?: (point: {
     date: string
     value: number
@@ -116,8 +118,9 @@ export function PersonalProgressChart({
         tabIndex={fitContainer ? undefined : 0}
       >
         <SharedWeightChart
+          compactOlderHistory={compactOlderHistory}
           title={`Personal weight history chart. ${points.length} saved weigh-ins, from ${rangeDescription}. Hollow points are daily estimates between saved entries.`}
-          description={`Solid points show saved dates and weights. Hollow points are estimates between saved entries and are not saved or used in the trend. Solid connecting lines show the interpolated daily path; estimated markers remain hollow. The trend uses only saved records.${referenceDescription} Private notes are never plotted.`}
+          description={`${compactOlderHistory ? 'The latest seven calendar dates stay detailed; larger older points are weekly averages of actual saved records. Activate a week to expand daily points; Back to weekly averages restores compression. Solid daily points' : 'Solid points'} show saved dates and weights. Hollow points are estimates between saved entries and are not saved or used in the trend. Solid connecting lines show the interpolated daily path; estimated markers remain hollow. The trend uses only saved records.${referenceDescription} Private notes are never plotted.`}
           points={plottedPoints}
           onPointActivate={(point) => onPointActivate?.(point)}
           lines={lines}

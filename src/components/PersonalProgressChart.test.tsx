@@ -7,6 +7,87 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+it('reuses weekly compression for personal points with source counts and original edit callbacks', () => {
+  const onPointActivate = vi.fn()
+  const records = [
+    { date: '2026-09-01', weightKg: 90, participantId: 'own' },
+    { date: '2026-09-02', weightKg: 88, participantId: 'own' },
+    { date: '2026-09-08', weightKg: 87, participantId: 'own' },
+    { date: '2026-09-15', weightKg: 86, participantId: 'own' },
+    { date: '2026-09-22', weightKg: 84, participantId: 'own' },
+  ]
+  const { container } = render(
+    <PersonalProgressChart
+      compactOlderHistory
+      labelExtremesOnly
+      weighIns={records}
+      onPointActivate={onPointActivate}
+      referenceWeightKg={85}
+    />,
+  )
+  expect(screen.getByRole('img')).toHaveAccessibleName(
+    /Personal weight history chart. 5 saved weigh-ins/,
+  )
+  expect(
+    container.querySelectorAll('[data-point-kind="weekly-summary"]'),
+  ).toHaveLength(3)
+  expect(
+    Array.from(
+      container.querySelectorAll('text.chart-value'),
+      (label) => label.textContent,
+    ),
+  ).toEqual(['89', '84'])
+  const start = screen.getByRole('slider', { name: 'Visible range start' })
+  fireEvent.keyDown(start, { key: 'ArrowRight' })
+  const summary = screen.getByRole('button', {
+    name: /Weekly average 89 kg.*2 recorded weigh-ins/,
+  })
+  expect(summary).toHaveAttribute('data-date', '2026-09-02')
+  fireEvent.keyDown(summary, { key: 'Enter' })
+  expect(onPointActivate).not.toHaveBeenCalled()
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Recorded weight on 02.09.2026' }),
+  )
+  expect(onPointActivate).toHaveBeenCalledWith(
+    expect.objectContaining({ date: '2026-09-02', value: 88 }),
+  )
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Back to weekly averages' }),
+  )
+  expect(
+    screen.getByRole('button', {
+      name: /Weekly average 89 kg.*2 recorded weigh-ins/,
+    }),
+  ).toHaveFocus()
+  fireEvent.click(screen.getByRole('button', { name: 'Show last 1 week' }))
+  expect(screen.getByRole('img')).toHaveAccessibleName(
+    /Range contains 1 of 5 recorded entries/,
+  )
+  expect(records[0].weightKg).toBe(90)
+})
+
+it('retains personal date-window axis bounds from the original interpolated history', () => {
+  const { container } = render(
+    <PersonalProgressChart
+      compactOlderHistory
+      weighIns={[
+        { date: '2026-09-01', weightKg: 80, participantId: 'own' },
+        { date: '2026-10-11', weightKg: 102, participantId: 'own' },
+        { date: '2026-11-01', weightKg: 105, participantId: 'own' },
+      ]}
+    />,
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'Show last 1 month' }))
+  const ticks = Array.from(
+    container.querySelectorAll('[data-chart-tick]'),
+    (tick) => Number(tick.getAttribute('data-chart-tick')),
+  )
+  expect(ticks.every((tick) => tick % 5 === 0)).toBe(true)
+  expect(
+    container.querySelectorAll('[data-chart-minor-tick]').length,
+  ).toBeGreaterThan(0)
+})
+
 it('keeps an estimate-only selected range safe and labels no estimates as extrema', () => {
   render(
     <PersonalProgressChart

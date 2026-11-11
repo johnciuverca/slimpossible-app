@@ -38,7 +38,10 @@ for (const width of [1280, 390]) {
     )
     await expect(
       chart.locator('circle[data-point-kind="recorded"][data-date]'),
-    ).toHaveCount(3)
+    ).toHaveCount(1)
+    await expect(
+      chart.locator('circle[data-point-kind="weekly-summary"]'),
+    ).toHaveCount(2)
     const explanation = page.getByText(
       /Solid points are saved personal entries/,
     )
