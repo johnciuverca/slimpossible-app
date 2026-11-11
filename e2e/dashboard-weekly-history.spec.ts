@@ -144,6 +144,159 @@ test('Dashboard weekly chart opens recorded and estimated editors on touch', asy
   await context.close()
 })
 
+test('Dashboard point details dismiss on chart background and preserve fresh activation', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  const today = new Date()
+  today.setUTCHours(0, 0, 0, 0)
+  const dateAt = (offset: number) => {
+    const date = new Date(today)
+    date.setUTCDate(date.getUTCDate() + offset)
+    return date.toISOString().slice(0, 10)
+  }
+  const dates = [-6, -3, 0].map(dateAt)
+  await page.addInitScript(
+    (entries) =>
+      localStorage.setItem(
+        'slimpossible.local.personal-weigh-ins',
+        JSON.stringify(entries),
+      ),
+    dates.map((date, index) => ({
+      id: `outside-dismiss-${index}`,
+      userId: 'user-alex',
+      date,
+      weightKg: 90 - index,
+      note: '',
+      sharedChallengeIds: [],
+    })),
+  )
+  await page.goto(
+    '/e2e/fixtures/personal-dashboard-harness.html?scenario=groups&path=/dashboard',
+  )
+  const chart = page.getByRole('img', {
+    name: /Personal weight history chart/,
+  })
+  const points = chart.locator(
+    'circle[data-point-kind="recorded"][data-chart-point]',
+  )
+  await expect(points).toHaveCount(3)
+  const first = points.nth(0)
+  const second = points.nth(1)
+  const details = page.getByRole('group', { name: /Chart point details/ })
+
+  await first.click()
+  await expect(details).toBeVisible()
+  const firstDetailsLabel = await details.getAttribute('aria-label')
+  await second.click()
+  await expect(details).toBeVisible()
+  await expect(details).not.toHaveAttribute('aria-label', firstDetailsLabel!)
+
+  const chartBox = (await chart.boundingBox())!
+  const backgroundPoint = {
+    x: chartBox.x + chartBox.width / 2,
+    y: chartBox.y + 4,
+  }
+  expect(
+    await page.evaluate(({ x, y }) => {
+      const element = document.elementFromPoint(x, y)
+      return Boolean(
+        element?.closest('[data-chart-point], [data-chart-point-popover]'),
+      )
+    }, backgroundPoint),
+  ).toBe(false)
+  await page.mouse.click(backgroundPoint.x, backgroundPoint.y)
+  await expect(details).toHaveCount(0)
+
+  await first.focus()
+  await page.keyboard.press('Enter')
+  await expect(details).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(details).toHaveCount(0)
+  await expect(first).toBeFocused()
+
+  await first.click()
+  await expect(details).toBeVisible()
+  const weighIns = page
+    .getByRole('navigation', { name: 'Dashboard sections' })
+    .getByRole('link', { name: 'Weigh-ins', exact: true })
+  await weighIns.click()
+  await expect(weighIns).toHaveAttribute('aria-current', 'page')
+  await expect(details).toHaveCount(0)
+})
+
+test('Dashboard touch outside chart background dismisses selected point details', async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+  })
+  const page = await context.newPage()
+  const today = new Date()
+  today.setUTCHours(0, 0, 0, 0)
+  const dateAt = (offset: number) => {
+    const date = new Date(today)
+    date.setUTCDate(date.getUTCDate() + offset)
+    return date.toISOString().slice(0, 10)
+  }
+  const dates = [-6, -3, 0].map(dateAt)
+  await page.addInitScript(
+    (entries) =>
+      localStorage.setItem(
+        'slimpossible.local.personal-weigh-ins',
+        JSON.stringify(entries),
+      ),
+    dates.map((date, index) => ({
+      id: `touch-outside-dismiss-${index}`,
+      userId: 'user-alex',
+      date,
+      weightKg: 90 - index,
+      note: '',
+      sharedChallengeIds: [],
+    })),
+  )
+  await page.goto(
+    '/e2e/fixtures/personal-dashboard-harness.html?scenario=groups&path=/dashboard',
+  )
+  const chart = page.getByRole('img', {
+    name: /Personal weight history chart/,
+  })
+  const point = chart
+    .locator('circle[data-point-kind="recorded"][data-chart-point]')
+    .nth(1)
+  const points = chart.locator(
+    'circle[data-point-kind="recorded"][data-chart-point]',
+  )
+  const firstPoint = points.first()
+  const lastPoint = points.last()
+  const details = page.getByRole('group', { name: /Chart point details/ })
+  const firstPointBox = (await firstPoint.boundingBox())!
+  await page.touchscreen.tap(
+    firstPointBox.x + firstPointBox.width / 2,
+    firstPointBox.y + firstPointBox.height / 2,
+  )
+  await expect(details).toBeVisible()
+  const firstPointLabel = await details.getAttribute('aria-label')
+  const lastPointBox = (await lastPoint.boundingBox())!
+  await page.touchscreen.tap(
+    lastPointBox.x + lastPointBox.width / 2,
+    lastPointBox.y + lastPointBox.height / 2,
+  )
+  await expect(details).toBeVisible()
+  await expect(details).not.toHaveAttribute('aria-label', firstPointLabel!)
+  const pointBox = (await point.boundingBox())!
+  await page.touchscreen.tap(
+    pointBox.x + pointBox.width / 2,
+    pointBox.y + pointBox.height / 2,
+  )
+  await expect(details).toBeVisible()
+  const chartBox = (await chart.boundingBox())!
+  await page.touchscreen.tap(chartBox.x + chartBox.width / 2, chartBox.y + 4)
+  await expect(details).toHaveCount(0)
+  await context.close()
+})
+
 for (const width of [320, 390, 430, 1280]) {
   test(`Dashboard weekly history preserves private editing and ranges at ${width}px`, async ({
     page,
