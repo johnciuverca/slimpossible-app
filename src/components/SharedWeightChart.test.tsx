@@ -68,11 +68,14 @@ it('retains overlapping weekly means in narrow ranges and connects summaries to 
     screen.getByRole('button', { name: 'Original September third' }),
   ).toHaveAttribute('data-value', '82')
   fireEvent.click(
-    screen.getByRole('button', { name: 'Collapse expanded weeks' }),
+    screen.getByRole('button', { name: 'Back to weekly averages' }),
   )
   expect(
     screen.getByRole('button', { name: /Weekly average 81 kg/ }),
   ).toHaveAttribute('data-value', '81')
+  expect(
+    screen.getByRole('button', { name: /Weekly average 81 kg/ }),
+  ).toHaveFocus()
 })
 
 it('expands weekly summaries accessibly, preserves daily activation, and collapses them', () => {
@@ -116,7 +119,7 @@ it('expands weekly summaries accessibly, preserves daily activation, and collaps
     'owner',
   )
   fireEvent.click(
-    screen.getByRole('button', { name: 'Collapse expanded weeks' }),
+    screen.getByRole('button', { name: 'Back to weekly averages' }),
   )
   expect(
     screen.getByRole('button', { name: /Weekly average 81 kg/ }),

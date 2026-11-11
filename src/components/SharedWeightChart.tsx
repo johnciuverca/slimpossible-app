@@ -145,6 +145,9 @@ export function SharedWeightChart({
     : `w-full min-w-[600px] ${sharedChartTheme.spacing.framePaddingClass}`
   const rangeId = useId()
   const tooltipId = useId()
+  const rangeControlsRef = useRef<HTMLDivElement>(null)
+  const expandedOriginRef = useRef<string | null>(null)
+  const [restoreWeeklyFocus, setRestoreWeeklyFocus] = useState(false)
   const plotRef = useRef<SVGSVGElement>(null)
   const [pointScale, setPointScale] = useState(1)
   useEffect(() => {
@@ -190,11 +193,25 @@ export function SharedWeightChart({
     '1w' | '2w' | '1m' | '3m' | 'all' | 'custom'
   >('all')
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    if (!restoreWeeklyFocus) return
+    const summary = Array.from(
+      plotRef.current?.querySelectorAll<SVGCircleElement>(
+        '[data-weekly-summary]',
+      ) ?? [],
+    ).find((point) => point.dataset.weeklySummary === expandedOriginRef.current)
+    const fallback = rangeControlsRef.current?.querySelector<HTMLButtonElement>(
+      'button[aria-pressed="true"]:not(:disabled), button:not(:disabled)',
+    )
+    ;(summary ?? fallback)?.focus()
+    setRestoreWeeklyFocus(false)
+  }, [restoreWeeklyFocus, expandedWeeks])
   const sourceSeries = series
   if (compactOlderHistory)
     series = compactWeeklyHistory(sourceSeries, expandedWeeks)
   const activatePoint = (point: SharedChartPoint, seriesId?: string) => {
     if (point.weeklySummary) {
+      expandedOriginRef.current = point.weeklySummary
       setExpandedWeeks((current) => new Set([...current, point.weeklySummary!]))
       setActivePoint(null)
     } else onPointActivate?.(point, seriesId)
@@ -767,22 +784,16 @@ export function SharedWeightChart({
         if (event.key === 'Escape') setActivePoint(null)
       }}
     >
-      {compactOlderHistory && expandedWeeks.size > 0 ? (
-        <button
-          type="button"
-          className="min-h-11 rounded-lg border px-3 py-2 text-sm"
-          onClick={() => {
-            setExpandedWeeks(new Set())
-            setActivePoint(null)
-          }}
-        >
-          Collapse expanded weeks
-        </button>
-      ) : null}
       <div
         role="group"
         aria-label="Chart date range controls"
-        className="w-full text-sm"
+        ref={rangeControlsRef}
+        style={
+          compactOlderHistory && expandedWeeks.size > 0
+            ? { top: 'calc(var(--group-navigation-height, 0px) + 8px)' }
+            : undefined
+        }
+        className={`w-full text-sm ${compactOlderHistory && expandedWeeks.size > 0 ? 'sticky z-20 rounded-lg bg-panel py-2 shadow-panel' : ''}`}
       >
         <div
           role="group"
@@ -847,6 +858,19 @@ export function SharedWeightChart({
           >
             All
           </button>
+          {compactOlderHistory && expandedWeeks.size > 0 ? (
+            <button
+              type="button"
+              className={`${presetClass(true)} min-h-11 w-full px-3 sm:w-auto`}
+              onClick={() => {
+                setExpandedWeeks(new Set())
+                setActivePoint(null)
+                setRestoreWeeklyFocus(true)
+              }}
+            >
+              Back to weekly averages
+            </button>
+          ) : null}
         </div>
       </div>
       <div
@@ -1054,6 +1078,7 @@ export function SharedWeightChart({
                               ? 'estimated'
                               : 'recorded'
                         }
+                        data-weekly-summary={point.weeklySummary}
                         data-series-id={item.id}
                         opacity={point.estimated ? 0.72 : 1}
                         data-date={point.date}
