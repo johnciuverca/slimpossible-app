@@ -1412,21 +1412,29 @@ export function SharedWeightChart({
                   source: 'pointer',
                 })
             }}
-            className="pointer-events-auto absolute z-10 max-w-[min(14rem,90vw)] rounded-lg border border-line bg-panel px-3 py-2 text-xs font-semibold leading-4 text-ink shadow-panel"
+            className="pointer-events-auto absolute z-10 max-w-[min(14rem,90vw)] rounded-lg border border-line bg-panel px-2 py-1.5 text-xs font-semibold leading-4 text-ink shadow-panel"
             style={{
               left: `${(tooltipPosition.x / viewBoxWidth) * 100}%`,
               top: `${(tooltipPosition.y / viewBoxHeight) * 100}%`,
               transform: tooltipTransform,
             }}
           >
-            <div id={tooltipId} role="tooltip" className="text-[0.6375rem]">
+            <div
+              id={tooltipId}
+              role="tooltip"
+              className={
+                visibleActivePoint.point.weeklySummary
+                  ? 'whitespace-nowrap text-[0.6375rem]'
+                  : 'text-[0.6375rem]'
+              }
+            >
               {visibleActivePoint.point.tooltip ??
                 visibleActivePoint.point.title}
             </div>
             {visibleActivePoint.point.weeklySummary || activePointCanEdit ? (
               <button
                 type="button"
-                className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-forest-700 px-3 text-xs font-semibold text-forest-800 hover:bg-forest-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+                className="mt-1 inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md border border-transparent px-1.5 py-1 text-[0.6375rem] font-semibold text-forest-800 hover:bg-forest-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
                 onClick={() =>
                   activatePoint(
                     visibleActivePoint.point,
@@ -1434,27 +1442,11 @@ export function SharedWeightChart({
                   )
                 }
               >
-                {visibleActivePoint.point.weeklySummary ? (
-                  'Expand week'
-                ) : visibleActivePoint.point.estimated ? (
-                  'Record weight'
-                ) : (
-                  <>
-                    <svg
-                      aria-hidden="true"
-                      viewBox="0 0 20 20"
-                      className="h-4 w-4 fill-none stroke-current"
-                    >
-                      <path
-                        d="m13.8 3.2 3 3M4 16l3.8-.8L17 6a2.12 2.12 0 0 0-3-3L4.8 13.2 4 16Z"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="1.7"
-                      />
-                    </svg>
-                    Edit
-                  </>
-                )}
+                {visibleActivePoint.point.weeklySummary
+                  ? 'Expand week'
+                  : visibleActivePoint.point.estimated
+                    ? 'Record weight'
+                    : 'Edit weight'}
               </button>
             ) : null}
           </div>

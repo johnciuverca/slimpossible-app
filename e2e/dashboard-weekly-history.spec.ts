@@ -57,7 +57,7 @@ test('Dashboard weekly chart opens recorded and estimated editors on touch', asy
     reopenedRecentBox.y + reopenedRecentBox.height / 2,
   )
   const recentEditAction = page.getByRole('button', {
-    name: 'Edit',
+    name: 'Edit weight',
     exact: true,
   })
   const recentEditBox = (await recentEditAction.boundingBox())!
@@ -99,7 +99,7 @@ test('Dashboard weekly chart opens recorded and estimated editors on touch', asy
   )
   await expect(page.getByRole('dialog')).toHaveCount(0)
   const historicalEditAction = page.getByRole('button', {
-    name: 'Edit',
+    name: 'Edit weight',
     exact: true,
   })
   const historicalEditBox = (await historicalEditAction.boundingBox())!
@@ -198,7 +198,10 @@ for (const width of [320, 390, 430, 1280]) {
       `circle[data-point-kind="recorded"][data-date="${dates[4]}"]`,
     )
     await recent.click()
-    const editAction = page.getByRole('button', { name: 'Edit', exact: true })
+    const editAction = page.getByRole('button', {
+      name: 'Edit weight',
+      exact: true,
+    })
     await expect(editAction).toBeVisible()
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await expect(recent).toHaveAttribute('style', 'outline: none;')
@@ -237,6 +240,17 @@ for (const width of [320, 390, 430, 1280]) {
       fullPage: true,
     })
     await summary.click()
+    const summaryDetails = page.getByRole('tooltip')
+    await expect(summaryDetails).toHaveText(
+      /\d{2}\.\d{2}\.\d{4} – \d{2}\.\d{2}\.\d{4}/,
+    )
+    await expect(summaryDetails).not.toContainText(
+      /Weekly average|recorded|Expand week/,
+    )
+    await page.screenshot({
+      path: testInfo.outputPath(`dashboard-weekly-details-${width}.png`),
+      fullPage: true,
+    })
     const expandWeek = page
       .getByRole('group', { name: /Chart point details/ })
       .getByRole('button', { name: 'Expand week', exact: true })
@@ -259,7 +273,7 @@ for (const width of [320, 390, 430, 1280]) {
     )
     await original.click()
     await expect(page.getByRole('dialog')).toHaveCount(0)
-    await page.getByRole('button', { name: 'Edit', exact: true }).click()
+    await page.getByRole('button', { name: 'Edit weight', exact: true }).click()
     await expect(edit.getByLabel('Date')).toHaveValue(dates[0])
     await edit
       .getByRole('button', { name: 'Close weight editor', exact: true })
@@ -283,7 +297,7 @@ for (const width of [320, 390, 430, 1280]) {
       .getByRole('button', { name: 'Expand week', exact: true })
       .click()
     await original.click()
-    await page.getByRole('button', { name: 'Edit', exact: true }).click()
+    await page.getByRole('button', { name: 'Edit weight', exact: true }).click()
     await edit.getByLabel('Weight in kg').fill('91')
     await edit
       .getByRole('button', { name: 'Update weight', exact: true })

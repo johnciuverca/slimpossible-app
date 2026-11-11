@@ -110,7 +110,9 @@ for (const width of [1280, 390]) {
     await firstPoint.hover()
     const pointTooltip = page.getByRole('tooltip')
     await expect(pointTooltip).toBeVisible()
-    await expect(pointTooltip).toContainText(/Weekly average 80.3 kg/)
+    await expect(pointTooltip).toHaveText(
+      /\d{2}\.\d{2}\.\d{4} – \d{2}\.\d{2}\.\d{4}/,
+    )
     await expect(pointTooltip.locator('..')).toHaveClass(/bg-panel/)
     await firstPoint.focus()
     await expect(firstPoint).toHaveAttribute(
@@ -122,7 +124,9 @@ for (const width of [1280, 390]) {
     if (width <= 600) {
       await firstPoint.dispatchEvent('pointerdown', { pointerType: 'touch' })
       await expect(pointTooltip).toBeVisible()
-      await expect(pointTooltip).toContainText(/Weekly average 80.3 kg/)
+      await expect(pointTooltip).toHaveText(
+        /\d{2}\.\d{2}\.\d{4} – \d{2}\.\d{2}\.\d{4}/,
+      )
       await page.keyboard.press('Escape')
     }
     for (const label of await chart.locator('.chart-value').all())

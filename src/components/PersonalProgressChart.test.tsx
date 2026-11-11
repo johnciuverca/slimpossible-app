@@ -52,7 +52,7 @@ it('reuses weekly compression for personal points with source counts and origina
   })
   fireEvent.click(daily)
   expect(onPointActivate).not.toHaveBeenCalled()
-  fireEvent.click(screen.getByRole('button', { name: /^Edit$/ }))
+  fireEvent.click(screen.getByRole('button', { name: /^Edit weight$/ }))
   expect(onPointActivate).toHaveBeenCalledWith(
     expect.objectContaining({ date: '2026-09-02', value: 88 }),
   )

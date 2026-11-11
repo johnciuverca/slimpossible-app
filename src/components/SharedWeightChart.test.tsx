@@ -120,12 +120,23 @@ it('requires explicit actions to expand weekly summaries and edit daily points',
   expect(summary).toHaveAttribute('data-point-kind', 'weekly-summary')
   fireEvent.keyDown(summary, { key: 'Enter' })
   expect(activate).not.toHaveBeenCalled()
+  expect(screen.getByRole('tooltip')).toHaveTextContent(
+    /^31\.08\.2026 – 06\.09\.2026$/,
+  )
+  expect(screen.getByRole('tooltip')).not.toHaveTextContent(
+    /Weekly average|recorded weigh-ins|Expand week/,
+  )
+  expect(
+    screen.getByRole('group', {
+      name: /Weekly average 81 kg.*2 recorded weigh-ins/,
+    }),
+  ).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /^Expand week$/ })).toHaveFocus()
   fireEvent.click(screen.getByRole('button', { name: /^Expand week$/ }))
   const daily = screen.getByRole('button', { name: 'Original own point' })
   fireEvent.click(daily)
   expect(activate).not.toHaveBeenCalled()
-  fireEvent.click(screen.getByRole('button', { name: /^Edit$/ }))
+  fireEvent.click(screen.getByRole('button', { name: /^Edit weight$/ }))
   expect(activate).toHaveBeenCalledWith(
     expect.objectContaining({ date: '2026-09-01', value: 80 }),
     'owner',
@@ -422,7 +433,7 @@ it('shows stable interactive point details with keyboard focus and outside dismi
   expectTooltip()
   fireEvent.keyDown(point, { key: 'Enter' })
   expect(onPointActivate).not.toHaveBeenCalled()
-  const edit = screen.getByRole('button', { name: /^Edit$/ })
+  const edit = screen.getByRole('button', { name: /^Edit weight$/ })
   expect(edit).toHaveFocus()
   fireEvent.keyDown(edit, { key: 'Escape' })
   expect(

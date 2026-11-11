@@ -1082,7 +1082,24 @@ for (const width of [320, 390, 430, 1280]) {
     })
     await summary.focus()
     const details = page.getByRole('tooltip')
-    await expect(details).toContainText('2 recorded weigh-ins')
+    await expect(details).toHaveText('31.08.2026 – 06.09.2026')
+    await expect(details).not.toContainText(
+      /Weekly average|recorded|Expand week/,
+    )
+    await expect(
+      page.getByRole('group', {
+        name: /Weekly average 89 kg.*2 recorded weigh-ins/,
+      }),
+    ).toBeVisible()
+    const expandSummary = page.getByRole('button', {
+      name: 'Expand week',
+      exact: true,
+    })
+    const expandSummaryBox = (await expandSummary.boundingBox())!
+    expect(expandSummaryBox.height).toBeGreaterThanOrEqual(
+      width < 640 ? 44 : 36,
+    )
+    expect(expandSummaryBox.width).toBeLessThanOrEqual(140)
     const detailsBox = await details.boundingBox()
     expect(detailsBox!.x).toBeGreaterThanOrEqual(0)
     expect(detailsBox!.x + detailsBox!.width).toBeLessThanOrEqual(width)
@@ -1162,7 +1179,7 @@ for (const width of [320, 390, 430, 1280]) {
       .getAttribute('aria-valuenow')
     await summary.focus()
     await expect(page.getByRole('tooltip')).toContainText(
-      '01.09.2026 to 02.09.2026',
+      '31.08.2026 – 06.09.2026',
     )
     await page.keyboard.press('Enter')
     const expandChartWeek = page.getByRole('button', {
