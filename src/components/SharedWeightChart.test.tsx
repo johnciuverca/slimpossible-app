@@ -4,7 +4,159 @@ import { SharedWeightChart } from './SharedWeightChart'
 
 afterEach(cleanup)
 
-it('marks estimates as hollow, labels them accessibly, and activates their date/value', () => {
+it('retains overlapping weekly means in narrow ranges and connects summaries to recent daily points', () => {
+  const { container } = render(
+    <SharedWeightChart
+      title="Ranges"
+      description="History"
+      yLabel="kg"
+      min={70}
+      max={90}
+      compactOlderHistory
+      lines={[
+        {
+          id: 'trend',
+          kind: 'trend',
+          color: 'orange',
+          from: { date: '2026-09-01', value: 80 },
+          to: { date: '2026-09-22', value: 77 },
+        },
+      ]}
+      series={[
+        {
+          id: 'a',
+          color: 'green',
+          points: [
+            { date: '2026-09-01', value: 80, title: 'First' },
+            {
+              date: '2026-09-03',
+              value: 82,
+              title: 'Second',
+              markerLabel: 'Original September third',
+            },
+            { date: '2026-09-08', value: 79, title: 'Boundary week' },
+            { date: '2026-09-09', value: 78, title: 'Recent boundary' },
+            { date: '2026-09-22', value: 77, title: 'Newest' },
+          ],
+        },
+      ]}
+    />,
+  )
+  expect(
+    container.querySelectorAll('path[data-series="weekly-summary-connection"]'),
+  ).toHaveLength(2)
+  const trendSegments = Array.from(
+    container.querySelectorAll('line[data-chart-line-kind="trend"]'),
+  )
+  expect(trendSegments).toHaveLength(9)
+  const segmentWidths = trendSegments.map(
+    (line) => Number(line.getAttribute('x2')) - Number(line.getAttribute('x1')),
+  )
+  for (const width of segmentWidths)
+    expect(width).toBeCloseTo(segmentWidths[0], 4)
+  const start = screen.getByRole('slider', { name: 'Visible range start' })
+  fireEvent.keyDown(start, { key: 'ArrowRight' })
+  fireEvent.keyDown(start, { key: 'ArrowRight' })
+  const summary = screen.getByRole('button', { name: /Weekly average 81 kg/ })
+  expect(summary).toHaveAttribute('data-date', '2026-09-03')
+  expect(summary).toHaveAttribute(
+    'aria-label',
+    expect.stringContaining('01.09.2026 to 03.09.2026'),
+  )
+  fireEvent.click(summary)
+  expect(
+    screen.getByRole('button', { name: /^Expand week$/ }),
+  ).toBeInTheDocument()
+  expect(
+    container.querySelector('circle[data-date="2026-09-03"][data-chart-point]'),
+  ).toHaveAttribute('data-point-kind', 'weekly-summary')
+  fireEvent.click(screen.getByRole('button', { name: /^Expand week$/ }))
+  expect(
+    screen.getByRole('button', { name: 'Original September third' }),
+  ).toHaveAttribute('data-value', '82')
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Back to weekly averages' }),
+  )
+  expect(
+    screen.getByRole('button', { name: /Weekly average 81 kg/ }),
+  ).toHaveAttribute('data-value', '81')
+  expect(
+    screen.getByRole('button', { name: /Weekly average 81 kg/ }),
+  ).toHaveFocus()
+})
+
+it('requires explicit actions to expand weekly summaries and edit daily points', () => {
+  const activate = vi.fn()
+  render(
+    <SharedWeightChart
+      title="Weekly history"
+      description="History"
+      yLabel="kg"
+      min={70}
+      max={90}
+      compactOlderHistory
+      onPointActivate={activate}
+      series={[
+        {
+          id: 'owner',
+          color: 'green',
+          points: [
+            {
+              date: '2026-09-01',
+              value: 80,
+              title: 'First',
+              markerLabel: 'Original own point',
+            },
+            { date: '2026-09-02', value: 82, title: 'Second' },
+            { date: '2026-11-10', value: 75, title: 'Newest' },
+          ],
+        },
+      ]}
+    />,
+  )
+  const summary = screen.getByRole('button', {
+    name: /Weekly average 81 kg/,
+  })
+  expect(summary).toHaveAttribute('data-point-kind', 'weekly-summary')
+  fireEvent.keyDown(summary, { key: 'Enter' })
+  expect(activate).not.toHaveBeenCalled()
+  expect(screen.getByRole('tooltip')).toHaveTextContent(
+    /^31\.08\.2026 – 06\.09\.2026$/,
+  )
+  expect(screen.getByRole('tooltip')).not.toHaveTextContent(
+    /Weekly average|recorded weigh-ins|Expand week/,
+  )
+  expect(
+    screen.getByRole('group', {
+      name: /Weekly average 81 kg.*2 recorded weigh-ins/,
+    }),
+  ).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /^Expand week$/ })).toHaveFocus()
+  const expandWeek = screen.getByRole('button', { name: /^Expand week$/ })
+  expect(expandWeek).toHaveClass('bg-transparent', 'min-h-11', 'min-w-11')
+  expect(expandWeek.querySelector('span')).toHaveClass(
+    'bg-forest-800',
+    'text-[#072b22]',
+    'text-[0.5rem]',
+  )
+  fireEvent.click(screen.getByRole('button', { name: /^Expand week$/ }))
+  const daily = screen.getByRole('button', { name: 'Original own point' })
+  fireEvent.click(daily)
+  expect(activate).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: /^Edit weight$/ }))
+  expect(activate).toHaveBeenCalledWith(
+    expect.objectContaining({ date: '2026-09-01', value: 80 }),
+    'owner',
+  )
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Back to weekly averages' }),
+  )
+  expect(
+    screen.getByRole('button', { name: /Weekly average 81 kg/ }),
+  ).toBeInTheDocument()
+})
+
+it('marks estimates as hollow and requires an explicit Record weight action', () => {
   const onPointActivate = vi.fn()
   render(
     <SharedWeightChart
@@ -61,14 +213,20 @@ it('marks estimates as hollow, labels them accessibly, and activates their date/
   expect(estimate).toHaveAttribute('opacity', '0.72')
   expect(estimate.querySelector('title')).toHaveTextContent('Estimated')
   fireEvent.keyDown(estimate, { key: 'Enter' })
+  expect(onPointActivate).not.toHaveBeenCalled()
+  expect(screen.getByRole('button', { name: /^Record weight$/ })).toHaveFocus()
+  fireEvent.click(screen.getByRole('button', { name: /^Record weight$/ }))
   expect(onPointActivate).toHaveBeenCalledWith(
     expect.objectContaining({
       date: '2026-11-02',
       value: 89.75,
       estimated: true,
     }),
+    undefined,
   )
   fireEvent.click(estimate)
+  expect(onPointActivate).toHaveBeenCalledTimes(1)
+  fireEvent.click(screen.getByRole('button', { name: /^Record weight$/ }))
   expect(onPointActivate).toHaveBeenCalledTimes(2)
 })
 
@@ -235,10 +393,11 @@ it('centers a one-point member label over its point at the shared chart edge', (
     'text[data-date="2026-10-03"][data-value="75"]',
   )
   expect(label).toHaveAttribute('text-anchor', 'middle')
-  expect(Number(label?.getAttribute('x'))).toBe(696)
+  expect(Number(label?.getAttribute('x'))).toBe(736)
 })
 
-it('shows an accessible themed point tooltip on hover, keyboard focus, and touch', () => {
+it('shows stable interactive point details with keyboard focus and outside dismissal', () => {
+  const onPointActivate = vi.fn()
   render(
     <SharedWeightChart
       title="Point detail chart"
@@ -252,29 +411,47 @@ it('shows an accessible themed point tooltip on hover, keyboard focus, and touch
           value: 86.25,
           title: 'native title only',
           markerLabel: 'Recorded weight point',
-          tooltip: '2026-10-01: 86.25 kg',
+          tooltip: (
+            <span className="whitespace-nowrap">2026-10-01: 86.25 kg</span>
+          ),
         },
       ]}
+      onPointActivate={onPointActivate}
     />,
   )
   const chart = screen.getByRole('img', { name: 'Point detail chart' })
   const point = chart.querySelector('circle[data-chart-point]')!
+  const details = () =>
+    screen.getByRole('group', { name: /Chart point details/ })
   const expectTooltip = () => {
+    const panel = details()
     const tooltip = screen.getByRole('tooltip')
     expect(tooltip).toHaveTextContent('2026-10-01: 86.25 kg')
-    expect(tooltip).toHaveClass('bg-panel', 'border-line', 'shadow-panel')
+    expect(tooltip).toHaveClass('text-[0.53125rem]')
+    expect(panel).toHaveClass('bg-panel', 'border-line', 'shadow-panel')
     expect(point).toHaveAttribute('aria-describedby', tooltip.id)
   }
 
   fireEvent.pointerEnter(point, { pointerType: 'mouse' })
   expectTooltip()
   fireEvent.pointerLeave(chart.parentElement!, { pointerType: 'mouse' })
-  expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+  expect(
+    screen.queryByRole('group', { name: /Chart point details/ }),
+  ).toBeNull()
 
   fireEvent.focus(point)
   expectTooltip()
-  fireEvent.keyDown(point, { key: 'Escape' })
-  expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+  fireEvent.keyDown(point, { key: 'Enter' })
+  expect(onPointActivate).not.toHaveBeenCalled()
+  const edit = screen.getByRole('button', { name: /^Edit weight$/ })
+  expect(edit).toHaveFocus()
+  fireEvent.keyDown(edit, { key: 'Escape' })
+  expect(
+    screen.queryByRole('group', { name: /Chart point details/ }),
+  ).toBeNull()
+  expect(point).toHaveFocus()
+  expect(point).toHaveAttribute('style', 'outline: none;')
+  expect(chart.querySelector('[data-point-highlight]')).toBeInTheDocument()
 
   fireEvent.pointerDown(point, { pointerType: 'touch' })
   expectTooltip()
@@ -284,7 +461,9 @@ it('shows an accessible themed point tooltip on hover, keyboard focus, and touch
       pointerType: 'touch',
     },
   )
-  expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+  expect(
+    screen.queryByRole('group', { name: /Chart point details/ }),
+  ).toBeNull()
 })
 
 it('applies quick ranges, adjustable date endpoints, clipped trend/reference lines, and restores all records', () => {
@@ -338,7 +517,7 @@ it('applies quick ranges, adjustable date endpoints, clipped trend/reference lin
   expect(chart().querySelector('[data-chart-reference]')).toBeInTheDocument()
   expect(chart().querySelector('[data-chart-trend]')).toHaveAttribute(
     'x1',
-    '64',
+    '44',
   )
   expect(screen.getByLabelText('Visible date range')).toHaveTextContent(
     '01.04.2026 – 01.05.2026',

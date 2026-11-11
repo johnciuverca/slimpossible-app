@@ -669,12 +669,15 @@ for (const layout of [
       const viewBoxHeight = await comparison.evaluate((element) =>
         Number(element.getAttribute('viewBox')?.trim().split(/\s+/)[3]),
       )
+      const plotRight = Number(
+        await comparison.getAttribute('data-chart-plot-right'),
+      )
       const outOfBoundsLabels = await comparison.locator('text').evaluateAll(
-        (elements, chartHeight) =>
+        (elements, { chartHeight, plotRight }) =>
           elements.flatMap((element) => {
             const box = (element as SVGGraphicsElement).getBBox()
             return box.x >= 0 &&
-              box.x + box.width <= 720 &&
+              box.x + box.width <= plotRight &&
               box.y >= 0 &&
               box.y + box.height <= chartHeight
               ? []
@@ -688,7 +691,7 @@ for (const layout of [
                   },
                 ]
           }),
-        viewBoxHeight,
+        { chartHeight: viewBoxHeight, plotRight },
       )
       expect(outOfBoundsLabels).toEqual([])
       expect(
@@ -921,6 +924,457 @@ test('selected Group sections retain readable contrast in both color schemes', a
     }
   }
 })
+
+for (const width of [320, 390, 430, 1280]) {
+  test(`weekly Group history expands and collapses at ${width}px`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 })
+    await installGroupFixtures(page, true)
+    await page.route(
+      `${supabaseRestUrl}/rpc/get_group_chart_history`,
+      async (route) => {
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify([
+            {
+              member_key: 'opaque-member-a',
+              display_name: 'Ava',
+              recorded_date: '2026-09-01',
+              weight_kg: 90,
+            },
+            {
+              member_key: 'opaque-member-a',
+              display_name: 'Ava',
+              recorded_date: '2026-09-02',
+              weight_kg: 88,
+            },
+            {
+              member_key: 'opaque-member-a',
+              display_name: 'Ava',
+              recorded_date: '2026-09-08',
+              weight_kg: 89,
+            },
+            {
+              member_key: 'opaque-member-a',
+              display_name: 'Ava',
+              recorded_date: '2026-09-15',
+              weight_kg: 88,
+            },
+            {
+              member_key: 'opaque-member-b',
+              display_name: 'Ben',
+              recorded_date: '2026-09-08',
+              weight_kg: 81,
+            },
+            {
+              member_key: 'opaque-member-b',
+              display_name: 'Ben',
+              recorded_date: '2026-09-22',
+              weight_kg: 80,
+            },
+            {
+              member_key: 'opaque-member-a',
+              display_name: 'Ava',
+              recorded_date: '2026-09-22',
+              weight_kg: 87,
+            },
+          ]),
+        })
+      },
+    )
+    await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    const expectVisibleCollapse = async (surface: string) => {
+      const controls = page.getByRole('group', {
+        name: 'Chart date range controls',
+        exact: true,
+      })
+      const collapse = controls.getByRole('button', {
+        name: 'Back to weekly averages',
+        exact: true,
+      })
+      await expect(
+        page.getByRole('button', {
+          name: 'Back to weekly averages',
+          exact: true,
+        }),
+      ).toHaveCount(1)
+      await page
+        .locator(
+          'circle[data-series-id="opaque-member-b"][data-date="2026-09-22"]',
+        )
+        .evaluate((point) => point.scrollIntoView({ block: 'center' }))
+      await expect(collapse).toBeInViewport()
+      expect(
+        await collapse.evaluate((button) => {
+          const box = button.getBoundingClientRect()
+          return (
+            document
+              .elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)
+              ?.closest('button') === button
+          )
+        }),
+      ).toBe(true)
+      const box = (await collapse.boundingBox())!
+      expect(box.height).toBeGreaterThanOrEqual(width < 640 ? 44 : 36)
+      expect(box.x).toBeGreaterThanOrEqual(0)
+      expect(box.x + box.width).toBeLessThanOrEqual(width)
+      await page.screenshot({
+        path: testInfo.outputPath(`weekly-collapse-${surface}-${width}.png`),
+      })
+    }
+    const summary = page.getByRole('button', {
+      name: /Weekly average 89 kg.*2 recorded weigh-ins/,
+    })
+    await expect(summary).toHaveCount(1)
+    const originalX = await summary.getAttribute('cx')
+    const originalColours = await page
+      .locator('circle[data-visual-marker="weekly"]')
+      .evaluateAll((points) =>
+        points.map((point) => point.getAttribute('fill')),
+      )
+    await expect(summary).toHaveAttribute(
+      'aria-label',
+      /Weekly average 89 kg.*2 recorded weigh-ins/,
+    )
+    await expect(
+      page.locator('circle[data-visual-marker="weekly"]').first(),
+    ).toHaveAttribute('r', '7')
+    await expect(
+      page.locator('circle[data-visual-marker="daily"]').first(),
+    ).toHaveAttribute('r', '3')
+    const geometry = await page
+      .locator('circle[data-series-id="opaque-member-a"][data-chart-point]')
+      .evaluateAll((markers) =>
+        markers.map((marker) => ({
+          date: marker.getAttribute('data-date'),
+          x:
+            marker.getBoundingClientRect().x +
+            marker.getBoundingClientRect().width / 2,
+          width: marker.getBoundingClientRect().width,
+        })),
+      )
+    const xs = [
+      '2026-09-01',
+      '2026-09-08',
+      '2026-09-15',
+      '2026-09-16',
+      '2026-09-17',
+    ].map((date) => geometry.find((marker) => marker.date === date)!.x)
+    const spacing = xs[1] - xs[0]
+    for (let index = 2; index < xs.length; index++)
+      expect(xs[index] - xs[index - 1]).toBeCloseTo(spacing, 3)
+    expect(
+      Math.min(...geometry.map((marker) => marker.width)),
+    ).toBeGreaterThanOrEqual(44)
+    const aligned = await page
+      .locator(
+        'circle[data-point-kind="weekly-summary"][data-date="2026-09-08"]',
+      )
+      .evaluateAll((markers) =>
+        markers.map((marker) => marker.getAttribute('cx')),
+      )
+    expect(new Set(aligned).size).toBe(1)
+    console.log('compressed-slot-bounds', width, {
+      xs,
+      spacing,
+      hitWidths: geometry.map((marker) => marker.width),
+    })
+    await summary.focus()
+    const details = page.getByRole('tooltip')
+    await expect(details).toHaveText('31.08.2026 – 06.09.2026')
+    await expect(details).not.toContainText(
+      /Weekly average|recorded|Expand week/,
+    )
+    await expect(
+      page.getByRole('group', {
+        name: /Weekly average 89 kg.*2 recorded weigh-ins/,
+      }),
+    ).toBeVisible()
+    const expandSummary = page.getByRole('button', {
+      name: 'Expand week',
+      exact: true,
+    })
+    const visibleExpandLabel = expandSummary.locator('span')
+    await expect(visibleExpandLabel).toHaveClass(/bg-forest-800/)
+    await expect(visibleExpandLabel).toHaveCSS('font-size', '8px')
+    await expect(visibleExpandLabel).toHaveCSS(
+      'background-color',
+      'rgb(49, 219, 176)',
+    )
+    await expect(visibleExpandLabel).toHaveCSS('color', 'rgb(7, 43, 34)')
+    const expandSummaryBox = (await expandSummary.boundingBox())!
+    expect(expandSummaryBox.height).toBeGreaterThanOrEqual(
+      width < 640 ? 44 : 36,
+    )
+    expect(expandSummaryBox.width).toBeLessThanOrEqual(140)
+    const detailsBox = await details.boundingBox()
+    expect(detailsBox!.x).toBeGreaterThanOrEqual(0)
+    expect(detailsBox!.x + detailsBox!.width).toBeLessThanOrEqual(width)
+    const [popoverBox, dateDetailsBox, actionLabelBox] = await Promise.all([
+      page.getByRole('group', { name: /Chart point details/ }).boundingBox(),
+      details.boundingBox(),
+      visibleExpandLabel.boundingBox(),
+    ])
+    expect(popoverBox).not.toBeNull()
+    expect(dateDetailsBox).not.toBeNull()
+    expect(actionLabelBox).not.toBeNull()
+    for (const box of [dateDetailsBox!, actionLabelBox!])
+      expect(
+        Math.abs(
+          box.x + box.width / 2 - (popoverBox!.x + popoverBox!.width / 2),
+        ),
+      ).toBeLessThanOrEqual(1)
+    await page.screenshot({
+      path: testInfo.outputPath(`weekly-details-${width}.png`),
+      fullPage: true,
+    })
+    await page.keyboard.press('Enter')
+    const expandOverviewWeek = page.getByRole('button', {
+      name: 'Expand week',
+      exact: true,
+    })
+    await expect(expandOverviewWeek).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(summary).toHaveCount(0)
+    await expectVisibleCollapse('overview')
+    await expect(
+      page.locator(
+        'circle[data-point-kind="recorded"][data-date="2026-09-01"]',
+      ),
+    ).toHaveCount(1)
+    await page.getByRole('button', { name: 'Back to weekly averages' }).click()
+    await expect(summary).toHaveCount(1)
+    await expect(summary).toBeFocused()
+    await expect(summary).toHaveAttribute('cx', originalX!)
+    expect(
+      await page
+        .locator('circle[data-visual-marker="weekly"]')
+        .evaluateAll((points) =>
+          points.map((point) => point.getAttribute('fill')),
+        ),
+    ).toEqual(originalColours)
+    const box = await summary.boundingBox()
+    expect(box!.x).toBeGreaterThanOrEqual(0)
+    expect(box!.x + box!.width).toBeLessThanOrEqual(width)
+    await page.screenshot({
+      path: testInfo.outputPath(`weekly-history-${width}.png`),
+      fullPage: true,
+    })
+    const sharedWeek = page.locator(
+      'circle[data-point-kind="weekly-summary"][data-series-id="opaque-member-a"][data-date="2026-09-08"]',
+    )
+    await sharedWeek.press('Enter')
+    await page.keyboard.press('Enter')
+    await expectVisibleCollapse('overview-shared')
+    const expandedShared = page.locator(
+      'circle[data-point-kind="recorded"][data-date="2026-09-08"]',
+    )
+    await expect(expandedShared).toHaveCount(2)
+    expect(
+      new Set(
+        await expandedShared.evaluateAll((markers) =>
+          markers.map((marker) => marker.getAttribute('cx')),
+        ),
+      ).size,
+    ).toBe(1)
+    await page.screenshot({
+      path: testInfo.outputPath(`weekly-expanded-${width}.png`),
+      fullPage: true,
+    })
+    await page.getByRole('button', { name: 'Back to weekly averages' }).click()
+    await page.getByRole('link', { name: 'Charts', exact: true }).click()
+    await expect(
+      page.getByRole('tab', { name: 'All members', exact: true }),
+    ).toHaveAttribute('aria-selected', 'true')
+    await expect(summary).toHaveCount(1)
+    await expect(
+      page.locator('path[data-series="weekly-summary-connection"]'),
+    ).not.toHaveCount(0)
+    await page
+      .getByRole('slider', { name: 'Visible range start' })
+      .press('ArrowRight')
+    await expect(summary).toHaveAttribute('data-date', '2026-09-02')
+    await expect(summary).toHaveAttribute('data-value', '89')
+    const selectedStart = await page
+      .getByRole('slider', { name: 'Visible range start' })
+      .getAttribute('aria-valuenow')
+    await summary.focus()
+    await expect(page.getByRole('tooltip')).toContainText(
+      '31.08.2026 – 06.09.2026',
+    )
+    await page.keyboard.press('Enter')
+    const expandChartWeek = page.getByRole('button', {
+      name: 'Expand week',
+      exact: true,
+    })
+    await expect(expandChartWeek).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(summary).toHaveCount(0)
+    await expectVisibleCollapse('charts')
+    await expect(
+      page.locator(
+        'circle[data-point-kind="recorded"][data-date="2026-09-02"]',
+      ),
+    ).toHaveCount(1)
+    await page.getByRole('button', { name: 'Back to weekly averages' }).click()
+    await expect(summary).toHaveAttribute('data-value', '89')
+    await expect(summary).toBeFocused()
+    await expect(
+      page.getByRole('slider', { name: 'Visible range start' }),
+    ).toHaveAttribute('aria-valuenow', selectedStart!)
+    await page.screenshot({
+      path: testInfo.outputPath(`weekly-charts-range-${width}.png`),
+      fullPage: true,
+    })
+  })
+}
+
+for (const width of [320, 390, 430, 1280]) {
+  test(`Group overview summary row geometry at ${width}px`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 })
+    await installGroupFixtures(page, true)
+    await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    await expect(
+      page.getByRole('heading', { name: 'Group progress', exact: true }),
+    ).toBeVisible()
+    const metrics = page.locator('.group-overview-metric')
+    await expect(metrics).toHaveCount(4)
+    const chart = page
+      .locator('.group-history-workspace svg[role="img"]')
+      .first()
+    await expect(chart).toBeVisible()
+    const bounds = await page.evaluate(() => {
+      const rect = (element: Element) => {
+        const { x, y, width, height, right, bottom } =
+          element.getBoundingClientRect()
+        return { x, y, width, height, right, bottom }
+      }
+      const card = document.querySelector('#group-summary')!
+      const row = card.querySelector('dl')!
+      const chart = document.querySelector(
+        '.group-history-workspace svg[role="img"]',
+      )!
+      return {
+        card: rect(card),
+        row: rect(row),
+        metrics: Array.from(row.children, rect),
+        metricText: Array.from(row.children, (metric) => {
+          const label = metric.querySelector('dt')!
+          const value = metric.querySelector('dd')!
+          const rangeRect = (element: Element) => {
+            const range = document.createRange()
+            range.selectNodeContents(element)
+            const { x, y, width, height, right, bottom } =
+              range.getBoundingClientRect()
+            return { x, y, width, height, right, bottom }
+          }
+          return { label: rangeRect(label), value: rangeRect(value) }
+        }),
+        chart: rect(chart),
+        pageWidth: document.documentElement.scrollWidth,
+        viewportWidth: window.innerWidth,
+      }
+    })
+    console.log('group-overview-summary-bounds', width, bounds)
+    await expect(metrics.nth(0)).toContainText('Members')
+    await expect(metrics.nth(0)).toContainText('3')
+    await expect(metrics.nth(1)).toContainText('42.5%')
+    await expect(metrics.nth(2)).toContainText('Checked in')
+    await expect(metrics.nth(3)).toContainText('Goals reached')
+    if (width < 640) {
+      const row = bounds.row
+      for (const metric of bounds.metrics) {
+        expect(metric.x).toBeGreaterThanOrEqual(row.x)
+        expect(metric.right).toBeLessThanOrEqual(row.right)
+      }
+      for (const text of bounds.metricText) {
+        for (const box of [text.label, text.value]) {
+          expect(box.x).toBeGreaterThanOrEqual(row.x)
+          expect(box.right).toBeLessThanOrEqual(row.right)
+        }
+      }
+      if (width >= 390) {
+        expect(new Set(bounds.metrics.map((metric) => metric.y)).size).toBe(1)
+        expect(bounds.row.height).toBeLessThanOrEqual(60)
+        expect(bounds.chart.y).toBeLessThan(530)
+      } else {
+        expect(new Set(bounds.metrics.map((metric) => metric.y)).size).toBe(2)
+        expect(bounds.chart.y).toBeLessThan(665)
+      }
+    } else {
+      expect(bounds.card.height).toBeCloseTo(103.15625, 1)
+      expect(bounds.row.height).toBeCloseTo(67.1875, 1)
+      expect(bounds.chart.x).toBeCloseTo(37, 1)
+      expect(bounds.chart.y).toBeCloseTo(444.15625, 1)
+      expect(bounds.chart.width).toBeCloseTo(1206, 1)
+      expect(bounds.chart.height).toBeCloseTo(441.140625, 1)
+    }
+    await page.screenshot({
+      path: testInfo.outputPath(`group-overview-${width}-after.png`),
+    })
+    if (width < 640) {
+      await page.locator('#group-summary').evaluate((card) => {
+        ;(card as HTMLElement).style.fontSize = '20px'
+      })
+      await metrics
+        .nth(1)
+        .locator('dt')
+        .evaluate((label) => {
+          label.textContent = 'Durchschnitt der Gruppenziele'
+        })
+      await metrics.locator('dt, dd').evaluateAll((texts) => {
+        for (const text of texts) {
+          ;(text as HTMLElement).style.fontSize = '20px'
+          ;(text as HTMLElement).style.lineHeight = '1.2'
+        }
+      })
+      const enlarged = await metrics.evaluateAll((cards) =>
+        cards.map((card) => {
+          const cardBox = card.getBoundingClientRect()
+          const textBoxes = ['dt', 'dd'].flatMap((selector) => {
+            const range = document.createRange()
+            range.selectNodeContents(card.querySelector(selector)!)
+            return Array.from(range.getClientRects(), (rect) => ({
+              left: rect.left,
+              right: rect.right,
+              top: rect.top,
+              bottom: rect.bottom,
+              cardLeft: cardBox.left,
+              cardRight: cardBox.right,
+              cardTop: cardBox.top,
+              cardBottom: cardBox.bottom,
+            }))
+          })
+          return { textBoxes }
+        }),
+      )
+      for (const { textBoxes } of enlarged) {
+        for (const textBox of textBoxes) {
+          expect(textBox.left).toBeGreaterThanOrEqual(textBox.cardLeft)
+          expect(textBox.right).toBeLessThanOrEqual(textBox.cardRight)
+          expect(textBox.top).toBeGreaterThanOrEqual(textBox.cardTop)
+          expect(textBox.bottom).toBeLessThanOrEqual(textBox.cardBottom)
+        }
+      }
+      await expect(metrics.nth(1)).toContainText('42.5%')
+      const enlargedRows = await metrics.evaluateAll(
+        (cards) =>
+          new Set(cards.map((card) => card.getBoundingClientRect().top)).size,
+      )
+      expect(enlargedRows).toBe(2)
+      const pageWidth = await page.evaluate(
+        () => document.documentElement.scrollWidth,
+      )
+      expect(pageWidth).toBeLessThanOrEqual(width === 320 ? 323 : width)
+      await page.screenshot({
+        path: testInfo.outputPath(`group-overview-${width}-large-text.png`),
+      })
+    }
+  })
+}
 
 for (const width of [1280, 390]) {
   test(`Group top actions align and retain disclosure/refresh behavior at ${width}px`, async ({
@@ -1441,6 +1895,23 @@ for (const viewport of [
       name: 'Weight (kg) — shared group history',
     })
     await expect(chart).toBeVisible()
+    await expect(chart.locator('.chart-axis-tick').first()).toHaveCSS(
+      'font-size',
+      '10.2px',
+    )
+    await expect(chart.locator('.chart-axis-title')).toHaveCSS(
+      'font-size',
+      '12px',
+    )
+    await expect(chart).toHaveAttribute(
+      'data-chart-plot-left',
+      viewport.width <= 600 ? '32' : '44',
+    )
+    await expect(chart).toHaveAttribute(
+      'data-chart-plot-right',
+      viewport.width <= 600 ? '304' : '736',
+    )
+    await expect(chart).toHaveAttribute('data-chart-plot-top', '27')
     const firstChartPoint = chart
       .locator('circle[data-point-kind="recorded"][data-chart-point]')
       .first()
@@ -1449,6 +1920,25 @@ for (const viewport of [
     await expect(pointTooltip).toContainText(
       /Ava \(member 1\).*20\.09\.2026.*90 kg/,
     )
+    await expect(pointTooltip).toHaveCSS('font-size', '8.5px')
+    expect((await pointTooltip.boundingBox())!.height).toBeLessThanOrEqual(16)
+    const [pointTooltipBox, pointPopoverBox] = await Promise.all([
+      pointTooltip.boundingBox(),
+      page.getByRole('group', { name: /Chart point details/ }).boundingBox(),
+    ])
+    expect(pointTooltipBox).not.toBeNull()
+    expect(pointPopoverBox).not.toBeNull()
+    expect(
+      Math.abs(
+        pointTooltipBox!.x +
+          pointTooltipBox!.width / 2 -
+          (pointPopoverBox!.x + pointPopoverBox!.width / 2),
+      ),
+    ).toBeLessThanOrEqual(1)
+    await page.screenshot({
+      path: test.info().outputPath(`group-daily-tooltip-${viewport.width}.png`),
+      fullPage: true,
+    })
     await page.mouse.move(8, 8)
     await expect(pointTooltip).toHaveCount(0)
     const groupLegend = page.getByRole('list', {
@@ -1461,6 +1951,19 @@ for (const viewport of [
     const chartRegion = page.getByRole('region', {
       name: 'Group comparison chart',
     })
+    const expectChartFrameInsideCard = async (targetChart: typeof chart) => {
+      const [sectionBounds, frameBounds] = await Promise.all([
+        targetChart.locator('xpath=ancestor::section[1]').boundingBox(),
+        targetChart.locator('xpath=../..').boundingBox(),
+      ])
+      expect(sectionBounds).not.toBeNull()
+      expect(frameBounds).not.toBeNull()
+      expect(frameBounds!.x).toBeGreaterThanOrEqual(sectionBounds!.x)
+      expect(frameBounds!.x + frameBounds!.width).toBeLessThanOrEqual(
+        sectionBounds!.x + sectionBounds!.width,
+      )
+    }
+    await expectChartFrameInsideCard(chart)
     const expectLegendCentered = async () => {
       const [legendBox, chartRegionBox] = await Promise.all([
         groupLegend.boundingBox(),
@@ -1494,11 +1997,11 @@ for (const viewport of [
     )!
     const plotBottom = await chart.evaluate(
       (element) =>
-        Number(element.getAttribute('viewBox')?.trim().split(/\s+/)[3]) - 52,
+        Number(element.getAttribute('viewBox')?.trim().split(/\s+/)[3]) - 36,
     )
     expect(heavier.y).toBeLessThan(lighter.y)
     for (const point of originalPoints) {
-      expect(point.y).toBeGreaterThan(25)
+      expect(point.y).toBeGreaterThan(27)
       expect(point.y).toBeLessThanOrEqual(plotBottom)
     }
     await expect(chart).toContainText('Weight (kg)')
@@ -1529,16 +2032,19 @@ for (const viewport of [
       ).toBeLessThan(2)
       await expect(rangeControls.getByRole('button')).toHaveCount(5)
       await expect(chartControlsTrack.getByRole('slider')).toHaveCount(2)
-      for (const control of await rangeControls.getByRole('button').all())
+      for (const control of await rangeControls.getByRole('button').all()) {
         await expect(control).toBeVisible()
+        const controlBounds = (await control.boundingBox())!
+        expect(controlBounds.height).toBeGreaterThanOrEqual(44)
+      }
       const regionBounds = await chartRegion.boundingBox()
       expect(regionBounds).not.toBeNull()
-      expect(chartBounds!.width).toBeLessThanOrEqual(regionBounds!.width + 1)
+      await expectChartFrameInsideCard(chart)
     } else {
       expect(
         Math.abs(
           quickRangeLabel!.x -
-            (chartBounds!.x + (64 / 760) * chartBounds!.width),
+            (chartBounds!.x + (44 / 760) * chartBounds!.width),
         ),
       ).toBeLessThan(2)
     }
@@ -1616,8 +2122,21 @@ for (const viewport of [
     await expect(all).toBeFocused()
     await tabs.getByRole('tab', { name: 'Ava (member 2)' }).click()
     const individualChart = page.getByRole('img', {
-      name: /Change from first shared weight \(kg\)/,
+      name: 'Weight (kg) — shared group history',
     })
+    await expectChartFrameInsideCard(individualChart)
+    await expect(individualChart.locator('.chart-axis-tick').first()).toHaveCSS(
+      'font-size',
+      '10.2px',
+    )
+    await expect(individualChart).toHaveAttribute(
+      'data-chart-plot-left',
+      viewport.width <= 600 ? '32' : '44',
+    )
+    await expect(individualChart).toHaveAttribute(
+      'data-chart-plot-right',
+      viewport.width <= 600 ? '304' : '736',
+    )
     await individualChart
       .locator('circle[data-point-kind="recorded"][data-chart-point]')
       .first()
@@ -1630,6 +2149,9 @@ for (const viewport of [
     await expect(
       individualChart.locator('circle[data-point-kind="recorded"][data-date]'),
     ).toHaveCount(2)
+    await individualChart.screenshot({
+      path: test.info().outputPath(`group-individual-${viewport.width}.png`),
+    })
     const individualTrack = page.getByRole('group', {
       name: 'Adjust visible date range',
     })
@@ -2757,6 +3279,40 @@ test.describe('group chart weigh-in dots', () => {
 
     await ownEstimate.focus()
     await page.keyboard.press('Enter')
+    const estimateTooltip = page.getByRole('tooltip')
+    await expect(estimateTooltip).toContainText('Estimated')
+    await expect(estimateTooltip).toHaveCSS('font-size', '8.5px')
+    const recordEstimate = page
+      .getByRole('group', { name: /Chart point details/ })
+      .getByRole('button', { name: 'Record weight', exact: true })
+    await expect(recordEstimate).toBeFocused()
+    const recordLabel = recordEstimate.locator('span')
+    await expect(recordLabel).toHaveCSS('font-size', '8px')
+    await expect(recordLabel).toHaveCSS('background-color', 'rgb(49, 219, 176)')
+    const [estimatePopoverBox, estimateTextBox, recordLabelBox] =
+      await Promise.all([
+        page.getByRole('group', { name: /Chart point details/ }).boundingBox(),
+        estimateTooltip.boundingBox(),
+        recordLabel.boundingBox(),
+      ])
+    expect(estimatePopoverBox).not.toBeNull()
+    expect(estimateTextBox).not.toBeNull()
+    expect(recordLabelBox).not.toBeNull()
+    for (const box of [estimateTextBox!, recordLabelBox!])
+      expect(
+        Math.abs(
+          box.x +
+            box.width / 2 -
+            (estimatePopoverBox!.x + estimatePopoverBox!.width / 2),
+        ),
+      ).toBeLessThanOrEqual(1)
+    await page.screenshot({
+      path: test.info().outputPath('group-estimate-tooltip-1280.png'),
+      fullPage: true,
+    })
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('dialog')).toBeVisible()
     const edit = page.getByRole('dialog', { name: 'Edit weight' })
     await expect(edit.getByLabel('Date')).toHaveValue('2026-09-21')
     await expect(edit.getByLabel('Weight in kg')).toHaveValue('84.25')
@@ -2777,6 +3333,7 @@ test.describe('group chart weigh-in dots', () => {
     ).toHaveLength(0)
 
     await ownEstimate.focus()
+    await page.keyboard.press('Enter')
     await page.keyboard.press('Enter')
     const reopened = page.getByRole('dialog', { name: 'Edit weight' })
     await expect(reopened.getByLabel('Weight in kg')).toHaveValue('84.25')
@@ -2847,6 +3404,7 @@ test.describe('group chart weigh-in dots', () => {
     await estimate.focus()
     await expect(estimate).toBeFocused()
     await page.keyboard.press('Enter')
+    await page.keyboard.press('Enter')
     await expect(page.getByRole('dialog')).toHaveCount(0)
 
     fixture.releasePersonalContexts()
@@ -2886,15 +3444,16 @@ test.describe('group chart weigh-in dots', () => {
       .click()
     await page.getByRole('tab', { name: 'Ava (member 1)' }).click()
     const chart = page.getByRole('img', {
-      name: 'Change from first shared weight (kg)',
+      name: 'Weight (kg) — shared group history',
     })
     const ownEstimate = chart.locator(
       `circle[data-series-id="${memberKey(ownGroupId, viewerId)}"][data-date="2026-09-21"][data-point-kind="estimated"]`,
     )
     await expect(ownEstimate).toBeVisible()
-    await expect(ownEstimate).toHaveAttribute('data-value', '-0.75')
+    await expect(ownEstimate).toHaveAttribute('data-value', '89.25')
     await expect(ownEstimate.locator('title')).toContainText('89.25 kg')
     await ownEstimate.focus()
+    await page.keyboard.press('Enter')
     await page.keyboard.press('Enter')
     const create = page.getByRole('dialog', { name: 'Record weight' })
     await expect(create.getByLabel('Weight in kg')).toHaveValue('89.25')
@@ -2925,8 +3484,8 @@ test.describe('group chart weigh-in dots', () => {
     const recoveredRecorded = chart.locator(
       `circle[data-series-id="${memberKey(ownGroupId, viewerId)}"][data-date="2026-09-21"][data-point-kind="recorded"]`,
     )
-    await expect(recoveredRecorded).toHaveAttribute('data-value', '-5.5')
-    await expect(recoveredRecorded.locator('title')).toContainText('-5.5 kg')
+    await expect(recoveredRecorded).toHaveAttribute('data-value', '84.5')
+    await expect(recoveredRecorded.locator('title')).toContainText('84.5 kg')
     await expect(chart).not.toContainText(
       'Private date collision must stay private',
     )
@@ -2962,8 +3521,14 @@ test.describe('group chart weigh-in dots', () => {
     await expect(ownEstimate).toHaveAttribute('aria-label', /Estimated/)
     await otherRecorded.click()
     await expect(page.getByRole('dialog')).toHaveCount(0)
+    const otherDetails = page.getByRole('group', {
+      name: /Chart point details/,
+    })
+    await expect(otherDetails).toBeVisible()
+    await expect(otherDetails.getByRole('button')).toHaveCount(0)
 
     await ownRecorded.focus()
+    await page.keyboard.press('Enter')
     await page.keyboard.press('Enter')
     const edit = page.getByRole('dialog', { name: 'Edit weight' })
     await expect(edit.getByLabel('Date')).toHaveValue('2026-09-22')
@@ -2990,6 +3555,16 @@ test.describe('group chart weigh-in dots', () => {
       )
     }
     await tapEstimate()
+    const recordWeight = page
+      .getByRole('group', { name: /Chart point details/ })
+      .getByRole('button', { name: 'Record weight', exact: true })
+    await expect(recordWeight).toBeVisible()
+    const recordWeightBounds = await recordWeight.boundingBox()
+    expect(recordWeightBounds!.height).toBeGreaterThanOrEqual(44)
+    await page.touchscreen.tap(
+      recordWeightBounds!.x + recordWeightBounds!.width / 2,
+      recordWeightBounds!.y + recordWeightBounds!.height / 2,
+    )
     const create = page.getByRole('dialog', { name: 'Record weight' })
     await expect(create.getByLabel('Date')).toHaveValue('2026-09-21')
     await expect(create.getByLabel('Weight in kg')).toHaveValue('89.4')
@@ -3009,6 +3584,10 @@ test.describe('group chart weigh-in dots', () => {
     ).toHaveLength(saveRequestsBeforeCancel)
 
     await tapEstimate()
+    await page
+      .getByRole('group', { name: /Chart point details/ })
+      .getByRole('button', { name: 'Record weight', exact: true })
+      .click()
     const confirmedCreate = page.getByRole('dialog', { name: 'Record weight' })
     await expect(
       confirmedCreate.getByLabel('E2E authorized group'),
@@ -3065,6 +3644,35 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
     await expect(
       page.locator('.group-history-workspace svg').first(),
     ).toBeVisible()
+    const overviewChart = page
+      .locator('.group-history-workspace svg[role="img"]')
+      .first()
+    await expect(overviewChart).toHaveAttribute(
+      'data-chart-plot-left',
+      width <= 600 ? '32' : '44',
+    )
+    await expect(overviewChart).toHaveAttribute(
+      'data-chart-plot-right',
+      width <= 600 ? '304' : '736',
+    )
+    const [overviewCardBounds, overviewFrameBounds] = await Promise.all([
+      overviewChart.locator('xpath=ancestor::section[1]').boundingBox(),
+      overviewChart.locator('xpath=../..').boundingBox(),
+    ])
+    expect(overviewCardBounds).not.toBeNull()
+    expect(overviewFrameBounds).not.toBeNull()
+    expect(overviewFrameBounds!.x).toBeGreaterThanOrEqual(overviewCardBounds!.x)
+    expect(
+      overviewFrameBounds!.x + overviewFrameBounds!.width,
+    ).toBeLessThanOrEqual(overviewCardBounds!.x + overviewCardBounds!.width)
+    await expect(overviewChart).toHaveAttribute('data-chart-plot-top', '27')
+    const overviewViewBoxHeight = await overviewChart.evaluate((chart) =>
+      Number(chart.getAttribute('viewBox')?.trim().split(/\s+/)[3]),
+    )
+    await expect(overviewChart).toHaveAttribute(
+      'data-chart-plot-bottom',
+      String(overviewViewBoxHeight - 36),
+    )
     const nav = page.getByRole('navigation', { name: 'Group sections' })
     for (const name of [
       'Record weight',
@@ -3136,8 +3744,8 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
         expect(side.color).toBe('rgb(53, 67, 83)')
       }
     if (width === 1440) {
-      expect(edges.plot.width).toBeCloseTo(1174, 0)
-      expect(edges.plot.height).toBeCloseTo(429.421875, 0)
+      expect(edges.plot.width).toBeCloseTo(1206, 0)
+      expect(edges.plot.height).toBeCloseTo(441.140625, 0)
     }
     if (width === 390) {
       expect(edges.plot.width).toBeLessThan(600)

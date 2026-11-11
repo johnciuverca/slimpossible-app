@@ -14,6 +14,7 @@ export function PersonalProgressChart({
   referenceLabel,
   fitContainer = false,
   labelExtremesOnly = false,
+  compactOlderHistory = false,
   onPointActivate,
 }: {
   weighIns: readonly WeighIn[]
@@ -21,6 +22,7 @@ export function PersonalProgressChart({
   referenceLabel?: string
   fitContainer?: boolean
   labelExtremesOnly?: boolean
+  compactOlderHistory?: boolean
   onPointActivate?: (point: {
     date: string
     value: number
@@ -53,7 +55,11 @@ export function PersonalProgressChart({
     value: point.weightKg,
     label: formatWeight(point.weightKg),
     markerLabel: `Recorded weight on ${formatChartDate(point.date)}`,
-    tooltip: `${formatChartDate(point.date)}: ${formatWeight(point.weightKg)} kg`,
+    tooltip: (
+      <span className="whitespace-nowrap">
+        {formatChartDate(point.date)}: {formatWeight(point.weightKg)} kg
+      </span>
+    ),
     title: `${formatChartDate(point.date)}: ${formatWeight(point.weightKg)} kg recorded`,
   }))
   const estimates = interpolateMissingWeights(chronological).map((point) => ({
@@ -61,7 +67,14 @@ export function PersonalProgressChart({
     value: point.weightKg,
     estimated: true,
     markerLabel: `Estimated weight on ${formatChartDate(point.date)}`,
-    tooltip: `Estimated — ${formatChartDate(point.date)}: ${formatWeight(point.weightKg)} kg`,
+    tooltip: (
+      <>
+        Estimated —{' '}
+        <span className="whitespace-nowrap">
+          {formatChartDate(point.date)}: {formatWeight(point.weightKg)} kg
+        </span>
+      </>
+    ),
     title: `Estimated: ${formatChartDate(point.date)}, ${formatWeight(point.weightKg)} kg`,
   }))
   const plottedPoints = [...points, ...estimates].sort((a, b) =>
@@ -102,11 +115,11 @@ export function PersonalProgressChart({
       : ` ${referenceLabel ?? 'The selected goal target'} is ${formatWeight(reference)} kilograms. Its reference line is shown only when it fits within the data-scaled chart range; otherwise its value is noted below the chart.`
   return (
     <figure
-      className="personal-weight-chart mt-5"
+      className="personal-weight-chart mt-5 w-full min-w-0"
       aria-labelledby={`${id}-caption`}
     >
       <div
-        className={fitContainer ? 'min-w-0' : 'overflow-x-auto'}
+        className={fitContainer ? 'w-full min-w-0' : 'overflow-x-auto'}
         role="group"
         aria-label={
           fitContainer
@@ -116,8 +129,9 @@ export function PersonalProgressChart({
         tabIndex={fitContainer ? undefined : 0}
       >
         <SharedWeightChart
+          compactOlderHistory={compactOlderHistory}
           title={`Personal weight history chart. ${points.length} saved weigh-ins, from ${rangeDescription}. Hollow points are daily estimates between saved entries.`}
-          description={`Solid points show saved dates and weights. Hollow points are estimates between saved entries and are not saved or used in the trend. Solid connecting lines show the interpolated daily path; estimated markers remain hollow. The trend uses only saved records.${referenceDescription} Private notes are never plotted.`}
+          description={`${compactOlderHistory ? 'The latest seven calendar dates stay detailed; larger older points are weekly averages of actual saved records. Activate a week to expand daily points; Back to weekly averages restores compression. Solid daily points' : 'Solid points'} show saved dates and weights. Hollow points are estimates between saved entries and are not saved or used in the trend. Solid connecting lines show the interpolated daily path; estimated markers remain hollow. The trend uses only saved records.${referenceDescription} Private notes are never plotted.`}
           points={plottedPoints}
           onPointActivate={(point) => onPointActivate?.(point)}
           lines={lines}

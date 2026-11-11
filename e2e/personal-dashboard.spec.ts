@@ -337,6 +337,14 @@ test('Dashboard chart opens edit/create drafts and only an explicit save records
   )
   await expect(actual).toBeVisible()
   await actual.click()
+  const actualDetails = page.getByRole('group', {
+    name: /Chart point details/,
+  })
+  await expect(actualDetails).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await actualDetails
+    .getByRole('button', { name: 'Edit weight', exact: true })
+    .click()
   const edit = page.getByRole('dialog', { name: 'Edit weight' })
   await expect(edit.getByLabel('Date')).toHaveValue(firstDate)
   await expect(edit.getByLabel('Weight in kg')).toHaveValue('90')
@@ -347,6 +355,14 @@ test('Dashboard chart opens edit/create drafts and only an explicit save records
     `circle[data-date="${estimateDate}"][data-point-kind="estimated"]`,
   )
   await estimate.click()
+  const estimateDetails = page.getByRole('group', {
+    name: /Chart point details/,
+  })
+  await expect(estimateDetails).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await estimateDetails
+    .getByRole('button', { name: 'Record weight', exact: true })
+    .click()
   const create = page.getByRole('dialog', { name: 'Record weight' })
   await expect(create.getByLabel('Date')).toHaveValue(estimateDate)
   await expect(create.getByLabel('Weight in kg')).toHaveValue('89.25')
@@ -363,6 +379,11 @@ test('Dashboard chart opens edit/create drafts and only an explicit save records
   await expect(estimate).toBeVisible()
 
   await estimate.click()
+  await expect(estimateDetails).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await estimateDetails
+    .getByRole('button', { name: 'Record weight', exact: true })
+    .click()
   const confirmedCreate = page.getByRole('dialog', { name: 'Record weight' })
   await confirmedCreate.getByRole('button', { name: 'Save weight' }).click()
   await expect(confirmedCreate).toHaveCount(0)

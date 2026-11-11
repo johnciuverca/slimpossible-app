@@ -31,7 +31,11 @@ for (const width of [1280, 390]) {
     })
     await expect(
       chart.locator('circle[data-point-kind="recorded"][data-chart-point]'),
-    ).toHaveCount(4)
+    ).toHaveCount(1)
+    await expect(chart).toHaveAccessibleName(/4 saved weigh-ins/)
+    await expect(
+      chart.locator('circle[data-point-kind="weekly-summary"]'),
+    ).not.toHaveCount(0)
     await expect(chart.locator('.chart-value')).toHaveCount(2)
     const labels = await chart.locator('.chart-value').evaluateAll((elements) =>
       elements.map((element) => ({
@@ -40,17 +44,19 @@ for (const width of [1280, 390]) {
         x: Number(element.getAttribute('x')),
         y: Number(element.getAttribute('y')),
         anchor: element.getAttribute('text-anchor'),
-        value: Number(element.getAttribute('data-weight-kg')),
+        value: Number(element.getAttribute('data-value')),
       })),
     )
     const points = await chart
-      .locator('circle[data-point-kind="recorded"][data-chart-point]')
+      .locator(
+        'circle[data-point-kind]:not([data-point-kind="estimated"])[data-chart-point]',
+      )
       .evaluateAll((elements) =>
         elements.map((element) => ({
           date: element.getAttribute('data-date'),
           x: Number(element.getAttribute('cx')),
           y: Number(element.getAttribute('cy')),
-          value: Number(element.getAttribute('data-weight-kg')),
+          value: Number(element.getAttribute('data-value')),
         })),
       )
 
@@ -69,11 +75,15 @@ for (const width of [1280, 390]) {
       expect(label.y).toBeGreaterThan(0)
       const estimatedHalfWidth =
         (label.text.length * (width <= 600 ? 5.4 : 4.2)) / 2
+      const plotLeft = Number(await chart.getAttribute('data-chart-plot-left'))
+      const plotRight = Number(
+        await chart.getAttribute('data-chart-plot-right'),
+      )
       expect(label.x - estimatedHalfWidth).toBeGreaterThanOrEqual(
-        width <= 600 ? 48 : 0,
+        width <= 600 ? plotLeft : 0,
       )
       expect(label.x + estimatedHalfWidth).toBeLessThanOrEqual(
-        width <= 600 ? 312 : 760,
+        width <= 600 ? plotRight : 760,
       )
     }
     await chart.screenshot({
