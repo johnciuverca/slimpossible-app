@@ -926,6 +926,259 @@ test('selected Group sections retain readable contrast in both color schemes', a
 })
 
 for (const width of [320, 390, 430, 1280]) {
+  test(`weekly Group history expands and collapses at ${width}px`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 })
+    await installGroupFixtures(page, true)
+    await page.route(
+      `${supabaseRestUrl}/rpc/get_group_chart_history`,
+      async (route) => {
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify([
+            {
+              member_key: 'opaque-member-a',
+              display_name: 'Ava',
+              recorded_date: '2026-09-01',
+              weight_kg: 90,
+            },
+            {
+              member_key: 'opaque-member-a',
+              display_name: 'Ava',
+              recorded_date: '2026-09-02',
+              weight_kg: 88,
+            },
+            {
+              member_key: 'opaque-member-a',
+              display_name: 'Ava',
+              recorded_date: '2026-09-08',
+              weight_kg: 89,
+            },
+            {
+              member_key: 'opaque-member-a',
+              display_name: 'Ava',
+              recorded_date: '2026-09-15',
+              weight_kg: 88,
+            },
+            {
+              member_key: 'opaque-member-b',
+              display_name: 'Ben',
+              recorded_date: '2026-09-08',
+              weight_kg: 81,
+            },
+            {
+              member_key: 'opaque-member-b',
+              display_name: 'Ben',
+              recorded_date: '2026-09-22',
+              weight_kg: 80,
+            },
+            {
+              member_key: 'opaque-member-a',
+              display_name: 'Ava',
+              recorded_date: '2026-09-22',
+              weight_kg: 87,
+            },
+          ]),
+        })
+      },
+    )
+    await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    const expectVisibleCollapse = async (surface: string) => {
+      const controls = page.getByRole('group', {
+        name: 'Chart date range controls',
+        exact: true,
+      })
+      const collapse = controls.getByRole('button', {
+        name: 'Back to weekly averages',
+        exact: true,
+      })
+      await expect(
+        page.getByRole('button', {
+          name: 'Back to weekly averages',
+          exact: true,
+        }),
+      ).toHaveCount(1)
+      await page
+        .locator(
+          'circle[data-series-id="opaque-member-b"][data-date="2026-09-22"]',
+        )
+        .evaluate((point) => point.scrollIntoView({ block: 'center' }))
+      await expect(collapse).toBeInViewport()
+      expect(
+        await collapse.evaluate((button) => {
+          const box = button.getBoundingClientRect()
+          return (
+            document
+              .elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)
+              ?.closest('button') === button
+          )
+        }),
+      ).toBe(true)
+      const box = (await collapse.boundingBox())!
+      expect(box.height).toBeGreaterThanOrEqual(width < 640 ? 44 : 36)
+      expect(box.x).toBeGreaterThanOrEqual(0)
+      expect(box.x + box.width).toBeLessThanOrEqual(width)
+      await page.screenshot({
+        path: testInfo.outputPath(`weekly-collapse-${surface}-${width}.png`),
+      })
+    }
+    const summary = page.getByRole('button', {
+      name: /Weekly average 89 kg.*2 recorded weigh-ins/,
+    })
+    await expect(summary).toHaveCount(1)
+    const originalX = await summary.getAttribute('cx')
+    const originalColours = await page
+      .locator('circle[data-visual-marker="weekly"]')
+      .evaluateAll((points) =>
+        points.map((point) => point.getAttribute('fill')),
+      )
+    await expect(summary).toHaveAttribute(
+      'aria-label',
+      /Weekly average 89 kg.*2 recorded weigh-ins/,
+    )
+    await expect(
+      page.locator('circle[data-visual-marker="weekly"]').first(),
+    ).toHaveAttribute('r', '7')
+    await expect(
+      page.locator('circle[data-visual-marker="daily"]').first(),
+    ).toHaveAttribute('r', '3')
+    const geometry = await page
+      .locator('circle[data-series-id="opaque-member-a"][data-chart-point]')
+      .evaluateAll((markers) =>
+        markers.map((marker) => ({
+          date: marker.getAttribute('data-date'),
+          x:
+            marker.getBoundingClientRect().x +
+            marker.getBoundingClientRect().width / 2,
+          width: marker.getBoundingClientRect().width,
+        })),
+      )
+    const xs = [
+      '2026-09-01',
+      '2026-09-08',
+      '2026-09-15',
+      '2026-09-16',
+      '2026-09-17',
+    ].map((date) => geometry.find((marker) => marker.date === date)!.x)
+    const spacing = xs[1] - xs[0]
+    for (let index = 2; index < xs.length; index++)
+      expect(xs[index] - xs[index - 1]).toBeCloseTo(spacing, 3)
+    expect(
+      Math.min(...geometry.map((marker) => marker.width)),
+    ).toBeGreaterThanOrEqual(44)
+    const aligned = await page
+      .locator(
+        'circle[data-point-kind="weekly-summary"][data-date="2026-09-08"]',
+      )
+      .evaluateAll((markers) =>
+        markers.map((marker) => marker.getAttribute('cx')),
+      )
+    expect(new Set(aligned).size).toBe(1)
+    console.log('compressed-slot-bounds', width, {
+      xs,
+      spacing,
+      hitWidths: geometry.map((marker) => marker.width),
+    })
+    await summary.focus()
+    const details = page.getByRole('tooltip')
+    await expect(details).toContainText('2 recorded weigh-ins')
+    const detailsBox = await details.boundingBox()
+    expect(detailsBox!.x).toBeGreaterThanOrEqual(0)
+    expect(detailsBox!.x + detailsBox!.width).toBeLessThanOrEqual(width)
+    await page.screenshot({
+      path: testInfo.outputPath(`weekly-details-${width}.png`),
+      fullPage: true,
+    })
+    await page.keyboard.press('Enter')
+    await expect(summary).toHaveCount(0)
+    await expectVisibleCollapse('overview')
+    await expect(
+      page.locator(
+        'circle[data-point-kind="recorded"][data-date="2026-09-01"]',
+      ),
+    ).toHaveCount(1)
+    await page.getByRole('button', { name: 'Back to weekly averages' }).click()
+    await expect(summary).toHaveCount(1)
+    await expect(summary).toBeFocused()
+    await expect(summary).toHaveAttribute('cx', originalX!)
+    expect(
+      await page
+        .locator('circle[data-visual-marker="weekly"]')
+        .evaluateAll((points) =>
+          points.map((point) => point.getAttribute('fill')),
+        ),
+    ).toEqual(originalColours)
+    const box = await summary.boundingBox()
+    expect(box!.x).toBeGreaterThanOrEqual(0)
+    expect(box!.x + box!.width).toBeLessThanOrEqual(width)
+    await page.screenshot({
+      path: testInfo.outputPath(`weekly-history-${width}.png`),
+      fullPage: true,
+    })
+    const sharedWeek = page.locator(
+      'circle[data-point-kind="weekly-summary"][data-series-id="opaque-member-a"][data-date="2026-09-08"]',
+    )
+    await sharedWeek.press('Enter')
+    await expectVisibleCollapse('overview-shared')
+    const expandedShared = page.locator(
+      'circle[data-point-kind="recorded"][data-date="2026-09-08"]',
+    )
+    await expect(expandedShared).toHaveCount(2)
+    expect(
+      new Set(
+        await expandedShared.evaluateAll((markers) =>
+          markers.map((marker) => marker.getAttribute('cx')),
+        ),
+      ).size,
+    ).toBe(1)
+    await page.screenshot({
+      path: testInfo.outputPath(`weekly-expanded-${width}.png`),
+      fullPage: true,
+    })
+    await page.getByRole('button', { name: 'Back to weekly averages' }).click()
+    await page.getByRole('link', { name: 'Charts', exact: true }).click()
+    await expect(
+      page.getByRole('tab', { name: 'All members', exact: true }),
+    ).toHaveAttribute('aria-selected', 'true')
+    await expect(summary).toHaveCount(1)
+    await expect(
+      page.locator('path[data-series="weekly-summary-connection"]'),
+    ).not.toHaveCount(0)
+    await page
+      .getByRole('slider', { name: 'Visible range start' })
+      .press('ArrowRight')
+    await expect(summary).toHaveAttribute('data-date', '2026-09-02')
+    await expect(summary).toHaveAttribute('data-value', '89')
+    const selectedStart = await page
+      .getByRole('slider', { name: 'Visible range start' })
+      .getAttribute('aria-valuenow')
+    await summary.focus()
+    await expect(page.getByRole('tooltip')).toContainText(
+      '01.09.2026 to 02.09.2026',
+    )
+    await page.keyboard.press('Enter')
+    await expect(summary).toHaveCount(0)
+    await expectVisibleCollapse('charts')
+    await expect(
+      page.locator(
+        'circle[data-point-kind="recorded"][data-date="2026-09-02"]',
+      ),
+    ).toHaveCount(1)
+    await page.getByRole('button', { name: 'Back to weekly averages' }).click()
+    await expect(summary).toHaveAttribute('data-value', '89')
+    await expect(summary).toBeFocused()
+    await expect(
+      page.getByRole('slider', { name: 'Visible range start' }),
+    ).toHaveAttribute('aria-valuenow', selectedStart!)
+    await page.screenshot({
+      path: testInfo.outputPath(`weekly-charts-range-${width}.png`),
+      fullPage: true,
+    })
+  })
+}
+
+for (const width of [320, 390, 430, 1280]) {
   test(`Group overview summary row geometry at ${width}px`, async ({
     page,
   }, testInfo) => {

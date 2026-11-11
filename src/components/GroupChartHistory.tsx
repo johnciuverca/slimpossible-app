@@ -302,8 +302,9 @@ export function GroupChartHistory({
                   className="mt-4 min-w-0 focus-visible:outline-2 focus-visible:outline-emerald-700"
                 >
                   <SharedWeightChart
+                    compactOlderHistory={!selectedKey}
                     title="Weight (kg) — shared group history"
-                    description={`Each member is plotted at their actual shared weight in kilograms. Points represent shared dates; lines connect only consecutive days.${compactOverview ? '' : ' The table below provides every exact recorded weight.'}`}
+                    description={`Each member is plotted at their actual shared weight in kilograms. ${selectedKey ? 'Points represent shared dates; lines connect only consecutive days.' : 'The latest 7 calendar dates stay detailed. Larger older points show Monday–Sunday averages of actual shared records; activate them to expand daily points.'}${compactOverview ? '' : ' The table below provides every exact recorded weight.'}`}
                     yLabel="Weight (kg)"
                     min={min}
                     max={max}

@@ -8,6 +8,11 @@ import {
 } from 'react'
 import { layoutChartValueLabels } from '../models/chartValueLabelLayout'
 import { formatChartDate } from '../models/chartDate'
+import {
+  compressedChartSlots,
+  slotIndex,
+} from '../models/compressedChartTimeline'
+import { compactWeeklyHistory } from '../models/weeklyChartHistory'
 import { sharedChartAxisTickPx, sharedChartTheme } from './sharedChartTheme'
 
 export type SharedChartPoint = {
@@ -18,6 +23,9 @@ export type SharedChartPoint = {
   label?: string
   markerLabel?: string
   estimated?: boolean
+  weeklySummary?: string
+  weeklyStart?: string
+  weeklyEnd?: string
 }
 
 export type SharedChartSeries = {
@@ -78,6 +86,7 @@ export function SharedWeightChart({
   fitContainer = false,
   labelExtremesOnly = false,
   labelSeriesExtremesOnly = false,
+  compactOlderHistory = false,
   className = 'block h-auto w-full min-w-[600px]',
   viewBox = '0 0 760 266',
 }: {
@@ -99,6 +108,7 @@ export function SharedWeightChart({
   fitContainer?: boolean
   labelExtremesOnly?: boolean
   labelSeriesExtremesOnly?: boolean
+  compactOlderHistory?: boolean
   className?: string
   viewBox?: string
 }) {
@@ -135,6 +145,25 @@ export function SharedWeightChart({
     : `w-full min-w-[600px] ${sharedChartTheme.spacing.framePaddingClass}`
   const rangeId = useId()
   const tooltipId = useId()
+  const rangeControlsRef = useRef<HTMLDivElement>(null)
+  const expandedOriginRef = useRef<string | null>(null)
+  const [restoreWeeklyFocus, setRestoreWeeklyFocus] = useState(false)
+  const plotRef = useRef<SVGSVGElement>(null)
+  const [pointScale, setPointScale] = useState(1)
+  useEffect(() => {
+    const plot = plotRef.current
+    if (!plot || !compactOlderHistory) return
+    const update = () =>
+      setPointScale(
+        plot.getBoundingClientRect().width /
+          (plot.viewBox?.baseVal?.width || 760) || 1,
+      )
+    update()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(update)
+    observer.observe(plot)
+    return () => observer.disconnect()
+  }, [compactOlderHistory, compactLayout, series.length])
   const rangeTrackRef = useRef<HTMLDivElement>(null)
   const [activePoint, setActivePoint] = useState<{
     id: string
@@ -163,7 +192,34 @@ export function SharedWeightChart({
   const [selectedPreset, setSelectedPreset] = useState<
     '1w' | '2w' | '1m' | '3m' | 'all' | 'custom'
   >('all')
-  const plotted = [...(points ?? []), ...series.flatMap((item) => item.points)]
+  const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    if (!restoreWeeklyFocus) return
+    const summary = Array.from(
+      plotRef.current?.querySelectorAll<SVGCircleElement>(
+        '[data-weekly-summary]',
+      ) ?? [],
+    ).find((point) => point.dataset.weeklySummary === expandedOriginRef.current)
+    const fallback = rangeControlsRef.current?.querySelector<HTMLButtonElement>(
+      'button[aria-pressed="true"]:not(:disabled), button:not(:disabled)',
+    )
+    ;(summary ?? fallback)?.focus()
+    setRestoreWeeklyFocus(false)
+  }, [restoreWeeklyFocus, expandedWeeks])
+  const sourceSeries = series
+  if (compactOlderHistory)
+    series = compactWeeklyHistory(sourceSeries, expandedWeeks)
+  const activatePoint = (point: SharedChartPoint, seriesId?: string) => {
+    if (point.weeklySummary) {
+      expandedOriginRef.current = point.weeklySummary
+      setExpandedWeeks((current) => new Set([...current, point.weeklySummary!]))
+      setActivePoint(null)
+    } else onPointActivate?.(point, seriesId)
+  }
+  const plotted = [
+    ...(points ?? []),
+    ...sourceSeries.flatMap((item) => item.points),
+  ]
   if (!plotted.length) return null
   const firstDay = Math.min(...plotted.map((point) => day(point.date)))
   const lastDay = Math.max(...plotted.map((point) => day(point.date)))
@@ -190,12 +246,27 @@ export function SharedWeightChart({
               ? customStart
               : firstDay
   const endDay = selectedPreset === 'custom' ? customEnd : lastDay
+  const newestRecorded = Math.max(
+    ...plotted
+      .filter((point) => !point.estimated)
+      .map((point) => day(point.date)),
+  )
+  const fullSlots = compactOlderHistory
+    ? compressedChartSlots(firstDay, lastDay, newestRecorded, expandedWeeks)
+    : []
+  const displaySlots = fullSlots.filter(
+    (slot) => slot.end >= startDay && slot.start <= endDay,
+  )
   const fullRange = startDay === firstDay && endDay === lastDay
   const span = endDay - startDay
   const x = (date: string) =>
-    span
-      ? chartLeft + ((day(date) - startDay) / span) * (chartRight - chartLeft)
-      : (chartLeft + chartRight) / 2
+    compactOlderHistory
+      ? chartLeft +
+        ((slotIndex(displaySlots, day(date)) + 0.5) / displaySlots.length) *
+          (chartRight - chartLeft)
+      : span
+        ? chartLeft + ((day(date) - startDay) / span) * (chartRight - chartLeft)
+        : (chartLeft + chartRight) / 2
   const inRange = (date: string) => day(date) >= startDay && day(date) <= endDay
   const visiblePoints = points.filter((point) => inRange(point.date))
   const extremeLabelPointIds = new Set<string>()
@@ -238,7 +309,21 @@ export function SharedWeightChart({
   }
   const visibleSeries = series.map((item) => ({
     ...item,
-    points: item.points.filter((point) => inRange(point.date)),
+    points: item.points.flatMap((point) => {
+      if (point.weeklySummary && point.weeklyStart && point.weeklyEnd) {
+        if (day(point.weeklyEnd) < startDay || day(point.weeklyStart) > endDay)
+          return []
+        return [
+          {
+            ...point,
+            date: dateAtDay(
+              Math.max(startDay, Math.min(endDay, day(point.date))),
+            ),
+          },
+        ]
+      }
+      return inRange(point.date) ? [point] : []
+    }),
   }))
   const extremeSeriesPointIds = new Set<string>()
   if (labelSeriesExtremesOnly) {
@@ -282,11 +367,13 @@ export function SharedWeightChart({
     ...visiblePoints.map((point, index) => ({
       id: `point:${point.date}:${index}`,
       point,
+      seriesId: undefined as string | undefined,
     })),
     ...visibleSeries.flatMap((item) =>
       item.points.map((point, index) => ({
         id: `series:${item.id}:${point.date}:${index}`,
         point,
+        seriesId: item.id,
       })),
     ),
   ]
@@ -411,9 +498,31 @@ export function SharedWeightChart({
             line.to.value > yMaximum),
       )
     : []
-  const renderedLines = visibleLines.filter(
-    (line) => !referenceLinesOutsideRange.includes(line),
-  )
+  const renderedLines = visibleLines
+    .filter((line) => !referenceLinesOutsideRange.includes(line))
+    .flatMap((line) => {
+      if (!compactOlderHistory) return [line]
+      const from = day(line.from.date)
+      const to = day(line.to.date)
+      const samples = displaySlots
+        .filter((slot) => slot.end >= from && slot.start <= to)
+        .map((slot) => {
+          const date = Math.max(from, Math.min(to, (slot.start + slot.end) / 2))
+          return {
+            date: dateAtDay(Math.floor(date)),
+            value:
+              line.from.value +
+              (to === from ? 0 : (date - from) / (to - from)) *
+                (line.to.value - line.from.value),
+          }
+        })
+      return samples.slice(1).map((sample, index) => ({
+        ...line,
+        id: `${line.id}-slot-${index}`,
+        from: samples[index],
+        to: sample,
+      }))
+    })
   const minorTicks = useFiveKgTicks
     ? Array.from(
         { length: Math.max(0, Math.ceil(yMaximum - yMinimum) - 1) },
@@ -434,12 +543,36 @@ export function SharedWeightChart({
         : 'center'
     : 'center'
   const tooltipTransform = `translate(${tooltipAlignment === 'start' ? '0' : tooltipAlignment === 'end' ? '-100%' : '-50%'}, ${tooltipPosition && tooltipPosition.y < chartTop + 52 ? '10px' : 'calc(-100% - 10px)'})`
+  const nearestTarget = (
+    event: { clientX: number; clientY: number },
+    id: string,
+  ) => {
+    const fallback = tooltipTargets.find((target) => target.id === id)
+    const plot = plotRef.current
+    if (!compactOlderHistory || !plot || (!event.clientX && !event.clientY))
+      return fallback
+    const bounds = plot.getBoundingClientRect()
+    const distance = (target: (typeof tooltipTargets)[number]) =>
+      Math.hypot(
+        bounds.left +
+          (x(target.point.date) * bounds.width) / viewBoxWidth -
+          event.clientX,
+        bounds.top +
+          (y(target.point.value) * bounds.height) / viewBoxHeight -
+          event.clientY,
+      )
+    return tooltipTargets.reduce(
+      (best, target) =>
+        !best || distance(target) < distance(best) ? target : best,
+      fallback,
+    )
+  }
   const setPointSource = (
     event: ReactPointerEvent<SVGCircleElement>,
     id: string,
   ) => {
     setActivePoint({
-      id,
+      id: nearestTarget(event, id)?.id ?? id,
       source: event.pointerType === 'touch' ? 'touch' : 'pointer',
     })
   }
@@ -447,7 +580,11 @@ export function SharedWeightChart({
     event: ReactPointerEvent<SVGCircleElement>,
     id: string,
   ) => {
-    if (event.pointerType === 'touch') setActivePoint({ id, source: 'touch' })
+    if (event.pointerType === 'touch')
+      setActivePoint({
+        id: nearestTarget(event, id)?.id ?? id,
+        source: 'touch',
+      })
   }
   const compactDateTickCount = Math.min(
     sharedChartTheme.dates.compactMaximumTicks,
@@ -475,30 +612,45 @@ export function SharedWeightChart({
     1,
     Math.ceil(minimumDateLabelGap / weeklyTickDistance),
   )
-  const dates = compactLayout
-    ? Array.from({ length: span ? compactDateTickCount : 1 }, (_, index) =>
-        compactDateTickCount === 1
-          ? startDay
-          : Math.round(startDay + (span * index) / (compactDateTickCount - 1)),
-      ).filter((date, index, allDates) => allDates.indexOf(date) === index)
-    : weeklyDates.filter((_, index) => index % weeklyTickStride === 0)
+  const slotTickStride = Math.max(
+    1,
+    Math.ceil(
+      minimumDateLabelGap /
+        ((chartRight - chartLeft) / Math.max(1, displaySlots.length)),
+    ),
+  )
+  const dates = compactOlderHistory
+    ? displaySlots
+        .filter((_, index) => index % slotTickStride === 0)
+        .map((slot) => Math.max(startDay, slot.start))
+    : compactLayout
+      ? Array.from({ length: span ? compactDateTickCount : 1 }, (_, index) =>
+          compactDateTickCount === 1
+            ? startDay
+            : Math.round(
+                startDay + (span * index) / (compactDateTickCount - 1),
+              ),
+        ).filter((date, index, allDates) => allDates.indexOf(date) === index)
+      : weeklyDates.filter((_, index) => index % weeklyTickStride === 0)
   const visibleCount =
     visiblePoints.filter((point) => !point.estimated).length +
-    visibleSeries.reduce(
+    sourceSeries.reduce(
       (sum, item) =>
-        sum + item.points.filter((point) => !point.estimated).length,
+        sum +
+        item.points.filter((point) => !point.estimated && inRange(point.date))
+          .length,
       0,
     )
   const totalCount =
     points.filter((point) => !point.estimated).length +
-    series.reduce(
+    sourceSeries.reduce(
       (sum, item) =>
         sum + item.points.filter((point) => !point.estimated).length,
       0,
     )
   const chartTitle = fullRange
     ? title
-    : `${title}. Showing ${visibleCount} of ${totalCount} recorded entries from ${formatChartDate(dateAtDay(startDay))} to ${formatChartDate(dateAtDay(endDay))}.`
+    : `${title}. ${compactOlderHistory ? 'Range contains' : 'Showing'} ${visibleCount} of ${totalCount} recorded entries from ${formatChartDate(dateAtDay(startDay))} to ${formatChartDate(dateAtDay(endDay))}.`
   const selectedRangeLabel =
     selectedPreset === '1w'
       ? 'Last 7 days'
@@ -511,8 +663,22 @@ export function SharedWeightChart({
             : selectedPreset === 'custom'
               ? 'Selected dates'
               : 'All recorded dates'
-  const rangePercent = (value: number) =>
-    span === 0 ? 0 : ((value - firstDay) / (lastDay - firstDay)) * 100
+  const rangePercent = (value: number) => {
+    if (compactOlderHistory) {
+      const index = slotIndex(fullSlots, value)
+      const slot = fullSlots[index]
+      const origin = 0.5 / (fullSlots[0].end - fullSlots[0].start + 1)
+      const limit = fullSlots.length - 0.5
+      const position =
+        index + (value - slot.start + 0.5) / (slot.end - slot.start + 1)
+      return limit === origin
+        ? 0
+        : ((position - origin) / (limit - origin)) * 100
+    }
+    return lastDay === firstDay
+      ? 0
+      : ((value - firstDay) / (lastDay - firstDay)) * 100
+  }
   const plotStartPercent = (chartLeft / viewBoxWidth) * 100
   const plotWidthPercent = ((chartRight - chartLeft) / viewBoxWidth) * 100
   const setThumbValue = (thumb: 'start' | 'end', value: number) => {
@@ -541,7 +707,25 @@ export function SharedWeightChart({
       0,
       Math.min(1, (clientX - bounds.left) / usableWidth),
     )
-    setThumbValue(thumb, Math.round(firstDay + percent * (lastDay - firstDay)))
+    if (compactOlderHistory) {
+      const origin = 0.5 / (fullSlots[0].end - fullSlots[0].start + 1)
+      const limit = fullSlots.length - 0.5
+      const position = origin + percent * (limit - origin)
+      const index = Math.min(fullSlots.length - 1, Math.floor(position))
+      const slot = fullSlots[index]
+      setThumbValue(
+        thumb,
+        Math.min(
+          slot.end,
+          slot.start +
+            Math.floor((position - index) * (slot.end - slot.start + 1)),
+        ),
+      )
+    } else
+      setThumbValue(
+        thumb,
+        Math.round(firstDay + percent * (lastDay - firstDay)),
+      )
   }
   const renderThumb = (thumb: 'start' | 'end') => {
     const isStart = thumb === 'start'
@@ -603,7 +787,13 @@ export function SharedWeightChart({
       <div
         role="group"
         aria-label="Chart date range controls"
-        className="w-full text-sm"
+        ref={rangeControlsRef}
+        style={
+          compactOlderHistory && expandedWeeks.size > 0
+            ? { top: 'calc(var(--group-navigation-height, 0px) + 8px)' }
+            : undefined
+        }
+        className={`w-full text-sm ${compactOlderHistory && expandedWeeks.size > 0 ? 'sticky z-20 rounded-lg bg-panel py-2 shadow-panel' : ''}`}
       >
         <div
           role="group"
@@ -668,6 +858,19 @@ export function SharedWeightChart({
           >
             All
           </button>
+          {compactOlderHistory && expandedWeeks.size > 0 ? (
+            <button
+              type="button"
+              className={`${presetClass(true)} min-h-11 w-full px-3 sm:w-auto`}
+              onClick={() => {
+                setExpandedWeeks(new Set())
+                setActivePoint(null)
+                setRestoreWeeklyFocus(true)
+              }}
+            >
+              Back to weekly averages
+            </button>
+          ) : null}
         </div>
       </div>
       <div
@@ -677,6 +880,7 @@ export function SharedWeightChart({
         }}
       >
         <svg
+          ref={plotRef}
           role="img"
           aria-label={chartTitle}
           aria-description={
@@ -783,14 +987,21 @@ export function SharedWeightChart({
               {item.points.slice(1).map((point, index) => {
                 const previous = item.points[index]
                 const connected =
-                  item.connectGaps || day(point.date) - day(previous.date) === 1
+                  point.weeklySummary ||
+                  previous.weeklySummary ||
+                  item.connectGaps ||
+                  day(point.date) - day(previous.date) === 1
                 if (!connected) return null
                 const estimated = previous.estimated || point.estimated
                 return (
                   <path
                     key={`line-${previous.date}-${point.date}`}
                     data-series={
-                      estimated ? 'estimated-connection' : 'recorded-connection'
+                      point.weeklySummary || previous.weeklySummary
+                        ? 'weekly-summary-connection'
+                        : estimated
+                          ? 'estimated-connection'
+                          : 'recorded-connection'
                     }
                     d={`M ${x(previous.date)} ${y(previous.value)} L ${x(point.date)} ${y(point.value)}`}
                     fill="none"
@@ -822,24 +1033,52 @@ export function SharedWeightChart({
                     extremeSeriesPointIds.has(pointId)
                   return (
                     <g key={`${point.date}-${index}`}>
+                      {compactOlderHistory ? (
+                        <circle
+                          cx={x(point.date)}
+                          cy={y(point.value)}
+                          r={point.weeklySummary ? 7 : 3}
+                          fill={
+                            point.estimated
+                              ? 'var(--color-panel, white)'
+                              : item.color
+                          }
+                          stroke={item.color}
+                          strokeWidth="2"
+                          aria-hidden="true"
+                          pointerEvents="none"
+                          data-visual-marker={
+                            point.weeklySummary ? 'weekly' : 'daily'
+                          }
+                        />
+                      ) : null}
                       <circle
                         cx={x(point.date)}
                         cy={y(point.value)}
-                        r="5"
+                        r={compactOlderHistory ? 22.1 / pointScale : 5}
                         fill={
-                          point.estimated
-                            ? 'var(--color-panel, white)'
-                            : item.color
+                          compactOlderHistory
+                            ? 'transparent'
+                            : point.estimated
+                              ? 'var(--color-panel, white)'
+                              : item.color
                         }
                         stroke={
-                          point.estimated
-                            ? item.color
-                            : 'var(--color-panel, white)'
+                          compactOlderHistory
+                            ? 'transparent'
+                            : point.estimated
+                              ? item.color
+                              : 'var(--color-panel, white)'
                         }
                         strokeWidth="2"
                         data-point-kind={
-                          point.estimated ? 'estimated' : 'recorded'
+                          point.weeklySummary
+                            ? 'weekly-summary'
+                            : point.estimated
+                              ? 'estimated'
+                              : 'recorded'
                         }
+                        data-weekly-summary={point.weeklySummary}
                         data-series-id={item.id}
                         opacity={point.estimated ? 0.72 : 1}
                         data-date={point.date}
@@ -878,10 +1117,16 @@ export function SharedWeightChart({
                           else if (event.key === 'Enter' || event.key === ' ') {
                             event.preventDefault()
                             setActivePoint({ id: pointId, source: 'focus' })
-                            onPointActivate?.(point, item.id)
+                            activatePoint(point, item.id)
                           }
                         }}
-                        onClick={() => onPointActivate?.(point, item.id)}
+                        onClick={(event) => {
+                          const target = nearestTarget(event, pointId)
+                          activatePoint(
+                            target?.point ?? point,
+                            target?.seriesId ?? item.id,
+                          )
+                        }}
                       >
                         <title>{point.title}</title>
                       </circle>

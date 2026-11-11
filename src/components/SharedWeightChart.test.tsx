@@ -4,6 +4,128 @@ import { SharedWeightChart } from './SharedWeightChart'
 
 afterEach(cleanup)
 
+it('retains overlapping weekly means in narrow ranges and connects summaries to recent daily points', () => {
+  const { container } = render(
+    <SharedWeightChart
+      title="Ranges"
+      description="History"
+      yLabel="kg"
+      min={70}
+      max={90}
+      compactOlderHistory
+      lines={[
+        {
+          id: 'trend',
+          kind: 'trend',
+          color: 'orange',
+          from: { date: '2026-09-01', value: 80 },
+          to: { date: '2026-09-22', value: 77 },
+        },
+      ]}
+      series={[
+        {
+          id: 'a',
+          color: 'green',
+          points: [
+            { date: '2026-09-01', value: 80, title: 'First' },
+            {
+              date: '2026-09-03',
+              value: 82,
+              title: 'Second',
+              markerLabel: 'Original September third',
+            },
+            { date: '2026-09-08', value: 79, title: 'Boundary week' },
+            { date: '2026-09-09', value: 78, title: 'Recent boundary' },
+            { date: '2026-09-22', value: 77, title: 'Newest' },
+          ],
+        },
+      ]}
+    />,
+  )
+  expect(
+    container.querySelectorAll('path[data-series="weekly-summary-connection"]'),
+  ).toHaveLength(2)
+  const trendSegments = Array.from(
+    container.querySelectorAll('line[data-chart-line-kind="trend"]'),
+  )
+  expect(trendSegments).toHaveLength(9)
+  const segmentWidths = trendSegments.map(
+    (line) => Number(line.getAttribute('x2')) - Number(line.getAttribute('x1')),
+  )
+  for (const width of segmentWidths)
+    expect(width).toBeCloseTo(segmentWidths[0], 4)
+  const start = screen.getByRole('slider', { name: 'Visible range start' })
+  fireEvent.keyDown(start, { key: 'ArrowRight' })
+  fireEvent.keyDown(start, { key: 'ArrowRight' })
+  const summary = screen.getByRole('button', { name: /Weekly average 81 kg/ })
+  expect(summary).toHaveAttribute('data-date', '2026-09-03')
+  expect(summary).toHaveAttribute(
+    'aria-label',
+    expect.stringContaining('01.09.2026 to 03.09.2026'),
+  )
+  fireEvent.click(summary)
+  expect(
+    screen.getByRole('button', { name: 'Original September third' }),
+  ).toHaveAttribute('data-value', '82')
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Back to weekly averages' }),
+  )
+  expect(
+    screen.getByRole('button', { name: /Weekly average 81 kg/ }),
+  ).toHaveAttribute('data-value', '81')
+  expect(
+    screen.getByRole('button', { name: /Weekly average 81 kg/ }),
+  ).toHaveFocus()
+})
+
+it('expands weekly summaries accessibly, preserves daily activation, and collapses them', () => {
+  const activate = vi.fn()
+  render(
+    <SharedWeightChart
+      title="Weekly history"
+      description="History"
+      yLabel="kg"
+      min={70}
+      max={90}
+      compactOlderHistory
+      onPointActivate={activate}
+      series={[
+        {
+          id: 'owner',
+          color: 'green',
+          points: [
+            {
+              date: '2026-09-01',
+              value: 80,
+              title: 'First',
+              markerLabel: 'Original own point',
+            },
+            { date: '2026-09-02', value: 82, title: 'Second' },
+            { date: '2026-11-10', value: 75, title: 'Newest' },
+          ],
+        },
+      ]}
+    />,
+  )
+  const summary = screen.getByRole('button', {
+    name: /Weekly average 81 kg/,
+  })
+  expect(summary).toHaveAttribute('data-point-kind', 'weekly-summary')
+  fireEvent.keyDown(summary, { key: 'Enter' })
+  expect(activate).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Original own point' }))
+  expect(activate).toHaveBeenCalledWith(
+    expect.objectContaining({ date: '2026-09-01', value: 80 }),
+    'owner',
+  )
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Back to weekly averages' }),
+  )
+  expect(
+    screen.getByRole('button', { name: /Weekly average 81 kg/ }),
+  ).toBeInTheDocument()
+})
+
 it('marks estimates as hollow, labels them accessibly, and activates their date/value', () => {
   const onPointActivate = vi.fn()
   render(

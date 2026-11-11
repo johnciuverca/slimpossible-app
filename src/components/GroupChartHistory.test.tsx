@@ -246,7 +246,9 @@ describe('Group chart history', () => {
       name: 'Weight (kg) — shared group history',
     })
     expect(
-      chart.querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
+      chart.querySelectorAll(
+        'circle[data-point-kind]:not([data-point-kind="estimated"])[data-date]',
+      ),
     ).toHaveLength(5)
     expect(chart.querySelectorAll('text.chart-value')).toHaveLength(2)
     expect(
@@ -273,12 +275,16 @@ describe('Group chart history', () => {
     ).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Show last 1 month' }))
     expect(
-      chart.querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
+      chart.querySelectorAll(
+        'circle[data-point-kind]:not([data-point-kind="estimated"])[data-date]',
+      ),
     ).toHaveLength(2)
     expect(chart.querySelector('[data-chart-reference]')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Show last 3 months' }))
     expect(
-      chart.querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
+      chart.querySelectorAll(
+        'circle[data-point-kind]:not([data-point-kind="estimated"])[data-date]',
+      ),
     ).toHaveLength(4)
     const allMembersTrack = screen.getByRole('group', {
       name: 'Adjust visible date range',
@@ -291,7 +297,9 @@ describe('Group chart history', () => {
       },
     )
     expect(
-      chart.querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
+      chart.querySelectorAll(
+        'circle[data-point-kind]:not([data-point-kind="estimated"])[data-date]',
+      ),
     ).toHaveLength(3)
     fireEvent.click(screen.getByRole('button', { name: 'Show all dates' }))
     fireEvent.click(screen.getByRole('tab', { name: 'Ava' }))
@@ -576,7 +584,9 @@ describe('Group chart history', () => {
     expect(table).toHaveTextContent('-1.5 kg')
     expect(load).toHaveBeenCalledWith('group-a')
     const chart = screen.getByRole('img')
-    expect(chart).toHaveAccessibleDescription(/Points represent shared dates/)
+    expect(chart).toHaveAccessibleDescription(
+      /latest 7 calendar dates stay detailed/,
+    )
     expect(
       screen.getByText(/Explicitly shared dates and weights only/),
     ).toHaveClass('sr-only')
