@@ -1,5 +1,97 @@
 import { expect, test } from '@playwright/test'
 
+test('Dashboard weekly chart opens recorded and estimated editors on touch', async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+  })
+  const page = await context.newPage()
+  const monday = new Date()
+  monday.setUTCHours(0, 0, 0, 0)
+  monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7))
+  const dateAt = (offset: number) =>
+    new Date(monday.getTime() + offset * 86400000).toISOString().slice(0, 10)
+  const dates = [-21, -20, -14, -7, 0].map(dateAt)
+  await page.addInitScript(
+    (entries) =>
+      localStorage.setItem(
+        'slimpossible.local.personal-weigh-ins',
+        JSON.stringify(entries),
+      ),
+    dates.map((date, index) => ({
+      id: `touch-own-${index}`,
+      userId: 'user-alex',
+      date,
+      weightKg: [90, 88, 87, 86, 84][index],
+      note: 'Touch fixture private note',
+      sharedChallengeIds: ['dashboard-active'],
+    })),
+  )
+  await page.goto(
+    '/e2e/fixtures/personal-dashboard-harness.html?scenario=groups&path=/dashboard',
+  )
+  const chart = page.getByRole('img', {
+    name: /Personal weight history chart/,
+  })
+  const recent = chart.locator(
+    `circle[data-point-kind="recorded"][data-date="${dates[4]}"]`,
+  )
+  const recentBox = (await recent.boundingBox())!
+  await page.touchscreen.tap(
+    recentBox.x + recentBox.width / 2,
+    recentBox.y + recentBox.height / 2,
+  )
+  const edit = page.getByRole('dialog', { name: 'Edit weight', exact: true })
+  await expect(edit.getByLabel('Date')).toHaveValue(dates[4])
+  await edit
+    .getByRole('button', { name: 'Close weight editor', exact: true })
+    .click()
+  const summary = page
+    .locator('circle[data-point-kind="weekly-summary"]')
+    .first()
+  const summaryBox = (await summary.boundingBox())!
+  await page.touchscreen.tap(
+    summaryBox.x + summaryBox.width / 2,
+    summaryBox.y + summaryBox.height / 2,
+  )
+  const historical = chart.locator(
+    `circle[data-point-kind="recorded"][data-date="${dates[0]}"]`,
+  )
+  const historicalBox = (await historical.boundingBox())!
+  await page.touchscreen.tap(
+    historicalBox.x + historicalBox.width / 2,
+    historicalBox.y + historicalBox.height / 2,
+  )
+  const historicalEdit = page.getByRole('dialog', {
+    name: 'Edit weight',
+    exact: true,
+  })
+  await expect(historicalEdit.getByLabel('Date')).toHaveValue(dates[0])
+  await historicalEdit
+    .getByRole('button', { name: 'Close weight editor', exact: true })
+    .click()
+  const estimate = chart.locator(
+    `circle[data-point-kind="estimated"][data-date="${dateAt(-1)}"]`,
+  )
+  const estimateBox = (await estimate.boundingBox())!
+  await page.touchscreen.tap(
+    estimateBox.x + estimateBox.width / 2,
+    estimateBox.y + estimateBox.height / 2,
+  )
+  const create = page.getByRole('dialog', {
+    name: 'Record weight',
+    exact: true,
+  })
+  await expect(create.getByLabel('Date')).toHaveValue(dateAt(-1))
+  await expect(create.getByLabel('Weight in kg')).not.toHaveValue('')
+  await create
+    .getByRole('button', { name: 'Close weight editor', exact: true })
+    .click()
+  await context.close()
+})
+
 for (const width of [320, 390, 430, 1280]) {
   test(`Dashboard weekly history preserves private editing and ranges at ${width}px`, async ({
     page,
@@ -48,6 +140,29 @@ for (const width of [320, 390, 430, 1280]) {
     await expect(chart).not.toContainText('Other account secret')
     await expect(chart).not.toContainText('Private weekly fixture note')
     await expect(chart.locator('[data-value="200"]')).toHaveCount(0)
+    // Exercise the real Dashboard activation path with pointer clicks. The
+    // personal points are adapted into a series before reaching the renderer.
+    const recent = chart.locator(
+      `circle[data-point-kind="recorded"][data-date="${dates[4]}"]`,
+    )
+    await recent.click()
+    const edit = page.getByRole('dialog', { name: 'Edit weight', exact: true })
+    await expect(edit.getByLabel('Date')).toHaveValue(dates[4])
+    await edit
+      .getByRole('button', { name: 'Close weight editor', exact: true })
+      .click()
+    const recentEstimate = chart.locator(
+      `circle[data-point-kind="estimated"][data-date="${dateAt(-1)}"]`,
+    )
+    await recentEstimate.click()
+    const estimateCreate = page.getByRole('dialog', {
+      name: 'Record weight',
+      exact: true,
+    })
+    await expect(estimateCreate.getByLabel('Date')).toHaveValue(dateAt(-1))
+    await estimateCreate
+      .getByRole('button', { name: 'Close weight editor', exact: true })
+      .click()
     const summary = chart.getByRole('button', {
       name: /Weekly average 89 kg.*2 recorded weigh-ins/,
     })
@@ -56,7 +171,7 @@ for (const width of [320, 390, 430, 1280]) {
       path: testInfo.outputPath(`dashboard-weekly-normal-${width}.png`),
       fullPage: true,
     })
-    await summary.press('Enter')
+    await summary.click()
     const collapse = page
       .getByRole('group', { name: 'Chart date range controls', exact: true })
       .getByRole('button', { name: 'Back to weekly averages' })
@@ -72,8 +187,7 @@ for (const width of [320, 390, 430, 1280]) {
     const original = chart.locator(
       `circle[data-point-kind="recorded"][data-date="${dates[0]}"]`,
     )
-    await original.press('Enter')
-    const edit = page.getByRole('dialog', { name: 'Edit weight', exact: true })
+    await original.click()
     await expect(edit.getByLabel('Date')).toHaveValue(dates[0])
     await edit
       .getByRole('button', { name: 'Close weight editor', exact: true })
@@ -91,8 +205,8 @@ for (const width of [320, 390, 430, 1280]) {
       path: testInfo.outputPath(`dashboard-weekly-collapsed-${width}.png`),
       fullPage: true,
     })
-    await summary.press('Enter')
-    await original.press('Enter')
+    await summary.click()
+    await original.click()
     await edit.getByLabel('Weight in kg').fill('91')
     await edit
       .getByRole('button', { name: 'Update weight', exact: true })
@@ -117,7 +231,7 @@ for (const width of [320, 390, 430, 1280]) {
     const estimate = chart.locator(
       `circle[data-point-kind="estimated"][data-date="${dateAt(-1)}"]`,
     )
-    await estimate.press('Enter')
+    await estimate.click()
     const create = page.getByRole('dialog', {
       name: 'Record weight',
       exact: true,
@@ -127,7 +241,7 @@ for (const width of [320, 390, 430, 1280]) {
       .getByRole('button', { name: 'Close weight editor', exact: true })
       .click()
     await expect(estimate).toHaveCount(1)
-    await estimate.press('Enter')
+    await estimate.click()
     await create
       .getByRole('button', { name: 'Save weight', exact: true })
       .click()
