@@ -204,16 +204,29 @@ export function SharedWeightChart({
     if (!selectedPoint) return
     const dismissOutsidePoint = (event: PointerEvent) => {
       if (!(event.target instanceof Element)) return
+      const target = event.target
       if (
-        !event.target.closest(
-          '[data-chart-point], [data-chart-point-popover], [role="dialog"]',
-        )
+        pointDetailsRef.current?.contains(target) ||
+        target.closest('[role="dialog"]')
       )
-        setSelectedPoint(null)
+        return
+      const activePoint = Array.from(
+        plotRef.current?.querySelectorAll<SVGCircleElement>(
+          '[data-chart-point-id]',
+        ) ?? [],
+      ).find((point) => point.dataset.chartPointId === selectedPoint.id)
+      if (activePoint?.contains(target)) return
+
+      setSelectedPoint(null)
+      setHoveredPointId(null)
+      setFocusedPointId(null)
+      plotRef.current
+        ?.querySelector<SVGCircleElement>('[data-chart-point-id]:focus')
+        ?.blur()
     }
-    document.addEventListener('pointerdown', dismissOutsidePoint)
+    document.addEventListener('pointerdown', dismissOutsidePoint, true)
     return () =>
-      document.removeEventListener('pointerdown', dismissOutsidePoint)
+      document.removeEventListener('pointerdown', dismissOutsidePoint, true)
   }, [selectedPoint])
   useEffect(() => {
     if (focusActionAfterSelectionRef.current && selectedPoint) {
