@@ -1095,6 +1095,13 @@ for (const width of [320, 390, 430, 1280]) {
       name: 'Expand week',
       exact: true,
     })
+    await expect(expandSummary).toHaveClass(/bg-forest-800/)
+    await expect(expandSummary).toHaveClass(/text-white/)
+    await expect(expandSummary).toHaveCSS(
+      'background-color',
+      'rgb(49, 219, 176)',
+    )
+    await expect(expandSummary).toHaveCSS('color', 'rgb(7, 43, 34)')
     const expandSummaryBox = (await expandSummary.boundingBox())!
     expect(expandSummaryBox.height).toBeGreaterThanOrEqual(
       width < 640 ? 44 : 36,
@@ -1898,7 +1905,8 @@ for (const viewport of [
     await expect(pointTooltip).toContainText(
       /Ava \(member 1\).*20\.09\.2026.*90 kg/,
     )
-    await expect(pointTooltip).toHaveCSS('font-size', '10.2px')
+    await expect(pointTooltip).toHaveCSS('font-size', '10px')
+    expect((await pointTooltip.boundingBox())!.height).toBeLessThanOrEqual(16)
     await page.mouse.move(8, 8)
     await expect(pointTooltip).toHaveCount(0)
     const groupLegend = page.getByRole('list', {

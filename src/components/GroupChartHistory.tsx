@@ -328,7 +328,15 @@ export function GroupChartHistory({
                           label: String(point.weightKg),
                           title: `${member.label}: ${formatChartDate(point.date)}, ${point.weightKg} kg`,
                           markerLabel: `Recorded weight for ${member.label} on ${formatChartDate(point.date)}`,
-                          tooltip: `${member.label} — ${formatChartDate(point.date)}: ${formatWeight(point.weightKg)} kg`,
+                          tooltip: (
+                            <>
+                              {member.label} —{' '}
+                              <span>
+                                {formatChartDate(point.date)}:{' '}
+                                {formatWeight(point.weightKg)} kg
+                              </span>
+                            </>
+                          ),
                         })),
                         ...interpolateMissingWeights(
                           member.points.map((point) => ({
@@ -341,7 +349,15 @@ export function GroupChartHistory({
                           estimated: true,
                           title: `${member.label}: Estimated ${formatChartDate(point.date)}, ${formatWeight(point.weightKg)} kg`,
                           markerLabel: `Estimated weight for ${member.label} on ${formatChartDate(point.date)}`,
-                          tooltip: `${member.label} — Estimated ${formatChartDate(point.date)}: ${formatWeight(point.weightKg)} kg`,
+                          tooltip: (
+                            <>
+                              {member.label} — Estimated{' '}
+                              <span>
+                                {formatChartDate(point.date)}:{' '}
+                                {formatWeight(point.weightKg)} kg
+                              </span>
+                            </>
+                          ),
                         })),
                       ].sort((a, b) => a.date.localeCompare(b.date)),
                     }))}

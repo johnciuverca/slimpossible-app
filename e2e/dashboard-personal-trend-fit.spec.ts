@@ -300,7 +300,30 @@ for (const viewport of viewports) {
       '',
     )
     await point.dispatchEvent('pointerdown', { pointerType: 'touch' })
-    await expect(page.getByRole('tooltip')).toHaveText(exactDetail)
+    const dailyTooltip = page.getByRole('tooltip')
+    await expect(dailyTooltip).toHaveText(exactDetail)
+    await expect(dailyTooltip).toHaveCSS('font-size', '10px')
+    const dailyTooltipBox = (await dailyTooltip.boundingBox())!
+    expect(dailyTooltipBox.height).toBeLessThanOrEqual(16)
+    const pointDetails = page.getByRole('group', {
+      name: /Chart point details/,
+    })
+    const pointDetailsBox = (await pointDetails.boundingBox())!
+    expect(pointDetailsBox.x).toBeGreaterThanOrEqual(0)
+    expect(pointDetailsBox.x + pointDetailsBox.width).toBeLessThanOrEqual(
+      viewport.width,
+    )
+    const editPoint = pointDetails.getByRole('button', {
+      name: 'Edit weight',
+      exact: true,
+    })
+    await expect(editPoint).toHaveCSS('background-color', 'rgb(49, 219, 176)')
+    await expect(editPoint).toHaveCSS('color', 'rgb(7, 43, 34)')
+    expect((await editPoint.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+    await page.screenshot({
+      path: test.info().outputPath(`daily-tooltip-${viewport.width}.png`),
+      fullPage: true,
+    })
     await chart.dispatchEvent('keydown', { key: 'Escape' })
     await rangeControls
       .getByRole('button', { name: 'Show last 1 month' })

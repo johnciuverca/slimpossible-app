@@ -1,6 +1,7 @@
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -194,6 +195,7 @@ export function SharedWeightChart({
     source: 'pointer' | 'focus' | 'touch'
   } | null>(null)
   const pointDetailsRef = useRef<HTMLDivElement>(null)
+  const [tooltipLeft, setTooltipLeft] = useState<number | null>(null)
   const focusActionAfterSelectionRef = useRef(false)
   const focusExpandedWeekRef = useRef(false)
   const restorePointFocusRef = useRef<string | null>(null)
@@ -305,7 +307,6 @@ export function SharedWeightChart({
     ...(points ?? []),
     ...sourceSeries.flatMap((item) => item.points),
   ]
-  if (!plotted.length) return null
   const firstDay = Math.min(...plotted.map((point) => day(point.date)))
   const lastDay = Math.max(...plotted.map((point) => day(point.date)))
   const oneWeekStart = Math.max(firstDay, lastDay - 6)
@@ -467,6 +468,58 @@ export function SharedWeightChart({
   const visibleActivePoint = visiblePointId
     ? tooltipTargets.find((target) => target.id === visiblePointId)
     : undefined
+  const activePointId = visibleActivePoint?.id
+  useLayoutEffect(() => {
+    if (!activePointId) {
+      setTooltipLeft(null)
+      return
+    }
+    const popover = pointDetailsRef.current
+    const frame = popover?.parentElement
+    const marker = Array.from(
+      plotRef.current?.querySelectorAll<SVGCircleElement>(
+        '[data-chart-point-id]',
+      ) ?? [],
+    ).find((point) => point.dataset.chartPointId === activePointId)
+    if (!popover || !frame || !marker) {
+      setTooltipLeft(null)
+      return
+    }
+    const updatePosition = () => {
+      const frameBounds = frame.getBoundingClientRect()
+      const markerBounds = marker.getBoundingClientRect()
+      const popoverWidth = popover.getBoundingClientRect().width
+      if (!frameBounds.width || !popoverWidth) {
+        setTooltipLeft(null)
+        return
+      }
+      const anchorX =
+        markerBounds.left + markerBounds.width / 2 - frameBounds.left
+      const maxLeft = Math.max(0, frameBounds.width - popoverWidth)
+      const nextLeft = Math.max(
+        0,
+        Math.min(maxLeft, anchorX - popoverWidth / 2),
+      )
+      setTooltipLeft((current) =>
+        current !== null && Math.abs(current - nextLeft) < 0.5
+          ? current
+          : nextLeft,
+      )
+    }
+    updatePosition()
+    const observer =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(updatePosition)
+    observer?.observe(frame)
+    observer?.observe(popover)
+    window.addEventListener('resize', updatePosition)
+    return () => {
+      observer?.disconnect()
+      window.removeEventListener('resize', updatePosition)
+    }
+  }, [activePointId, selectedRange, selectedPreset, expandedWeeks])
+  if (!plotted.length) return null
   let yMinimum = min
   let yMaximum = max
   if (!fullRange) {
@@ -636,6 +689,10 @@ export function SharedWeightChart({
         : 'center'
     : 'center'
   const tooltipTransform = `translate(${tooltipAlignment === 'start' ? '0' : tooltipAlignment === 'end' ? '-100%' : '-50%'}, ${tooltipPosition && tooltipPosition.y < chartTop + 52 ? '10px' : 'calc(-100% - 10px)'})`
+  const tooltipVerticalTransform =
+    tooltipPosition && tooltipPosition.y < chartTop + 52
+      ? '10px'
+      : 'calc(-100% - 10px)'
   const activePointCanEdit = Boolean(
     visibleActivePoint &&
     !visibleActivePoint.point.weeklySummary &&
@@ -1412,11 +1469,17 @@ export function SharedWeightChart({
                   source: 'pointer',
                 })
             }}
-            className="pointer-events-auto absolute z-10 max-w-[min(14rem,90vw)] rounded-lg border border-line bg-panel px-2 py-1.5 text-xs font-semibold leading-4 text-ink shadow-panel"
+            className="pointer-events-auto absolute z-10 w-max max-w-[min(14rem,90vw,calc(100%-0.5rem))] break-words rounded-lg border border-line bg-panel px-2 py-1.5 text-xs font-semibold leading-4 text-ink shadow-panel"
             style={{
-              left: `${(tooltipPosition.x / viewBoxWidth) * 100}%`,
+              left:
+                tooltipLeft === null
+                  ? `${(tooltipPosition.x / viewBoxWidth) * 100}%`
+                  : `${tooltipLeft}px`,
               top: `${(tooltipPosition.y / viewBoxHeight) * 100}%`,
-              transform: tooltipTransform,
+              transform:
+                tooltipLeft === null
+                  ? tooltipTransform
+                  : `translateY(${tooltipVerticalTransform})`,
             }}
           >
             <div
@@ -1424,8 +1487,8 @@ export function SharedWeightChart({
               role="tooltip"
               className={
                 visibleActivePoint.point.weeklySummary
-                  ? 'whitespace-nowrap text-[0.6375rem]'
-                  : 'text-[0.6375rem]'
+                  ? 'whitespace-nowrap text-[0.625rem] leading-[1.25]'
+                  : 'text-[0.625rem] leading-[1.25]'
               }
             >
               {visibleActivePoint.point.tooltip ??
@@ -1434,7 +1497,7 @@ export function SharedWeightChart({
             {visibleActivePoint.point.weeklySummary || activePointCanEdit ? (
               <button
                 type="button"
-                className="mt-1 inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md border border-transparent px-1.5 py-1 text-[0.6375rem] font-semibold text-forest-800 hover:bg-forest-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+                className="mt-1 inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md border border-forest-800 bg-forest-800 px-1.5 py-1 text-[0.6rem] font-semibold text-white hover:bg-forest-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
                 onClick={() =>
                   activatePoint(
                     visibleActivePoint.point,

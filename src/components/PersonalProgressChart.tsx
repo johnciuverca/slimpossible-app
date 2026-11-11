@@ -55,7 +55,11 @@ export function PersonalProgressChart({
     value: point.weightKg,
     label: formatWeight(point.weightKg),
     markerLabel: `Recorded weight on ${formatChartDate(point.date)}`,
-    tooltip: `${formatChartDate(point.date)}: ${formatWeight(point.weightKg)} kg`,
+    tooltip: (
+      <span>
+        {formatChartDate(point.date)}: {formatWeight(point.weightKg)} kg
+      </span>
+    ),
     title: `${formatChartDate(point.date)}: ${formatWeight(point.weightKg)} kg recorded`,
   }))
   const estimates = interpolateMissingWeights(chronological).map((point) => ({
@@ -63,7 +67,14 @@ export function PersonalProgressChart({
     value: point.weightKg,
     estimated: true,
     markerLabel: `Estimated weight on ${formatChartDate(point.date)}`,
-    tooltip: `Estimated — ${formatChartDate(point.date)}: ${formatWeight(point.weightKg)} kg`,
+    tooltip: (
+      <>
+        Estimated —{' '}
+        <span>
+          {formatChartDate(point.date)}: {formatWeight(point.weightKg)} kg
+        </span>
+      </>
+    ),
     title: `Estimated: ${formatChartDate(point.date)}, ${formatWeight(point.weightKg)} kg`,
   }))
   const plottedPoints = [...points, ...estimates].sort((a, b) =>
