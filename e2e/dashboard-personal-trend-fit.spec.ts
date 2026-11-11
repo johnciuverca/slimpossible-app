@@ -302,7 +302,7 @@ for (const viewport of viewports) {
     await point.dispatchEvent('pointerdown', { pointerType: 'touch' })
     const dailyTooltip = page.getByRole('tooltip')
     await expect(dailyTooltip).toHaveText(exactDetail)
-    await expect(dailyTooltip).toHaveCSS('font-size', '10px')
+    await expect(dailyTooltip).toHaveCSS('font-size', '8.5px')
     const dailyTooltipBox = (await dailyTooltip.boundingBox())!
     expect(dailyTooltipBox.height).toBeLessThanOrEqual(16)
     const pointDetails = page.getByRole('group', {
@@ -317,11 +317,68 @@ for (const viewport of viewports) {
       name: 'Edit weight',
       exact: true,
     })
-    await expect(editPoint).toHaveCSS('background-color', 'rgb(49, 219, 176)')
-    await expect(editPoint).toHaveCSS('color', 'rgb(7, 43, 34)')
-    expect((await editPoint.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+    const [dailyPanelBox, editTargetBox] = await Promise.all([
+      pointDetails.boundingBox(),
+      editPoint.boundingBox(),
+    ])
+    expect(dailyPanelBox).not.toBeNull()
+    expect(editTargetBox).not.toBeNull()
+    expect(
+      Math.abs(
+        dailyTooltipBox!.x +
+          dailyTooltipBox!.width / 2 -
+          (dailyPanelBox!.x + dailyPanelBox!.width / 2),
+      ),
+    ).toBeLessThanOrEqual(1)
+    expect(editTargetBox!.height).toBeGreaterThanOrEqual(44)
+    const visibleEditLabel = editPoint.locator('span')
+    await expect(visibleEditLabel).toHaveCSS('font-size', '8px')
+    await expect(visibleEditLabel).toHaveCSS(
+      'background-color',
+      'rgb(49, 219, 176)',
+    )
+    await expect(visibleEditLabel).toHaveCSS('color', 'rgb(7, 43, 34)')
+    const visibleEditBox = (await visibleEditLabel.boundingBox())!
+    expect(
+      Math.abs(
+        visibleEditBox.x +
+          visibleEditBox.width / 2 -
+          (dailyPanelBox!.x + dailyPanelBox!.width / 2),
+      ),
+    ).toBeLessThanOrEqual(1)
     await page.screenshot({
       path: test.info().outputPath(`daily-tooltip-${viewport.width}.png`),
+      fullPage: true,
+    })
+    await chart.dispatchEvent('keydown', { key: 'Escape' })
+    const estimate = chart
+      .locator('circle[data-point-kind="estimated"]')
+      .first()
+    await expect(estimate).toBeVisible()
+    await estimate.dispatchEvent('pointerdown', { pointerType: 'touch' })
+    const estimateTooltip = page.getByRole('tooltip')
+    await expect(estimateTooltip).toContainText('Estimated')
+    await expect(estimateTooltip).toHaveCSS('font-size', '8.5px')
+    const estimatePanel = page.getByRole('group', {
+      name: /Chart point details/,
+    })
+    const recordAction = estimatePanel.getByRole('button', {
+      name: 'Record weight',
+      exact: true,
+    })
+    const estimatePanelBox = (await estimatePanel.boundingBox())!
+    const estimateLabel = recordAction.locator('span')
+    await expect(estimateLabel).toHaveCSS('font-size', '8px')
+    const estimateLabelBox = (await estimateLabel.boundingBox())!
+    expect(
+      Math.abs(
+        estimateLabelBox.x +
+          estimateLabelBox.width / 2 -
+          (estimatePanelBox.x + estimatePanelBox.width / 2),
+      ),
+    ).toBeLessThanOrEqual(1)
+    await page.screenshot({
+      path: test.info().outputPath(`estimate-tooltip-${viewport.width}.png`),
       fullPage: true,
     })
     await chart.dispatchEvent('keydown', { key: 'Escape' })

@@ -244,7 +244,7 @@ for (const width of [320, 390, 430, 1280]) {
     await expect(summaryDetails).toHaveText(
       /\d{2}\.\d{2}\.\d{4} – \d{2}\.\d{2}\.\d{4}/,
     )
-    await expect(summaryDetails).toHaveCSS('font-size', '10px')
+    await expect(summaryDetails).toHaveCSS('font-size', '8.5px')
     await expect(summaryDetails).not.toContainText(
       /Weekly average|recorded|Expand week/,
     )
@@ -256,12 +256,33 @@ for (const width of [320, 390, 430, 1280]) {
       .getByRole('group', { name: /Chart point details/ })
       .getByRole('button', { name: 'Expand week', exact: true })
     await expect(expandWeek).toBeVisible()
-    await expect(expandWeek).toHaveClass(/bg-forest-800/)
-    await expect(expandWeek).toHaveClass(/text-white/)
-    await expect(expandWeek).toHaveCSS('background-color', 'rgb(49, 219, 176)')
-    await expect(expandWeek).toHaveCSS('color', 'rgb(7, 43, 34)')
+    const visibleExpandLabel = expandWeek.locator('span')
+    await expect(visibleExpandLabel).toHaveClass(/bg-forest-800/)
+    await expect(visibleExpandLabel).toHaveCSS('font-size', '8px')
+    await expect(visibleExpandLabel).toHaveCSS(
+      'background-color',
+      'rgb(49, 219, 176)',
+    )
+    await expect(visibleExpandLabel).toHaveCSS('color', 'rgb(7, 43, 34)')
     const expandWeekBox = (await expandWeek.boundingBox())!
     expect(expandWeekBox.height).toBeGreaterThanOrEqual(width < 640 ? 44 : 36)
+    const [summaryTooltipBox, summaryPanelBox, expandLabelBox] =
+      await Promise.all([
+        summaryDetails.boundingBox(),
+        page.getByRole('group', { name: /Chart point details/ }).boundingBox(),
+        visibleExpandLabel.boundingBox(),
+      ])
+    expect(summaryTooltipBox).not.toBeNull()
+    expect(summaryPanelBox).not.toBeNull()
+    expect(expandLabelBox).not.toBeNull()
+    for (const box of [summaryTooltipBox!, expandLabelBox!])
+      expect(
+        Math.abs(
+          box.x +
+            box.width / 2 -
+            (summaryPanelBox!.x + summaryPanelBox!.width / 2),
+        ),
+      ).toBeLessThanOrEqual(1)
     await expandWeek.click()
     const collapse = page
       .getByRole('group', { name: 'Chart date range controls', exact: true })

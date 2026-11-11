@@ -331,7 +331,7 @@ export function GroupChartHistory({
                           tooltip: (
                             <>
                               {member.label} —{' '}
-                              <span>
+                              <span className="whitespace-nowrap">
                                 {formatChartDate(point.date)}:{' '}
                                 {formatWeight(point.weightKg)} kg
                               </span>
@@ -352,7 +352,7 @@ export function GroupChartHistory({
                           tooltip: (
                             <>
                               {member.label} — Estimated{' '}
-                              <span>
+                              <span className="whitespace-nowrap">
                                 {formatChartDate(point.date)}:{' '}
                                 {formatWeight(point.weightKg)} kg
                               </span>

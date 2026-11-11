@@ -56,7 +56,7 @@ export function PersonalProgressChart({
     label: formatWeight(point.weightKg),
     markerLabel: `Recorded weight on ${formatChartDate(point.date)}`,
     tooltip: (
-      <span>
+      <span className="whitespace-nowrap">
         {formatChartDate(point.date)}: {formatWeight(point.weightKg)} kg
       </span>
     ),
@@ -70,7 +70,7 @@ export function PersonalProgressChart({
     tooltip: (
       <>
         Estimated —{' '}
-        <span>
+        <span className="whitespace-nowrap">
           {formatChartDate(point.date)}: {formatWeight(point.weightKg)} kg
         </span>
       </>

@@ -1095,13 +1095,14 @@ for (const width of [320, 390, 430, 1280]) {
       name: 'Expand week',
       exact: true,
     })
-    await expect(expandSummary).toHaveClass(/bg-forest-800/)
-    await expect(expandSummary).toHaveClass(/text-white/)
-    await expect(expandSummary).toHaveCSS(
+    const visibleExpandLabel = expandSummary.locator('span')
+    await expect(visibleExpandLabel).toHaveClass(/bg-forest-800/)
+    await expect(visibleExpandLabel).toHaveCSS('font-size', '8px')
+    await expect(visibleExpandLabel).toHaveCSS(
       'background-color',
       'rgb(49, 219, 176)',
     )
-    await expect(expandSummary).toHaveCSS('color', 'rgb(7, 43, 34)')
+    await expect(visibleExpandLabel).toHaveCSS('color', 'rgb(7, 43, 34)')
     const expandSummaryBox = (await expandSummary.boundingBox())!
     expect(expandSummaryBox.height).toBeGreaterThanOrEqual(
       width < 640 ? 44 : 36,
@@ -1110,6 +1111,20 @@ for (const width of [320, 390, 430, 1280]) {
     const detailsBox = await details.boundingBox()
     expect(detailsBox!.x).toBeGreaterThanOrEqual(0)
     expect(detailsBox!.x + detailsBox!.width).toBeLessThanOrEqual(width)
+    const [popoverBox, dateDetailsBox, actionLabelBox] = await Promise.all([
+      page.getByRole('group', { name: /Chart point details/ }).boundingBox(),
+      details.boundingBox(),
+      visibleExpandLabel.boundingBox(),
+    ])
+    expect(popoverBox).not.toBeNull()
+    expect(dateDetailsBox).not.toBeNull()
+    expect(actionLabelBox).not.toBeNull()
+    for (const box of [dateDetailsBox!, actionLabelBox!])
+      expect(
+        Math.abs(
+          box.x + box.width / 2 - (popoverBox!.x + popoverBox!.width / 2),
+        ),
+      ).toBeLessThanOrEqual(1)
     await page.screenshot({
       path: testInfo.outputPath(`weekly-details-${width}.png`),
       fullPage: true,
@@ -1905,8 +1920,25 @@ for (const viewport of [
     await expect(pointTooltip).toContainText(
       /Ava \(member 1\).*20\.09\.2026.*90 kg/,
     )
-    await expect(pointTooltip).toHaveCSS('font-size', '10px')
+    await expect(pointTooltip).toHaveCSS('font-size', '8.5px')
     expect((await pointTooltip.boundingBox())!.height).toBeLessThanOrEqual(16)
+    const [pointTooltipBox, pointPopoverBox] = await Promise.all([
+      pointTooltip.boundingBox(),
+      page.getByRole('group', { name: /Chart point details/ }).boundingBox(),
+    ])
+    expect(pointTooltipBox).not.toBeNull()
+    expect(pointPopoverBox).not.toBeNull()
+    expect(
+      Math.abs(
+        pointTooltipBox!.x +
+          pointTooltipBox!.width / 2 -
+          (pointPopoverBox!.x + pointPopoverBox!.width / 2),
+      ),
+    ).toBeLessThanOrEqual(1)
+    await page.screenshot({
+      path: test.info().outputPath(`group-daily-tooltip-${viewport.width}.png`),
+      fullPage: true,
+    })
     await page.mouse.move(8, 8)
     await expect(pointTooltip).toHaveCount(0)
     const groupLegend = page.getByRole('list', {
@@ -3247,10 +3279,37 @@ test.describe('group chart weigh-in dots', () => {
 
     await ownEstimate.focus()
     await page.keyboard.press('Enter')
+    const estimateTooltip = page.getByRole('tooltip')
+    await expect(estimateTooltip).toContainText('Estimated')
+    await expect(estimateTooltip).toHaveCSS('font-size', '8.5px')
     const recordEstimate = page
       .getByRole('group', { name: /Chart point details/ })
       .getByRole('button', { name: 'Record weight', exact: true })
     await expect(recordEstimate).toBeFocused()
+    const recordLabel = recordEstimate.locator('span')
+    await expect(recordLabel).toHaveCSS('font-size', '8px')
+    await expect(recordLabel).toHaveCSS('background-color', 'rgb(49, 219, 176)')
+    const [estimatePopoverBox, estimateTextBox, recordLabelBox] =
+      await Promise.all([
+        page.getByRole('group', { name: /Chart point details/ }).boundingBox(),
+        estimateTooltip.boundingBox(),
+        recordLabel.boundingBox(),
+      ])
+    expect(estimatePopoverBox).not.toBeNull()
+    expect(estimateTextBox).not.toBeNull()
+    expect(recordLabelBox).not.toBeNull()
+    for (const box of [estimateTextBox!, recordLabelBox!])
+      expect(
+        Math.abs(
+          box.x +
+            box.width / 2 -
+            (estimatePopoverBox!.x + estimatePopoverBox!.width / 2),
+        ),
+      ).toBeLessThanOrEqual(1)
+    await page.screenshot({
+      path: test.info().outputPath('group-estimate-tooltip-1280.png'),
+      fullPage: true,
+    })
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await page.keyboard.press('Enter')
     await expect(page.getByRole('dialog')).toBeVisible()

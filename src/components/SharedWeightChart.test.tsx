@@ -132,11 +132,12 @@ it('requires explicit actions to expand weekly summaries and edit daily points',
     }),
   ).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /^Expand week$/ })).toHaveFocus()
-  expect(screen.getByRole('button', { name: /^Expand week$/ })).toHaveClass(
+  const expandWeek = screen.getByRole('button', { name: /^Expand week$/ })
+  expect(expandWeek).toHaveClass('bg-transparent', 'min-h-11', 'min-w-11')
+  expect(expandWeek.querySelector('span')).toHaveClass(
     'bg-forest-800',
-    'text-white',
-    'min-h-11',
-    'min-w-11',
+    'text-[#072b22]',
+    'text-[0.5rem]',
   )
   fireEvent.click(screen.getByRole('button', { name: /^Expand week$/ }))
   const daily = screen.getByRole('button', { name: 'Original own point' })
@@ -426,7 +427,7 @@ it('shows stable interactive point details with keyboard focus and outside dismi
     const panel = details()
     const tooltip = screen.getByRole('tooltip')
     expect(tooltip).toHaveTextContent('2026-10-01: 86.25 kg')
-    expect(tooltip).toHaveClass('text-[0.625rem]')
+    expect(tooltip).toHaveClass('text-[0.53125rem]')
     expect(panel).toHaveClass('bg-panel', 'border-line', 'shadow-panel')
     expect(point).toHaveAttribute('aria-describedby', tooltip.id)
   }
