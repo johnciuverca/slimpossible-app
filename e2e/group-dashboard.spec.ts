@@ -1082,14 +1082,59 @@ for (const width of [320, 390, 430, 1280]) {
     })
     await summary.focus()
     const details = page.getByRole('tooltip')
-    await expect(details).toContainText('2 recorded weigh-ins')
+    await expect(details).toHaveText('31.08.2026 – 06.09.2026')
+    await expect(details).not.toContainText(
+      /Weekly average|recorded|Expand week/,
+    )
+    await expect(
+      page.getByRole('group', {
+        name: /Weekly average 89 kg.*2 recorded weigh-ins/,
+      }),
+    ).toBeVisible()
+    const expandSummary = page.getByRole('button', {
+      name: 'Expand week',
+      exact: true,
+    })
+    const visibleExpandLabel = expandSummary.locator('span')
+    await expect(visibleExpandLabel).toHaveClass(/bg-forest-800/)
+    await expect(visibleExpandLabel).toHaveCSS('font-size', '8px')
+    await expect(visibleExpandLabel).toHaveCSS(
+      'background-color',
+      'rgb(49, 219, 176)',
+    )
+    await expect(visibleExpandLabel).toHaveCSS('color', 'rgb(7, 43, 34)')
+    const expandSummaryBox = (await expandSummary.boundingBox())!
+    expect(expandSummaryBox.height).toBeGreaterThanOrEqual(
+      width < 640 ? 44 : 36,
+    )
+    expect(expandSummaryBox.width).toBeLessThanOrEqual(140)
     const detailsBox = await details.boundingBox()
     expect(detailsBox!.x).toBeGreaterThanOrEqual(0)
     expect(detailsBox!.x + detailsBox!.width).toBeLessThanOrEqual(width)
+    const [popoverBox, dateDetailsBox, actionLabelBox] = await Promise.all([
+      page.getByRole('group', { name: /Chart point details/ }).boundingBox(),
+      details.boundingBox(),
+      visibleExpandLabel.boundingBox(),
+    ])
+    expect(popoverBox).not.toBeNull()
+    expect(dateDetailsBox).not.toBeNull()
+    expect(actionLabelBox).not.toBeNull()
+    for (const box of [dateDetailsBox!, actionLabelBox!])
+      expect(
+        Math.abs(
+          box.x + box.width / 2 - (popoverBox!.x + popoverBox!.width / 2),
+        ),
+      ).toBeLessThanOrEqual(1)
     await page.screenshot({
       path: testInfo.outputPath(`weekly-details-${width}.png`),
       fullPage: true,
     })
+    await page.keyboard.press('Enter')
+    const expandOverviewWeek = page.getByRole('button', {
+      name: 'Expand week',
+      exact: true,
+    })
+    await expect(expandOverviewWeek).toBeFocused()
     await page.keyboard.press('Enter')
     await expect(summary).toHaveCount(0)
     await expectVisibleCollapse('overview')
@@ -1120,6 +1165,7 @@ for (const width of [320, 390, 430, 1280]) {
       'circle[data-point-kind="weekly-summary"][data-series-id="opaque-member-a"][data-date="2026-09-08"]',
     )
     await sharedWeek.press('Enter')
+    await page.keyboard.press('Enter')
     await expectVisibleCollapse('overview-shared')
     const expandedShared = page.locator(
       'circle[data-point-kind="recorded"][data-date="2026-09-08"]',
@@ -1155,8 +1201,14 @@ for (const width of [320, 390, 430, 1280]) {
       .getAttribute('aria-valuenow')
     await summary.focus()
     await expect(page.getByRole('tooltip')).toContainText(
-      '01.09.2026 to 02.09.2026',
+      '31.08.2026 – 06.09.2026',
     )
+    await page.keyboard.press('Enter')
+    const expandChartWeek = page.getByRole('button', {
+      name: 'Expand week',
+      exact: true,
+    })
+    await expect(expandChartWeek).toBeFocused()
     await page.keyboard.press('Enter')
     await expect(summary).toHaveCount(0)
     await expectVisibleCollapse('charts')
@@ -1868,6 +1920,25 @@ for (const viewport of [
     await expect(pointTooltip).toContainText(
       /Ava \(member 1\).*20\.09\.2026.*90 kg/,
     )
+    await expect(pointTooltip).toHaveCSS('font-size', '8.5px')
+    expect((await pointTooltip.boundingBox())!.height).toBeLessThanOrEqual(16)
+    const [pointTooltipBox, pointPopoverBox] = await Promise.all([
+      pointTooltip.boundingBox(),
+      page.getByRole('group', { name: /Chart point details/ }).boundingBox(),
+    ])
+    expect(pointTooltipBox).not.toBeNull()
+    expect(pointPopoverBox).not.toBeNull()
+    expect(
+      Math.abs(
+        pointTooltipBox!.x +
+          pointTooltipBox!.width / 2 -
+          (pointPopoverBox!.x + pointPopoverBox!.width / 2),
+      ),
+    ).toBeLessThanOrEqual(1)
+    await page.screenshot({
+      path: test.info().outputPath(`group-daily-tooltip-${viewport.width}.png`),
+      fullPage: true,
+    })
     await page.mouse.move(8, 8)
     await expect(pointTooltip).toHaveCount(0)
     const groupLegend = page.getByRole('list', {
@@ -3208,6 +3279,40 @@ test.describe('group chart weigh-in dots', () => {
 
     await ownEstimate.focus()
     await page.keyboard.press('Enter')
+    const estimateTooltip = page.getByRole('tooltip')
+    await expect(estimateTooltip).toContainText('Estimated')
+    await expect(estimateTooltip).toHaveCSS('font-size', '8.5px')
+    const recordEstimate = page
+      .getByRole('group', { name: /Chart point details/ })
+      .getByRole('button', { name: 'Record weight', exact: true })
+    await expect(recordEstimate).toBeFocused()
+    const recordLabel = recordEstimate.locator('span')
+    await expect(recordLabel).toHaveCSS('font-size', '8px')
+    await expect(recordLabel).toHaveCSS('background-color', 'rgb(49, 219, 176)')
+    const [estimatePopoverBox, estimateTextBox, recordLabelBox] =
+      await Promise.all([
+        page.getByRole('group', { name: /Chart point details/ }).boundingBox(),
+        estimateTooltip.boundingBox(),
+        recordLabel.boundingBox(),
+      ])
+    expect(estimatePopoverBox).not.toBeNull()
+    expect(estimateTextBox).not.toBeNull()
+    expect(recordLabelBox).not.toBeNull()
+    for (const box of [estimateTextBox!, recordLabelBox!])
+      expect(
+        Math.abs(
+          box.x +
+            box.width / 2 -
+            (estimatePopoverBox!.x + estimatePopoverBox!.width / 2),
+        ),
+      ).toBeLessThanOrEqual(1)
+    await page.screenshot({
+      path: test.info().outputPath('group-estimate-tooltip-1280.png'),
+      fullPage: true,
+    })
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('dialog')).toBeVisible()
     const edit = page.getByRole('dialog', { name: 'Edit weight' })
     await expect(edit.getByLabel('Date')).toHaveValue('2026-09-21')
     await expect(edit.getByLabel('Weight in kg')).toHaveValue('84.25')
@@ -3228,6 +3333,7 @@ test.describe('group chart weigh-in dots', () => {
     ).toHaveLength(0)
 
     await ownEstimate.focus()
+    await page.keyboard.press('Enter')
     await page.keyboard.press('Enter')
     const reopened = page.getByRole('dialog', { name: 'Edit weight' })
     await expect(reopened.getByLabel('Weight in kg')).toHaveValue('84.25')
@@ -3298,6 +3404,7 @@ test.describe('group chart weigh-in dots', () => {
     await estimate.focus()
     await expect(estimate).toBeFocused()
     await page.keyboard.press('Enter')
+    await page.keyboard.press('Enter')
     await expect(page.getByRole('dialog')).toHaveCount(0)
 
     fixture.releasePersonalContexts()
@@ -3346,6 +3453,7 @@ test.describe('group chart weigh-in dots', () => {
     await expect(ownEstimate).toHaveAttribute('data-value', '89.25')
     await expect(ownEstimate.locator('title')).toContainText('89.25 kg')
     await ownEstimate.focus()
+    await page.keyboard.press('Enter')
     await page.keyboard.press('Enter')
     const create = page.getByRole('dialog', { name: 'Record weight' })
     await expect(create.getByLabel('Weight in kg')).toHaveValue('89.25')
@@ -3413,8 +3521,14 @@ test.describe('group chart weigh-in dots', () => {
     await expect(ownEstimate).toHaveAttribute('aria-label', /Estimated/)
     await otherRecorded.click()
     await expect(page.getByRole('dialog')).toHaveCount(0)
+    const otherDetails = page.getByRole('group', {
+      name: /Chart point details/,
+    })
+    await expect(otherDetails).toBeVisible()
+    await expect(otherDetails.getByRole('button')).toHaveCount(0)
 
     await ownRecorded.focus()
+    await page.keyboard.press('Enter')
     await page.keyboard.press('Enter')
     const edit = page.getByRole('dialog', { name: 'Edit weight' })
     await expect(edit.getByLabel('Date')).toHaveValue('2026-09-22')
@@ -3441,6 +3555,16 @@ test.describe('group chart weigh-in dots', () => {
       )
     }
     await tapEstimate()
+    const recordWeight = page
+      .getByRole('group', { name: /Chart point details/ })
+      .getByRole('button', { name: 'Record weight', exact: true })
+    await expect(recordWeight).toBeVisible()
+    const recordWeightBounds = await recordWeight.boundingBox()
+    expect(recordWeightBounds!.height).toBeGreaterThanOrEqual(44)
+    await page.touchscreen.tap(
+      recordWeightBounds!.x + recordWeightBounds!.width / 2,
+      recordWeightBounds!.y + recordWeightBounds!.height / 2,
+    )
     const create = page.getByRole('dialog', { name: 'Record weight' })
     await expect(create.getByLabel('Date')).toHaveValue('2026-09-21')
     await expect(create.getByLabel('Weight in kg')).toHaveValue('89.4')
@@ -3460,6 +3584,10 @@ test.describe('group chart weigh-in dots', () => {
     ).toHaveLength(saveRequestsBeforeCancel)
 
     await tapEstimate()
+    await page
+      .getByRole('group', { name: /Chart point details/ })
+      .getByRole('button', { name: 'Record weight', exact: true })
+      .click()
     const confirmedCreate = page.getByRole('dialog', { name: 'Record weight' })
     await expect(
       confirmedCreate.getByLabel('E2E authorized group'),

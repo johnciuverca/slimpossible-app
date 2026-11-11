@@ -532,7 +532,16 @@ for (const width of [1280, 390]) {
             exact: true,
           }),
         ).toBeVisible()
-        await expect(chart.locator('[data-chart-reference]')).toHaveCount(1)
+        await expect(chart.locator('[data-chart-reference]')).not.toHaveCount(0)
+        expect(
+          await chart
+            .locator('[data-chart-reference]')
+            .evaluateAll((segments) =>
+              segments.every(
+                (line) => line.getAttribute('y1') === line.getAttribute('y2'),
+              ),
+            ),
+        ).toBe(true)
         await expect(chart).toHaveAccessibleDescription(
           /Synthetic personal goal target is .* kilograms\. Its reference line is shown only when it fits within the data-scaled chart range/,
         )

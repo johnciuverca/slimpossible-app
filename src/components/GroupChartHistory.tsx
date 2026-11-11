@@ -328,7 +328,15 @@ export function GroupChartHistory({
                           label: String(point.weightKg),
                           title: `${member.label}: ${formatChartDate(point.date)}, ${point.weightKg} kg`,
                           markerLabel: `Recorded weight for ${member.label} on ${formatChartDate(point.date)}`,
-                          tooltip: `${member.label} — ${formatChartDate(point.date)}: ${formatWeight(point.weightKg)} kg`,
+                          tooltip: (
+                            <>
+                              {member.label} —{' '}
+                              <span className="whitespace-nowrap">
+                                {formatChartDate(point.date)}:{' '}
+                                {formatWeight(point.weightKg)} kg
+                              </span>
+                            </>
+                          ),
                         })),
                         ...interpolateMissingWeights(
                           member.points.map((point) => ({
@@ -341,7 +349,15 @@ export function GroupChartHistory({
                           estimated: true,
                           title: `${member.label}: Estimated ${formatChartDate(point.date)}, ${formatWeight(point.weightKg)} kg`,
                           markerLabel: `Estimated weight for ${member.label} on ${formatChartDate(point.date)}`,
-                          tooltip: `${member.label} — Estimated ${formatChartDate(point.date)}: ${formatWeight(point.weightKg)} kg`,
+                          tooltip: (
+                            <>
+                              {member.label} — Estimated{' '}
+                              <span className="whitespace-nowrap">
+                                {formatChartDate(point.date)}:{' '}
+                                {formatWeight(point.weightKg)} kg
+                              </span>
+                            </>
+                          ),
                         })),
                       ].sort((a, b) => a.date.localeCompare(b.date)),
                     }))}
@@ -366,6 +382,10 @@ export function GroupChartHistory({
                           estimated: false,
                         })
                     }}
+                    canEditPoint={(_point, memberKey) =>
+                      memberKey === ownMemberKey &&
+                      personalWorkspace.userId === viewerId.toLowerCase()
+                    }
                     lines={[
                       ...series.flatMap((member) => {
                         const target = memberProgress.find(

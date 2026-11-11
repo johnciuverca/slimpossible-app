@@ -62,13 +62,17 @@ for (const viewport of viewports) {
     await chart.scrollIntoViewIfNeeded()
     await expect(
       chart.locator('circle[data-point-kind="recorded"][data-date]'),
-    ).toHaveCount(13)
+    ).toHaveCount(1)
+    await expect(chart).toHaveAccessibleName(/13 saved weigh-ins/)
+    await expect(
+      chart.locator('circle[data-point-kind="weekly-summary"]'),
+    ).toHaveCount(12)
     const valueLabels = chart.locator('.chart-value')
     await expect(valueLabels).toHaveCount(2)
     expect(
       await valueLabels.evaluateAll((labels) =>
         labels
-          .map((label) => Number(label.getAttribute('data-weight-kg')))
+          .map((label) => Number(label.getAttribute('data-value')))
           .sort((first, second) => first - second),
       ),
     ).toEqual([99, 105])
@@ -144,12 +148,21 @@ for (const viewport of viewports) {
         .evaluateAll((labels) =>
           labels.map((label) => label.getAttribute('data-chart-date-tick')!),
         )
+      const tickXs = await chart
+        .locator('[data-chart-date-tick]')
+        .evaluateAll((labels) =>
+          labels.map((label) => Number(label.getAttribute('x'))),
+        )
       for (let index = 1; index < desktopDateTicks.length; index++) {
         const distance =
           (Date.parse(`${desktopDateTicks[index]}T00:00:00Z`) -
             Date.parse(`${desktopDateTicks[index - 1]}T00:00:00Z`)) /
           86400000
-        expect(distance % 7).toBe(0)
+        expect(distance).toBeGreaterThan(0)
+        expect(tickXs[index] - tickXs[index - 1]).toBeCloseTo(
+          tickXs[1] - tickXs[0],
+          3,
+        )
       }
     }
     const [rangeTicks, rangeControls, sliderTrack] = await Promise.all([
@@ -174,7 +187,10 @@ for (const viewport of viewports) {
           .sort(),
       )
       expect(rangeTicks[0]).toBe(savedDates[0])
-      expect(rangeTicks.at(-1)).toBe(savedDates.at(-1))
+      expect(rangeTicks.at(-1)! <= savedDates.at(-1)!).toBe(true)
+      await expect(
+        page.getByRole('status', { name: 'Visible date range' }),
+      ).toContainText(savedDates.at(-1)!.split('-').reverse().join('.'))
       const plotMetrics = await chart.evaluate((element) => {
         const tickLabels = Array.from(
           element.querySelectorAll('[data-chart-tick] text'),
@@ -284,25 +300,108 @@ for (const viewport of viewports) {
       '',
     )
     await point.dispatchEvent('pointerdown', { pointerType: 'touch' })
-    await expect(page.getByRole('tooltip')).toHaveText(exactDetail)
+    const dailyTooltip = page.getByRole('tooltip')
+    await expect(dailyTooltip).toHaveText(exactDetail)
+    await expect(dailyTooltip).toHaveCSS('font-size', '8.5px')
+    const dailyTooltipBox = (await dailyTooltip.boundingBox())!
+    expect(dailyTooltipBox.height).toBeLessThanOrEqual(16)
+    const pointDetails = page.getByRole('group', {
+      name: /Chart point details/,
+    })
+    const pointDetailsBox = (await pointDetails.boundingBox())!
+    expect(pointDetailsBox.x).toBeGreaterThanOrEqual(0)
+    expect(pointDetailsBox.x + pointDetailsBox.width).toBeLessThanOrEqual(
+      viewport.width,
+    )
+    const editPoint = pointDetails.getByRole('button', {
+      name: 'Edit weight',
+      exact: true,
+    })
+    const [dailyPanelBox, editTargetBox] = await Promise.all([
+      pointDetails.boundingBox(),
+      editPoint.boundingBox(),
+    ])
+    expect(dailyPanelBox).not.toBeNull()
+    expect(editTargetBox).not.toBeNull()
+    expect(
+      Math.abs(
+        dailyTooltipBox!.x +
+          dailyTooltipBox!.width / 2 -
+          (dailyPanelBox!.x + dailyPanelBox!.width / 2),
+      ),
+    ).toBeLessThanOrEqual(1)
+    expect(editTargetBox!.height).toBeGreaterThanOrEqual(44)
+    const visibleEditLabel = editPoint.locator('span')
+    await expect(visibleEditLabel).toHaveCSS('font-size', '8px')
+    await expect(visibleEditLabel).toHaveCSS(
+      'background-color',
+      'rgb(49, 219, 176)',
+    )
+    await expect(visibleEditLabel).toHaveCSS('color', 'rgb(7, 43, 34)')
+    const visibleEditBox = (await visibleEditLabel.boundingBox())!
+    expect(
+      Math.abs(
+        visibleEditBox.x +
+          visibleEditBox.width / 2 -
+          (dailyPanelBox!.x + dailyPanelBox!.width / 2),
+      ),
+    ).toBeLessThanOrEqual(1)
+    await page.screenshot({
+      path: test.info().outputPath(`daily-tooltip-${viewport.width}.png`),
+      fullPage: true,
+    })
+    await chart.dispatchEvent('keydown', { key: 'Escape' })
+    const estimate = chart
+      .locator('circle[data-point-kind="estimated"]')
+      .first()
+    await expect(estimate).toBeVisible()
+    await estimate.dispatchEvent('pointerdown', { pointerType: 'touch' })
+    const estimateTooltip = page.getByRole('tooltip')
+    await expect(estimateTooltip).toContainText('Estimated')
+    await expect(estimateTooltip).toHaveCSS('font-size', '8.5px')
+    const estimatePanel = page.getByRole('group', {
+      name: /Chart point details/,
+    })
+    const recordAction = estimatePanel.getByRole('button', {
+      name: 'Record weight',
+      exact: true,
+    })
+    const estimatePanelBox = (await estimatePanel.boundingBox())!
+    const estimateLabel = recordAction.locator('span')
+    await expect(estimateLabel).toHaveCSS('font-size', '8px')
+    const estimateLabelBox = (await estimateLabel.boundingBox())!
+    expect(
+      Math.abs(
+        estimateLabelBox.x +
+          estimateLabelBox.width / 2 -
+          (estimatePanelBox.x + estimatePanelBox.width / 2),
+      ),
+    ).toBeLessThanOrEqual(1)
+    await page.screenshot({
+      path: test.info().outputPath(`estimate-tooltip-${viewport.width}.png`),
+      fullPage: true,
+    })
     await chart.dispatchEvent('keydown', { key: 'Escape' })
     await rangeControls
       .getByRole('button', { name: 'Show last 1 month' })
       .click()
     await expect(
       chart.locator('circle[data-point-kind="recorded"][data-date]'),
-    ).toHaveCount(2)
+    ).toHaveCount(1)
+    await expect(
+      chart.locator('circle[data-point-kind="weekly-summary"]'),
+    ).toHaveCount(1)
     expect(
       await valueLabels.evaluateAll((labels) =>
         labels
-          .map((label) => Number(label.getAttribute('data-weight-kg')))
+          .map((label) => Number(label.getAttribute('data-value')))
           .sort((first, second) => first - second),
       ),
     ).toEqual([104.5, 105])
     await rangeControls.getByRole('button', { name: 'Show all dates' }).click()
     await expect(
       chart.locator('circle[data-point-kind="recorded"][data-date]'),
-    ).toHaveCount(13)
+    ).toHaveCount(1)
 
     expect(
       await page.evaluate(

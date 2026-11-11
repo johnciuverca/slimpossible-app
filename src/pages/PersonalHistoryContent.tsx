@@ -48,6 +48,7 @@ export function PersonalHistoryContent({
           </p>
           {history.length ? (
             <PersonalProgressChart
+              compactOlderHistory
               fitContainer
               labelExtremesOnly
               referenceWeightKg={referenceWeightKg}

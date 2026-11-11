@@ -61,14 +61,40 @@ for (const width of [1280, 390]) {
       name: /^Personal weight history chart/,
     })
     await expect(
-      chart.locator('circle[data-point-kind="recorded"][data-date]'),
+      chart.locator(
+        'circle[data-point-kind]:not([data-point-kind="estimated"])[data-date]',
+      ),
     ).toHaveCount(5)
-    await expect(chart.locator('[data-chart-trend]')).toHaveCount(1)
-    await expect(chart.locator('[data-chart-reference]')).toHaveCount(1)
-    await expect(chart.locator('[data-chart-trend]')).toHaveAttribute(
+    await expect(chart.locator('[data-chart-trend]')).not.toHaveCount(0)
+    await expect(chart.locator('[data-chart-reference]')).not.toHaveCount(0)
+    await expect(chart.locator('[data-chart-trend]').first()).toHaveAttribute(
       'opacity',
       '0.35',
     )
+    const mappedTrend = await chart
+      .locator('[data-chart-trend]')
+      .evaluateAll((segments) =>
+        segments.map((line) => ({
+          x1: line.getAttribute('x1'),
+          x2: line.getAttribute('x2'),
+          y1: line.getAttribute('y1'),
+          y2: line.getAttribute('y2'),
+        })),
+      )
+    expect(mappedTrend.length).toBeGreaterThan(1)
+    for (let index = 1; index < mappedTrend.length; index++) {
+      expect(mappedTrend[index].x1).toBe(mappedTrend[index - 1].x2)
+      expect(mappedTrend[index].y1).toBe(mappedTrend[index - 1].y2)
+    }
+    expect(
+      await chart
+        .locator('[data-chart-reference]')
+        .evaluateAll((segments) =>
+          segments.every(
+            (line) => line.getAttribute('y1') === line.getAttribute('y2'),
+          ),
+        ),
+    ).toBe(true)
     await expect(chart.locator('.chart-legend')).toHaveCount(0)
     await expect(chart).toHaveAccessibleDescription(
       /The trend uses only saved records/,
@@ -79,13 +105,15 @@ for (const width of [1280, 390]) {
       width <= 600 ? '0 0 320 266' : '0 0 760 266',
     )
     const firstPoint = chart
-      .locator('circle[data-point-kind="recorded"][data-chart-point]')
+      .locator('circle[data-point-kind="weekly-summary"][data-value="80.3"]')
       .first()
     await firstPoint.hover()
     const pointTooltip = page.getByRole('tooltip')
     await expect(pointTooltip).toBeVisible()
-    await expect(pointTooltip).toContainText(/\d{2}\.\d{2}\.\d{4}: 80\.3 kg/)
-    await expect(pointTooltip).toHaveClass(/bg-panel/)
+    await expect(pointTooltip).toHaveText(
+      /\d{2}\.\d{2}\.\d{4} – \d{2}\.\d{2}\.\d{4}/,
+    )
+    await expect(pointTooltip.locator('..')).toHaveClass(/bg-panel/)
     await firstPoint.focus()
     await expect(firstPoint).toHaveAttribute(
       'aria-describedby',
@@ -96,7 +124,9 @@ for (const width of [1280, 390]) {
     if (width <= 600) {
       await firstPoint.dispatchEvent('pointerdown', { pointerType: 'touch' })
       await expect(pointTooltip).toBeVisible()
-      await expect(pointTooltip).toContainText(/\d{2}\.\d{2}\.\d{4}: 80\.3 kg/)
+      await expect(pointTooltip).toHaveText(
+        /\d{2}\.\d{2}\.\d{4} – \d{2}\.\d{2}\.\d{4}/,
+      )
       await page.keyboard.press('Escape')
     }
     for (const label of await chart.locator('.chart-value').all())
@@ -187,7 +217,9 @@ for (const width of [1280, 390]) {
       .getByRole('button', { name: 'Show last 1 month' })
       .click()
     await expect(
-      chart.locator('circle[data-point-kind="recorded"][data-date]'),
+      chart.locator(
+        'circle[data-point-kind]:not([data-point-kind="estimated"])[data-date]',
+      ),
     ).toHaveCount(4)
     const recentTicks = await chart
       .locator('[data-chart-tick]')
@@ -208,7 +240,9 @@ for (const width of [1280, 390]) {
     )
     await dateControls.getByRole('button', { name: 'Show all dates' }).click()
     await expect(
-      chart.locator('circle[data-point-kind="recorded"][data-date]'),
+      chart.locator(
+        'circle[data-point-kind]:not([data-point-kind="estimated"])[data-date]',
+      ),
     ).toHaveCount(5)
     const endSlider = sliderTrack.getByRole('slider', {
       name: 'Visible range end',
@@ -218,7 +252,9 @@ for (const width of [1280, 390]) {
     await page.keyboard.press('ArrowLeft')
     await expect(endSlider).not.toHaveAttribute('aria-valuetext', originalEnd!)
     await expect(
-      chart.locator('circle[data-point-kind="recorded"][data-date]'),
+      chart.locator(
+        'circle[data-point-kind]:not([data-point-kind="estimated"])[data-date]',
+      ),
     ).toHaveCount(4)
     await chart.scrollIntoViewIfNeeded()
     const chartBottomBox = await chart.boundingBox()
@@ -230,7 +266,9 @@ for (const width of [1280, 390]) {
     )
     await dateControls.getByRole('button', { name: 'Show all dates' }).click()
     await expect(
-      chart.locator('circle[data-point-kind="recorded"][data-date]'),
+      chart.locator(
+        'circle[data-point-kind]:not([data-point-kind="estimated"])[data-date]',
+      ),
     ).toHaveCount(5)
     await expect(
       dateControls.getByRole('button', { name: 'Show all dates' }),
@@ -261,7 +299,9 @@ for (const width of [1280, 390]) {
     await expect(account).toBeFocused()
 
     await expect(
-      chart.locator('circle[data-point-kind="recorded"][data-date]'),
+      chart.locator(
+        'circle[data-point-kind]:not([data-point-kind="estimated"])[data-date]',
+      ),
     ).toHaveCount(5)
   })
 }
