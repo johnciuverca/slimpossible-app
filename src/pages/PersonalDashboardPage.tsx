@@ -4,7 +4,7 @@ import {
   usePersonalWorkspace,
   type PersonalWorkspace,
 } from '../data/usePersonalWorkspace'
-import { Card, FeedbackPanel, StatusPill } from '../components/ui'
+import { Card, FeedbackPanel } from '../components/ui'
 import {
   workspaceSection,
   workspaceSectionLink,
@@ -98,9 +98,6 @@ export function PersonalDashboardWorkspace({
   ])
   const today = personalWeighInToday()
   const { latest } = personalHistory(workspace.personal.data, today)
-  const todayEntry = workspace.personal.data.find(
-    (entry) => entry.date === today,
-  )
   const choices =
     workspace.contexts.state === 'ready'
       ? personalGoalChoices(
@@ -180,7 +177,7 @@ export function PersonalDashboardWorkspace({
       {section === 'overview' ? (
         <div id="dashboard-overview-panel" className="space-y-4">
           <div className="dashboard-top-grid">
-            <Card className="dashboard-latest p-4">
+            <Card className="dashboard-latest p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   {workspace.personal.state === 'loading' ? (
@@ -197,7 +194,7 @@ export function PersonalDashboardWorkspace({
                         Latest weight
                       </h2>
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                        <p className="text-3xl font-extrabold tracking-tight">
+                        <p className="text-2xl font-extrabold tracking-tight">
                           {latest
                             ? formatPersonalWeight(latest.weightKg)
                             : 'No record yet'}
@@ -210,9 +207,6 @@ export function PersonalDashboardWorkspace({
                             {formatChartDate(latest.date)}
                           </time>
                         ) : null}
-                        <StatusPill>
-                          {todayEntry ? 'Logged today' : 'Not logged today'}
-                        </StatusPill>
                       </div>
                     </>
                   )}

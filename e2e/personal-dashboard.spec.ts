@@ -15,9 +15,7 @@ for (const viewport of [
     await expect(
       page.getByRole('heading', { name: 'Dashboard', exact: true }),
     ).toBeVisible()
-    await expect(
-      page.getByText('Not logged today', { exact: true }),
-    ).toBeVisible()
+    await expect(page.getByText(/^(?:Not )?Logged today$/)).toHaveCount(0)
     expect(
       await page.evaluate(() => ({
         challenges: JSON.parse(
@@ -68,7 +66,7 @@ for (const viewport of [
     ).toBeFocused()
     await page.keyboard.press('Enter')
     await expect(dialog).toHaveCount(0)
-    await expect(page.getByText('Logged today', { exact: true })).toBeVisible()
+    await expect(page.getByText(/^(?:Not )?Logged today$/)).toHaveCount(0)
     await expect(record).toBeFocused()
     await expect(
       page.getByRole('button', { name: 'Record weight', exact: true }),
@@ -83,7 +81,7 @@ for (const viewport of [
       page.getByText('Synthetic Dashboard private note', { exact: true }),
     ).toHaveCount(0)
     await page.reload()
-    await expect(page.getByText('Logged today', { exact: true })).toBeVisible()
+    await expect(page.getByText(/^(?:Not )?Logged today$/)).toHaveCount(0)
     await expect(
       page.getByText('82.4 kg', { exact: true }).first(),
     ).toBeVisible()
@@ -247,9 +245,7 @@ for (const viewport of [
       .getByRole('navigation', { name: 'Dashboard sections' })
       .getByRole('link', { name: 'Overview', exact: true })
       .click()
-    await expect(
-      page.getByText('Not logged today', { exact: true }),
-    ).toBeVisible()
+    await expect(page.getByText(/^(?:Not )?Logged today$/)).toHaveCount(0)
     await expect(page.getByText('No record yet', { exact: true })).toBeVisible()
     await expect(goal).toHaveCount(0)
     await page.reload()
@@ -300,9 +296,7 @@ for (const viewport of [
       .getByRole('navigation', { name: 'Dashboard sections' })
       .getByRole('link', { name: 'Overview', exact: true })
       .click()
-    await expect(
-      page.getByText('Not logged today', { exact: true }),
-    ).toBeVisible()
+    await expect(page.getByText(/^(?:Not )?Logged today$/)).toHaveCount(0)
   })
 }
 

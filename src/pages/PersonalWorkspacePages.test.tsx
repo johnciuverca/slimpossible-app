@@ -546,7 +546,7 @@ describe('personal Dashboard and My Progress', () => {
   it('records a private entry with no challenge and updates logged-today state', async () => {
     render(page(<PersonalDashboardPage />))
     await screen.findByText('No record yet')
-    expect(screen.getByText('Not logged today')).toBeInTheDocument()
+    expect(screen.queryByText('Not logged today')).not.toBeInTheDocument()
     expect(
       screen.queryByRole('button', { name: 'Edit weight' }),
     ).not.toBeInTheDocument()
@@ -561,7 +561,7 @@ describe('personal Dashboard and My Progress', () => {
     })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save weight' }))
     await screen.findAllByText('82.1 kg')
-    expect(screen.getByText('Logged today')).toBeInTheDocument()
+    expect(screen.queryByText('Logged today')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Record weight' })).toBeEnabled()
     expect(
       screen.queryByRole('button', { name: 'Edit weight' }),
