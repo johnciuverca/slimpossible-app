@@ -12,11 +12,11 @@ export function WeightEntryCard({
   return (
     <div className="group/weight inline-flex h-10 shrink-0 flex-nowrap items-center gap-0 rounded-lg border border-line bg-page px-1 py-0 has-[button]:w-[124px] pointer-coarse:h-12 pointer-coarse:has-[button]:w-[148px]">
       <span
-        className="inline-flex shrink-0 items-baseline justify-end gap-0.5 whitespace-nowrap text-[7.5px] group-has-[button]/weight:w-[50px]"
+        className="inline-flex shrink-0 items-baseline justify-end gap-0.5 whitespace-nowrap text-[10px] group-has-[button]/weight:w-[50px]"
         title={`${weightKg} kg`}
       >
         <span
-          className="text-right tabular-nums group-has-[button]/weight:w-9 group-not-has-[button]/weight:text-[7.5px]!"
+          className="text-right tabular-nums group-has-[button]/weight:w-9 group-not-has-[button]/weight:text-[10px]!"
           style={
             label.length > 6
               ? { fontSize: `${60 / label.length}px` }

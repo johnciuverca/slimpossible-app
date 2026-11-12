@@ -382,7 +382,7 @@ export function MilestoneProgress({
                     {formatKg(milestoneWeight)}
                   </p>
                 )}
-                <p className="mt-1 text-[0.4875rem] font-bold uppercase tracking-wide sm:text-[0.5625rem]">
+                <p className="mt-1 text-[0.65rem] font-bold uppercase tracking-wide sm:text-xs">
                   {stateLabel(state)}
                 </p>
               </li>

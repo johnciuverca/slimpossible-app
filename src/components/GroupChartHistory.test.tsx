@@ -12,6 +12,7 @@ import type { Persistence } from '../data/persistence'
 import type { GroupChartEntry } from '../models/groupChartHistory'
 import type { GroupMemberProgress } from '../models/groupMemberProgress'
 import type { RepositoryListResult } from '../data/supabase/repositories'
+import { sharedChartTheme } from './sharedChartTheme'
 const originalInnerWidth = window.innerWidth
 afterEach(() => {
   cleanup()
@@ -31,12 +32,18 @@ const persistence = (
     mode: 'remote',
     repositories: { groupProgress: { getChartHistory: load } },
   }) as unknown as Persistence
+const legendName = (item: Element) => {
+  const copy = item.cloneNode(true) as Element
+  copy.querySelector('[data-avatar-preset]')?.remove()
+  return copy.textContent?.trim()
+}
 describe('Group chart history', () => {
-  it('lists only challenge member names while keeping target and trend chart lines', async () => {
+  it('lists challenge members, omits target references, and styles each trend with its series', async () => {
     const groupProgress: GroupMemberProgress[] = [
       {
         memberKey: 'a',
         displayName: 'Ava',
+        avatarPresetId: 'female-03',
         targetWeightKg: 85,
         startingWeightKg: 90,
         completionPercentage: 50,
@@ -76,12 +83,27 @@ describe('Group chart history', () => {
       name: 'Weight (kg) — shared group history',
     })
     expect(chart).toHaveAttribute('viewBox', '0 0 760 278')
+    expect(chart.querySelector('[data-series="target-reference"]')).toBeNull()
+    const trend = chart.querySelector('[data-series="derived-trend"]')
+    expect(trend).toHaveAttribute('data-chart-series-id', 'a')
+    expect(trend).toHaveAttribute('stroke', '#31dbb0')
+    expect(trend).toHaveAttribute(
+      'opacity',
+      String(sharedChartTheme.trendOpacity),
+    )
+    expect(trend).not.toHaveAttribute('stroke-dasharray')
     expect(
-      chart.querySelector('[data-series="target-reference"]'),
-    ).toHaveAttribute('stroke-dasharray', '9 5')
-    expect(
-      chart.querySelector('[data-series="derived-trend"]'),
-    ).toHaveAttribute('stroke-dasharray', '3 6')
+      document.querySelector('[data-series="target-reference"]'),
+    ).toBeNull()
+    const hiddenTrend = document.querySelector(
+      '.group-history-workspace svg.hidden [data-series="derived-trend"]',
+    )
+    expect(hiddenTrend).toHaveAttribute('stroke', '#31dbb0')
+    expect(hiddenTrend).toHaveAttribute(
+      'opacity',
+      String(sharedChartTheme.trendOpacity),
+    )
+    expect(hiddenTrend).not.toHaveAttribute('stroke-dasharray')
     expect(
       chart.querySelectorAll('circle[data-point-kind="recorded"]'),
     ).toHaveLength(3)
@@ -96,14 +118,195 @@ describe('Group chart history', () => {
     const legend = screen.getByRole('list', { name: 'Group chart legend' })
     expect(legend).toHaveClass('w-full', 'justify-center')
     expect(
-      Array.from(legend.querySelectorAll('li'), (item) =>
-        item.textContent?.trim(),
-      ),
-    ).toEqual(['Ava', 'Nora'])
+      legend.querySelector('[data-avatar-preset="female-03"]'),
+    ).toBeInTheDocument()
+    expect(Array.from(legend.querySelectorAll('li'), legendName)).toEqual([
+      'Ava',
+      'Nora',
+    ])
     expect(legend).not.toHaveTextContent(
       /recorded weights|first shared|baseline|target\/reference|derived trend/i,
     )
     expect(screen.getByRole('rowheader', { name: '2026-09-03' })).toBeVisible()
+  })
+  it('toggles comparison series without changing axes, dates, or source history', async () => {
+    const entries: GroupChartEntry[] = [
+      {
+        memberKey: 'member-a',
+        displayName: 'Ava',
+        date: '2026-08-01',
+        weightKg: 91,
+      },
+      {
+        memberKey: 'member-a',
+        displayName: 'Ava',
+        date: '2026-09-01',
+        weightKg: 90,
+      },
+      {
+        memberKey: 'member-a',
+        displayName: 'Ava',
+        date: '2026-09-03',
+        weightKg: 88,
+      },
+      {
+        memberKey: 'member-b',
+        displayName: 'Nora',
+        date: '2026-08-01',
+        weightKg: 71,
+      },
+      {
+        memberKey: 'member-b',
+        displayName: 'Nora',
+        date: '2026-09-01',
+        weightKg: 70,
+      },
+      {
+        memberKey: 'member-b',
+        displayName: 'Nora',
+        date: '2026-09-03',
+        weightKg: 72,
+      },
+    ]
+    render(
+      <GroupChartHistory
+        challengeId="group"
+        viewerId="viewer"
+        persistence={persistence(
+          vi.fn().mockResolvedValue({ state: 'success', data: entries }),
+        )}
+        refreshVersion={0}
+        memberProgress={[
+          {
+            memberKey: 'member-a',
+            displayName: 'Ava',
+            avatarPresetId: 'female-03',
+            startingWeightKg: 90,
+            targetWeightKg: 80,
+            completionPercentage: 50,
+            signedDisplayPercentage: 50,
+            negativeProgressCapped: false,
+            progressState: 'in_progress',
+            reachedTargetMilestones: [],
+          },
+          {
+            memberKey: 'member-b',
+            displayName: 'Nora',
+            avatarPresetId: 'female-04',
+            startingWeightKg: 90,
+            targetWeightKg: 80,
+            completionPercentage: 50,
+            signedDisplayPercentage: 50,
+            negativeProgressCapped: false,
+            progressState: 'in_progress',
+            reachedTargetMilestones: [],
+          },
+        ]}
+      />,
+    )
+
+    const chart = await screen.findByRole('img', {
+      name: 'Weight (kg) — shared group history',
+    })
+    const sharedHistory = screen.getByRole('table', {
+      name: 'Shared group weight history',
+    })
+    const sourceHistoryBefore = sharedHistory.textContent
+    const legend = screen.getByRole('list', { name: 'Group chart legend' })
+    const avaToggle = within(legend).getByRole('button', {
+      name: 'Ava chart series, currently visible',
+    })
+    const noraToggle = within(legend).getByRole('button', {
+      name: 'Nora chart series, currently visible',
+    })
+    expect(
+      legend.querySelector('[data-avatar-preset="female-03"]'),
+    ).toBeInTheDocument()
+    expect(
+      legend.querySelector('[data-avatar-preset="female-04"]'),
+    ).toBeInTheDocument()
+    const avaAvatar = avaToggle.querySelector('[data-avatar-preset]')!
+    const avaSwatch = avaToggle.querySelector(':scope > span[style]')!
+    expect(avaAvatar.closest('button')).toBe(avaToggle)
+    expect(avaSwatch.closest('button')).toBe(avaToggle)
+    fireEvent.click(avaAvatar.querySelector('span[style]')!)
+    expect(avaToggle).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(avaSwatch)
+    expect(avaToggle).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(within(avaToggle).getByText('Ava'))
+    expect(avaToggle).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(avaToggle)
+    expect(avaToggle).toHaveAttribute('aria-pressed', 'true')
+    const weeklySummary = chart.querySelector(
+      'circle[data-point-kind="weekly-summary"][data-chart-point]',
+    )!
+    fireEvent.click(weeklySummary)
+    fireEvent.click(screen.getByRole('button', { name: 'Expand week' }))
+    const backToAverages = screen.getByRole('button', {
+      name: 'Back to weekly averages',
+    })
+    expect(backToAverages).toBeVisible()
+    const ticksBefore = Array.from(
+      chart.querySelectorAll('[data-chart-tick]'),
+      (tick) => tick.getAttribute('data-chart-tick'),
+    )
+    const datesBefore = Array.from(
+      chart.querySelectorAll('[data-chart-date-tick]'),
+      (tick) => tick.getAttribute('data-chart-date-tick'),
+    )
+    const avaPoints = chart.querySelectorAll(
+      '[data-series-id="member-a"][data-chart-point]',
+    )
+    expect(avaPoints.length).toBeGreaterThan(0)
+    fireEvent.focus(avaPoints[0])
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Ava —')
+
+    fireEvent.click(avaToggle)
+    expect(avaToggle).toHaveAttribute('aria-pressed', 'false')
+    expect(
+      legend.querySelector('[data-avatar-preset="female-03"]'),
+    ).toBeInTheDocument()
+    expect(
+      chart.querySelectorAll('[data-chart-series-id="member-a"]'),
+    ).toHaveLength(0)
+    expect(chart.querySelectorAll('[data-series-id="member-a"]')).toHaveLength(
+      0,
+    )
+    expect(
+      chart.querySelectorAll('[data-series-id="member-b"]'),
+    ).not.toHaveLength(0)
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    expect(backToAverages).toBeVisible()
+    expect(
+      Array.from(chart.querySelectorAll('[data-chart-tick]'), (tick) =>
+        tick.getAttribute('data-chart-tick'),
+      ),
+    ).toEqual(ticksBefore)
+    expect(
+      Array.from(chart.querySelectorAll('[data-chart-date-tick]'), (tick) =>
+        tick.getAttribute('data-chart-date-tick'),
+      ),
+    ).toEqual(datesBefore)
+
+    fireEvent.click(noraToggle)
+    expect(noraToggle).toHaveAttribute('aria-pressed', 'false')
+    expect(
+      screen.getByRole('status', { name: 'Chart visibility status' }),
+    ).toHaveTextContent('All participants are hidden')
+    expect(sharedHistory.textContent).toBe(sourceHistoryBefore)
+    expect(legend).toBeVisible()
+    expect(avaToggle).toBeVisible()
+    fireEvent.click(avaToggle)
+    expect(avaToggle).toHaveAttribute('aria-pressed', 'true')
+    expect(
+      screen.queryByRole('status', { name: 'Chart visibility status' }),
+    ).not.toBeInTheDocument()
+    expect(
+      chart.querySelectorAll('[data-series-id="member-a"]'),
+    ).not.toHaveLength(0)
+    expect(chart.querySelectorAll('[data-series-id="member-b"]')).toHaveLength(
+      0,
+    )
   })
   it('keeps each identity color aligned across comparison, legend, member selection, and date filters', async () => {
     const entries: GroupChartEntry[] = [
@@ -172,13 +375,17 @@ describe('Group chart history', () => {
     const legend = screen.getByRole('list', { name: 'Group chart legend' })
     for (const [name, color] of initialColors) {
       const item = within(legend).getByText(name).closest('li')!
-      expect(item.querySelector('span')).toHaveStyle({ borderColor: color })
+      expect(item.querySelector('span[style]')).toHaveStyle({
+        borderColor: color,
+      })
     }
 
     fireEvent.click(screen.getByRole('button', { name: 'Show last 1 week' }))
     for (const [name, color] of initialColors) {
       const item = within(legend).getByText(name).closest('li')!
-      expect(item.querySelector('span')).toHaveStyle({ borderColor: color })
+      expect(item.querySelector('span[style]')).toHaveStyle({
+        borderColor: color,
+      })
     }
 
     for (const [name, color] of initialColors) {
@@ -205,7 +412,9 @@ describe('Group chart history', () => {
         expect(screen.getByRole('tooltip')).toHaveTextContent('89 kg')
       }
       const item = within(legend).getByText(name).closest('li')!
-      expect(item.querySelector('span')).toHaveStyle({ borderColor: color })
+      expect(item.querySelector('span[style]')).toHaveStyle({
+        borderColor: color,
+      })
     }
   })
   it('uses the same view-only ranges for all members and an individual member chart', async () => {
@@ -246,7 +455,9 @@ describe('Group chart history', () => {
       name: 'Weight (kg) — shared group history',
     })
     expect(
-      chart.querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
+      chart.querySelectorAll(
+        'circle[data-point-kind]:not([data-point-kind="estimated"])[data-date]',
+      ),
     ).toHaveLength(5)
     expect(chart.querySelectorAll('text.chart-value')).toHaveLength(2)
     expect(
@@ -273,12 +484,16 @@ describe('Group chart history', () => {
     ).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Show last 1 month' }))
     expect(
-      chart.querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
+      chart.querySelectorAll(
+        'circle[data-point-kind]:not([data-point-kind="estimated"])[data-date]',
+      ),
     ).toHaveLength(2)
-    expect(chart.querySelector('[data-chart-reference]')).toBeInTheDocument()
+    expect(chart.querySelector('[data-chart-reference]')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Show last 3 months' }))
     expect(
-      chart.querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
+      chart.querySelectorAll(
+        'circle[data-point-kind]:not([data-point-kind="estimated"])[data-date]',
+      ),
     ).toHaveLength(4)
     const allMembersTrack = screen.getByRole('group', {
       name: 'Adjust visible date range',
@@ -291,7 +506,9 @@ describe('Group chart history', () => {
       },
     )
     expect(
-      chart.querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
+      chart.querySelectorAll(
+        'circle[data-point-kind]:not([data-point-kind="estimated"])[data-date]',
+      ),
     ).toHaveLength(3)
     fireEvent.click(screen.getByRole('button', { name: 'Show all dates' }))
     fireEvent.click(screen.getByRole('tab', { name: 'Ava' }))
@@ -308,9 +525,7 @@ describe('Group chart history', () => {
     })
     expect(individualLegend).toHaveClass('w-full', 'justify-center')
     expect(
-      Array.from(individualLegend.querySelectorAll('li'), (item) =>
-        item.textContent?.trim(),
-      ),
+      Array.from(individualLegend.querySelectorAll('li'), legendName),
     ).toEqual(['Ava'])
     expect(
       screen.getByRole('group', { name: 'Chart date range controls' }),
@@ -389,7 +604,7 @@ describe('Group chart history', () => {
       true,
     )
     const plotBottom =
-      Number(chart.getAttribute('viewBox')?.split(/\s+/)[3]) - 52
+      Number(chart.getAttribute('viewBox')?.split(/\s+/)[3]) - 36
     const eighty = circles.find(
       (circle) => circle.textContent === 'Member 0: 01.09.2026, 80 kg',
     )!
@@ -399,9 +614,9 @@ describe('Group chart history', () => {
     expect(Number(hundred.getAttribute('cy'))).toBeLessThan(
       Number(eighty.getAttribute('cy')),
     )
-    expect(Number(eighty.getAttribute('cy'))).toBeGreaterThan(36)
+    expect(Number(eighty.getAttribute('cy'))).toBeGreaterThan(27)
     for (const circle of circles) {
-      expect(Number(circle.getAttribute('cy'))).toBeGreaterThan(25)
+      expect(Number(circle.getAttribute('cy'))).toBeGreaterThan(27)
       expect(Number(circle.getAttribute('cy'))).toBeLessThanOrEqual(plotBottom)
     }
     expect(
@@ -576,7 +791,9 @@ describe('Group chart history', () => {
     expect(table).toHaveTextContent('-1.5 kg')
     expect(load).toHaveBeenCalledWith('group-a')
     const chart = screen.getByRole('img')
-    expect(chart).toHaveAccessibleDescription(/Points represent shared dates/)
+    expect(chart).toHaveAccessibleDescription(
+      /latest 7 calendar dates stay detailed/,
+    )
     expect(
       screen.getByText(/Explicitly shared dates and weights only/),
     ).toHaveClass('sr-only')
@@ -600,7 +817,7 @@ describe('Group chart history', () => {
         screen
           .getByRole('list', { name: 'Group chart legend' })
           .querySelectorAll('li'),
-        (item) => item.textContent?.trim(),
+        legendName,
       ),
     ).toEqual(['Ava'])
   })

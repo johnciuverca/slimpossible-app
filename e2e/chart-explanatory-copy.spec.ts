@@ -38,7 +38,10 @@ for (const width of [1280, 390]) {
     )
     await expect(
       chart.locator('circle[data-point-kind="recorded"][data-date]'),
-    ).toHaveCount(3)
+    ).toHaveCount(1)
+    await expect(
+      chart.locator('circle[data-point-kind="weekly-summary"]'),
+    ).toHaveCount(2)
     const explanation = page.getByText(
       /Solid points are saved personal entries/,
     )
@@ -75,7 +78,7 @@ for (const width of [1280, 390]) {
     await expect(chartRegion).toBeVisible()
     await expect(chart).toBeVisible()
     await expect(chart).toHaveAccessibleDescription(
-      /Points represent shared dates/,
+      /latest 7 calendar dates stay detailed.*Monday–Sunday averages/,
     )
     await expect(
       page.getByText(/Explicitly shared dates and weights only/),
@@ -96,6 +99,9 @@ for (const width of [1280, 390]) {
     }
 
     await page.getByRole('tab', { name: 'Synthetic Alex' }).click()
+    await expect(chart).toHaveAccessibleDescription(
+      /Points represent shared dates/,
+    )
     await expect(
       chart.locator('circle[data-point-kind="recorded"][data-date]'),
     ).toHaveCount(3)

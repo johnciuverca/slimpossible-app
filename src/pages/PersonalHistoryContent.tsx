@@ -14,13 +14,9 @@ import { personalWeighInToday } from '../models/personalWeighIn'
 
 export function PersonalHistoryContent({
   workspace,
-  referenceWeightKg,
-  referenceLabel,
   children,
 }: {
   workspace: PersonalWorkspace
-  referenceWeightKg?: number
-  referenceLabel?: string
   children?: ReactNode
 }) {
   const [selectedChartPoint, setSelectedChartPoint] =
@@ -48,10 +44,9 @@ export function PersonalHistoryContent({
           </p>
           {history.length ? (
             <PersonalProgressChart
+              compactOlderHistory
               fitContainer
               labelExtremesOnly
-              referenceWeightKg={referenceWeightKg}
-              referenceLabel={referenceLabel}
               weighIns={history.map((entry) => ({
                 date: entry.date,
                 weightKg: entry.weightKg,

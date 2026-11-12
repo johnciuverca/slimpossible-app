@@ -336,6 +336,7 @@ export type Database = {
         Returns: {
           member_key: string
           display_name: string
+          avatar_preset_id: string | null
           starting_weight_kg: number | null
           target_weight_kg: number | null
           latest_recorded_date: string | null

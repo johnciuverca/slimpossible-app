@@ -48,16 +48,31 @@ for (const viewport of viewports) {
       name: /^Personal weight history chart/,
     })
     await expect(chart).toBeVisible()
+    const axisTickSizes = await chart.evaluate((element) =>
+      Array.from(element.querySelectorAll('.chart-axis-tick')).map(
+        (tick) => getComputedStyle(tick).fontSize,
+      ),
+    )
+    expect(axisTickSizes.length).toBeGreaterThan(0)
+    expect(new Set(axisTickSizes)).toEqual(new Set(['10.2px']))
+    await expect(chart.locator('.chart-axis-title')).toHaveCSS(
+      'font-size',
+      '12px',
+    )
     await chart.scrollIntoViewIfNeeded()
     await expect(
       chart.locator('circle[data-point-kind="recorded"][data-date]'),
-    ).toHaveCount(13)
+    ).toHaveCount(1)
+    await expect(chart).toHaveAccessibleName(/13 saved weigh-ins/)
+    await expect(
+      chart.locator('circle[data-point-kind="weekly-summary"]'),
+    ).toHaveCount(12)
     const valueLabels = chart.locator('.chart-value')
     await expect(valueLabels).toHaveCount(2)
     expect(
       await valueLabels.evaluateAll((labels) =>
         labels
-          .map((label) => Number(label.getAttribute('data-weight-kg')))
+          .map((label) => Number(label.getAttribute('data-value')))
           .sort((first, second) => first - second),
       ),
     ).toEqual([99, 105])
@@ -68,9 +83,13 @@ for (const viewport of viewports) {
           return { left: bounds.x, right: bounds.x + bounds.width }
         }),
       )
+      const plotLeft = Number(await chart.getAttribute('data-chart-plot-left'))
+      const plotRight = Number(
+        await chart.getAttribute('data-chart-plot-right'),
+      )
       for (const bounds of labelBounds) {
-        expect(bounds.left).toBeGreaterThanOrEqual(42)
-        expect(bounds.right).toBeLessThanOrEqual(312)
+        expect(bounds.left).toBeGreaterThanOrEqual(plotLeft)
+        expect(bounds.right).toBeLessThanOrEqual(plotRight)
       }
     }
 
@@ -86,16 +105,66 @@ for (const viewport of viewports) {
     expect(groupBox!.x + groupBox!.width).toBeLessThanOrEqual(
       cardBox!.x + cardBox!.width,
     )
-    expect(chartBox!.x).toBeGreaterThanOrEqual(groupBox!.x)
-    expect(chartBox!.x + chartBox!.width).toBeLessThanOrEqual(
-      groupBox!.x + groupBox!.width,
-    )
+    const frameBox = await chart.locator('xpath=../..').boundingBox()
+    expect(frameBox).not.toBeNull()
+    expect(frameBox!.x).toBeGreaterThanOrEqual(cardBox!.x)
+    expect(
+      cardBox!.x + cardBox!.width - frameBox!.x - frameBox!.width,
+    ).toBeGreaterThanOrEqual(0)
 
     const compact = viewport.width <= 600
     await expect(chart).toHaveAttribute(
       'viewBox',
       compact ? '0 0 320 266' : '0 0 760 266',
     )
+    await expect(chart).toHaveAttribute(
+      'data-chart-plot-left',
+      compact ? '32' : '44',
+    )
+    await expect(chart).toHaveAttribute(
+      'data-chart-plot-right',
+      compact ? '304' : '736',
+    )
+    await expect(chart).toHaveAttribute('data-chart-plot-top', '27')
+    await expect(chart).toHaveAttribute('data-chart-plot-bottom', '230')
+    if (!compact) {
+      const dateLabelBounds = await chart
+        .locator('[data-chart-date-tick]')
+        .evaluateAll((labels) =>
+          labels
+            .map((label) => {
+              const bounds = (label as SVGTextElement).getBBox()
+              return { left: bounds.x, right: bounds.x + bounds.width }
+            })
+            .sort((first, second) => first.left - second.left),
+        )
+      expect(dateLabelBounds.length).toBeLessThanOrEqual(11)
+      for (let index = 1; index < dateLabelBounds.length; index++)
+        expect(dateLabelBounds[index - 1].right).toBeLessThanOrEqual(
+          dateLabelBounds[index].left,
+        )
+      const desktopDateTicks = await chart
+        .locator('[data-chart-date-tick]')
+        .evaluateAll((labels) =>
+          labels.map((label) => label.getAttribute('data-chart-date-tick')!),
+        )
+      const tickXs = await chart
+        .locator('[data-chart-date-tick]')
+        .evaluateAll((labels) =>
+          labels.map((label) => Number(label.getAttribute('x'))),
+        )
+      for (let index = 1; index < desktopDateTicks.length; index++) {
+        const distance =
+          (Date.parse(`${desktopDateTicks[index]}T00:00:00Z`) -
+            Date.parse(`${desktopDateTicks[index - 1]}T00:00:00Z`)) /
+          86400000
+        expect(distance).toBeGreaterThan(0)
+        expect(tickXs[index] - tickXs[index - 1]).toBeCloseTo(
+          tickXs[1] - tickXs[0],
+          3,
+        )
+      }
+    }
     const [rangeTicks, rangeControls, sliderTrack] = await Promise.all([
       chart
         .locator('[data-chart-date-tick]')
@@ -118,34 +187,10 @@ for (const viewport of viewports) {
           .sort(),
       )
       expect(rangeTicks[0]).toBe(savedDates[0])
-      expect(rangeTicks.at(-1)).toBe(savedDates.at(-1))
-      expect(
-        await chart
-          .locator('[data-chart-tick] text')
-          .first()
-          .getAttribute('font-size'),
-      ).toBe('9.75')
-      expect(
-        await chart
-          .locator('[data-chart-date-tick]')
-          .first()
-          .getAttribute('font-size'),
-      ).toBe('7.5')
-      const scrollMetrics = await chartGroup.evaluate((element) => {
-        const frame = element.querySelector('svg')?.parentElement?.parentElement
-        return {
-          groupClientWidth: element.clientWidth,
-          groupScrollWidth: element.scrollWidth,
-          frameClientWidth: frame?.clientWidth ?? 0,
-          frameScrollWidth: frame?.scrollWidth ?? 0,
-        }
-      })
-      expect(scrollMetrics.groupScrollWidth).toBeLessThanOrEqual(
-        scrollMetrics.groupClientWidth + 6,
-      )
-      expect(scrollMetrics.frameScrollWidth).toBeLessThanOrEqual(
-        scrollMetrics.frameClientWidth + 6,
-      )
+      expect(rangeTicks.at(-1)! <= savedDates.at(-1)!).toBe(true)
+      await expect(
+        page.getByRole('status', { name: 'Visible date range' }),
+      ).toContainText(savedDates.at(-1)!.split('-').reverse().join('.'))
       const plotMetrics = await chart.evaluate((element) => {
         const tickLabels = Array.from(
           element.querySelectorAll('[data-chart-tick] text'),
@@ -153,25 +198,41 @@ for (const viewport of viewports) {
         const plotLines = Array.from(
           element.querySelectorAll('[data-chart-tick] line'),
         )
-        const left = Math.min(...tickLabels.map((label) => label.getBBox().x))
+        const labelLeft = Math.min(
+          ...tickLabels.map((label) => label.getBBox().x),
+        )
+        const labelRight = Math.max(
+          ...tickLabels.map((label) => {
+            const bounds = label.getBBox()
+            return bounds.x + bounds.width
+          }),
+        )
+        const left = Math.min(
+          ...plotLines.map((line) => Number(line.getAttribute('x1'))),
+        )
         const right = Math.max(
           ...plotLines.map((line) => Number(line.getAttribute('x2'))),
         )
-        return { left, right, width: element.viewBox.baseVal.width }
+        return {
+          labelLeft,
+          labelRight,
+          left,
+          right,
+          width: element.viewBox.baseVal.width,
+        }
       })
-      expect(
-        Math.abs(plotMetrics.left - (plotMetrics.width - plotMetrics.right)),
-      ).toBeLessThanOrEqual(3)
+      expect(plotMetrics.labelLeft).toBeGreaterThanOrEqual(0)
+      expect(plotMetrics.labelRight).toBeLessThanOrEqual(plotMetrics.left)
       const sliderBox = await sliderTrack.boundingBox()
       expect(sliderBox).not.toBeNull()
       const expectedSliderLeft =
         chartBox!.x + (plotMetrics.left / plotMetrics.width) * chartBox!.width
       const expectedSliderRight =
         chartBox!.x + (plotMetrics.right / plotMetrics.width) * chartBox!.width
-      expect(Math.abs(sliderBox!.x - expectedSliderLeft)).toBeLessThan(8)
+      expect(Math.abs(sliderBox!.x - expectedSliderLeft)).toBeLessThan(2)
       expect(
         Math.abs(sliderBox!.x + sliderBox!.width - expectedSliderRight),
-      ).toBeLessThan(8)
+      ).toBeLessThan(2)
       const dateRangeLabel = await rangeControls
         .getByText('Date range', { exact: true })
         .boundingBox()
@@ -217,10 +278,18 @@ for (const viewport of viewports) {
     await expect(sliderTrack.getByRole('slider')).toHaveCount(2)
     for (const handle of await sliderTrack.getByRole('slider').all()) {
       const handleBox = (await handle.boundingBox())!
+      if (viewport.width <= 600)
+        expect(handleBox.height).toBeGreaterThanOrEqual(44)
       expect(handleBox.x).toBeGreaterThanOrEqual(cardBox!.x)
       expect(handleBox.x + handleBox.width).toBeLessThanOrEqual(
         cardBox!.x + cardBox!.width,
       )
+    }
+    if (viewport.width <= 600) {
+      for (const button of await rangeControls.getByRole('button').all()) {
+        const box = (await button.boundingBox())!
+        expect(box.height).toBeGreaterThanOrEqual(44)
+      }
     }
 
     const point = chart
@@ -231,25 +300,108 @@ for (const viewport of viewports) {
       '',
     )
     await point.dispatchEvent('pointerdown', { pointerType: 'touch' })
-    await expect(page.getByRole('tooltip')).toHaveText(exactDetail)
+    const dailyTooltip = page.getByRole('tooltip')
+    await expect(dailyTooltip).toHaveText(exactDetail)
+    await expect(dailyTooltip).toHaveCSS('font-size', '8.5px')
+    const dailyTooltipBox = (await dailyTooltip.boundingBox())!
+    expect(dailyTooltipBox.height).toBeLessThanOrEqual(16)
+    const pointDetails = page.getByRole('group', {
+      name: /Chart point details/,
+    })
+    const pointDetailsBox = (await pointDetails.boundingBox())!
+    expect(pointDetailsBox.x).toBeGreaterThanOrEqual(0)
+    expect(pointDetailsBox.x + pointDetailsBox.width).toBeLessThanOrEqual(
+      viewport.width,
+    )
+    const editPoint = pointDetails.getByRole('button', {
+      name: 'Edit weight',
+      exact: true,
+    })
+    const [dailyPanelBox, editTargetBox] = await Promise.all([
+      pointDetails.boundingBox(),
+      editPoint.boundingBox(),
+    ])
+    expect(dailyPanelBox).not.toBeNull()
+    expect(editTargetBox).not.toBeNull()
+    expect(
+      Math.abs(
+        dailyTooltipBox!.x +
+          dailyTooltipBox!.width / 2 -
+          (dailyPanelBox!.x + dailyPanelBox!.width / 2),
+      ),
+    ).toBeLessThanOrEqual(1)
+    expect(editTargetBox!.height).toBeGreaterThanOrEqual(44)
+    const visibleEditLabel = editPoint.locator('span')
+    await expect(visibleEditLabel).toHaveCSS('font-size', '8px')
+    await expect(visibleEditLabel).toHaveCSS(
+      'background-color',
+      'rgb(49, 219, 176)',
+    )
+    await expect(visibleEditLabel).toHaveCSS('color', 'rgb(7, 43, 34)')
+    const visibleEditBox = (await visibleEditLabel.boundingBox())!
+    expect(
+      Math.abs(
+        visibleEditBox.x +
+          visibleEditBox.width / 2 -
+          (dailyPanelBox!.x + dailyPanelBox!.width / 2),
+      ),
+    ).toBeLessThanOrEqual(1)
+    await page.screenshot({
+      path: test.info().outputPath(`daily-tooltip-${viewport.width}.png`),
+      fullPage: true,
+    })
+    await chart.dispatchEvent('keydown', { key: 'Escape' })
+    const estimate = chart
+      .locator('circle[data-point-kind="estimated"]')
+      .first()
+    await expect(estimate).toBeVisible()
+    await estimate.dispatchEvent('pointerdown', { pointerType: 'touch' })
+    const estimateTooltip = page.getByRole('tooltip')
+    await expect(estimateTooltip).toContainText('Estimated')
+    await expect(estimateTooltip).toHaveCSS('font-size', '8.5px')
+    const estimatePanel = page.getByRole('group', {
+      name: /Chart point details/,
+    })
+    const recordAction = estimatePanel.getByRole('button', {
+      name: 'Record weight',
+      exact: true,
+    })
+    const estimatePanelBox = (await estimatePanel.boundingBox())!
+    const estimateLabel = recordAction.locator('span')
+    await expect(estimateLabel).toHaveCSS('font-size', '8px')
+    const estimateLabelBox = (await estimateLabel.boundingBox())!
+    expect(
+      Math.abs(
+        estimateLabelBox.x +
+          estimateLabelBox.width / 2 -
+          (estimatePanelBox.x + estimatePanelBox.width / 2),
+      ),
+    ).toBeLessThanOrEqual(1)
+    await page.screenshot({
+      path: test.info().outputPath(`estimate-tooltip-${viewport.width}.png`),
+      fullPage: true,
+    })
     await chart.dispatchEvent('keydown', { key: 'Escape' })
     await rangeControls
       .getByRole('button', { name: 'Show last 1 month' })
       .click()
     await expect(
       chart.locator('circle[data-point-kind="recorded"][data-date]'),
-    ).toHaveCount(2)
+    ).toHaveCount(1)
+    await expect(
+      chart.locator('circle[data-point-kind="weekly-summary"]'),
+    ).toHaveCount(1)
     expect(
       await valueLabels.evaluateAll((labels) =>
         labels
-          .map((label) => Number(label.getAttribute('data-weight-kg')))
+          .map((label) => Number(label.getAttribute('data-value')))
           .sort((first, second) => first - second),
       ),
     ).toEqual([104.5, 105])
     await rangeControls.getByRole('button', { name: 'Show all dates' }).click()
     await expect(
       chart.locator('circle[data-point-kind="recorded"][data-date]'),
-    ).toHaveCount(13)
+    ).toHaveCount(1)
 
     expect(
       await page.evaluate(

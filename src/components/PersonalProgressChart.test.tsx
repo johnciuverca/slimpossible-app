@@ -2,9 +2,95 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { PersonalProgressChart } from './PersonalProgressChart'
 import { SharedWeightChart } from './SharedWeightChart'
+import { sharedChartTheme } from './sharedChartTheme'
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
+})
+
+it('reuses weekly compression for personal points with source counts and original edit callbacks', () => {
+  const onPointActivate = vi.fn()
+  const records = [
+    { date: '2026-09-01', weightKg: 90, participantId: 'own' },
+    { date: '2026-09-02', weightKg: 88, participantId: 'own' },
+    { date: '2026-09-08', weightKg: 87, participantId: 'own' },
+    { date: '2026-09-15', weightKg: 86, participantId: 'own' },
+    { date: '2026-09-22', weightKg: 84, participantId: 'own' },
+  ]
+  const { container } = render(
+    <PersonalProgressChart
+      compactOlderHistory
+      labelExtremesOnly
+      weighIns={records}
+      onPointActivate={onPointActivate}
+    />,
+  )
+  expect(screen.getByRole('img')).toHaveAccessibleName(
+    /Personal weight history chart. 5 saved weigh-ins/,
+  )
+  expect(
+    container.querySelectorAll('[data-point-kind="weekly-summary"]'),
+  ).toHaveLength(3)
+  expect(
+    Array.from(
+      container.querySelectorAll('text.chart-value'),
+      (label) => label.textContent,
+    ),
+  ).toEqual(['89', '84'])
+  const start = screen.getByRole('slider', { name: 'Visible range start' })
+  fireEvent.keyDown(start, { key: 'ArrowRight' })
+  const summary = screen.getByRole('button', {
+    name: /Weekly average 89 kg.*2 recorded weigh-ins/,
+  })
+  expect(summary).toHaveAttribute('data-date', '2026-09-02')
+  fireEvent.keyDown(summary, { key: 'Enter' })
+  expect(onPointActivate).not.toHaveBeenCalled()
+  expect(screen.getByRole('button', { name: /^Expand week$/ })).toHaveFocus()
+  fireEvent.click(screen.getByRole('button', { name: /^Expand week$/ }))
+  const daily = screen.getByRole('button', {
+    name: 'Recorded weight on 02.09.2026',
+  })
+  fireEvent.click(daily)
+  expect(onPointActivate).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: /^Edit weight$/ }))
+  expect(onPointActivate).toHaveBeenCalledWith(
+    expect.objectContaining({ date: '2026-09-02', value: 88 }),
+  )
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Back to weekly averages' }),
+  )
+  expect(
+    screen.getByRole('button', {
+      name: /Weekly average 89 kg.*2 recorded weigh-ins/,
+    }),
+  ).toHaveFocus()
+  fireEvent.click(screen.getByRole('button', { name: 'Show last 1 week' }))
+  expect(screen.getByRole('img')).toHaveAccessibleName(
+    /Range contains 1 of 5 recorded entries/,
+  )
+  expect(records[0].weightKg).toBe(90)
+})
+
+it('retains personal date-window axis bounds from the original interpolated history', () => {
+  const { container } = render(
+    <PersonalProgressChart
+      compactOlderHistory
+      weighIns={[
+        { date: '2026-09-01', weightKg: 80, participantId: 'own' },
+        { date: '2026-10-11', weightKg: 102, participantId: 'own' },
+        { date: '2026-11-01', weightKg: 105, participantId: 'own' },
+      ]}
+    />,
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'Show last 1 month' }))
+  const ticks = Array.from(
+    container.querySelectorAll('[data-chart-tick]'),
+    (tick) => Number(tick.getAttribute('data-chart-tick')),
+  )
+  expect(ticks.every((tick) => tick % 5 === 0)).toBe(true)
+  expect(
+    container.querySelectorAll('[data-chart-minor-tick]').length,
+  ).toBeGreaterThan(0)
 })
 
 it('keeps an estimate-only selected range safe and labels no estimates as extrema', () => {
@@ -79,9 +165,9 @@ it('fits a Dashboard personal trend inside its card while keeping range controls
   ).toEqual([100, 93])
   for (const label of extremeLabels) {
     const x = Number(label.getAttribute('x'))
-    const halfWidth = (label.textContent!.length * 4.455) / 2
-    expect(x - halfWidth).toBeGreaterThanOrEqual(42)
-    expect(x + halfWidth).toBeLessThanOrEqual(312)
+    const halfWidth = (label.textContent!.length * 5.4) / 2
+    expect(x - halfWidth).toBeGreaterThanOrEqual(32)
+    expect(x + halfWidth).toBeLessThanOrEqual(304)
   }
   const dateTicks = Array.from(
     chart.querySelectorAll('[data-chart-date-tick]'),
@@ -184,15 +270,13 @@ it('labels one point per extreme, one point on equal values, and updates extreme
     chart().querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
   ).toHaveLength(4)
 })
-it('keeps derived trend and goal lines separate from exact saved points', () => {
+it('matches the personal trend to its saved-weight series and omits goal reference lines', () => {
   render(
     <PersonalProgressChart
       weighIns={[
         { date: '2026-10-01', weightKg: 100, participantId: 'own' },
         { date: '2026-10-11', weightKg: 90, participantId: 'own' },
       ]}
-      referenceWeightKg={95}
-      referenceLabel="Own selected goal"
     />,
   )
   const chart = screen.getByRole('img')
@@ -206,24 +290,24 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
   expect(chart.querySelector('[data-chart-trend]')).toBeInTheDocument()
   expect(chart.querySelector('[data-chart-trend]')).toHaveAttribute(
     'opacity',
-    '0.35',
+    String(sharedChartTheme.trendOpacity),
   )
-  expect(chart.querySelector('[data-chart-reference]')).toBeInTheDocument()
-  expect(
-    chart.querySelector('[data-chart-line-kind="reference"]'),
-  ).toHaveAttribute('stroke-dasharray', '9 5')
-  expect(chart.querySelector('[data-chart-line-kind="trend"]')).toHaveAttribute(
+  expect(chart.querySelector('[data-chart-trend]')).toHaveAttribute(
+    'stroke',
+    'var(--chart-recorded, #087756)',
+  )
+  expect(chart.querySelector('[data-chart-trend]')).not.toHaveAttribute(
     'stroke-dasharray',
-    '3 6',
   )
+  expect(chart.querySelector('[data-chart-reference]')).toBeNull()
   expect(screen.getByText('Weight (kg)')).toBeInTheDocument()
   expect(chart.querySelector('.chart-legend')).toBeNull()
-  expect(chart).toHaveAccessibleDescription(/Own selected goal is 95 kilograms/)
+  expect(chart).not.toHaveAccessibleDescription(/goal|target|reference line/i)
   const labels = Array.from(chart.querySelectorAll('.chart-value'))
   expect(labels.map((label) => label.textContent)).toEqual(['100', '90'])
   expect(labels.map((label) => label.getAttribute('font-size'))).toEqual([
-    '5.445',
-    '5.445',
+    '6.6',
+    '6.6',
   ])
   const weights = Array.from(
     chart.querySelectorAll('[data-chart-tick]'),
@@ -237,9 +321,9 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
   expect(dates).toEqual(['2026-10-01', '2026-10-08'])
   expect(
     Array.from(chart.querySelectorAll('[data-chart-date-tick]'), (tick) =>
-      tick.getAttribute('font-size'),
+      tick.classList.contains('chart-axis-tick'),
     ),
-  ).toEqual(['4.875', '4.875'])
+  ).toEqual([true, true])
   expect(chart).toHaveAttribute('viewBox', '0 0 760 266')
   expect(chart).toHaveClass('block', 'h-auto', 'w-full', 'min-w-[600px]')
   expect(chart.querySelector('path:not([data-chart-trend])')).toHaveAttribute(
@@ -250,16 +334,12 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
     'stroke-width',
     '2',
   )
-  expect(chart.querySelector('[data-chart-reference]')).toHaveAttribute(
-    'stroke-width',
-    '2',
-  )
   expect(
     Array.from(
       chart.querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
       (point) => Number(point.getAttribute('cx')),
     ),
-  ).toEqual([64, 696])
+  ).toEqual([44, 736])
   expect(
     chart.querySelector('circle[data-point-kind="recorded"] title'),
   ).toHaveTextContent('01.10.2026: 100 kg recorded')
@@ -358,33 +438,25 @@ it('recalculates axis labels when an edited weigh-in widens or narrows the visib
   expect(chart().querySelectorAll('[data-chart-minor-tick]')).toHaveLength(0)
 })
 
-it.each([83, 120])(
-  'keeps an owner goal at %s kg outside the data-driven axis',
-  (referenceWeightKg) => {
-    const weighIns = [
-      { date: '2026-10-15', weightKg: 99.7, participantId: 'owner' },
-    ]
-    render(
-      <PersonalProgressChart
-        weighIns={weighIns}
-        referenceWeightKg={referenceWeightKg}
-      />,
+it('keeps the personal axis data-driven with no visual target reference', () => {
+  const weighIns = [
+    { date: '2026-10-15', weightKg: 99.7, participantId: 'owner' },
+  ]
+  render(<PersonalProgressChart weighIns={weighIns} />)
+  const chart = () =>
+    screen.getByRole('img', { name: /Personal weight history/ })
+  const majorTicks = () =>
+    Array.from(chart().querySelectorAll('[data-chart-tick]'), (tick) =>
+      Number(tick.getAttribute('data-chart-tick')),
     )
-    const chart = () =>
-      screen.getByRole('img', { name: /Personal weight history/ })
-    const majorTicks = () =>
-      Array.from(chart().querySelectorAll('[data-chart-tick]'), (tick) =>
-        Number(tick.getAttribute('data-chart-tick')),
-      )
 
-    expect(majorTicks().some((tick) => tick % 5 !== 0)).toBe(true)
-    expect(Math.min(...majorTicks())).toBeGreaterThanOrEqual(99)
-    expect(Math.max(...majorTicks())).toBeLessThanOrEqual(100.5)
-    expect(chart().querySelectorAll('[data-chart-minor-tick]')).toHaveLength(0)
-    expect(chart().querySelector('[data-chart-reference]')).toBeNull()
-    expect(screen.queryByRole('note')).not.toBeInTheDocument()
-  },
-)
+  expect(majorTicks().some((tick) => tick % 5 !== 0)).toBe(true)
+  expect(Math.min(...majorTicks())).toBeGreaterThanOrEqual(99)
+  expect(Math.max(...majorTicks())).toBeLessThanOrEqual(100.5)
+  expect(chart().querySelectorAll('[data-chart-minor-tick]')).toHaveLength(0)
+  expect(chart().querySelector('[data-chart-reference]')).toBeNull()
+  expect(screen.queryByRole('note')).not.toBeInTheDocument()
+})
 
 it('keeps five-kilogram ticks aligned around low and negative generic ranges', () => {
   render(
@@ -435,10 +507,10 @@ it('labels every saved weigh-in with only its numeric value', () => {
       label.getAttribute('font-size'),
     ]),
   ).toEqual([
-    ['2026-10-01', '90', '90', '5.445'],
-    ['2026-10-08', '89.5', '89.5', '5.445'],
-    ['2026-10-15', '88.5', '88.5', '5.445'],
-    ['2026-10-22', '87', '87', '5.445'],
+    ['2026-10-01', '90', '90', '6.6'],
+    ['2026-10-08', '89.5', '89.5', '6.6'],
+    ['2026-10-15', '88.5', '88.5', '6.6'],
+    ['2026-10-22', '87', '87', '6.6'],
   ])
 })
 

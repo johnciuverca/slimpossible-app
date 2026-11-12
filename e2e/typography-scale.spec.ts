@@ -9,6 +9,7 @@ test('shared typography scale reaches Dashboard, Group, Profile, and auth', asyn
     '/e2e/fixtures/group-chart-harness.html',
     '/e2e/fixtures/profile-harness.html',
     '/login',
+    '/register',
   ]
 
   for (const surface of surfaces) {
@@ -25,6 +26,20 @@ test('shared typography scale reaches Dashboard, Group, Profile, and auth', asyn
       return values
     })
     expect(sizes).toEqual([9, 9.45, 10.8])
+
+    if (surface === '/login' || surface === '/register') {
+      const authSizes = await page.evaluate(() => {
+        const heading = document.querySelector('.auth-page h1')
+        const intro = document.querySelector('.auth-page p.text-lg')
+        const label = document.querySelector('.auth-page label.text-sm')
+        if (!heading || !intro || !label)
+          throw new Error('Expected auth heading, intro, and form label')
+        return [heading, intro, label].map((element) =>
+          Number.parseFloat(getComputedStyle(element).fontSize),
+        )
+      })
+      expect(authSizes).toEqual([18.9, 12.15, 9.45])
+    }
 
     const zoomedBase = await page.evaluate(() => {
       document.documentElement.style.fontSize = '200%'
@@ -108,33 +123,63 @@ test('content type and controls shrink while navigation and chart geometry stay 
   })
   expect(scale).toEqual({ header: 12.6, main: 9.45 })
 
-  const mainControl = page.locator('.app-shell-main button').first()
-  await expect(mainControl).toBeVisible()
-  expect(
-    await mainControl.evaluate((element) =>
-      Number.parseFloat(getComputedStyle(element).minHeight),
-    ),
-  ).toBeGreaterThanOrEqual(44)
+  const contentControlMetrics = await page.evaluate(() => {
+    const main = document.querySelector('.app-shell-main')
+    if (!main) throw new Error('Expected the page content area')
+    const button = document.createElement('button')
+    button.className = 'rounded text-sm'
+    button.textContent = 'Content action'
+    main.append(button)
+    const style = getComputedStyle(button)
+    const metrics = {
+      fontSize: Number.parseFloat(style.fontSize),
+      minHeight: Number.parseFloat(style.minHeight),
+      paddingBlock: Number.parseFloat(style.paddingBlockStart),
+      paddingInline: Number.parseFloat(style.paddingInlineStart),
+    }
+    button.remove()
+    return metrics
+  })
+  expect(contentControlMetrics).toEqual({
+    fontSize: 9.45,
+    minHeight: 44,
+    paddingBlock: 6,
+    paddingInline: 12,
+  })
 
   const chart = page.getByRole('img', {
     name: /^Personal weight history chart/,
   })
   await expect(chart).toHaveAttribute('viewBox', '0 0 320 266')
-  await expect(
-    chart.locator('circle[data-point-kind="recorded"]').first(),
-  ).toHaveAttribute('r', '5')
-  await expect(chart.locator('[data-chart-trend]')).toHaveAttribute(
+  await expect(chart.locator('[data-chart-trend]').first()).toHaveAttribute(
     'stroke-width',
     '2',
   )
-  expect(
-    await chart
-      .locator('.chart-axis')
-      .first()
-      .evaluate((element) =>
-        Number.parseFloat(getComputedStyle(element).fontSize),
-      ),
-  ).toBe(9)
+  await expect(chart.locator('[data-chart-trend]').first()).toHaveAttribute(
+    'opacity',
+    '0.32',
+  )
+  const chartText = await chart.evaluate((element) => ({
+    axisTitle: Number.parseFloat(
+      getComputedStyle(element.querySelector('.chart-axis-title')!).fontSize,
+    ),
+    axisTick: Number.parseFloat(
+      getComputedStyle(element.querySelector('.chart-axis-tick')!).fontSize,
+    ),
+    value: Number.parseFloat(
+      getComputedStyle(element.querySelector('.chart-value')!).fontSize,
+    ),
+    dateTick: Number.parseFloat(
+      getComputedStyle(element.querySelector('[data-chart-date-tick]')!)
+        .fontSize,
+    ),
+  }))
+  expect(chartText).toEqual({
+    axisTitle: 12,
+    axisTick: 10.2,
+    value: 9,
+    dateTick: 10.2,
+  })
 
   const inputSize = await page.evaluate(() => {
     const input = document.createElement('input')

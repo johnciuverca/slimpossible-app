@@ -15,14 +15,15 @@ import { deriveGroupChartTrend } from '../models/groupChartTrend'
 import type { GroupMemberProgress } from '../models/groupMemberProgress'
 import { createGroupMemberChartColorMap } from '../models/groupMemberChartColors'
 import { SharedWeightChart } from './SharedWeightChart'
+import { GroupParticipantAvatar } from './GroupParticipantAvatar'
+import { sharedChartTheme } from './sharedChartTheme'
 import { interpolateMissingWeights } from '../models/estimatedWeighIns'
 import {
   ChartWeightPointEditor,
   type ChartWeightPointSelection,
 } from './ChartWeightPointEditor'
 
-const trendColor = '#ffbf69'
-const referenceColor = '#c49cff'
+const noHiddenMembers = new Set<string>()
 const day = (date: string) => Date.parse(`${date}T00:00:00Z`) / 86400000
 const signed = (value: number) => `${value > 0 ? '+' : ''}${value} kg`
 const formatWeight = (value: number) =>
@@ -57,6 +58,14 @@ export function GroupChartHistory({
   const key = `${viewerId}:${challengeId}:${refreshVersion}:${localHistoryRefresh}:${persistence.mode}`
   const context = `${viewerId}:${challengeId}:${persistence.mode}`
   const [selection, setSelection] = useState({ context, memberKey: '' })
+  const [hiddenMemberState, setHiddenMemberState] = useState<{
+    context: string
+    memberKeys: Set<string>
+  }>({ context, memberKeys: new Set() })
+  const hiddenMemberKeys =
+    hiddenMemberState.context === context
+      ? hiddenMemberState.memberKeys
+      : noHiddenMembers
   const tabs = useRef<HTMLDivElement>(null)
   const workspace = useRef<HTMLDivElement>(null)
   const navigationRef = useRef<HTMLDivElement>(null)
@@ -117,6 +126,9 @@ export function GroupChartHistory({
     (member) => member.memberKey === selectedKey,
   )
   const matrix = createGroupHistoryMatrix(series)
+  const avatarByMemberKey = new Map(
+    memberProgress.map((member) => [member.memberKey, member]),
+  )
   const trends = series.map((member) => ({
     memberKey: member.memberKey,
     trend: deriveGroupChartTrend(member.points),
@@ -302,8 +314,9 @@ export function GroupChartHistory({
                   className="mt-4 min-w-0 focus-visible:outline-2 focus-visible:outline-emerald-700"
                 >
                   <SharedWeightChart
+                    compactOlderHistory={!selectedKey}
                     title="Weight (kg) — shared group history"
-                    description={`Each member is plotted at their actual shared weight in kilograms. Points represent shared dates; lines connect only consecutive days.${compactOverview ? '' : ' The table below provides every exact recorded weight.'}`}
+                    description={`Each member is plotted at their actual shared weight in kilograms. ${selectedKey ? 'Points represent shared dates; lines connect only consecutive days.' : 'The latest 7 calendar dates stay detailed. Larger older points show Monday–Sunday averages of actual shared records; activate them to expand daily points.'}${compactOverview ? '' : ' The table below provides every exact recorded weight.'}`}
                     yLabel="Weight (kg)"
                     min={min}
                     max={max}
@@ -316,6 +329,9 @@ export function GroupChartHistory({
                     viewBox={`0 0 760 ${chartViewBoxHeight}`}
                     fitContainer
                     labelSeriesExtremesOnly
+                    hiddenSeriesIds={
+                      selectedKey ? noHiddenMembers : hiddenMemberKeys
+                    }
                     series={series.map((member) => ({
                       id: member.memberKey,
                       color: memberColors.get(member.memberKey)!,
@@ -327,7 +343,15 @@ export function GroupChartHistory({
                           label: String(point.weightKg),
                           title: `${member.label}: ${formatChartDate(point.date)}, ${point.weightKg} kg`,
                           markerLabel: `Recorded weight for ${member.label} on ${formatChartDate(point.date)}`,
-                          tooltip: `${member.label} — ${formatChartDate(point.date)}: ${formatWeight(point.weightKg)} kg`,
+                          tooltip: (
+                            <>
+                              {member.label} —{' '}
+                              <span className="whitespace-nowrap">
+                                {formatChartDate(point.date)}:{' '}
+                                {formatWeight(point.weightKg)} kg
+                              </span>
+                            </>
+                          ),
                         })),
                         ...interpolateMissingWeights(
                           member.points.map((point) => ({
@@ -340,7 +364,15 @@ export function GroupChartHistory({
                           estimated: true,
                           title: `${member.label}: Estimated ${formatChartDate(point.date)}, ${formatWeight(point.weightKg)} kg`,
                           markerLabel: `Estimated weight for ${member.label} on ${formatChartDate(point.date)}`,
-                          tooltip: `${member.label} — Estimated ${formatChartDate(point.date)}: ${formatWeight(point.weightKg)} kg`,
+                          tooltip: (
+                            <>
+                              {member.label} — Estimated{' '}
+                              <span className="whitespace-nowrap">
+                                {formatChartDate(point.date)}:{' '}
+                                {formatWeight(point.weightKg)} kg
+                              </span>
+                            </>
+                          ),
                         })),
                       ].sort((a, b) => a.date.localeCompare(b.date)),
                     }))}
@@ -365,38 +397,17 @@ export function GroupChartHistory({
                           estimated: false,
                         })
                     }}
+                    canEditPoint={(_point, memberKey) =>
+                      memberKey === ownMemberKey &&
+                      personalWorkspace.userId === viewerId.toLowerCase()
+                    }
                     lines={[
-                      ...series.flatMap((member) => {
-                        const target = memberProgress.find(
-                          (candidate) =>
-                            candidate.memberKey === member.memberKey,
-                        )?.targetWeightKg
-                        return target === null ||
-                          target === undefined ||
-                          !Number.isFinite(target)
-                          ? []
-                          : [
-                              {
-                                id: `target:${member.memberKey}`,
-                                from: {
-                                  date: member.points[0].date,
-                                  value: chartValue(target),
-                                },
-                                to: {
-                                  date: member.points.at(-1)!.date,
-                                  value: chartValue(target),
-                                },
-                                color: referenceColor,
-                                title: `${member.label} target reference: ${target} kg`,
-                                kind: 'reference' as const,
-                              },
-                            ]
-                      }),
                       ...trends.flatMap(({ memberKey, trend }) =>
                         trend
                           ? [
                               {
                                 id: `trend:${memberKey}`,
+                                seriesId: memberKey,
                                 from: {
                                   date: trend.startDate,
                                   value: chartValue(trend.startWeightKg),
@@ -405,7 +416,7 @@ export function GroupChartHistory({
                                   date: trend.endDate,
                                   value: chartValue(trend.endWeightKg),
                                 },
-                                color: trendColor,
+                                color: memberColors.get(memberKey)!,
                                 title: `${series.find((member) => member.memberKey === memberKey)?.label ?? 'Member'} derived trend from displayed shared points`,
                                 kind: 'trend' as const,
                               },
@@ -414,6 +425,20 @@ export function GroupChartHistory({
                       ),
                     ]}
                   />
+                  {!selectedKey &&
+                  series.length > 0 &&
+                  series.every((member) =>
+                    hiddenMemberKeys.has(member.memberKey),
+                  ) ? (
+                    <p
+                      role="status"
+                      aria-label="Chart visibility status"
+                      className="mt-2 text-center text-sm"
+                    >
+                      All participants are hidden. Select a participant in the
+                      legend to show their chart.
+                    </p>
+                  ) : null}
                   <svg
                     aria-hidden="true"
                     viewBox="0 0 720 265"
@@ -431,7 +456,7 @@ export function GroupChartHistory({
                       only consecutive days. The table below provides every
                       exact recorded weight.
                     </desc>
-                    <text x={plotLeft} y={14} fontSize={9}>
+                    <text x={plotLeft} y={14} fontSize={12}>
                       Weight (kg)
                     </text>
                     {ticks.map((value) => (
@@ -447,34 +472,12 @@ export function GroupChartHistory({
                           x={plotLeft - 5}
                           y={y(value) + 4}
                           textAnchor="end"
-                          fontSize={9}
+                          fontSize={12}
                         >
                           {`${Math.round(value * 100) / 100} kg`}
                         </text>
                       </g>
                     ))}
-                    {series.map((member) => {
-                      const target = memberProgress.find(
-                        (candidate) => candidate.memberKey === member.memberKey,
-                      )?.targetWeightKg
-                      return target === null || target === undefined ? null : (
-                        <line
-                          key={`target:${member.memberKey}`}
-                          data-series="target-reference"
-                          x1={plotLeft}
-                          x2={675}
-                          y1={y(chartValue(target))}
-                          y2={y(chartValue(target))}
-                          stroke={referenceColor}
-                          strokeWidth={2}
-                          strokeDasharray="8 5"
-                        >
-                          <title>
-                            {member.label} target reference: {target} kg
-                          </title>
-                        </line>
-                      )
-                    })}
                     {series.map((member) => (
                       <g
                         key={member.memberKey}
@@ -510,9 +513,9 @@ export function GroupChartHistory({
                                 )!.trend!.endWeightKg,
                               ),
                             )}
-                            stroke={trendColor}
+                            stroke={memberColors.get(member.memberKey)}
                             strokeWidth={2.5}
-                            strokeDasharray="2 5"
+                            opacity={sharedChartTheme.trendOpacity}
                             strokeLinecap="round"
                           >
                             <title>
@@ -551,12 +554,12 @@ export function GroupChartHistory({
                         })}
                       </g>
                     ))}
-                    <text x={plotLeft} y={242} fontSize={9}>
+                    <text x={plotLeft} y={242} fontSize={12}>
                       {formatChartDate(
                         new Date(start * 86400000).toISOString().slice(0, 10),
                       )}
                     </text>
-                    <text x={675} y={242} textAnchor="end" fontSize={9}>
+                    <text x={675} y={242} textAnchor="end" fontSize={12}>
                       {formatChartDate(
                         new Date(end * 86400000).toISOString().slice(0, 10),
                       )}
@@ -567,21 +570,73 @@ export function GroupChartHistory({
                   aria-label="Group chart legend"
                   className="mt-3 flex w-full flex-wrap justify-center gap-x-5 gap-y-2 text-sm"
                 >
-                  {series.map((member) => (
-                    <li
-                      key={member.memberKey}
-                      className="flex items-center gap-2"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className="inline-block w-6 border-t-2"
-                        style={{
-                          borderColor: memberColors.get(member.memberKey),
-                        }}
-                      />
-                      {member.label}
-                    </li>
-                  ))}
+                  {series.map((member) => {
+                    const isComparison = !selectedKey
+                    const isHidden =
+                      isComparison && hiddenMemberKeys.has(member.memberKey)
+                    return (
+                      <li
+                        key={member.memberKey}
+                        className="flex min-w-0 items-center gap-1"
+                      >
+                        {isComparison ? (
+                          <button
+                            type="button"
+                            aria-label={`${member.label} chart series, currently ${isHidden ? 'hidden' : 'visible'}`}
+                            aria-pressed={!isHidden}
+                            onClick={() =>
+                              setHiddenMemberState((current) => {
+                                const memberKeys = new Set(
+                                  current.context === context
+                                    ? current.memberKeys
+                                    : [],
+                                )
+                                if (memberKeys.has(member.memberKey))
+                                  memberKeys.delete(member.memberKey)
+                                else memberKeys.add(member.memberKey)
+                                return { context, memberKeys }
+                              })
+                            }
+                            className={`inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md border-0 bg-transparent px-1 text-center font-semibold focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-emerald-700 ${isHidden ? 'text-slate-500 line-through' : 'text-current'}`}
+                          >
+                            <span
+                              aria-hidden="true"
+                              className={`inline-block w-6 shrink-0 border-t-2 ${isHidden ? 'opacity-40' : ''}`}
+                              style={{
+                                borderColor: memberColors.get(member.memberKey),
+                              }}
+                            />
+                            <GroupParticipantAvatar
+                              avatarPresetId={
+                                avatarByMemberKey.get(member.memberKey)
+                                  ?.avatarPresetId
+                              }
+                              displayName={member.label}
+                            />
+                            <span>{member.label}</span>
+                          </button>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 py-1 font-semibold">
+                            <span
+                              aria-hidden="true"
+                              className="inline-block w-6 shrink-0 border-t-2"
+                              style={{
+                                borderColor: memberColors.get(member.memberKey),
+                              }}
+                            />
+                            <GroupParticipantAvatar
+                              avatarPresetId={
+                                avatarByMemberKey.get(member.memberKey)
+                                  ?.avatarPresetId
+                              }
+                              displayName={member.label}
+                            />
+                            <span>{member.label}</span>
+                          </span>
+                        )}
+                      </li>
+                    )
+                  })}
                 </ul>
                 {!compactOverview ? (
                   <div
@@ -669,7 +724,7 @@ export function GroupChartHistory({
                                         />
                                       ) : null}
                                     </WeightEntryCard>{' '}
-                                    <span className="block text-[7.5px] text-ink-muted">
+                                    <span className="block text-[10px] text-ink-muted">
                                       Previous shared entry:{' '}
                                       {point.previousSharedChangeKg === null
                                         ? '—'

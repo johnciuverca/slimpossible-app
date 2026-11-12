@@ -7,6 +7,9 @@ const read = (path: string) =>
 const migration = read(
   'supabase/migrations/20261012100000_add_group_member_progress_projection.sql',
 )
+const avatarMigration = read(
+  'supabase/migrations/20261102010000_group_participant_avatar_presets.sql',
+)
 const authorizationCheck = read(
   'supabase/tests/group_member_progress_projection_authorization.sql',
 )
@@ -15,6 +18,28 @@ const rollback = read(
 )
 
 describe('Group member progress projection SQL contract', () => {
+  it('adds only a built-in preset to the existing challenge-authorized projection', () => {
+    expect(avatarMigration).toContain('profile.avatar_preset_id')
+    expect(avatarMigration).toContain('security definer')
+    expect(avatarMigration).toContain("member.status = 'active'")
+    expect(avatarMigration).toContain('challenge.owner_id = auth.uid()')
+    expect(avatarMigration).toContain(
+      'grant execute on function public.get_group_member_progress(uuid)',
+    )
+    expect(avatarMigration).not.toContain('avatar_path')
+    expect(avatarMigration).not.toContain('storage.')
+    expect(authorizationCheck).toContain(
+      'active_challenge_peer_gets_only_selected_builtin_avatar',
+    )
+    expect(authorizationCheck).toContain(
+      'uploaded_photo_path_never_enters_member_projection',
+    )
+    expect(authorizationCheck).toContain(
+      'other_challenge_avatar_is_not_returned',
+    )
+    expect(authorizationCheck).toContain("not row_json ? 'avatar_path'")
+  })
+
   it('limits access and returns only the selected group progress projection', () => {
     expect(migration).toContain(
       'create function public.get_group_member_progress(target_challenge_id uuid)',
