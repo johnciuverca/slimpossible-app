@@ -2303,10 +2303,9 @@ for (const viewport of [
     const groupLegend = page.getByRole('list', {
       name: 'Group chart legend',
     })
-    await expect(groupLegend.getByRole('button')).toHaveText([
-      'Ava (member 1)',
-      'Ava (member 2)',
-    ])
+    await expect(
+      groupLegend.locator('li > button > span:last-child'),
+    ).toHaveText(['Ava (member 1)', 'Ava (member 2)'])
     // The preview may still be backed by the pre-migration RPC, which omits
     // avatar_preset_id. In that case show a neutral initial until staging is migrated.
     await expect(
@@ -2508,9 +2507,9 @@ for (const viewport of [
     await expect(page.getByRole('tooltip')).toContainText(
       /Ava \(member 2\).*20\.09\.2026.*70 kg/,
     )
-    await expect(groupLegend.locator('li > span:last-child')).toHaveText([
-      'Ava (member 2)',
-    ])
+    await expect(groupLegend.locator('li > span > span:last-child')).toHaveText(
+      ['Ava (member 2)'],
+    )
     await expectLegendCentered()
     await expect(
       individualChart.locator('circle[data-point-kind="recorded"][data-date]'),
