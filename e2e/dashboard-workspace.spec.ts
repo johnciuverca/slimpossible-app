@@ -30,18 +30,28 @@ for (const viewport of [
     await expect(
       actionGrid.getByRole('link', { name: 'My progress', exact: true }),
     ).toBeVisible()
-    const [cardBox, gridBox] = await Promise.all([
+    const [cardBox, actionCardBox, gridBox] = await Promise.all([
       latestCard.boundingBox(),
       actionCard.boundingBox(),
+      actionGrid.boundingBox(),
     ])
     expect(cardBox).not.toBeNull()
+    expect(actionCardBox).not.toBeNull()
     expect(gridBox).not.toBeNull()
+    await actionCard.screenshot({
+      path: test.info().outputPath(`dashboard-actions-${viewport.label}.png`),
+    })
 
     if (viewport.width >= 1100) {
-      expect(Math.abs(cardBox!.y - gridBox!.y)).toBeLessThanOrEqual(1)
+      expect(Math.abs(cardBox!.y - actionCardBox!.y)).toBeLessThanOrEqual(1)
       expect(
-        Math.abs(cardBox!.y + cardBox!.height - gridBox!.y - gridBox!.height),
+        Math.abs(actionCardBox!.height - cardBox!.height),
       ).toBeLessThanOrEqual(1)
+      expect(cardBox!.height).toBeCloseTo(72.8, 1)
+      expect(actionCardBox!.height).toBeCloseTo(72.8, 1)
+    } else if (viewport.width === 390) {
+      expect(cardBox!.height).toBeCloseTo(62, 0)
+      expect(actionCardBox!.height).toBeCloseTo(48, 0)
     } else {
       expect(gridBox!.y).toBeGreaterThanOrEqual(cardBox!.y + cardBox!.height)
       expect(Math.abs(cardBox!.height - gridBox!.height)).toBeGreaterThan(1)
@@ -226,9 +236,7 @@ for (const width of [320, 390, 430]) {
       ).toBe(true)
       expect(
         actionMetrics.every(({ fontSize }) =>
-          textSize === 'increased'
-            ? fontSize === 20
-            : fontSize >= 12 && fontSize <= 14,
+          textSize === 'increased' ? fontSize === 20 : fontSize === 12,
         ),
       ).toBe(true)
       expect(

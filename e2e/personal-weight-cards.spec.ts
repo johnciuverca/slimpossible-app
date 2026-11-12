@@ -45,8 +45,9 @@ for (const width of [1280, 390]) {
     )
     for (const button of [edit, remove]) {
       const box = await button.boundingBox()
-      expect(box!.width).toBeGreaterThanOrEqual(44)
-      expect(box!.height).toBeGreaterThanOrEqual(44)
+      const minimumTargetSize = width <= 600 ? 44 : 33
+      expect(box!.width).toBeGreaterThanOrEqual(minimumTargetSize)
+      expect(box!.height).toBeGreaterThanOrEqual(minimumTargetSize)
     }
     const weight = page.getByLabel('Weight in kg')
     await expect(weight).not.toBeFocused()

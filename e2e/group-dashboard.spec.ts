@@ -4191,6 +4191,7 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
     const manageBox = (await manage.boundingBox())!
     expect(manageBox.width).toBeGreaterThanOrEqual(44)
     expect(manageBox.height).toBeGreaterThanOrEqual(44)
+    await expect(manage).toHaveCSS('font-size', '12.6px')
     await page.getByRole('link', { name: /Group · testtest/ }).focus()
     await page.keyboard.press('Tab')
     await expect(manage).toBeFocused()
@@ -4294,7 +4295,7 @@ test('shows the challenge owner badge only in Members and fits on mobile', async
       height: bounds.height,
     }
   })
-  expect(badgeMetrics.fontSize).toBe('12px')
+  expect(badgeMetrics.fontSize).toBe('9px')
   expect(badgeMetrics.height).toBeGreaterThanOrEqual(20)
   expect(
     await page.evaluate(
