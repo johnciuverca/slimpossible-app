@@ -1710,7 +1710,18 @@ for (const layout of [
     })
     try {
       const page = await context.newPage()
-      await installGroupFixtures(page, true)
+      await installGroupFixtures(
+        page,
+        true,
+        false,
+        false,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        'e2e-owner',
+        { participantAvatars: true },
+      )
       await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
 
       const activate = async (target: ReturnType<typeof page.getByRole>) => {
@@ -1772,6 +1783,20 @@ for (const layout of [
         await expect(toggles).toHaveCount(2)
         const firstToggle = toggles.nth(0)
         const secondToggle = toggles.nth(1)
+        const firstAvatar = firstToggle.locator(
+          '[data-avatar-preset="female-03"] > span[style]',
+        )
+        const firstSwatch = firstToggle.locator(':scope > span').nth(0)
+        const firstName = firstToggle.locator(':scope > span').last()
+        await activate(firstAvatar)
+        await expect(firstToggle).toHaveAttribute('aria-pressed', 'false')
+        await activate(firstSwatch)
+        await expect(firstToggle).toHaveAttribute('aria-pressed', 'true')
+        await activate(firstName)
+        await expect(firstToggle).toHaveAttribute('aria-pressed', 'false')
+        await activate(firstToggle)
+        await expect(firstToggle).toHaveAttribute('aria-pressed', 'true')
+        await expect(firstToggle).toBeVisible()
         if (sectionName === 'Charts') {
           for (const toggle of [firstToggle, secondToggle]) {
             if ((await toggle.getAttribute('aria-pressed')) === 'false')
@@ -1823,9 +1848,7 @@ for (const layout of [
         })
         await expect(details).toBeVisible()
         const initialColor = await firstToggle.evaluate(
-          (toggle) =>
-            toggle.parentElement?.firstElementChild?.getAttribute('style') ??
-            null,
+          (toggle) => toggle.firstElementChild?.getAttribute('style') ?? null,
         )
         expect(initialColor).not.toBeNull()
 
@@ -1872,9 +1895,7 @@ for (const layout of [
           chart.locator('circle[data-chart-point][data-series-id]'),
         ).not.toHaveCount(0)
         const restoredColor = await firstToggle.evaluate(
-          (toggle) =>
-            toggle.parentElement?.firstElementChild?.getAttribute('style') ??
-            null,
+          (toggle) => toggle.firstElementChild?.getAttribute('style') ?? null,
         )
         expect(restoredColor).toBe(initialColor)
 

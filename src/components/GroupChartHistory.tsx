@@ -435,8 +435,8 @@ export function GroupChartHistory({
                       aria-label="Chart visibility status"
                       className="mt-2 text-center text-sm"
                     >
-                      All participants are hidden. Select a name in the legend
-                      to show their chart.
+                      All participants are hidden. Select a participant in the
+                      legend to show their chart.
                     </p>
                   ) : null}
                   <svg
@@ -579,20 +579,6 @@ export function GroupChartHistory({
                         key={member.memberKey}
                         className="flex min-w-0 items-center gap-1"
                       >
-                        <span
-                          aria-hidden="true"
-                          className={`inline-block w-6 shrink-0 border-t-2 ${isHidden ? 'opacity-40' : ''}`}
-                          style={{
-                            borderColor: memberColors.get(member.memberKey),
-                          }}
-                        />
-                        <GroupParticipantAvatar
-                          avatarPresetId={
-                            avatarByMemberKey.get(member.memberKey)
-                              ?.avatarPresetId
-                          }
-                          displayName={member.label}
-                        />
                         {isComparison ? (
                           <button
                             type="button"
@@ -611,13 +597,41 @@ export function GroupChartHistory({
                                 return { context, memberKeys }
                               })
                             }
-                            className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border-0 bg-transparent px-1 text-center font-semibold focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-emerald-700 ${isHidden ? 'text-slate-500 line-through' : 'text-current'}`}
+                            className={`inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md border-0 bg-transparent px-1 text-center font-semibold focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-emerald-700 ${isHidden ? 'text-slate-500 line-through' : 'text-current'}`}
                           >
+                            <span
+                              aria-hidden="true"
+                              className={`inline-block w-6 shrink-0 border-t-2 ${isHidden ? 'opacity-40' : ''}`}
+                              style={{
+                                borderColor: memberColors.get(member.memberKey),
+                              }}
+                            />
+                            <GroupParticipantAvatar
+                              avatarPresetId={
+                                avatarByMemberKey.get(member.memberKey)
+                                  ?.avatarPresetId
+                              }
+                              displayName={member.label}
+                            />
                             <span>{member.label}</span>
                           </button>
                         ) : (
-                          <span className="py-1 font-semibold">
-                            {member.label}
+                          <span className="inline-flex items-center gap-1 py-1 font-semibold">
+                            <span
+                              aria-hidden="true"
+                              className="inline-block w-6 shrink-0 border-t-2"
+                              style={{
+                                borderColor: memberColors.get(member.memberKey),
+                              }}
+                            />
+                            <GroupParticipantAvatar
+                              avatarPresetId={
+                                avatarByMemberKey.get(member.memberKey)
+                                  ?.avatarPresetId
+                              }
+                              displayName={member.label}
+                            />
+                            <span>{member.label}</span>
                           </span>
                         )}
                       </li>

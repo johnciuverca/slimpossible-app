@@ -225,6 +225,18 @@ describe('Group chart history', () => {
     expect(
       legend.querySelector('[data-avatar-preset="female-04"]'),
     ).toBeInTheDocument()
+    const avaAvatar = avaToggle.querySelector('[data-avatar-preset]')!
+    const avaSwatch = avaToggle.querySelector(':scope > span[style]')!
+    expect(avaAvatar.closest('button')).toBe(avaToggle)
+    expect(avaSwatch.closest('button')).toBe(avaToggle)
+    fireEvent.click(avaAvatar.querySelector('span[style]')!)
+    expect(avaToggle).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(avaSwatch)
+    expect(avaToggle).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(within(avaToggle).getByText('Ava'))
+    expect(avaToggle).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(avaToggle)
+    expect(avaToggle).toHaveAttribute('aria-pressed', 'true')
     const weeklySummary = chart.querySelector(
       'circle[data-point-kind="weekly-summary"][data-chart-point]',
     )!
@@ -363,13 +375,17 @@ describe('Group chart history', () => {
     const legend = screen.getByRole('list', { name: 'Group chart legend' })
     for (const [name, color] of initialColors) {
       const item = within(legend).getByText(name).closest('li')!
-      expect(item.querySelector('span')).toHaveStyle({ borderColor: color })
+      expect(item.querySelector('span[style]')).toHaveStyle({
+        borderColor: color,
+      })
     }
 
     fireEvent.click(screen.getByRole('button', { name: 'Show last 1 week' }))
     for (const [name, color] of initialColors) {
       const item = within(legend).getByText(name).closest('li')!
-      expect(item.querySelector('span')).toHaveStyle({ borderColor: color })
+      expect(item.querySelector('span[style]')).toHaveStyle({
+        borderColor: color,
+      })
     }
 
     for (const [name, color] of initialColors) {
@@ -396,7 +412,9 @@ describe('Group chart history', () => {
         expect(screen.getByRole('tooltip')).toHaveTextContent('89 kg')
       }
       const item = within(legend).getByText(name).closest('li')!
-      expect(item.querySelector('span')).toHaveStyle({ borderColor: color })
+      expect(item.querySelector('span[style]')).toHaveStyle({
+        borderColor: color,
+      })
     }
   })
   it('uses the same view-only ranges for all members and an individual member chart', async () => {
