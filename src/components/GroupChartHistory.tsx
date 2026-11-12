@@ -22,6 +22,7 @@ import {
   type ChartWeightPointSelection,
 } from './ChartWeightPointEditor'
 
+const noHiddenMembers = new Set<string>()
 const day = (date: string) => Date.parse(`${date}T00:00:00Z`) / 86400000
 const signed = (value: number) => `${value > 0 ? '+' : ''}${value} kg`
 const formatWeight = (value: number) =>
@@ -56,6 +57,14 @@ export function GroupChartHistory({
   const key = `${viewerId}:${challengeId}:${refreshVersion}:${localHistoryRefresh}:${persistence.mode}`
   const context = `${viewerId}:${challengeId}:${persistence.mode}`
   const [selection, setSelection] = useState({ context, memberKey: '' })
+  const [hiddenMemberState, setHiddenMemberState] = useState<{
+    context: string
+    memberKeys: Set<string>
+  }>({ context, memberKeys: new Set() })
+  const hiddenMemberKeys =
+    hiddenMemberState.context === context
+      ? hiddenMemberState.memberKeys
+      : noHiddenMembers
   const tabs = useRef<HTMLDivElement>(null)
   const workspace = useRef<HTMLDivElement>(null)
   const navigationRef = useRef<HTMLDivElement>(null)
@@ -316,6 +325,9 @@ export function GroupChartHistory({
                     viewBox={`0 0 760 ${chartViewBoxHeight}`}
                     fitContainer
                     labelSeriesExtremesOnly
+                    hiddenSeriesIds={
+                      selectedKey ? noHiddenMembers : hiddenMemberKeys
+                    }
                     series={series.map((member) => ({
                       id: member.memberKey,
                       color: memberColors.get(member.memberKey)!,
@@ -409,6 +421,20 @@ export function GroupChartHistory({
                       ),
                     ]}
                   />
+                  {!selectedKey &&
+                  series.length > 0 &&
+                  series.every((member) =>
+                    hiddenMemberKeys.has(member.memberKey),
+                  ) ? (
+                    <p
+                      role="status"
+                      aria-label="Chart visibility status"
+                      className="mt-2 text-center text-sm"
+                    >
+                      All participants are hidden. Select a name in the legend
+                      to show their chart.
+                    </p>
+                  ) : null}
                   <svg
                     aria-hidden="true"
                     viewBox="0 0 720 265"
@@ -540,21 +566,52 @@ export function GroupChartHistory({
                   aria-label="Group chart legend"
                   className="mt-3 flex w-full flex-wrap justify-center gap-x-5 gap-y-2 text-sm"
                 >
-                  {series.map((member) => (
-                    <li
-                      key={member.memberKey}
-                      className="flex items-center gap-2"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className="inline-block w-6 border-t-2"
-                        style={{
-                          borderColor: memberColors.get(member.memberKey),
-                        }}
-                      />
-                      {member.label}
-                    </li>
-                  ))}
+                  {series.map((member) => {
+                    const isComparison = !selectedKey
+                    const isHidden =
+                      isComparison && hiddenMemberKeys.has(member.memberKey)
+                    return (
+                      <li
+                        key={member.memberKey}
+                        className="flex min-w-0 items-center gap-1"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={`inline-block w-6 shrink-0 border-t-2 ${isHidden ? 'opacity-40' : ''}`}
+                          style={{
+                            borderColor: memberColors.get(member.memberKey),
+                          }}
+                        />
+                        {isComparison ? (
+                          <button
+                            type="button"
+                            aria-label={`${member.label} chart series, currently ${isHidden ? 'hidden' : 'visible'}`}
+                            aria-pressed={!isHidden}
+                            onClick={() =>
+                              setHiddenMemberState((current) => {
+                                const memberKeys = new Set(
+                                  current.context === context
+                                    ? current.memberKeys
+                                    : [],
+                                )
+                                if (memberKeys.has(member.memberKey))
+                                  memberKeys.delete(member.memberKey)
+                                else memberKeys.add(member.memberKey)
+                                return { context, memberKeys }
+                              })
+                            }
+                            className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border-0 bg-transparent px-1 text-center font-semibold focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-emerald-700 ${isHidden ? 'text-slate-500 line-through' : 'text-current'}`}
+                          >
+                            {member.label}
+                          </button>
+                        ) : (
+                          <span className="py-1 font-semibold">
+                            {member.label}
+                          </span>
+                        )}
+                      </li>
+                    )
+                  })}
                 </ul>
                 {!compactOverview ? (
                   <div

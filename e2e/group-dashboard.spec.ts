@@ -1672,6 +1672,225 @@ for (const width of [1280, 390]) {
   })
 }
 
+for (const layout of [
+  { label: 'desktop', width: 1280, hasTouch: false },
+  { label: 'mobile touch', width: 390, hasTouch: true },
+]) {
+  test(`Group comparison legend hides and restores member data on ${layout.label}`, async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({
+      viewport: { width: layout.width, height: 900 },
+      hasTouch: layout.hasTouch,
+    })
+    try {
+      const page = await context.newPage()
+      await installGroupFixtures(page, true)
+      await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+
+      const activate = async (target: ReturnType<typeof page.getByRole>) => {
+        if (!layout.hasTouch) {
+          await target.click()
+          return
+        }
+        await target.scrollIntoViewIfNeeded()
+        const bounds = (await target.boundingBox())!
+        await page.touchscreen.tap(
+          bounds.x + bounds.width / 2,
+          bounds.y + bounds.height / 2,
+        )
+      }
+      const chartDates = async (chart: ReturnType<typeof page.getByRole>) =>
+        chart
+          .locator('[data-chart-date-tick]')
+          .evaluateAll((ticks) =>
+            ticks.map((tick) => tick.getAttribute('data-chart-date-tick')),
+          )
+      const chartTicks = async (chart: ReturnType<typeof page.getByRole>) =>
+        chart
+          .locator('[data-chart-tick]')
+          .evaluateAll((ticks) =>
+            ticks.map((tick) => tick.getAttribute('data-chart-tick')),
+          )
+      const markerPositions = async (
+        chart: ReturnType<typeof page.getByRole>,
+        seriesId: string,
+      ) =>
+        chart
+          .locator(`circle[data-chart-point][data-series-id="${seriesId}"]`)
+          .evaluateAll((markers) =>
+            markers.map((marker) => ({
+              date: marker.getAttribute('data-date'),
+              x: marker.getAttribute('cx'),
+              y: marker.getAttribute('cy'),
+              kind: marker.getAttribute('data-point-kind'),
+            })),
+          )
+
+      for (const sectionName of ['Overview', 'Charts']) {
+        if (sectionName === 'Charts') {
+          const chartsLink = page
+            .getByRole('navigation', { name: 'Group sections' })
+            .getByRole('link', { name: 'Charts', exact: true })
+          await chartsLink.click()
+          await expect(chartsLink).toHaveAttribute('aria-current', 'page')
+          await expect(
+            page.getByRole('tab', { name: 'All members', exact: true }),
+          ).toBeVisible()
+        }
+        const chart = page.getByRole('img', {
+          name: 'Weight (kg) — shared group history',
+        })
+        await expect(chart).toBeVisible()
+        const legend = page.getByRole('list', { name: 'Group chart legend' })
+        const toggles = legend.getByRole('button')
+        await expect(toggles).toHaveCount(2)
+        const firstToggle = toggles.nth(0)
+        const secondToggle = toggles.nth(1)
+        if (sectionName === 'Charts') {
+          for (const toggle of [firstToggle, secondToggle]) {
+            if ((await toggle.getAttribute('aria-pressed')) === 'false')
+              await activate(toggle)
+            await expect(toggle).toHaveAttribute('aria-pressed', 'true')
+          }
+        }
+        const seriesIds = await chart
+          .locator('circle[data-chart-point][data-series-id]')
+          .evaluateAll((markers) =>
+            Array.from(
+              new Set(
+                markers.map((marker) => marker.getAttribute('data-series-id')),
+              ),
+            ).filter((id): id is string => Boolean(id)),
+          )
+        expect(seriesIds).toHaveLength(2)
+
+        const datesBefore = await chartDates(chart)
+        const ticksBefore = await chartTicks(chart)
+        const weeklySummary = chart
+          .locator('circle[data-point-kind="weekly-summary"][data-chart-point]')
+          .first()
+        if (await weeklySummary.count()) {
+          await activate(weeklySummary)
+          await page
+            .getByRole('group', { name: /Chart point details/ })
+            .getByRole('button', { name: 'Expand week', exact: true })
+            .click()
+          await expect(
+            page.getByRole('button', { name: 'Back to weekly averages' }),
+          ).toBeVisible()
+        }
+        const positionsBefore = new Map(
+          await Promise.all(
+            seriesIds.map(
+              async (seriesId) =>
+                [seriesId, await markerPositions(chart, seriesId)] as const,
+            ),
+          ),
+        )
+
+        const activeMarker = chart
+          .locator('circle[data-chart-point][data-series-id]')
+          .first()
+        await activate(activeMarker)
+        const details = page.getByRole('group', {
+          name: /Chart point details/,
+        })
+        await expect(details).toBeVisible()
+        const initialColor = await firstToggle.evaluate(
+          (toggle) =>
+            toggle.previousElementSibling?.getAttribute('style') ?? null,
+        )
+        expect(initialColor).not.toBeNull()
+
+        const firstBounds = (await firstToggle.boundingBox())!
+        if (layout.hasTouch)
+          expect(firstBounds.height).toBeGreaterThanOrEqual(44)
+        await activate(firstToggle)
+        await expect(firstToggle).toHaveAttribute('aria-pressed', 'false')
+        await expect(details).toHaveCount(0)
+        const hiddenSeriesIds = await Promise.all(
+          seriesIds.map(async (seriesId) =>
+            (await chart.locator(`[data-series-id="${seriesId}"]`).count()) ===
+            0
+              ? seriesId
+              : null,
+          ),
+        ).then((ids) => ids.filter((id): id is string => id !== null))
+        expect(hiddenSeriesIds).toHaveLength(1)
+        const hiddenSeriesId = hiddenSeriesIds[0]
+        const remainingSeriesId = seriesIds.find(
+          (seriesId) => seriesId !== hiddenSeriesId,
+        )!
+        await expect(
+          chart.locator(`[data-chart-series-id="${hiddenSeriesId}"]`),
+        ).toHaveCount(0)
+        await expect(
+          chart.locator('circle[data-chart-point][data-series-id]'),
+        ).not.toHaveCount(0)
+        expect(await markerPositions(chart, remainingSeriesId)).toEqual(
+          positionsBefore.get(remainingSeriesId),
+        )
+        expect(await chartDates(chart)).toEqual(datesBefore)
+        expect(await chartTicks(chart)).toEqual(ticksBefore)
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= window.innerWidth,
+          ),
+        ).toBe(true)
+
+        firstToggle.focus()
+        await page.keyboard.press('Space')
+        await expect(firstToggle).toHaveAttribute('aria-pressed', 'true')
+        await expect(
+          chart.locator('circle[data-chart-point][data-series-id]'),
+        ).not.toHaveCount(0)
+        const restoredColor = await firstToggle.evaluate(
+          (toggle) =>
+            toggle.previousElementSibling?.getAttribute('style') ?? null,
+        )
+        expect(restoredColor).toBe(initialColor)
+
+        await secondToggle.focus()
+        await expect(secondToggle).toBeFocused()
+        await secondToggle.press('Enter')
+        await expect(secondToggle).toHaveAttribute('aria-pressed', 'false')
+        await activate(firstToggle)
+        await expect(firstToggle).toHaveAttribute('aria-pressed', 'false')
+        await expect(
+          page.getByRole('status', { name: 'Chart visibility status' }),
+        ).toContainText('All participants are hidden')
+        await expect(toggles).toHaveCount(2)
+        await expect(firstToggle).toBeVisible()
+        await expect(secondToggle).toBeVisible()
+        if (
+          await page
+            .getByRole('button', { name: 'Back to weekly averages' })
+            .count()
+        )
+          await expect(
+            page.getByRole('button', { name: 'Back to weekly averages' }),
+          ).toBeVisible()
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= window.innerWidth,
+          ),
+        ).toBe(true)
+
+        await activate(secondToggle)
+        await expect(secondToggle).toHaveAttribute('aria-pressed', 'true')
+        await expect(
+          chart.locator('circle[data-chart-point][data-series-id]'),
+        ).not.toHaveCount(0)
+        expect(await chartDates(chart)).toEqual(datesBefore)
+        expect(await chartTicks(chart)).toEqual(ticksBefore)
+      }
+    } finally {
+      await context.close()
+    }
+  })
+}
+
 for (const viewport of [
   { label: 'desktop', width: 1280 },
   { label: 'mobile', width: 390 },
@@ -2649,7 +2868,7 @@ for (const viewport of [
       .locator('circle[data-chart-point]')
       .count()
     await expect(historyPanel.getByRole('button')).toHaveCount(
-      5 + chartPointCount,
+      7 + chartPointCount,
     )
 
     await expect(
