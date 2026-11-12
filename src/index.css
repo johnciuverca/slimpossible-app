@@ -624,17 +624,15 @@ body {
   outline-offset: 4px;
   border-radius: 2px;
 }
-.dashboard-shell .dashboard-workspace > header h1 {
-  margin-top: 0.5rem;
-  font-size: clamp(1.8rem, 3.15vw, 2.7rem);
+.dashboard-workspace {
+  position: relative;
 }
-.dashboard-shell .dashboard-workspace > header p:last-child {
-  margin-top: 0.5rem;
-  font-size: 0.9rem;
-  line-height: 1.6;
-}
-.dashboard-shell .dashboard-workspace > header > div > p:first-child {
-  display: none;
+.dashboard-page-header {
+  position: absolute;
+  z-index: 60;
+  inset: 0 0 auto;
+  height: 0;
+  pointer-events: none;
 }
 .page-title-row {
   display: flex;
@@ -648,6 +646,10 @@ body {
   min-width: 0;
 }
 .dashboard-save-confirmation-slot {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
   display: flex;
   width: min(100%, 20rem);
   min-width: 0;
@@ -659,6 +661,10 @@ body {
   overflow: hidden;
   border-radius: 0.75rem;
   padding: 0.5rem 0.75rem;
+  pointer-events: auto;
+}
+.dashboard-save-confirmation-slot:empty {
+  display: none;
 }
 .dashboard-save-confirmation {
   min-width: 0;
@@ -681,17 +687,26 @@ body {
   outline: 2px solid var(--color-forest-700);
   outline-offset: 2px;
 }
+@media (min-width: 1100px) {
+  .dashboard-save-confirmation-slot {
+    top: 4rem;
+  }
+}
+@media (min-width: 601px) and (max-width: 1099px) {
+  .dashboard-save-confirmation-slot:not(:empty) {
+    position: fixed;
+    top: auto;
+    right: 1rem;
+    bottom: 1rem;
+    left: auto;
+    border: 1px solid var(--color-line);
+    background: var(--color-panel);
+    box-shadow: var(--shadow-panel);
+  }
+}
 @media (max-width: 600px) {
   .page-title-row {
     align-items: flex-start;
-  }
-  .dashboard-shell
-    .dashboard-workspace
-    .dashboard-save-confirmation-slot:empty {
-    display: none;
-  }
-  .dashboard-save-confirmation-slot {
-    flex-basis: 100%;
   }
 }
 .dashboard-top-grid {
@@ -757,13 +772,12 @@ body {
   .dashboard-shell .app-shell-main:has(.dashboard-workspace) {
     padding-block-start: 0.5rem;
   }
-  .dashboard-shell .dashboard-workspace > header .page-title-row h1 {
-    margin-block-start: 0;
-  }
-  .dashboard-shell .dashboard-workspace > :not(:first-child),
   .dashboard-shell #dashboard-overview-panel > :not(:first-child),
   .dashboard-shell #dashboard-progress-panel > :not(:first-child) {
     margin-block-start: 0.75rem;
+  }
+  .dashboard-shell .dashboard-workspace > #dashboard-overview-panel {
+    margin-block-start: 0;
   }
   .dashboard-shell .dashboard-top-grid {
     gap: 0.75rem;
@@ -832,6 +846,7 @@ body {
   .dashboard-shell .dashboard-save-confirmation-slot:not(:empty) {
     position: fixed;
     z-index: 60;
+    top: auto;
     right: 0.75rem;
     bottom: calc(env(safe-area-inset-bottom) + 0.75rem);
     left: 0.75rem;
@@ -1317,15 +1332,6 @@ body {
   .dashboard-actions-region .dashboard-action-grid {
     flex: 1;
     grid-template-rows: repeat(2, 1fr);
-  }
-  .dashboard-workspace .page-title-row {
-    display: grid;
-    grid-template-columns: minmax(220px, 0.85fr) minmax(0, 1.6fr);
-    gap: 1rem;
-  }
-  .dashboard-workspace .dashboard-save-confirmation-slot {
-    width: 50%;
-    justify-self: end;
   }
 }
 

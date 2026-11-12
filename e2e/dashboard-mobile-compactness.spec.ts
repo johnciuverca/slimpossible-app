@@ -22,6 +22,17 @@ test('Dashboard compactness bounds and screenshots', async ({ page }) => {
       name: /^Personal weight history chart/,
     })
     await expect(heading).toBeVisible()
+    await expect(heading).toHaveClass(/\bsr-only\b/)
+    await expect(page.locator('.dashboard-save-confirmation-slot')).toHaveCSS(
+      'display',
+      'none',
+    )
+    await expect(page).toHaveTitle('Synthetic Dashboard workspace')
+    await expect(
+      page
+        .getByRole('navigation', { name: 'Primary navigation' })
+        .getByRole('link', { name: 'Dashboard', exact: true }),
+    ).toHaveAttribute('aria-current', 'page')
     await expect(latest).toBeVisible()
     await expect(actions).toBeVisible()
     await expect(chart).toBeVisible()
@@ -33,7 +44,6 @@ test('Dashboard compactness bounds and screenshots', async ({ page }) => {
         return { x, y, width, height, bottom, right }
       }
       const subnav = rect('.contextual-subnav')
-      const heading = rect('#dashboard-title')
       const latest = rect('.dashboard-latest')
       const actions = rect('.dashboard-actions-compact')
       const actionsElement = document.querySelector(
@@ -54,8 +64,7 @@ test('Dashboard compactness bounds and screenshots', async ({ page }) => {
       const plotTopY = chart.y + (plotTop / viewBoxHeight) * chart.height
       const plotBottomY = chart.y + (plotBottom / viewBoxHeight) * chart.height
       return {
-        subnavHeadingGap: heading.y - subnav.bottom,
-        heading,
+        subnavContentGap: latest.y - subnav.bottom,
         latest,
         actions,
         actionsContentLeft:
@@ -92,7 +101,8 @@ test('Dashboard compactness bounds and screenshots', async ({ page }) => {
         390: 254.359375,
         430: 207.328125,
       }[viewport.width]
-      expect(metrics.subnavHeadingGap).toBeLessThanOrEqual(12)
+      expect(metrics.subnavContentGap).toBeGreaterThanOrEqual(0)
+      expect(metrics.subnavContentGap).toBeLessThanOrEqual(12)
       expect(metrics.latest.height).toBeLessThanOrEqual(baseline.latest * 0.75)
       expect(metrics.actions.height).toBeLessThanOrEqual(
         baseline.actions * (viewport.width === 320 ? 0.85 : 0.75),
@@ -130,7 +140,8 @@ test('Dashboard compactness bounds and screenshots', async ({ page }) => {
         ),
       ).toBe(true)
     } else {
-      expect(metrics.subnavHeadingGap).toBeCloseTo(44.84375, 1)
+      expect(metrics.subnavContentGap).toBeLessThanOrEqual(40)
+      expect(metrics.subnavContentGap).toBeGreaterThanOrEqual(0)
       expect(metrics.latest.height).toBeCloseTo(124.359375, 1)
       expect(metrics.actions.height).toBeCloseTo(124.359375, 1)
       expect(metrics.chart.width).toBeCloseTo(1150, 0)
@@ -152,51 +163,93 @@ test('Dashboard compactness bounds and screenshots', async ({ page }) => {
   }
 })
 
-test('mobile save feedback does not shift Dashboard content', async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto(
-    '/e2e/fixtures/dashboard-workspace-harness.html?path=%2Fdashboard',
-  )
-  const measureContent = async () => {
-    const latest = await page.locator('.dashboard-latest').boundingBox()
-    const actions = await page
-      .locator('.dashboard-actions-compact')
-      .boundingBox()
-    const chart = await page
-      .getByRole('img', { name: /^Personal weight history chart/ })
-      .boundingBox()
-    expect(latest).not.toBeNull()
-    expect(actions).not.toBeNull()
-    expect(chart).not.toBeNull()
-    return [latest!.y, latest!.height, actions!.y, actions!.height, chart!.y]
-  }
-  const before = await measureContent()
-  await page
-    .locator('.dashboard-latest')
-    .getByRole('button', { name: 'Record weight', exact: true })
-    .click()
-  const dialog = page.getByRole('dialog', { name: 'Record weight' })
-  await dialog.getByLabel('Weight in kg').fill('61.2')
-  await dialog.getByRole('button', { name: 'Save weight', exact: true }).click()
-  const confirmation = page.locator(
-    '.dashboard-save-confirmation[role="status"]',
-  )
-  await expect(confirmation).toBeVisible()
-  await expect(page.locator('.dashboard-save-confirmation-slot')).toHaveCSS(
-    'position',
-    'fixed',
-  )
-  await page.screenshot({
-    path: test.info().outputPath('dashboard-save-feedback-390.png'),
+for (const viewport of [
+  { label: 'mobile', width: 390, height: 844 },
+  { label: 'desktop', width: 1280, height: 900 },
+]) {
+  test(`${viewport.label} save feedback does not shift Dashboard content`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport)
+    await page.goto(
+      '/e2e/fixtures/dashboard-workspace-harness.html?path=%2Fdashboard',
+    )
+    const heading = page.getByRole('heading', { name: 'Dashboard', level: 1 })
+    await expect(heading).toHaveClass(/\bsr-only\b/)
+    await expect(page.getByRole('region', { name: 'Dashboard' })).toBeVisible()
+    await expect(page).toHaveTitle('Synthetic Dashboard workspace')
+    await expect(
+      page
+        .getByRole('navigation', { name: 'Primary navigation' })
+        .getByRole('link', { name: 'Dashboard', exact: true }),
+    ).toHaveAttribute('aria-current', 'page')
+    const subnav = page.getByRole('navigation', { name: 'Dashboard sections' })
+    await expect(
+      subnav.getByRole('link', { name: 'Overview', exact: true }),
+    ).toHaveAttribute('aria-current', 'page')
+    const measureContent = async () => {
+      const latest = await page.locator('.dashboard-latest').boundingBox()
+      const actions = await page
+        .locator('.dashboard-actions-compact')
+        .boundingBox()
+      const chart = await page
+        .getByRole('img', { name: /^Personal weight history chart/ })
+        .boundingBox()
+      expect(latest).not.toBeNull()
+      expect(actions).not.toBeNull()
+      expect(chart).not.toBeNull()
+      return [latest!.y, latest!.height, actions!.y, actions!.height, chart!.y]
+    }
+    const before = await measureContent()
+    await page
+      .locator('.dashboard-latest')
+      .getByRole('button', { name: 'Record weight', exact: true })
+      .click()
+    const dialog = page.getByRole('dialog', { name: 'Record weight' })
+    await dialog.getByLabel('Weight in kg').fill('61.2')
+    await dialog
+      .getByRole('button', { name: 'Save weight', exact: true })
+      .click()
+    const confirmation = page.locator(
+      '.dashboard-save-confirmation[role="status"]',
+    )
+    await expect(confirmation).toBeVisible()
+    await expect(page.locator('.dashboard-save-confirmation-slot')).toHaveCSS(
+      'position',
+      viewport.width < 640 ? 'fixed' : 'absolute',
+    )
+    await page.screenshot({
+      path: test
+        .info()
+        .outputPath(`dashboard-save-feedback-${viewport.width}.png`),
+    })
+    expect(await measureContent()).toEqual(before)
+    const dismiss = page.getByRole('button', {
+      name: 'Dismiss save confirmation',
+    })
+    if (viewport.width < 640) {
+      await expect(dismiss).toHaveCSS('min-height', '44px')
+    } else {
+      const [slot, actions, controls] = await Promise.all([
+        page.locator('.dashboard-save-confirmation-slot').boundingBox(),
+        page.locator('.dashboard-actions-compact').boundingBox(),
+        page
+          .locator(
+            '.dashboard-actions-compact .dashboard-action-grid-compact > a, .dashboard-actions-compact .dashboard-action-grid-compact > button',
+          )
+          .evaluateAll((elements) =>
+            elements.map((element) => element.getBoundingClientRect().bottom),
+          ),
+      ])
+      expect(slot).not.toBeNull()
+      expect(actions).not.toBeNull()
+      expect(slot!.y).toBeGreaterThanOrEqual(Math.max(...controls))
+      expect(slot!.y + slot!.height).toBeLessThanOrEqual(
+        actions!.y + actions!.height,
+      )
+    }
+    await dismiss.click()
+    await expect(confirmation).toHaveCount(0)
+    expect(await measureContent()).toEqual(before)
   })
-  expect(await measureContent()).toEqual(before)
-  const dismiss = page.getByRole('button', {
-    name: 'Dismiss save confirmation',
-  })
-  await expect(dismiss).toHaveCSS('min-height', '44px')
-  await dismiss.click()
-  await expect(confirmation).toHaveCount(0)
-  expect(await measureContent()).toEqual(before)
-})
+}

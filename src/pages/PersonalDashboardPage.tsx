@@ -4,7 +4,7 @@ import {
   usePersonalWorkspace,
   type PersonalWorkspace,
 } from '../data/usePersonalWorkspace'
-import { Card, FeedbackPanel, PageHeader, StatusPill } from '../components/ui'
+import { Card, FeedbackPanel, StatusPill } from '../components/ui'
 import {
   workspaceSection,
   workspaceSectionLink,
@@ -146,39 +146,36 @@ export function PersonalDashboardWorkspace({
     <section
       data-weight-page-header
       aria-labelledby="dashboard-title"
-      className="dashboard-workspace mx-auto w-full max-w-6xl space-y-4"
+      className="dashboard-workspace mx-auto w-full max-w-6xl"
     >
-      <header>
-        <PageHeader
-          title="Dashboard"
-          titleId="dashboard-title"
-          titleTrailing={
-            <div className="dashboard-save-confirmation-slot">
-              {saveConfirmation?.ownerKey === workspace.ownerKey &&
-              saveConfirmation.count ? (
-                <>
-                  <p
-                    key={saveConfirmation.count}
-                    className="dashboard-save-confirmation"
-                    role="status"
-                    aria-live="polite"
-                    aria-atomic="true"
-                  >
-                    Personal weight saved.
-                  </p>
-                  <button
-                    aria-label="Dismiss save confirmation"
-                    className="dashboard-save-confirmation-dismiss"
-                    onClick={() => setSaveConfirmation(null)}
-                    type="button"
-                  >
-                    Dismiss
-                  </button>
-                </>
-              ) : null}
-            </div>
-          }
-        />
+      <header className="dashboard-page-header">
+        <h1 className="sr-only" id="dashboard-title">
+          Dashboard
+        </h1>
+        <div className="dashboard-save-confirmation-slot">
+          {saveConfirmation?.ownerKey === workspace.ownerKey &&
+          saveConfirmation.count ? (
+            <>
+              <p
+                key={saveConfirmation.count}
+                className="dashboard-save-confirmation"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+              >
+                Personal weight saved.
+              </p>
+              <button
+                aria-label="Dismiss save confirmation"
+                className="dashboard-save-confirmation-dismiss"
+                onClick={() => setSaveConfirmation(null)}
+                type="button"
+              >
+                Dismiss
+              </button>
+            </>
+          ) : null}
+        </div>
       </header>
       {section === 'overview' ? (
         <div id="dashboard-overview-panel" className="space-y-4">
@@ -245,11 +242,13 @@ export function PersonalDashboardWorkspace({
         </div>
       ) : null}
       {params.get('navigation') === 'challenge-unavailable' ? (
-        <FeedbackPanel tone="info">
-          That challenge is not available to this account. You are viewing your
-          personal Dashboard; choose an authorized Group from the Group
-          workspace if needed.
-        </FeedbackPanel>
+        <div className="mt-4">
+          <FeedbackPanel tone="info">
+            That challenge is not available to this account. You are viewing
+            your personal Dashboard; choose an authorized Group from the Group
+            workspace if needed.
+          </FeedbackPanel>
+        </div>
       ) : null}
     </section>
   )
