@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { PersonalProgressChart } from './PersonalProgressChart'
 import { SharedWeightChart } from './SharedWeightChart'
+import { sharedChartTheme } from './sharedChartTheme'
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
@@ -22,7 +23,6 @@ it('reuses weekly compression for personal points with source counts and origina
       labelExtremesOnly
       weighIns={records}
       onPointActivate={onPointActivate}
-      referenceWeightKg={85}
     />,
   )
   expect(screen.getByRole('img')).toHaveAccessibleName(
@@ -270,15 +270,13 @@ it('labels one point per extreme, one point on equal values, and updates extreme
     chart().querySelectorAll('circle[data-point-kind="recorded"][data-date]'),
   ).toHaveLength(4)
 })
-it('keeps derived trend and goal lines separate from exact saved points', () => {
+it('matches the personal trend to its saved-weight series and omits goal reference lines', () => {
   render(
     <PersonalProgressChart
       weighIns={[
         { date: '2026-10-01', weightKg: 100, participantId: 'own' },
         { date: '2026-10-11', weightKg: 90, participantId: 'own' },
       ]}
-      referenceWeightKg={95}
-      referenceLabel="Own selected goal"
     />,
   )
   const chart = screen.getByRole('img')
@@ -292,19 +290,19 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
   expect(chart.querySelector('[data-chart-trend]')).toBeInTheDocument()
   expect(chart.querySelector('[data-chart-trend]')).toHaveAttribute(
     'opacity',
-    '0.35',
+    String(sharedChartTheme.trendOpacity),
   )
-  expect(chart.querySelector('[data-chart-reference]')).toBeInTheDocument()
-  expect(
-    chart.querySelector('[data-chart-line-kind="reference"]'),
-  ).toHaveAttribute('stroke-dasharray', '9 5')
-  expect(chart.querySelector('[data-chart-line-kind="trend"]')).toHaveAttribute(
+  expect(chart.querySelector('[data-chart-trend]')).toHaveAttribute(
+    'stroke',
+    'var(--chart-recorded, #087756)',
+  )
+  expect(chart.querySelector('[data-chart-trend]')).not.toHaveAttribute(
     'stroke-dasharray',
-    '3 6',
   )
+  expect(chart.querySelector('[data-chart-reference]')).toBeNull()
   expect(screen.getByText('Weight (kg)')).toBeInTheDocument()
   expect(chart.querySelector('.chart-legend')).toBeNull()
-  expect(chart).toHaveAccessibleDescription(/Own selected goal is 95 kilograms/)
+  expect(chart).not.toHaveAccessibleDescription(/goal|target|reference line/i)
   const labels = Array.from(chart.querySelectorAll('.chart-value'))
   expect(labels.map((label) => label.textContent)).toEqual(['100', '90'])
   expect(labels.map((label) => label.getAttribute('font-size'))).toEqual([
@@ -333,10 +331,6 @@ it('keeps derived trend and goal lines separate from exact saved points', () => 
     '3',
   )
   expect(chart.querySelector('[data-chart-trend]')).toHaveAttribute(
-    'stroke-width',
-    '2',
-  )
-  expect(chart.querySelector('[data-chart-reference]')).toHaveAttribute(
     'stroke-width',
     '2',
   )
@@ -444,33 +438,25 @@ it('recalculates axis labels when an edited weigh-in widens or narrows the visib
   expect(chart().querySelectorAll('[data-chart-minor-tick]')).toHaveLength(0)
 })
 
-it.each([83, 120])(
-  'keeps an owner goal at %s kg outside the data-driven axis',
-  (referenceWeightKg) => {
-    const weighIns = [
-      { date: '2026-10-15', weightKg: 99.7, participantId: 'owner' },
-    ]
-    render(
-      <PersonalProgressChart
-        weighIns={weighIns}
-        referenceWeightKg={referenceWeightKg}
-      />,
+it('keeps the personal axis data-driven with no visual target reference', () => {
+  const weighIns = [
+    { date: '2026-10-15', weightKg: 99.7, participantId: 'owner' },
+  ]
+  render(<PersonalProgressChart weighIns={weighIns} />)
+  const chart = () =>
+    screen.getByRole('img', { name: /Personal weight history/ })
+  const majorTicks = () =>
+    Array.from(chart().querySelectorAll('[data-chart-tick]'), (tick) =>
+      Number(tick.getAttribute('data-chart-tick')),
     )
-    const chart = () =>
-      screen.getByRole('img', { name: /Personal weight history/ })
-    const majorTicks = () =>
-      Array.from(chart().querySelectorAll('[data-chart-tick]'), (tick) =>
-        Number(tick.getAttribute('data-chart-tick')),
-      )
 
-    expect(majorTicks().some((tick) => tick % 5 !== 0)).toBe(true)
-    expect(Math.min(...majorTicks())).toBeGreaterThanOrEqual(99)
-    expect(Math.max(...majorTicks())).toBeLessThanOrEqual(100.5)
-    expect(chart().querySelectorAll('[data-chart-minor-tick]')).toHaveLength(0)
-    expect(chart().querySelector('[data-chart-reference]')).toBeNull()
-    expect(screen.queryByRole('note')).not.toBeInTheDocument()
-  },
-)
+  expect(majorTicks().some((tick) => tick % 5 !== 0)).toBe(true)
+  expect(Math.min(...majorTicks())).toBeGreaterThanOrEqual(99)
+  expect(Math.max(...majorTicks())).toBeLessThanOrEqual(100.5)
+  expect(chart().querySelectorAll('[data-chart-minor-tick]')).toHaveLength(0)
+  expect(chart().querySelector('[data-chart-reference]')).toBeNull()
+  expect(screen.queryByRole('note')).not.toBeInTheDocument()
+})
 
 it('keeps five-kilogram ticks aligned around low and negative generic ranges', () => {
   render(

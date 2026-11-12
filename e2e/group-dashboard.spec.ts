@@ -984,6 +984,49 @@ for (const width of [320, 390, 430, 1280]) {
       },
     )
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    const chart = page.getByRole('img', {
+      name: 'Weight (kg) — shared group history',
+    })
+    const expectTrendStyles = async () => {
+      await expect(chart).toBeVisible()
+      await expect(chart.locator('[data-chart-trend]')).not.toHaveCount(0)
+      await expect(chart.locator('[data-chart-reference]')).toHaveCount(0)
+      await expect(
+        chart.locator('[data-series="target-reference"]'),
+      ).toHaveCount(0)
+      const styles = await chart
+        .locator('[data-chart-trend]')
+        .evaluateAll((trends) =>
+          trends.map((trend) => {
+            const seriesId = trend.getAttribute('data-chart-series-id')
+            const seriesLine = Array.from(
+              trend
+                .closest('svg')!
+                .querySelectorAll('path[data-chart-series-id]'),
+            ).find(
+              (path) => path.getAttribute('data-chart-series-id') === seriesId,
+            )
+            return {
+              seriesId,
+              stroke: trend.getAttribute('stroke'),
+              seriesStroke: seriesLine?.getAttribute('stroke'),
+              opacity: trend.getAttribute('opacity'),
+              dash: trend.getAttribute('stroke-dasharray'),
+            }
+          }),
+        )
+      expect(styles.length).toBeGreaterThan(0)
+      for (const style of styles) {
+        expect(style.seriesId).toBeTruthy()
+        expect(style.stroke).toBe(style.seriesStroke)
+        expect(style.opacity).toBe('0.55')
+        expect(style.dash).toBeNull()
+      }
+    }
+    await expectTrendStyles()
+    await chart.screenshot({
+      path: testInfo.outputPath(`group-comparison-chart-${width}.png`),
+    })
     const expectVisibleCollapse = async (surface: string) => {
       const controls = page.getByRole('group', {
         name: 'Chart date range controls',
@@ -1184,6 +1227,7 @@ for (const width of [320, 390, 430, 1280]) {
     })
     await page.getByRole('button', { name: 'Back to weekly averages' }).click()
     await page.getByRole('link', { name: 'Charts', exact: true }).click()
+    await expectTrendStyles()
     await expect(
       page.getByRole('tab', { name: 'All members', exact: true }),
     ).toHaveAttribute('aria-selected', 'true')
@@ -1225,6 +1269,16 @@ for (const width of [320, 390, 430, 1280]) {
     ).toHaveAttribute('aria-valuenow', selectedStart!)
     await page.screenshot({
       path: testInfo.outputPath(`weekly-charts-range-${width}.png`),
+      fullPage: true,
+    })
+    await page.getByRole('tab', { name: 'Ava', exact: true }).click()
+    await expect(chart.locator('[data-chart-trend]')).toHaveCount(1)
+    await expectTrendStyles()
+    await chart.screenshot({
+      path: testInfo.outputPath(`group-member-chart-${width}.png`),
+    })
+    await page.screenshot({
+      path: testInfo.outputPath(`weekly-member-chart-${width}.png`),
       fullPage: true,
     })
   })
