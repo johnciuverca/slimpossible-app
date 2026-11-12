@@ -69,7 +69,7 @@ for (const width of [1280, 390]) {
     await expect(chart.locator('[data-chart-reference]')).toHaveCount(0)
     await expect(chart.locator('[data-chart-trend]').first()).toHaveAttribute(
       'opacity',
-      '0.55',
+      '0.32',
     )
     await expect(
       chart.locator('[data-chart-trend]').first(),

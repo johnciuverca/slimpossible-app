@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { SharedWeightChart } from './SharedWeightChart'
+import { sharedChartTheme } from './sharedChartTheme'
 
 afterEach(cleanup)
 
@@ -524,7 +525,7 @@ it('applies date ranges and sliders, clips trends, and suppresses reference line
   )
   expect(chart().querySelector('[data-chart-trend]')).toHaveAttribute(
     'opacity',
-    '0.55',
+    String(sharedChartTheme.trendOpacity),
   )
   expect(screen.getByLabelText('Visible date range')).toHaveTextContent(
     '01.04.2026 – 01.05.2026',

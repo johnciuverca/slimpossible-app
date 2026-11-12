@@ -1019,7 +1019,7 @@ for (const width of [320, 390, 430, 1280]) {
       for (const style of styles) {
         expect(style.seriesId).toBeTruthy()
         expect(style.stroke).toBe(style.seriesStroke)
-        expect(style.opacity).toBe('0.55')
+        expect(style.opacity).toBe('0.32')
         expect(style.dash).toBeNull()
       }
     }
