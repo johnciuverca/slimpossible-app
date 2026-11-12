@@ -15,6 +15,7 @@ import { deriveGroupChartTrend } from '../models/groupChartTrend'
 import type { GroupMemberProgress } from '../models/groupMemberProgress'
 import { createGroupMemberChartColorMap } from '../models/groupMemberChartColors'
 import { SharedWeightChart } from './SharedWeightChart'
+import { GroupParticipantAvatar } from './GroupParticipantAvatar'
 import { sharedChartTheme } from './sharedChartTheme'
 import { interpolateMissingWeights } from '../models/estimatedWeighIns'
 import {
@@ -125,6 +126,9 @@ export function GroupChartHistory({
     (member) => member.memberKey === selectedKey,
   )
   const matrix = createGroupHistoryMatrix(series)
+  const avatarByMemberKey = new Map(
+    memberProgress.map((member) => [member.memberKey, member]),
+  )
   const trends = series.map((member) => ({
     memberKey: member.memberKey,
     trend: deriveGroupChartTrend(member.points),
@@ -431,8 +435,8 @@ export function GroupChartHistory({
                       aria-label="Chart visibility status"
                       className="mt-2 text-center text-sm"
                     >
-                      All participants are hidden. Select a name in the legend
-                      to show their chart.
+                      All participants are hidden. Select a participant in the
+                      legend to show their chart.
                     </p>
                   ) : null}
                   <svg
@@ -575,13 +579,6 @@ export function GroupChartHistory({
                         key={member.memberKey}
                         className="flex min-w-0 items-center gap-1"
                       >
-                        <span
-                          aria-hidden="true"
-                          className={`inline-block w-6 shrink-0 border-t-2 ${isHidden ? 'opacity-40' : ''}`}
-                          style={{
-                            borderColor: memberColors.get(member.memberKey),
-                          }}
-                        />
                         {isComparison ? (
                           <button
                             type="button"
@@ -600,13 +597,41 @@ export function GroupChartHistory({
                                 return { context, memberKeys }
                               })
                             }
-                            className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border-0 bg-transparent px-1 text-center font-semibold focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-emerald-700 ${isHidden ? 'text-slate-500 line-through' : 'text-current'}`}
+                            className={`inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md border-0 bg-transparent px-1 text-center font-semibold focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-emerald-700 ${isHidden ? 'text-slate-500 line-through' : 'text-current'}`}
                           >
-                            {member.label}
+                            <span
+                              aria-hidden="true"
+                              className={`inline-block w-6 shrink-0 border-t-2 ${isHidden ? 'opacity-40' : ''}`}
+                              style={{
+                                borderColor: memberColors.get(member.memberKey),
+                              }}
+                            />
+                            <GroupParticipantAvatar
+                              avatarPresetId={
+                                avatarByMemberKey.get(member.memberKey)
+                                  ?.avatarPresetId
+                              }
+                              displayName={member.label}
+                            />
+                            <span>{member.label}</span>
                           </button>
                         ) : (
-                          <span className="py-1 font-semibold">
-                            {member.label}
+                          <span className="inline-flex items-center gap-1 py-1 font-semibold">
+                            <span
+                              aria-hidden="true"
+                              className="inline-block w-6 shrink-0 border-t-2"
+                              style={{
+                                borderColor: memberColors.get(member.memberKey),
+                              }}
+                            />
+                            <GroupParticipantAvatar
+                              avatarPresetId={
+                                avatarByMemberKey.get(member.memberKey)
+                                  ?.avatarPresetId
+                              }
+                              displayName={member.label}
+                            />
+                            <span>{member.label}</span>
                           </span>
                         )}
                       </li>

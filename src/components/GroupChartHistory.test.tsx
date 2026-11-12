@@ -32,12 +32,18 @@ const persistence = (
     mode: 'remote',
     repositories: { groupProgress: { getChartHistory: load } },
   }) as unknown as Persistence
+const legendName = (item: Element) => {
+  const copy = item.cloneNode(true) as Element
+  copy.querySelector('[data-avatar-preset]')?.remove()
+  return copy.textContent?.trim()
+}
 describe('Group chart history', () => {
   it('lists challenge members, omits target references, and styles each trend with its series', async () => {
     const groupProgress: GroupMemberProgress[] = [
       {
         memberKey: 'a',
         displayName: 'Ava',
+        avatarPresetId: 'female-03',
         targetWeightKg: 85,
         startingWeightKg: 90,
         completionPercentage: 50,
@@ -112,10 +118,12 @@ describe('Group chart history', () => {
     const legend = screen.getByRole('list', { name: 'Group chart legend' })
     expect(legend).toHaveClass('w-full', 'justify-center')
     expect(
-      Array.from(legend.querySelectorAll('li'), (item) =>
-        item.textContent?.trim(),
-      ),
-    ).toEqual(['Ava', 'Nora'])
+      legend.querySelector('[data-avatar-preset="female-03"]'),
+    ).toBeInTheDocument()
+    expect(Array.from(legend.querySelectorAll('li'), legendName)).toEqual([
+      'Ava',
+      'Nora',
+    ])
     expect(legend).not.toHaveTextContent(
       /recorded weights|first shared|baseline|target\/reference|derived trend/i,
     )
@@ -168,6 +176,32 @@ describe('Group chart history', () => {
           vi.fn().mockResolvedValue({ state: 'success', data: entries }),
         )}
         refreshVersion={0}
+        memberProgress={[
+          {
+            memberKey: 'member-a',
+            displayName: 'Ava',
+            avatarPresetId: 'female-03',
+            startingWeightKg: 90,
+            targetWeightKg: 80,
+            completionPercentage: 50,
+            signedDisplayPercentage: 50,
+            negativeProgressCapped: false,
+            progressState: 'in_progress',
+            reachedTargetMilestones: [],
+          },
+          {
+            memberKey: 'member-b',
+            displayName: 'Nora',
+            avatarPresetId: 'female-04',
+            startingWeightKg: 90,
+            targetWeightKg: 80,
+            completionPercentage: 50,
+            signedDisplayPercentage: 50,
+            negativeProgressCapped: false,
+            progressState: 'in_progress',
+            reachedTargetMilestones: [],
+          },
+        ]}
       />,
     )
 
@@ -185,6 +219,24 @@ describe('Group chart history', () => {
     const noraToggle = within(legend).getByRole('button', {
       name: 'Nora chart series, currently visible',
     })
+    expect(
+      legend.querySelector('[data-avatar-preset="female-03"]'),
+    ).toBeInTheDocument()
+    expect(
+      legend.querySelector('[data-avatar-preset="female-04"]'),
+    ).toBeInTheDocument()
+    const avaAvatar = avaToggle.querySelector('[data-avatar-preset]')!
+    const avaSwatch = avaToggle.querySelector(':scope > span[style]')!
+    expect(avaAvatar.closest('button')).toBe(avaToggle)
+    expect(avaSwatch.closest('button')).toBe(avaToggle)
+    fireEvent.click(avaAvatar.querySelector('span[style]')!)
+    expect(avaToggle).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(avaSwatch)
+    expect(avaToggle).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(within(avaToggle).getByText('Ava'))
+    expect(avaToggle).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(avaToggle)
+    expect(avaToggle).toHaveAttribute('aria-pressed', 'true')
     const weeklySummary = chart.querySelector(
       'circle[data-point-kind="weekly-summary"][data-chart-point]',
     )!
@@ -211,6 +263,9 @@ describe('Group chart history', () => {
 
     fireEvent.click(avaToggle)
     expect(avaToggle).toHaveAttribute('aria-pressed', 'false')
+    expect(
+      legend.querySelector('[data-avatar-preset="female-03"]'),
+    ).toBeInTheDocument()
     expect(
       chart.querySelectorAll('[data-chart-series-id="member-a"]'),
     ).toHaveLength(0)
@@ -320,13 +375,17 @@ describe('Group chart history', () => {
     const legend = screen.getByRole('list', { name: 'Group chart legend' })
     for (const [name, color] of initialColors) {
       const item = within(legend).getByText(name).closest('li')!
-      expect(item.querySelector('span')).toHaveStyle({ borderColor: color })
+      expect(item.querySelector('span[style]')).toHaveStyle({
+        borderColor: color,
+      })
     }
 
     fireEvent.click(screen.getByRole('button', { name: 'Show last 1 week' }))
     for (const [name, color] of initialColors) {
       const item = within(legend).getByText(name).closest('li')!
-      expect(item.querySelector('span')).toHaveStyle({ borderColor: color })
+      expect(item.querySelector('span[style]')).toHaveStyle({
+        borderColor: color,
+      })
     }
 
     for (const [name, color] of initialColors) {
@@ -353,7 +412,9 @@ describe('Group chart history', () => {
         expect(screen.getByRole('tooltip')).toHaveTextContent('89 kg')
       }
       const item = within(legend).getByText(name).closest('li')!
-      expect(item.querySelector('span')).toHaveStyle({ borderColor: color })
+      expect(item.querySelector('span[style]')).toHaveStyle({
+        borderColor: color,
+      })
     }
   })
   it('uses the same view-only ranges for all members and an individual member chart', async () => {
@@ -464,9 +525,7 @@ describe('Group chart history', () => {
     })
     expect(individualLegend).toHaveClass('w-full', 'justify-center')
     expect(
-      Array.from(individualLegend.querySelectorAll('li'), (item) =>
-        item.textContent?.trim(),
-      ),
+      Array.from(individualLegend.querySelectorAll('li'), legendName),
     ).toEqual(['Ava'])
     expect(
       screen.getByRole('group', { name: 'Chart date range controls' }),
@@ -758,7 +817,7 @@ describe('Group chart history', () => {
         screen
           .getByRole('list', { name: 'Group chart legend' })
           .querySelectorAll('li'),
-        (item) => item.textContent?.trim(),
+        legendName,
       ),
     ).toEqual(['Ava'])
   })

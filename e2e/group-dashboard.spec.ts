@@ -32,6 +32,7 @@ async function installGroupFixtures(
     privateEntrySharedWithOtherGroup?: boolean
     duplicateEstimateOnSave?: boolean
     holdPersonalContexts?: boolean
+    participantAvatars?: boolean
   } = {},
 ) {
   const challengeId = ownEntries ? ownGroupId : 'e2e-challenge'
@@ -308,12 +309,14 @@ async function installGroupFixtures(
         target_challenge_id: string
       }
       const name = target_challenge_id === challengeId ? 'Ava' : 'Jo'
-      const ownKey = ownEntries
-        ? memberKey(target_challenge_id, viewerId)
-        : 'opaque-member-a'
-      const otherKey = ownEntries
-        ? memberKey(target_challenge_id, otherViewerId)
-        : 'opaque-member-b'
+      const ownKey =
+        ownEntries || options.participantAvatars
+          ? memberKey(target_challenge_id, viewerId)
+          : 'opaque-member-a'
+      const otherKey =
+        ownEntries || options.participantAvatars
+          ? memberKey(target_challenge_id, otherViewerId)
+          : 'opaque-member-b'
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify([
@@ -517,10 +520,21 @@ async function installGroupFixtures(
         body: JSON.stringify([
           {
             member_key: ownKey,
-            display_name:
-              body.target_challenge_id === challengeId
+            display_name: options.participantAvatars
+              ? body.target_challenge_id === challengeId
+                ? 'Ava'
+                : 'Jo'
+              : body.target_challenge_id === challengeId
                 ? 'Same display name'
                 : 'Second group member',
+            ...(options.participantAvatars
+              ? {
+                  avatar_preset_id:
+                    body.target_challenge_id === challengeId
+                      ? 'female-03'
+                      : 'female-04',
+                }
+              : {}),
             starting_weight_kg:
               body.target_challenge_id === challengeId
                 ? ownStartingWeight
@@ -559,10 +573,21 @@ async function installGroupFixtures(
           },
           {
             member_key: otherKey,
-            display_name:
-              body.target_challenge_id === challengeId
+            display_name: options.participantAvatars
+              ? body.target_challenge_id === challengeId
+                ? 'Ben'
+                : 'Kim'
+              : body.target_challenge_id === challengeId
                 ? 'Same display name'
                 : 'Second group member',
+            ...(options.participantAvatars
+              ? {
+                  avatar_preset_id:
+                    body.target_challenge_id === challengeId
+                      ? 'male-02'
+                      : 'male-05',
+                }
+              : {}),
             starting_weight_kg: 100,
             target_weight_kg: ownTarget,
             latest_recorded_date: '2026-09-22',
@@ -1685,7 +1710,18 @@ for (const layout of [
     })
     try {
       const page = await context.newPage()
-      await installGroupFixtures(page, true)
+      await installGroupFixtures(
+        page,
+        true,
+        false,
+        false,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        'e2e-owner',
+        { participantAvatars: true },
+      )
       await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
 
       const activate = async (target: ReturnType<typeof page.getByRole>) => {
@@ -1747,6 +1783,20 @@ for (const layout of [
         await expect(toggles).toHaveCount(2)
         const firstToggle = toggles.nth(0)
         const secondToggle = toggles.nth(1)
+        const firstAvatar = firstToggle.locator(
+          '[data-avatar-preset="female-03"] > span[style]',
+        )
+        const firstSwatch = firstToggle.locator(':scope > span').nth(0)
+        const firstName = firstToggle.locator(':scope > span').last()
+        await activate(firstAvatar)
+        await expect(firstToggle).toHaveAttribute('aria-pressed', 'false')
+        await activate(firstSwatch)
+        await expect(firstToggle).toHaveAttribute('aria-pressed', 'true')
+        await activate(firstName)
+        await expect(firstToggle).toHaveAttribute('aria-pressed', 'false')
+        await activate(firstToggle)
+        await expect(firstToggle).toHaveAttribute('aria-pressed', 'true')
+        await expect(firstToggle).toBeVisible()
         if (sectionName === 'Charts') {
           for (const toggle of [firstToggle, secondToggle]) {
             if ((await toggle.getAttribute('aria-pressed')) === 'false')
@@ -1798,8 +1848,7 @@ for (const layout of [
         })
         await expect(details).toBeVisible()
         const initialColor = await firstToggle.evaluate(
-          (toggle) =>
-            toggle.previousElementSibling?.getAttribute('style') ?? null,
+          (toggle) => toggle.firstElementChild?.getAttribute('style') ?? null,
         )
         expect(initialColor).not.toBeNull()
 
@@ -1846,8 +1895,7 @@ for (const layout of [
           chart.locator('circle[data-chart-point][data-series-id]'),
         ).not.toHaveCount(0)
         const restoredColor = await firstToggle.evaluate(
-          (toggle) =>
-            toggle.previousElementSibling?.getAttribute('style') ?? null,
+          (toggle) => toggle.firstElementChild?.getAttribute('style') ?? null,
         )
         expect(restoredColor).toBe(initialColor)
 
@@ -2255,10 +2303,14 @@ for (const viewport of [
     const groupLegend = page.getByRole('list', {
       name: 'Group chart legend',
     })
-    await expect(groupLegend.locator('li')).toHaveText([
-      'Ava (member 1)',
-      'Ava (member 2)',
-    ])
+    await expect(
+      groupLegend.locator('li > button > span:last-child'),
+    ).toHaveText(['Ava (member 1)', 'Ava (member 2)'])
+    // The preview may still be backed by the pre-migration RPC, which omits
+    // avatar_preset_id. In that case show a neutral initial until staging is migrated.
+    await expect(
+      groupLegend.locator('li [data-avatar-preset="default"]'),
+    ).toHaveText(['A', 'A'])
     const chartRegion = page.getByRole('region', {
       name: 'Group comparison chart',
     })
@@ -2455,7 +2507,9 @@ for (const viewport of [
     await expect(page.getByRole('tooltip')).toContainText(
       /Ava \(member 2\).*20\.09\.2026.*70 kg/,
     )
-    await expect(groupLegend.locator('li')).toHaveText(['Ava (member 2)'])
+    await expect(groupLegend.locator('li > span > span:last-child')).toHaveText(
+      ['Ava (member 2)'],
+    )
     await expectLegendCentered()
     await expect(
       individualChart.locator('circle[data-point-kind="recorded"][data-date]'),
@@ -2755,13 +2809,33 @@ for (const viewport of [
     page,
   }) => {
     await page.setViewportSize({ height: 900, width: viewport.width })
-    const requests = await installGroupFixtures(page)
+    const requests = await installGroupFixtures(
+      page,
+      false,
+      false,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'e2e-owner',
+      { participantAvatars: true },
+    )
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
 
     await expect(
       page.getByRole('heading', { name: 'E2E authorized group', exact: true }),
     ).toBeVisible()
     await expect(page.getByText('42.5%', { exact: true })).toBeVisible()
+    const overviewLegend = page.getByRole('list', {
+      name: 'Group chart legend',
+    })
+    await expect(
+      overviewLegend.locator('[data-avatar-preset="female-03"]'),
+    ).toBeVisible()
+    await expect(
+      overviewLegend.locator('[data-avatar-preset="male-02"]'),
+    ).toBeVisible()
     await page
       .getByRole('navigation', { name: 'Group sections' })
       .getByRole('link', { name: 'Weekly results' })
@@ -2773,6 +2847,27 @@ for (const viewport of [
     await expect(
       page.getByRole('list', { name: 'Weekly winners' }),
     ).toContainText('Ben')
+    await expect(
+      page
+        .getByRole('list', { name: 'Weekly winners' })
+        .locator('[data-avatar-preset="female-03"]'),
+    ).toBeVisible()
+    await expect(
+      page
+        .getByRole('list', { name: 'Weekly winners' })
+        .locator('[data-avatar-preset="male-02"]'),
+    ).toBeVisible()
+
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Members', exact: true })
+      .click()
+    await expect(
+      page.locator('#group-progress [data-avatar-preset="female-03"]'),
+    ).toBeVisible()
+    await expect(
+      page.locator('#group-progress [data-avatar-preset="male-02"]'),
+    ).toBeVisible()
 
     await page
       .getByRole('navigation', { name: 'Group sections' })

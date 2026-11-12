@@ -61,6 +61,13 @@ begin
     (missing_id, 'No entry member'), (rounded_id, 'Rounded progress member'),
     (negative_id, 'Negative progress member'), (capped_id, 'Capped progress member')
   on conflict (id) do nothing;
+  update public.profiles set avatar_path =
+    id::text || '/11111111-1111-4111-8111-111111111111.png'
+    where id = member_id;
+  update public.profiles set avatar_preset_id = 'female-03',
+    avatar_path = null where id = peer_id;
+  update public.profiles set avatar_preset_id = 'male-04'
+    where id = outsider_id;
 
   insert into public.challenges (
     id, owner_id, created_by, name, start_date, end_date, status, challenge_kind
@@ -137,7 +144,12 @@ begin
     ('projection_excludes_weights_notes_and_raw_ids',
       not row_json ? 'weight_kg' and not row_json ? 'note'
       and not row_json ? 'user_id' and not row_json ? 'participant_id'
-      and not row_json ? 'email' and not row_json ? 'id');
+      and not row_json ? 'email' and not row_json ? 'id'
+      and not row_json ? 'avatar_path' and not row_json ? 'signed_url');
+  insert into group_member_projection_checks values
+    ('uploaded_photo_path_never_enters_member_projection',
+      member_row.avatar_preset_id is null
+      and not row_json ? 'avatar_path' and not row_json ? 'signed_url');
   insert into group_member_projection_checks values
     ('milestones_contain_only_shared_achievements',
       jsonb_array_length(member_row.reached_target_milestones) = 2
@@ -149,6 +161,9 @@ begin
         jsonb_build_object('target_weight_kg', 60, 'achieved_on', (current_date - 6)::text, 'state', 'reached')));
   select * into peer_row from public.get_group_member_progress(group_id)
     where member_key = md5(group_id::text || ':' || peer_id::text);
+  insert into group_member_projection_checks values
+    ('active_challenge_peer_gets_only_selected_builtin_avatar',
+      peer_row.avatar_preset_id = 'female-03');
   insert into group_member_projection_checks values
     ('peer_midpoint_uses_clamped_loss_formula',
       peer_row.completion_percentage = 50.0 and peer_row.progress_state = 'in_progress');
@@ -216,6 +231,10 @@ begin
       (select count(*) = 8 from public.get_group_member_progress(group_id))
       and not exists (select 1 from public.get_group_member_progress(group_id)
         where member_key = md5(other_group_id::text || ':' || outsider_id::text)));
+  insert into group_member_projection_checks values
+    ('other_challenge_avatar_is_not_returned', not exists (
+      select 1 from public.get_group_member_progress(group_id)
+      where avatar_preset_id = 'male-04'));
 
   -- Owner access matches the existing Group contract even without enrollment.
   perform set_config('request.jwt.claim.sub', owner_id::text, true);
