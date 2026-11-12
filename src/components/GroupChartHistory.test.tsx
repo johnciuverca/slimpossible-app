@@ -12,6 +12,7 @@ import type { Persistence } from '../data/persistence'
 import type { GroupChartEntry } from '../models/groupChartHistory'
 import type { GroupMemberProgress } from '../models/groupMemberProgress'
 import type { RepositoryListResult } from '../data/supabase/repositories'
+import { sharedChartTheme } from './sharedChartTheme'
 const originalInnerWidth = window.innerWidth
 afterEach(() => {
   cleanup()
@@ -32,7 +33,7 @@ const persistence = (
     repositories: { groupProgress: { getChartHistory: load } },
   }) as unknown as Persistence
 describe('Group chart history', () => {
-  it('lists only challenge member names while keeping target and trend chart lines', async () => {
+  it('lists challenge members, omits target references, and styles each trend with its series', async () => {
     const groupProgress: GroupMemberProgress[] = [
       {
         memberKey: 'a',
@@ -76,12 +77,27 @@ describe('Group chart history', () => {
       name: 'Weight (kg) — shared group history',
     })
     expect(chart).toHaveAttribute('viewBox', '0 0 760 278')
+    expect(chart.querySelector('[data-series="target-reference"]')).toBeNull()
+    const trend = chart.querySelector('[data-series="derived-trend"]')
+    expect(trend).toHaveAttribute('data-chart-series-id', 'a')
+    expect(trend).toHaveAttribute('stroke', '#31dbb0')
+    expect(trend).toHaveAttribute(
+      'opacity',
+      String(sharedChartTheme.trendOpacity),
+    )
+    expect(trend).not.toHaveAttribute('stroke-dasharray')
     expect(
-      chart.querySelector('[data-series="target-reference"]'),
-    ).toHaveAttribute('stroke-dasharray', '9 5')
-    expect(
-      chart.querySelector('[data-series="derived-trend"]'),
-    ).toHaveAttribute('stroke-dasharray', '3 6')
+      document.querySelector('[data-series="target-reference"]'),
+    ).toBeNull()
+    const hiddenTrend = document.querySelector(
+      '.group-history-workspace svg.hidden [data-series="derived-trend"]',
+    )
+    expect(hiddenTrend).toHaveAttribute('stroke', '#31dbb0')
+    expect(hiddenTrend).toHaveAttribute(
+      'opacity',
+      String(sharedChartTheme.trendOpacity),
+    )
+    expect(hiddenTrend).not.toHaveAttribute('stroke-dasharray')
     expect(
       chart.querySelectorAll('circle[data-point-kind="recorded"]'),
     ).toHaveLength(3)
@@ -279,7 +295,7 @@ describe('Group chart history', () => {
         'circle[data-point-kind]:not([data-point-kind="estimated"])[data-date]',
       ),
     ).toHaveLength(2)
-    expect(chart.querySelector('[data-chart-reference]')).toBeInTheDocument()
+    expect(chart.querySelector('[data-chart-reference]')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Show last 3 months' }))
     expect(
       chart.querySelectorAll(

@@ -18,7 +18,6 @@ import {
 import { personalWeighInToday } from '../models/personalWeighIn'
 import { PersonalHistoryContent } from './PersonalHistoryContent'
 import { DashboardGoals } from '../components/DashboardGoals'
-import { personalGoalChoices } from '../models/personalGoalChoices'
 import { formatChartDate } from '../models/chartDate'
 
 export function PersonalDashboardPage() {
@@ -98,33 +97,6 @@ export function PersonalDashboardWorkspace({
   ])
   const today = personalWeighInToday()
   const { latest } = personalHistory(workspace.personal.data, today)
-  const choices =
-    workspace.contexts.state === 'ready'
-      ? personalGoalChoices(
-          workspace.userId,
-          workspace.contexts.data.challenges,
-          workspace.contexts.data.participants,
-        )
-      : []
-  const selected = params.get('challenge')
-    ? choices.find((challenge) => challenge.id === params.get('challenge'))
-    : choices[0]
-  const member = selected
-    ? workspace.contexts.data.participants.find(
-        (row) =>
-          row.challengeId === selected.id &&
-          row.userId === workspace.userId &&
-          row.status === 'active',
-      )
-    : undefined
-  const referenceWeightKg =
-    member &&
-    Number.isFinite(member.targetWeightKg) &&
-    member.targetWeightKg > 0 &&
-    (selected?.kind !== 'group' ||
-      member.targetWeightKg <= member.startingWeightKg)
-      ? member.targetWeightKg
-      : undefined
   const recordAction = (
     <RecordWeightAction
       workspace={workspace}
@@ -224,8 +196,6 @@ export function PersonalDashboardWorkspace({
             <PersonalHistoryContent
               key={`history:${workspace.ownerKey}`}
               workspace={workspace}
-              referenceWeightKg={referenceWeightKg}
-              referenceLabel={selected ? `${selected.name} target` : undefined}
             >
               <DashboardGoals
                 key={`goals:${workspace.ownerKey}`}
