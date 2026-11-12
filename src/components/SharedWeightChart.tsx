@@ -666,19 +666,12 @@ export function SharedWeightChart({
     pointX: number,
     pointY: number,
   ) => chartValueLabelPositions.get(pointId) ?? { x: pointX, y: pointY - 12 }
-  const referenceLinesOutsideRange = adaptiveWeightTicks
-    ? visibleLines.filter(
-        (line) =>
-          line.kind === 'reference' &&
-          (line.from.value < yMinimum ||
-            line.from.value > yMaximum ||
-            line.to.value < yMinimum ||
-            line.to.value > yMaximum),
-      )
-    : []
   const renderedLines = visibleLines
-    .filter((line) => !referenceLinesOutsideRange.includes(line))
-    .filter((line) => !line.seriesId || !hiddenSeriesIds?.has(line.seriesId))
+    .filter(
+      (line) =>
+        line.kind === 'trend' &&
+        (!line.seriesId || !hiddenSeriesIds?.has(line.seriesId)),
+    )
     .flatMap((line) => {
       if (!compactOlderHistory) return [line]
       const from = day(line.from.date)
@@ -1128,28 +1121,20 @@ export function SharedWeightChart({
             </g>
           ))}
           {renderedLines.map((line) => {
-            const yy =
-              line.kind === 'reference' ? y(line.from.value) : undefined
             return (
               <line
                 key={line.id}
-                data-series={
-                  line.kind === 'trend' ? 'derived-trend' : 'target-reference'
-                }
+                data-series="derived-trend"
                 data-chart-line-kind={line.kind}
                 data-chart-series-id={line.seriesId}
-                data-chart-trend={line.kind === 'trend' ? '' : undefined}
-                data-chart-reference={
-                  line.kind === 'reference' ? '' : undefined
-                }
+                data-chart-trend=""
                 x1={x(line.from.date)}
-                y1={yy ?? y(line.from.value)}
+                y1={y(line.from.value)}
                 x2={x(line.to.date)}
-                y2={yy ?? y(line.to.value)}
+                y2={y(line.to.value)}
                 stroke={line.color}
                 strokeWidth="2"
-                strokeDasharray={line.kind === 'trend' ? '3 6' : '9 5'}
-                opacity={line.kind === 'trend' ? 0.35 : undefined}
+                opacity={sharedChartTheme.trendOpacity}
               >
                 {line.title ? <title>{line.title}</title> : null}
               </line>

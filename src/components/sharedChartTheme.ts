@@ -7,6 +7,7 @@ export const sharedChartTheme = {
   axisBaselinePx: 12,
   axisTickScale: 0.85,
   axisTitlePx: 12,
+  trendOpacity: 0.32,
   plot: {
     left: 44,
     right: 736,

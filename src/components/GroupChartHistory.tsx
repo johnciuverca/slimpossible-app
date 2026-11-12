@@ -15,14 +15,13 @@ import { deriveGroupChartTrend } from '../models/groupChartTrend'
 import type { GroupMemberProgress } from '../models/groupMemberProgress'
 import { createGroupMemberChartColorMap } from '../models/groupMemberChartColors'
 import { SharedWeightChart } from './SharedWeightChart'
+import { sharedChartTheme } from './sharedChartTheme'
 import { interpolateMissingWeights } from '../models/estimatedWeighIns'
 import {
   ChartWeightPointEditor,
   type ChartWeightPointSelection,
 } from './ChartWeightPointEditor'
 
-const trendColor = '#ffbf69'
-const referenceColor = '#c49cff'
 const noHiddenMembers = new Set<string>()
 const day = (date: string) => Date.parse(`${date}T00:00:00Z`) / 86400000
 const signed = (value: number) => `${value > 0 ? '+' : ''}${value} kg`
@@ -399,33 +398,6 @@ export function GroupChartHistory({
                       personalWorkspace.userId === viewerId.toLowerCase()
                     }
                     lines={[
-                      ...series.flatMap((member) => {
-                        const target = memberProgress.find(
-                          (candidate) =>
-                            candidate.memberKey === member.memberKey,
-                        )?.targetWeightKg
-                        return target === null ||
-                          target === undefined ||
-                          !Number.isFinite(target)
-                          ? []
-                          : [
-                              {
-                                id: `target:${member.memberKey}`,
-                                seriesId: member.memberKey,
-                                from: {
-                                  date: member.points[0].date,
-                                  value: chartValue(target),
-                                },
-                                to: {
-                                  date: member.points.at(-1)!.date,
-                                  value: chartValue(target),
-                                },
-                                color: referenceColor,
-                                title: `${member.label} target reference: ${target} kg`,
-                                kind: 'reference' as const,
-                              },
-                            ]
-                      }),
                       ...trends.flatMap(({ memberKey, trend }) =>
                         trend
                           ? [
@@ -440,7 +412,7 @@ export function GroupChartHistory({
                                   date: trend.endDate,
                                   value: chartValue(trend.endWeightKg),
                                 },
-                                color: trendColor,
+                                color: memberColors.get(memberKey)!,
                                 title: `${series.find((member) => member.memberKey === memberKey)?.label ?? 'Member'} derived trend from displayed shared points`,
                                 kind: 'trend' as const,
                               },
@@ -502,28 +474,6 @@ export function GroupChartHistory({
                         </text>
                       </g>
                     ))}
-                    {series.map((member) => {
-                      const target = memberProgress.find(
-                        (candidate) => candidate.memberKey === member.memberKey,
-                      )?.targetWeightKg
-                      return target === null || target === undefined ? null : (
-                        <line
-                          key={`target:${member.memberKey}`}
-                          data-series="target-reference"
-                          x1={plotLeft}
-                          x2={675}
-                          y1={y(chartValue(target))}
-                          y2={y(chartValue(target))}
-                          stroke={referenceColor}
-                          strokeWidth={2}
-                          strokeDasharray="8 5"
-                        >
-                          <title>
-                            {member.label} target reference: {target} kg
-                          </title>
-                        </line>
-                      )
-                    })}
                     {series.map((member) => (
                       <g
                         key={member.memberKey}
@@ -559,9 +509,9 @@ export function GroupChartHistory({
                                 )!.trend!.endWeightKg,
                               ),
                             )}
-                            stroke={trendColor}
+                            stroke={memberColors.get(member.memberKey)}
                             strokeWidth={2.5}
-                            strokeDasharray="2 5"
+                            opacity={sharedChartTheme.trendOpacity}
                             strokeLinecap="round"
                           >
                             <title>

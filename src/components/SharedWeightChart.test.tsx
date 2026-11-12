@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { SharedWeightChart } from './SharedWeightChart'
+import { sharedChartTheme } from './sharedChartTheme'
 
 afterEach(cleanup)
 
@@ -466,7 +467,7 @@ it('shows stable interactive point details with keyboard focus and outside dismi
   ).toBeNull()
 })
 
-it('applies quick ranges, adjustable date endpoints, clipped trend/reference lines, and restores all records', () => {
+it('applies date ranges and sliders, clips trends, and suppresses reference lines', () => {
   const dates = [
     '2026-01-01',
     '2026-02-01',
@@ -514,10 +515,17 @@ it('applies quick ranges, adjustable date endpoints, clipped trend/reference lin
   fireEvent.click(screen.getByRole('button', { name: 'Show last 1 month' }))
   expect(chart().querySelectorAll('circle[data-date]')).toHaveLength(2)
   expect(chart().querySelectorAll('[data-chart-tick]')).not.toHaveLength(0)
-  expect(chart().querySelector('[data-chart-reference]')).toBeInTheDocument()
+  expect(chart().querySelector('[data-chart-reference]')).toBeNull()
   expect(chart().querySelector('[data-chart-trend]')).toHaveAttribute(
     'x1',
     '44',
+  )
+  expect(chart().querySelector('[data-chart-trend]')).not.toHaveAttribute(
+    'stroke-dasharray',
+  )
+  expect(chart().querySelector('[data-chart-trend]')).toHaveAttribute(
+    'opacity',
+    String(sharedChartTheme.trendOpacity),
   )
   expect(screen.getByLabelText('Visible date range')).toHaveTextContent(
     '01.04.2026 – 01.05.2026',
