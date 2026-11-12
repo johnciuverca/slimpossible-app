@@ -3,7 +3,516 @@ import { expect, test } from '@playwright/test'
 const fixture = (path: string) =>
   `/e2e/fixtures/personal-dashboard-harness.html?${new URLSearchParams({ scenario: 'groups', path })}`
 
-for (const width of [1280, 390]) {
+test('compact mobile Record weight keeps group choices and Save reachable', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(fixture('/dashboard'))
+  await page.getByRole('button', { name: 'Record weight', exact: true }).click()
+
+  let dialog = page.getByRole('dialog', { name: 'Record weight' })
+  const date = dialog.getByLabel('Date')
+  const weight = dialog.getByLabel('Weight in kg')
+  await expect(date).toBeVisible()
+  await expect(weight).toBeVisible()
+  await expect(weight).not.toBeFocused()
+  const [dateBox, weightBox] = await Promise.all([
+    date.boundingBox(),
+    weight.boundingBox(),
+  ])
+  const dateShell = dialog.locator('.record-weight-field-shell').nth(0)
+  const weightShell = dialog.locator('.record-weight-field-shell').nth(1)
+  const [dateShellBox, weightShellBox, noteBox, sharingBox, saveButton] =
+    await Promise.all([
+      dateShell.boundingBox(),
+      weightShell.boundingBox(),
+      dialog.getByRole('button', { name: /Private note/ }).boundingBox(),
+      dialog.locator('fieldset').boundingBox(),
+      dialog.getByRole('button', { name: 'Save weight', exact: true }),
+    ])
+  const [dateShellStyle, weightShellStyle] = await Promise.all([
+    dateShell.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return {
+        height: style.height,
+        radius: style.borderRadius,
+        padding: style.padding,
+      }
+    }),
+    weightShell.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return {
+        height: style.height,
+        radius: style.borderRadius,
+        padding: style.padding,
+      }
+    }),
+  ])
+  expect(dateBox).not.toBeNull()
+  expect(weightBox).not.toBeNull()
+  expect(dateShellBox).not.toBeNull()
+  expect(weightShellBox).not.toBeNull()
+  expect(noteBox).not.toBeNull()
+  expect(sharingBox).not.toBeNull()
+  expect(dateShellStyle).toEqual(weightShellStyle)
+  expect(dateShellBox!.height).toBeCloseTo(weightShellBox!.height, 1)
+  expect(dateBox!.x).toBeGreaterThanOrEqual(dateShellBox!.x)
+  expect(dateBox!.x + dateBox!.width).toBeLessThanOrEqual(
+    dateShellBox!.x + dateShellBox!.width,
+  )
+  expect(weightBox!.x).toBeGreaterThanOrEqual(weightShellBox!.x)
+  expect(weightBox!.x + weightBox!.width).toBeLessThanOrEqual(
+    weightShellBox!.x + weightShellBox!.width,
+  )
+  expect(Math.abs(dateShellBox!.x - weightShellBox!.x)).toBeLessThan(1)
+  expect(dateShellBox!.width).toBeCloseTo(weightShellBox!.width, 1)
+  expect(dateShellBox!.x).toBeCloseTo(noteBox!.x, 1)
+  expect(dateShellBox!.width).toBeCloseTo(noteBox!.width, 1)
+  expect(dateShellBox!.x).toBeCloseTo(sharingBox!.x, 1)
+  expect(dateShellBox!.width).toBeCloseTo(sharingBox!.width, 1)
+  const actionBox = (await saveButton.boundingBox())!
+  expect(actionBox.x).toBeCloseTo(dateShellBox!.x, 1)
+  expect(Math.abs(dateBox!.x - weightBox!.x)).toBeLessThan(2)
+  expect(dateBox!.y + dateBox!.height).toBeLessThanOrEqual(weightBox!.y)
+  await expect(date).toHaveAttribute('type', 'date')
+  await date.focus()
+  await expect(date).toBeFocused()
+  await dialog.focus()
+
+  const noteToggle = dialog.getByRole('button', { name: /Private note/ })
+  await expect(noteToggle).toHaveAttribute('aria-expanded', 'false')
+  await expect(dialog.getByLabel('Private note (optional)')).not.toBeVisible()
+  await expect(
+    dialog.getByRole('checkbox', { name: 'Synthetic draft group' }),
+  ).toBeVisible()
+  const group = dialog.getByRole('checkbox', {
+    name: 'Synthetic active group',
+  })
+  await expect(group).toBeVisible()
+  await expect(group).not.toBeChecked()
+  const groupLabel = dialog.getByText('Synthetic active group', { exact: true })
+  const [groupBox, groupNameBox] = await Promise.all([
+    group.boundingBox(),
+    groupLabel.boundingBox(),
+  ])
+  expect(groupBox).not.toBeNull()
+  expect(groupNameBox).not.toBeNull()
+  expect(groupBox!.y + groupBox!.height / 2).toBeCloseTo(
+    groupNameBox!.y + groupNameBox!.height / 2,
+    0,
+  )
+  await groupLabel.click()
+  await expect(group).toBeChecked()
+  await group.uncheck()
+
+  const save = dialog.getByRole('button', { name: 'Save weight', exact: true })
+  await expect(save).toBeVisible()
+  const saveBox = (await save.boundingBox())!
+  expect(saveBox.y + saveBox.height).toBeLessThanOrEqual(844)
+
+  await noteToggle.click()
+  await expect(
+    dialog.getByText('Private note (optional)', { exact: true }),
+  ).toBeVisible()
+  await dialog
+    .getByLabel('Private note (optional)')
+    .fill('Private compact note')
+  await weight.fill('82.3')
+  await group.check()
+  await save.click()
+  await expect(dialog).toHaveCount(0)
+  await expect
+    .poll(() =>
+      page.evaluate(() => ({
+        htmlOverflow: document.documentElement.style.overflow,
+        bodyPosition: document.body.style.position,
+        bodyOverflow: document.body.style.overflow,
+      })),
+    )
+    .toEqual({ htmlOverflow: '', bodyPosition: '', bodyOverflow: '' })
+
+  await page.getByRole('button', { name: 'Record weight', exact: true }).click()
+  dialog = page.getByRole('dialog', { name: 'Edit weight' })
+  const savedNoteToggle = dialog.getByRole('button', { name: /Private note/ })
+  await expect(savedNoteToggle).toHaveAttribute('aria-expanded', 'false')
+  await expect(savedNoteToggle).toHaveAccessibleName('Private note (optional)')
+  await savedNoteToggle.click()
+  await expect(savedNoteToggle).toHaveAccessibleName('Private note (optional)')
+  await expect(dialog.getByLabel('Private note (optional)')).toHaveValue(
+    'Private compact note',
+  )
+  await expect(
+    dialog.getByRole('checkbox', { name: 'Synthetic active group' }),
+  ).toBeChecked()
+
+  const update = dialog.getByRole('button', {
+    name: 'Update weight',
+    exact: true,
+  })
+  await dialog.getByLabel('Weight in kg').focus()
+  await page.evaluate(() => {
+    const visualViewport = window.visualViewport
+    if (!visualViewport) throw new Error('VisualViewport is unavailable')
+    Object.defineProperty(visualViewport, 'height', {
+      configurable: true,
+      value: 400,
+    })
+    visualViewport.dispatchEvent(new Event('resize'))
+  })
+  await expect(update).toBeVisible()
+  await expect
+    .poll(() => dialog.evaluate((element) => element.style.bottom))
+    .toBe('444px')
+  const keyboardViewportSave = (await update.boundingBox())!
+  expect(
+    keyboardViewportSave.y + keyboardViewportSave.height,
+  ).toBeLessThanOrEqual(400)
+  await page.evaluate(() => {
+    const visualViewport = window.visualViewport
+    if (!visualViewport) return
+    delete (visualViewport as VisualViewport & { height?: number }).height
+    visualViewport.dispatchEvent(new Event('resize'))
+  })
+})
+
+test('mobile note stays expanded and focused through keyboard resize, and the sheet contains scrolling', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 520 })
+  await page.goto(fixture('/dashboard'))
+  await page.evaluate(() => {
+    document.body.style.minHeight = '2400px'
+    window.scrollTo(0, 240)
+  })
+  await page.getByRole('button', { name: 'Record weight', exact: true }).click()
+
+  const dialog = page.getByRole('dialog', { name: 'Record weight' })
+  const noteToggle = dialog.getByRole('button', { name: /Private note/ })
+  const note = dialog.getByLabel('Private note (optional)')
+  await expect(noteToggle).toHaveAttribute('aria-expanded', 'false')
+  await noteToggle.click()
+  await expect(noteToggle).toHaveAttribute('aria-expanded', 'true')
+  await note.focus()
+  await page.evaluate(() => {
+    const viewport = window.visualViewport
+    if (!viewport) throw new Error('VisualViewport is unavailable')
+    Object.defineProperty(viewport, 'height', {
+      configurable: true,
+      value: 280,
+    })
+    viewport.dispatchEvent(new Event('resize'))
+  })
+  await expect(noteToggle).toHaveAttribute('aria-expanded', 'true')
+  await expect(note).toBeFocused()
+  await note.fill('Draft survives the virtual keyboard resize')
+  const save = dialog.getByRole('button', {
+    name: 'Save weight',
+    exact: true,
+  })
+  await save.scrollIntoViewIfNeeded()
+  const keyboardSaveBox = (await save.boundingBox())!
+  expect(keyboardSaveBox.y + keyboardSaveBox.height).toBeLessThanOrEqual(280)
+  await page.evaluate(() => {
+    const viewport = window.visualViewport
+    if (!viewport) return
+    delete (viewport as VisualViewport & { height?: number }).height
+    viewport.dispatchEvent(new Event('resize'))
+  })
+  await expect(noteToggle).toHaveAttribute('aria-expanded', 'true')
+  await expect(note).toBeFocused()
+  await expect(note).toHaveValue('Draft survives the virtual keyboard resize')
+
+  const scrollState = await page.evaluate(() => ({
+    htmlOverflow: document.documentElement.style.overflow,
+    bodyPosition: document.body.style.position,
+    bodyTop: document.body.style.top,
+    scrollY: window.scrollY,
+  }))
+  expect(scrollState.htmlOverflow).toBe('hidden')
+  expect(scrollState.bodyPosition).toBe('fixed')
+  const initialDialogScroll = await dialog.evaluate(
+    (element) => element.scrollTop,
+  )
+  await page.mouse.move(200, 430)
+  await page.mouse.wheel(0, 360)
+  await expect
+    .poll(() => dialog.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(initialDialogScroll)
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrollState.scrollY)
+  await dialog.evaluate((element) => {
+    element.scrollTop = element.scrollHeight
+  })
+  const bottomDialogScroll = await dialog.evaluate(
+    (element) => element.scrollTop,
+  )
+  await page.mouse.wheel(0, 360)
+  await expect
+    .poll(() => dialog.evaluate((element) => element.scrollTop))
+    .toBe(bottomDialogScroll)
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrollState.scrollY)
+  await expect(save).toBeVisible()
+
+  await noteToggle.click()
+  await expect(noteToggle).toHaveAttribute('aria-expanded', 'false')
+  await expect(note).not.toBeVisible()
+  await noteToggle.click()
+  await expect(note).toHaveValue('Draft survives the virtual keyboard resize')
+
+  await dialog.getByRole('button', { name: 'Close weight editor' }).click()
+  await page.getByRole('button', { name: 'Discard and leave' }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect
+    .poll(() =>
+      page.evaluate(() => ({
+        htmlOverflow: document.documentElement.style.overflow,
+        htmlOverscroll: document.documentElement.style.overscrollBehavior,
+        bodyPosition: document.body.style.position,
+        bodyTop: document.body.style.top,
+        bodyLeft: document.body.style.left,
+        bodyRight: document.body.style.right,
+        bodyWidth: document.body.style.width,
+        bodyOverflow: document.body.style.overflow,
+        bodyOverscroll: document.body.style.overscrollBehavior,
+        bodyMinHeight: document.body.style.minHeight,
+      })),
+    )
+    .toEqual({
+      htmlOverflow: '',
+      htmlOverscroll: '',
+      bodyPosition: '',
+      bodyTop: '',
+      bodyLeft: '',
+      bodyRight: '',
+      bodyWidth: '',
+      bodyOverflow: '',
+      bodyOverscroll: '',
+      bodyMinHeight: '2400px',
+    })
+  expect(await page.evaluate(() => window.scrollY)).toBe(
+    Math.abs(Number.parseFloat(scrollState.bodyTop)),
+  )
+})
+
+test('localized date and weight controls fit narrow, landscape, zoomed, and wide viewports', async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    locale: 'ru-RU',
+    viewport: { width: 320, height: 720 },
+  })
+  const page = await context.newPage()
+  await page.goto(fixture('/dashboard'))
+  expect(await page.evaluate(() => navigator.language)).toMatch(/^ru/)
+  await page.getByRole('button', { name: 'Record weight', exact: true }).click()
+
+  const dialog = page.getByRole('dialog', { name: 'Record weight' })
+  const date = dialog.getByLabel('Date')
+  const weight = dialog.getByLabel('Weight in kg')
+  await date.fill('2025-11-03')
+
+  for (const viewport of [
+    { width: 320, height: 720 },
+    { width: 360, height: 720 },
+    { width: 390, height: 844 },
+    { width: 430, height: 932 },
+    { width: 767, height: 390 },
+    { width: 844, height: 390 },
+    { width: 1024, height: 768 },
+  ]) {
+    await page.setViewportSize(viewport)
+    const stacked = viewport.width < 400
+    await expect
+      .poll(async () => {
+        const [dateBox, weightBox] = await Promise.all([
+          date.boundingBox(),
+          weight.boundingBox(),
+        ])
+        if (!dateBox || !weightBox) return false
+        return stacked
+          ? dateBox.y + dateBox.height <= weightBox.y &&
+              Math.abs(dateBox.x - weightBox.x) < 2
+          : dateBox.x + dateBox.width <= weightBox.x
+      })
+      .toBe(true)
+    const [dateBox, weightBox, dateRow, weightRow, dialogBox] =
+      await Promise.all([
+        date.boundingBox(),
+        weight.boundingBox(),
+        date.locator('xpath=../../..').boundingBox(),
+        weight.locator('xpath=../../..').boundingBox(),
+        dialog.boundingBox(),
+      ])
+    expect(dateBox).not.toBeNull()
+    expect(weightBox).not.toBeNull()
+    expect(dateRow).not.toBeNull()
+    expect(weightRow).not.toBeNull()
+    expect(dialogBox).not.toBeNull()
+    expect(dateBox!.x).toBeGreaterThanOrEqual(dateRow!.x)
+    expect(dateBox!.x + dateBox!.width).toBeLessThanOrEqual(
+      dateRow!.x + dateRow!.width,
+    )
+    expect(weightBox!.x).toBeGreaterThanOrEqual(weightRow!.x)
+    expect(weightBox!.x + weightBox!.width).toBeLessThanOrEqual(
+      weightRow!.x + weightRow!.width,
+    )
+    expect(dateRow!.x).toBeGreaterThanOrEqual(dialogBox!.x)
+    expect(weightRow!.x + weightRow!.width).toBeLessThanOrEqual(
+      dialogBox!.x + dialogBox!.width,
+    )
+
+    if (stacked) {
+      expect(dateBox!.y + dateBox!.height).toBeLessThanOrEqual(weightBox!.y)
+      expect(Math.abs(dateBox!.x - weightBox!.x)).toBeLessThan(2)
+      await expect(
+        dialog.getByRole('button', { name: /Private note/ }),
+      ).toHaveAttribute('aria-expanded', 'false')
+    } else {
+      expect(dateBox!.x + dateBox!.width).toBeLessThanOrEqual(weightBox!.x)
+      expect(weightBox!.x - (dateBox!.x + dateBox!.width)).toBeGreaterThan(0)
+    }
+    if (viewport.width === 430) {
+      await expect(dialog).toHaveAttribute('data-compact-viewport', '')
+      await expect(dialog).not.toHaveAttribute('data-narrow-fields', '')
+      const [dateShellBox, weightShellBox, dateShellStyle, weightShellStyle] =
+        await Promise.all([
+          dialog.locator('.record-weight-field-shell').nth(0).boundingBox(),
+          dialog.locator('.record-weight-field-shell').nth(1).boundingBox(),
+          dialog
+            .locator('.record-weight-field-shell')
+            .nth(0)
+            .evaluate((element) => {
+              const style = getComputedStyle(element)
+              return {
+                height: style.height,
+                paddingLeft: style.paddingLeft,
+                paddingRight: style.paddingRight,
+              }
+            }),
+          dialog
+            .locator('.record-weight-field-shell')
+            .nth(1)
+            .evaluate((element) => {
+              const style = getComputedStyle(element)
+              return {
+                height: style.height,
+                paddingLeft: style.paddingLeft,
+                paddingRight: style.paddingRight,
+              }
+            }),
+        ])
+      expect(dateShellBox).not.toBeNull()
+      expect(weightShellBox).not.toBeNull()
+      expect(dateShellStyle).toEqual(weightShellStyle)
+      expect(Number.parseFloat(dateShellStyle.height)).toBeGreaterThanOrEqual(
+        44,
+      )
+      expect(dateShellBox!.height).toBeCloseTo(weightShellBox!.height, 1)
+      expect(dateShellBox!.x + dateShellBox!.width).toBeLessThanOrEqual(
+        weightShellBox!.x,
+      )
+      expect(dateBox!.x).toBeGreaterThanOrEqual(dateShellBox!.x)
+      expect(dateBox!.x + dateBox!.width).toBeLessThanOrEqual(
+        dateShellBox!.x + dateShellBox!.width,
+      )
+      expect(weightBox!.x).toBeGreaterThanOrEqual(weightShellBox!.x)
+      expect(weightBox!.x + weightBox!.width).toBeLessThanOrEqual(
+        weightShellBox!.x + weightShellBox!.width,
+      )
+      expect(Number.parseFloat(dateShellStyle.paddingLeft)).toBeGreaterThan(0)
+      expect(Number.parseFloat(dateShellStyle.paddingRight)).toBeGreaterThan(0)
+    }
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(viewport.width)
+  }
+
+  await page.evaluate(() => {
+    const viewport = window.visualViewport
+    if (!viewport) throw new Error('VisualViewport is unavailable')
+    Object.defineProperties(viewport, {
+      width: { configurable: true, value: 512 },
+      scale: { configurable: true, value: 2 },
+    })
+    viewport.dispatchEvent(new Event('resize'))
+  })
+  await expect(dialog).toHaveAttribute('data-compact-viewport', '')
+  await expect(dialog).toHaveAttribute('data-narrow-fields', '')
+  await expect(
+    dialog.getByRole('button', { name: /Private note/ }),
+  ).toHaveAttribute('aria-expanded', 'false')
+  const [zoomedDateBox, zoomedWeightBox] = await Promise.all([
+    date.boundingBox(),
+    weight.boundingBox(),
+  ])
+  expect(zoomedDateBox!.y + zoomedDateBox!.height).toBeLessThanOrEqual(
+    zoomedWeightBox!.y,
+  )
+
+  await page.evaluate(() => {
+    const viewport = window.visualViewport as
+      (VisualViewport & { width?: number; scale?: number }) | null
+    if (!viewport) throw new Error('VisualViewport is unavailable')
+    delete viewport.width
+    delete viewport.scale
+    viewport.dispatchEvent(new Event('resize'))
+  })
+  await page.setViewportSize({ width: 430, height: 932 })
+  const noteToggle = dialog.getByRole('button', { name: /Private note/ })
+  await expect(noteToggle).toHaveAttribute('aria-expanded', 'false')
+  await expect(
+    dialog.getByRole('checkbox', { name: 'Synthetic active group' }),
+  ).toBeVisible()
+
+  const save = dialog.getByRole('button', { name: 'Save weight', exact: true })
+  await page.getByLabel('Weight in kg').focus()
+  await page.evaluate(() => {
+    const viewport = window.visualViewport
+    if (!viewport) throw new Error('VisualViewport is unavailable')
+    Object.defineProperties(viewport, {
+      height: { configurable: true, value: 320 },
+      offsetTop: { configurable: true, value: 24 },
+    })
+    viewport.dispatchEvent(new Event('resize'))
+  })
+  await expect(dialog).not.toHaveAttribute('data-narrow-fields', '')
+  const [
+    keyboardDateBox,
+    keyboardWeightBox,
+    keyboardDateShell,
+    keyboardWeightShell,
+  ] = await Promise.all([
+    date.boundingBox(),
+    weight.boundingBox(),
+    dialog.locator('.record-weight-field-shell').nth(0).boundingBox(),
+    dialog.locator('.record-weight-field-shell').nth(1).boundingBox(),
+  ])
+  expect(keyboardDateShell).not.toBeNull()
+  expect(keyboardWeightShell).not.toBeNull()
+  expect(keyboardDateShell!.x + keyboardDateShell!.width).toBeLessThanOrEqual(
+    keyboardWeightShell!.x,
+  )
+  expect(keyboardDateShell!.y).toBeCloseTo(keyboardWeightShell!.y, 0)
+  expect(keyboardDateBox!.y).toBeCloseTo(keyboardWeightBox!.y, 0)
+  expect(keyboardDateBox!.x).toBeGreaterThanOrEqual(keyboardDateShell!.x)
+  expect(keyboardDateBox!.x + keyboardDateBox!.width).toBeLessThanOrEqual(
+    keyboardDateShell!.x + keyboardDateShell!.width,
+  )
+  expect(keyboardWeightBox!.x).toBeGreaterThanOrEqual(keyboardWeightShell!.x)
+  expect(keyboardWeightBox!.x + keyboardWeightBox!.width).toBeLessThanOrEqual(
+    keyboardWeightShell!.x + keyboardWeightShell!.width,
+  )
+  await expect
+    .poll(() => dialog.evaluate((element) => element.style.bottom))
+    .toBe('588px')
+  await save.scrollIntoViewIfNeeded()
+  const saveBox = (await save.boundingBox())!
+  expect(saveBox.y).toBeGreaterThanOrEqual(24)
+  expect(saveBox.y + saveBox.height).toBeLessThanOrEqual(344)
+
+  await context.close()
+})
+
+for (const width of [1280, 390, 430]) {
   test(`shared recording action preserves today's canonical note and shares across pages at ${width}px`, async ({
     page,
   }) => {
@@ -49,6 +558,8 @@ for (const width of [1280, 390]) {
     await action.click()
     let editor = page.getByRole('dialog')
     await editor.getByLabel('Weight in kg').fill('90')
+    if (width <= 600)
+      await editor.getByRole('button', { name: /Private note/ }).click()
     await editor
       .getByLabel('Private note (optional)')
       .fill('Synthetic preserved note')
@@ -154,7 +665,12 @@ for (const width of [1280, 390]) {
         path === '/weigh-ins'
           ? page.getByRole('form', { name: 'Personal weigh-in form' })
           : page.getByRole('dialog', { name: 'Edit weight' })
-      await expect(editor.getByLabel('Weight in kg')).toBeFocused()
+      if (path === '/weigh-ins' || width > 600)
+        await expect(editor.getByLabel('Weight in kg')).toBeFocused()
+      else {
+        await expect(editor).toBeFocused()
+        await editor.getByRole('button', { name: /Private note/ }).click()
+      }
       await expect(editor.getByLabel('Private note (optional)')).toHaveValue(
         'Synthetic preserved note',
       )

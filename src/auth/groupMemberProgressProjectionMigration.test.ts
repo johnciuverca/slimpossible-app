@@ -31,6 +31,12 @@ describe('Group member progress projection SQL contract', () => {
     expect(authorizationCheck).toContain(
       'active_challenge_peer_gets_only_selected_builtin_avatar',
     )
+    expect(authorizationCheck).toContain(
+      'uploaded_photo_path_never_enters_member_projection',
+    )
+    expect(authorizationCheck).toContain(
+      'other_challenge_avatar_is_not_returned',
+    )
     expect(authorizationCheck).toContain("not row_json ? 'avatar_path'")
   })
 

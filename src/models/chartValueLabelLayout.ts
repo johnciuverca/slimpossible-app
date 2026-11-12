@@ -20,6 +20,7 @@ export const layoutChartValueLabels = (
   labels: readonly ChartValueLabel[],
   viewBoxWidth: number,
   viewBoxHeight: number,
+  characterWidth = 4.2,
 ): ChartValueLabelPosition[] => {
   const sorted = [...labels].sort(
     (first, second) =>
@@ -30,7 +31,7 @@ export const layoutChartValueLabels = (
   const placed: Array<ChartValueLabelPosition & { width: number }> = []
 
   for (const label of sorted) {
-    const width = label.text.length * 4.2
+    const width = label.text.length * characterWidth
     const minimumY = labelHeight + 1
     const maximumY = Math.min(viewBoxHeight - 1, label.pointY - 5)
     const candidates = [0]

@@ -49,6 +49,242 @@ for (const viewport of [
   })
 }
 
+for (const width of [320, 390, 430]) {
+  for (const textSize of ['normal', 'increased']) {
+    test(`mobile Dashboard spacing and contained actions at ${width}px with ${textSize} text`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto(fixture())
+      if (textSize === 'increased') {
+        await page.addStyleTag({
+          content: `
+            .dashboard-actions-compact .dashboard-action-grid-compact > a,
+            .dashboard-actions-compact .dashboard-action-grid-compact > button {
+              font-size: 20px !important;
+              line-height: 1.2 !important;
+            }
+          `,
+        })
+      }
+      const dashboardHeader = page.locator('.dashboard-workspace > header')
+      const latestCard = page.locator('.dashboard-latest')
+      const emptyConfirmation = page.locator(
+        '.dashboard-save-confirmation-slot:empty',
+      )
+      const actionCard = page.locator('.dashboard-actions-compact')
+      const actionGrid = actionCard.locator('.dashboard-action-grid')
+      await expect(emptyConfirmation).toBeHidden()
+      const [headerBox, latestBox] = await Promise.all([
+        dashboardHeader.boundingBox(),
+        latestCard.boundingBox(),
+      ])
+      expect(headerBox).not.toBeNull()
+      expect(latestBox).not.toBeNull()
+      expect(
+        latestBox!.y - headerBox!.y - headerBox!.height,
+      ).toBeLessThanOrEqual(24)
+
+      const actionMetrics = await actionGrid
+        .locator(':scope > a, :scope > button')
+        .evaluateAll((actions) =>
+          actions.map((action) => {
+            const box = action.getBoundingClientRect()
+            const style = getComputedStyle(action)
+            const grid = action.parentElement!
+            const gridStyle = getComputedStyle(grid)
+            const card = grid.closest('.dashboard-actions-compact')!
+            const cardBox = card.getBoundingClientRect()
+            const cardStyle = getComputedStyle(card)
+            const label = action.querySelector('span') ?? action
+            const textWalker = document.createTreeWalker(
+              label,
+              NodeFilter.SHOW_TEXT,
+            )
+            const labelRects: Array<{
+              left: number
+              right: number
+              top: number
+              bottom: number
+            }> = []
+            while (textWalker.nextNode()) {
+              const range = document.createRange()
+              range.selectNodeContents(textWalker.currentNode)
+              labelRects.push(
+                ...Array.from(range.getClientRects()).map(
+                  ({ left, right, top, bottom }) => ({
+                    left,
+                    right,
+                    top,
+                    bottom,
+                  }),
+                ),
+              )
+            }
+            return {
+              label: action.textContent?.trim(),
+              x: box.x,
+              y: box.y,
+              right: box.right,
+              bottom: box.bottom,
+              height: box.height,
+              paddingLeft: Number.parseFloat(style.paddingLeft),
+              paddingRight: Number.parseFloat(style.paddingRight),
+              paddingTop: Number.parseFloat(style.paddingTop),
+              paddingBottom: Number.parseFloat(style.paddingBottom),
+              borderLeft: Number.parseFloat(style.borderLeftWidth),
+              borderRight: Number.parseFloat(style.borderRightWidth),
+              borderTop: Number.parseFloat(style.borderTopWidth),
+              borderBottom: Number.parseFloat(style.borderBottomWidth),
+              cardContentLeft:
+                cardBox.left +
+                Number.parseFloat(cardStyle.borderLeftWidth) +
+                Number.parseFloat(cardStyle.paddingLeft),
+              cardContentRight:
+                cardBox.right -
+                Number.parseFloat(cardStyle.borderRightWidth) -
+                Number.parseFloat(cardStyle.paddingRight),
+              cardInnerBorderLeft:
+                cardBox.left + Number.parseFloat(cardStyle.borderLeftWidth),
+              cardInnerBorderRight:
+                cardBox.right - Number.parseFloat(cardStyle.borderRightWidth),
+              cardPaddingLeft: Number.parseFloat(cardStyle.paddingLeft),
+              cardPaddingRight: Number.parseFloat(cardStyle.paddingRight),
+              cardPaddingTop: Number.parseFloat(cardStyle.paddingTop),
+              cardPaddingBottom: Number.parseFloat(cardStyle.paddingBottom),
+              gridColumnGap: Number.parseFloat(gridStyle.columnGap),
+              gridRowGap: Number.parseFloat(gridStyle.rowGap),
+              fontSize: Number.parseFloat(style.fontSize),
+              labelRects,
+            }
+          }),
+        )
+      expect(actionMetrics).toHaveLength(4)
+      const longestLabel = actionMetrics.find(
+        ({ label }) => label === 'Create challenge',
+      )
+      expect(longestLabel).toBeDefined()
+      expect(actionMetrics.every(({ height }) => height >= 44)).toBe(true)
+      expect(
+        actionMetrics.every(
+          ({ x, right, cardContentLeft, cardContentRight }) =>
+            x >= cardContentLeft - 0.5 && right <= cardContentRight + 0.5,
+        ),
+      ).toBe(true)
+      const borderInsets = actionMetrics.flatMap(
+        ({ x, right, cardInnerBorderLeft, cardInnerBorderRight }) => [
+          x - cardInnerBorderLeft,
+          cardInnerBorderRight - right,
+        ],
+      )
+      const actionRows = new Map<number, typeof actionMetrics>()
+      for (const action of actionMetrics) {
+        const row = Math.round(action.y)
+        actionRows.set(row, [...(actionRows.get(row) ?? []), action])
+      }
+      const measuredGaps = [...actionRows.values()].flatMap((row) =>
+        row
+          .sort((left, right) => left.x - right.x)
+          .slice(1)
+          .map((action, index) => action.x - row[index].right),
+      )
+      const minimumButtonInset = Math.min(...borderInsets)
+      const minimumButtonGap = Math.min(...measuredGaps)
+      console.log('dashboard-action-containment', {
+        width,
+        textSize,
+        minimumButtonInset,
+        minimumButtonGap,
+      })
+      expect(minimumButtonInset).toBeGreaterThanOrEqual(8)
+      expect(minimumButtonGap).toBeGreaterThanOrEqual(4)
+      expect(
+        actionMetrics.every(
+          ({
+            cardPaddingLeft,
+            cardPaddingRight,
+            cardPaddingTop,
+            cardPaddingBottom,
+          }) =>
+            cardPaddingLeft >= 8 &&
+            cardPaddingRight >= 8 &&
+            cardPaddingTop >= 1 &&
+            cardPaddingBottom >= 1,
+        ),
+      ).toBe(true)
+      expect(
+        actionMetrics.every(
+          ({ gridColumnGap, gridRowGap }) =>
+            gridColumnGap >= 4 && gridRowGap >= 4,
+        ),
+      ).toBe(true)
+      expect(
+        actionMetrics.every(
+          ({ paddingLeft, paddingRight }) =>
+            paddingLeft >= 10 && paddingRight >= 10,
+        ),
+      ).toBe(true)
+      expect(
+        actionMetrics.every(({ fontSize }) =>
+          textSize === 'increased'
+            ? fontSize === 20
+            : fontSize >= 12 && fontSize <= 14,
+        ),
+      ).toBe(true)
+      expect(
+        actionMetrics.every(
+          ({
+            x,
+            right,
+            y,
+            bottom,
+            paddingLeft,
+            paddingRight,
+            paddingTop,
+            paddingBottom,
+            borderLeft,
+            borderRight,
+            borderTop,
+            borderBottom,
+            labelRects,
+          }) =>
+            labelRects.length > 0 &&
+            labelRects.every(
+              ({ left, right: labelRight, top, bottom: labelBottom }) =>
+                left >= x + borderLeft + paddingLeft - 0.5 &&
+                labelRight <= right - borderRight - paddingRight + 0.5 &&
+                top >= y + borderTop + paddingTop - 0.5 &&
+                labelBottom <= bottom - borderBottom - paddingBottom + 0.5,
+            ),
+        ),
+        `Labels must remain inside padded button bounds: ${JSON.stringify(actionMetrics)}`,
+      ).toBe(true)
+      const rows = new Set(actionMetrics.map(({ y }) => Math.round(y)))
+      if (width === 430 && textSize === 'normal') {
+        expect(
+          new Set(actionMetrics.map(({ height }) => Math.round(height))).size,
+        ).toBe(1)
+        expect(longestLabel!.labelRects.length).toBeGreaterThan(1)
+      } else if (width < 360) {
+        expect(rows.size).toBeGreaterThan(1)
+      } else {
+        expect(rows.size).toBe(1)
+      }
+      expect(rows.size).toBeLessThanOrEqual(4)
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+      ).toBe(true)
+      if (width === 430 && textSize === 'normal') {
+        await page.screenshot({
+          path: test.info().outputPath('dashboard-actions-430.png'),
+        })
+      }
+    })
+  }
+}
+
 test('Dashboard Overview combines progress with latest weight at 390px', async ({
   page,
 }) => {
@@ -296,10 +532,8 @@ for (const width of [1280, 390]) {
             exact: true,
           }),
         ).toBeVisible()
-        await expect(chart.locator('[data-chart-reference]')).toHaveCount(1)
-        await expect(chart).toHaveAccessibleDescription(
-          /Synthetic personal goal target is .* kilograms\. Its reference line is shown only when it fits within the data-scaled chart range/,
-        )
+        await expect(chart.locator('[data-chart-reference]')).toHaveCount(0)
+        await expect(chart).not.toHaveAccessibleDescription(/reference line/i)
         await expect(chart.locator('.chart-legend')).toHaveCount(0)
         await expect(
           goals.getByRole('button', { name: 'Edit starting weight' }),

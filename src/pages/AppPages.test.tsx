@@ -1592,6 +1592,19 @@ describe('GroupDashboardPage', () => {
     expect(
       screen.getByText(/based on 2 of 3 active members/),
     ).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('link', { name: 'Members' }))
+    expect(
+      document.querySelector(
+        '#group-progress [data-avatar-preset="female-03"]',
+      ),
+    ).toBeInTheDocument()
+    expect(
+      document.querySelector('#group-progress [data-avatar-preset="male-02"]'),
+    ).toBeInTheDocument()
+    expect(
+      document.querySelector('#group-progress [data-avatar-preset="default"]'),
+    ).toHaveTextContent('C')
+    fireEvent.click(screen.getByRole('link', { name: 'Weekly results' }))
     expect(
       await screen.findByRole('heading', { name: 'Weeks won' }),
     ).toBeInTheDocument()

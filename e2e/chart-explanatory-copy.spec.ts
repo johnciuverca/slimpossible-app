@@ -34,18 +34,25 @@ for (const width of [1280, 390]) {
     })
     await expect(chart).toBeVisible()
     await expect(chart).toHaveAccessibleDescription(
-      /dashed trend is a least-squares fit/,
+      /Hollow points are estimates between saved entries/,
     )
-    await expect(chart.locator('circle[data-date]')).toHaveCount(3)
+    await expect(
+      chart.locator('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveCount(1)
+    await expect(
+      chart.locator('circle[data-point-kind="weekly-summary"]'),
+    ).toHaveCount(2)
     const explanation = page.getByText(
-      /Every plotted point is a saved personal entry/,
+      /Solid points are saved personal entries/,
     )
     await expect(explanation).toHaveClass('sr-only')
     await expect(
       page.getByText(/3 saved weigh-ins from \d{2}\.\d{2}\.\d{4} to/),
     ).toHaveClass('sr-only')
 
-    const firstPoint = chart.locator('circle[data-chart-point]').first()
+    const firstPoint = chart
+      .locator('circle[data-point-kind="recorded"][data-chart-point]')
+      .first()
     await firstPoint.hover()
     await expect(page.getByRole('tooltip')).toBeVisible()
 
@@ -71,18 +78,18 @@ for (const width of [1280, 390]) {
     await expect(chartRegion).toBeVisible()
     await expect(chart).toBeVisible()
     await expect(chart).toHaveAccessibleDescription(
-      /Points represent shared dates/,
+      /latest 7 calendar dates stay detailed.*Monday–Sunday averages/,
     )
     await expect(
       page.getByText(/Explicitly shared dates and weights only/),
     ).toHaveClass('sr-only')
     await expect(
-      page.getByText(/Missing dates are gaps, not estimated weights/),
+      page.getByText(/Hollow points estimate missing dates only/),
     ).toHaveClass('sr-only')
 
     const hiddenExplanations = [
       page.getByText(/Explicitly shared dates and weights only/),
-      page.getByText(/Missing dates are gaps, not estimated weights/),
+      page.getByText(/Hollow points estimate missing dates only/),
     ]
     for (const explanation of hiddenExplanations) {
       const box = await explanation.boundingBox()
@@ -92,8 +99,16 @@ for (const width of [1280, 390]) {
     }
 
     await page.getByRole('tab', { name: 'Synthetic Alex' }).click()
-    await expect(chart.locator('circle[data-date]')).toHaveCount(3)
-    await chart.locator('circle[data-chart-point]').first().hover()
+    await expect(chart).toHaveAccessibleDescription(
+      /Points represent shared dates/,
+    )
+    await expect(
+      chart.locator('circle[data-point-kind="recorded"][data-date]'),
+    ).toHaveCount(3)
+    await chart
+      .locator('circle[data-point-kind="recorded"][data-chart-point]')
+      .first()
+      .hover()
     await expect(page.getByRole('tooltip')).toContainText('Synthetic Alex')
     await expect
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
