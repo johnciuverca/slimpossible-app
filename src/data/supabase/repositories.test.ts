@@ -161,6 +161,39 @@ describe('Supabase repositories', () => {
     )
   })
 
+  it('maps finalized weekly result state without exposing endpoint evidence', async () => {
+    stubResponse([
+      {
+        result_state: 'finalized',
+        finalized_at: '2026-11-09T18:00:00.000Z',
+        active_participant_count: 3,
+        eligible_participant_count: 2,
+        winner_count: 2,
+        winner_names: ['Ava', 'Ben'],
+      },
+    ])
+
+    const result = await createRepositories(
+      client,
+    ).groupProgress.getWeeklyResultDisplay?.('group-1', '2026-11-08')
+
+    expect(result).toEqual({
+      state: 'success',
+      data: {
+        state: 'finalized',
+        finalizedAt: '2026-11-09T18:00:00.000Z',
+        activeParticipantCount: 3,
+        eligibleParticipantCount: 2,
+        winnerCount: 2,
+        winnerNames: ['Ava', 'Ben'],
+      },
+    })
+    expect(JSON.stringify(result)).not.toContain('weight_kg')
+    expect(String(vi.mocked(fetch).mock.calls[0]?.[0])).toContain(
+      '/rpc/get_group_weekly_result_display',
+    )
+  })
+
   it('maps chart identity and exact shared values without notes, emails or raw identities', async () => {
     stubResponse([
       {

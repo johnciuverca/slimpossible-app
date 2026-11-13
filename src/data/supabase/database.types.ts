@@ -313,6 +313,17 @@ export type Database = {
           win_count: number
         }[]
       }
+      get_group_weekly_result_display: {
+        Args: { target_challenge_id: string; target_sunday: string }
+        Returns: {
+          active_participant_count: number
+          eligible_participant_count: number
+          finalized_at: string | null
+          result_state: string
+          winner_count: number
+          winner_names: string[]
+        }[]
+      }
       get_group_weigh_in_history: {
         Args: { target_challenge_id: string }
         Returns: {

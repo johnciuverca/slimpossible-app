@@ -21,6 +21,7 @@ import { isProfileAvatarPresetId } from '../../auth/profileAvatar'
 import type {
   GroupProgressSummary,
   GroupWeeklyWinCount,
+  GroupWeeklyResultDisplay,
   GroupWeighInHistoryEntry,
 } from '../../models/groupProgress'
 import type { ProvisionalGroupLeaderSummary } from '../../models/provisionalGroupLeader'
@@ -180,6 +181,10 @@ export type PersonalWeighInRepository = {
 }
 
 export type GroupProgressRepository = {
+  getWeeklyResultDisplay?: (
+    challengeId: string,
+    currentSunday: string,
+  ) => Promise<RepositoryResult<GroupWeeklyResultDisplay>>
   getWeeklyWinCounts: (
     challengeId: string,
   ) => Promise<RepositoryListResult<GroupWeeklyWinCount>>
@@ -757,6 +762,58 @@ export function createRepositories(client: DatabaseClient): Repositories {
       },
     },
     groupProgress: {
+      async getWeeklyResultDisplay(challengeId, currentSunday) {
+        const { data, error } = await client.rpc(
+          'get_group_weekly_result_display',
+          {
+            target_challenge_id: challengeId,
+            target_sunday: currentSunday,
+          },
+        )
+        if (error)
+          return {
+            error: requestError('load weekly result status', error),
+            state: 'error',
+          }
+        return mapSingle(
+          data?.[0] ?? null,
+          (row) => {
+            const validStates = [
+              'disabled',
+              'not_available',
+              'not_announced',
+              'pending',
+              'provisional',
+              'finalized',
+            ]
+            if (
+              !validStates.includes(row.result_state) ||
+              !Number.isInteger(row.active_participant_count) ||
+              !Number.isInteger(row.eligible_participant_count) ||
+              !Number.isInteger(row.winner_count) ||
+              row.winner_count !== row.winner_names.length ||
+              row.winner_names.some((name) => typeof name !== 'string')
+            ) {
+              throw new Error('Invalid group weekly result status')
+            }
+            return {
+              activeParticipantCount: row.active_participant_count,
+              eligibleParticipantCount: row.eligible_participant_count,
+              finalizedAt: row.finalized_at,
+              state: row.result_state as
+                | 'disabled'
+                | 'not_available'
+                | 'not_announced'
+                | 'pending'
+                | 'provisional'
+                | 'finalized',
+              winnerCount: row.winner_count,
+              winnerNames: [...row.winner_names],
+            }
+          },
+          'group weekly result status',
+        )
+      },
       async getWeeklyWinCounts(challengeId) {
         const { data, error } = await client.rpc(
           'get_group_weekly_win_counts',

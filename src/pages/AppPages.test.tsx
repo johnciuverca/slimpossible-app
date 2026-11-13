@@ -1546,7 +1546,20 @@ describe('GroupDashboardPage', () => {
                     { member_key: 'c', display_name: 'Casey', win_count: 0 },
                   ]),
                 )
-              : fetchMock(url, init),
+              : String(url).includes('/rpc/get_group_weekly_result_display')
+                ? Promise.resolve(
+                    response([
+                      {
+                        result_state: 'finalized',
+                        finalized_at: '2026-11-09T18:00:00.000Z',
+                        active_participant_count: 3,
+                        eligible_participant_count: 2,
+                        winner_count: 2,
+                        winner_names: ['Ava', 'Ben'],
+                      },
+                    ]),
+                  )
+                : fetchMock(url, init),
       ),
       '/group?challenge=',
     )
@@ -1581,7 +1594,9 @@ describe('GroupDashboardPage', () => {
       screen.queryByRole('link', { name: /Personal ·/ }),
     ).not.toBeInTheDocument()
     expect(screen.queryByText('48.5%')).not.toBeInTheDocument()
-    expect(screen.getByText(/Shared weekly winners/)).toBeInTheDocument()
+    expect(
+      await screen.findByText(/Final shared weekly winners/),
+    ).toBeInTheDocument()
     const winnerList = screen.getByRole('list', { name: 'Weekly winners' })
     expect(
       winnerList.querySelector('[data-avatar-preset="female-03"]'),
@@ -1589,9 +1604,7 @@ describe('GroupDashboardPage', () => {
     expect(
       winnerList.querySelector('[data-avatar-preset="male-02"]'),
     ).toBeInTheDocument()
-    expect(
-      screen.getByText(/based on 2 of 3 active members/),
-    ).toBeInTheDocument()
+    expect(screen.getByText(/This award is locked/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('link', { name: 'Members' }))
     expect(
       document.querySelector(
@@ -1681,19 +1694,21 @@ describe('GroupDashboardPage', () => {
       screen.getByRole('button', { name: 'Refresh shared progress' }),
     )
     expect(await screen.findByText('Casey')).toBeInTheDocument()
-    expect(
-      within(screen.getByRole('region', { name: 'Weekly result' })).queryByText(
-        'Ava',
-      ),
-    ).not.toBeInTheDocument()
+    const finalizedWeeklyResult = screen.getByRole('region', {
+      name: 'Weekly result',
+    })
+    expect(finalizedWeeklyResult).toHaveTextContent(
+      'Final shared weekly winners',
+    )
+    expect(finalizedWeeklyResult).toHaveTextContent('Ava')
+    expect(finalizedWeeklyResult).toHaveTextContent('Ben')
+    expect(finalizedWeeklyResult).not.toHaveTextContent('Casey')
     await waitFor(() =>
       expect(
         screen.getByRole('region', { name: 'Provisional leader' }),
       ).toHaveTextContent('No provisional leader is available yet'),
     )
-    expect(
-      await screen.findByText('Weekly result updated: Casey.'),
-    ).toHaveAttribute('role', 'status')
+    expect(screen.queryByText('Weekly result updated: Casey.')).toBeNull()
 
     fireEvent.click(
       screen.getByRole('button', { name: 'Refresh shared progress' }),
@@ -1800,6 +1815,20 @@ describe('GroupDashboardPage', () => {
           leaderNames: ['Owner'],
         }),
       )
+    fetchMock.mockImplementation((input: RequestInfo | URL) =>
+      String(input).includes('/rpc/get_group_weekly_result_display')
+        ? response([
+            {
+              result_state: 'disabled',
+              finalized_at: null,
+              active_participant_count: 0,
+              eligible_participant_count: 0,
+              winner_count: 0,
+              winner_names: [],
+            },
+          ])
+        : response([]),
+    )
 
     renderDashboard(
       <GroupDashboardPage />,
@@ -2092,6 +2121,20 @@ describe('GroupDashboardPage', () => {
           state: 'solo-challenge',
         }),
       )
+    fetchMock.mockImplementation((input: RequestInfo | URL) =>
+      String(input).includes('/rpc/get_group_weekly_result_display')
+        ? response([
+            {
+              result_state: 'disabled',
+              finalized_at: null,
+              active_participant_count: 0,
+              eligible_participant_count: 0,
+              winner_count: 0,
+              winner_names: [],
+            },
+          ])
+        : response([]),
+    )
 
     renderDashboard(
       <GroupDashboardPage />,
