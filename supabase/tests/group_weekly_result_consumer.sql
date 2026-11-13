@@ -44,9 +44,61 @@ select * from pg_create_logical_replication_slot(
   'slimpossible_group_weekly_results_v1', 'pgoutput'
 );
 
+do $$
+declare
+  future_sunday date := date_trunc('week',
+    (clock_timestamp() at time zone 'Europe/Bucharest'))::date + 13;
+  provisional_cutoff timestamptz;
+begin
+  provisional_cutoff := ((future_sunday::timestamp + time '20:00')
+    at time zone 'Europe/Bucharest');
+  if public.group_weekly_rollout_cutoff_is_future(
+    future_sunday, provisional_cutoff
+  ) is distinct from false or not public.group_weekly_rollout_cutoff_is_future(
+    future_sunday, provisional_cutoff - interval '1 microsecond'
+  ) or public.group_weekly_rollout_cutoff_is_future(
+    future_sunday, provisional_cutoff + interval '1 microsecond'
+  ) is distinct from false then
+    raise exception 'Rollout initialization cutoff does not enforce strict boundary semantics.';
+  end if;
+end;
+$$;
+
+set role service_role;
+select public.capture_group_weekly_barrier();
+do $$
+declare
+  current_sunday date := date_trunc('week',
+    (clock_timestamp() at time zone 'Europe/Bucharest'))::date + 6;
+begin
+  begin
+    perform public.initialize_group_weekly_results(current_sunday - 7);
+    raise exception 'Initializer accepted a past rollout Sunday.';
+  exception when sqlstate '22023' then null;
+  end;
+  if ((current_sunday::timestamp + time '20:00')
+      at time zone 'Europe/Bucharest') <= clock_timestamp() then
+    begin
+      perform public.initialize_group_weekly_results(current_sunday);
+      raise exception 'Initializer accepted a Sunday at or after its provisional cutoff.';
+    exception when sqlstate '22023' then null;
+    end;
+  end if;
+end;
+$$;
+reset role;
+
+do $$
+begin
+  if exists (select 1 from public.group_weekly_result_outbox) then
+    raise exception 'Source/barrier triggers accumulated data before initialization.';
+  end if;
+end;
+$$;
+
 set role service_role;
 select public.initialize_group_weekly_results(
-  (date_trunc('week', current_date)::date + 6 - 21)
+  (date_trunc('week', (clock_timestamp() at time zone 'Europe/Bucharest'))::date + 13)
 );
 select public.persist_group_weekly_result_events();
 select public.persist_group_weekly_result_events();

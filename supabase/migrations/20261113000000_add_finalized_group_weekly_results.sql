@@ -87,10 +87,71 @@ returns void language sql security definer
 set search_path = pg_catalog, public
 as $$
   insert into public.group_weekly_result_outbox(payload)
-  values (target_payload::text)
+  select target_payload::text
+  where exists (
+    select 1 from public.group_weekly_result_control as control
+    where control.singleton
+  )
 $$;
 revoke all on function public.enqueue_group_weekly_result_event(jsonb)
   from public, anon, authenticated, service_role;
+
+create function public.lock_group_weekly_weigh_in_mutation()
+returns trigger language plpgsql security definer
+set search_path = pg_catalog, public
+as $$
+begin
+  if tg_op = 'UPDATE' and old.id is distinct from new.id then
+    if old.id < new.id then
+      perform pg_catalog.pg_advisory_xact_lock(hashtextextended(old.id::text, 404405));
+      perform pg_catalog.pg_advisory_xact_lock(hashtextextended(new.id::text, 404405));
+    else
+      perform pg_catalog.pg_advisory_xact_lock(hashtextextended(new.id::text, 404405));
+      perform pg_catalog.pg_advisory_xact_lock(hashtextextended(old.id::text, 404405));
+    end if;
+  else
+    perform pg_catalog.pg_advisory_xact_lock(hashtextextended(
+      (case when tg_op = 'DELETE' then old.id else new.id end)::text, 404405
+    ));
+  end if;
+  return case when tg_op = 'DELETE' then old else new end;
+end;
+$$;
+revoke all on function public.lock_group_weekly_weigh_in_mutation() from public;
+create trigger personal_weigh_ins_00_lock_weekly_mutation
+  before insert or update or delete on public.personal_weigh_ins
+  for each row execute function public.lock_group_weekly_weigh_in_mutation();
+
+create function public.lock_group_weekly_share_mutation()
+returns trigger language plpgsql security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  old_id uuid;
+  new_id uuid;
+begin
+  old_id := case when tg_op = 'INSERT' then null else old.personal_weigh_in_id end;
+  new_id := case when tg_op = 'DELETE' then null else new.personal_weigh_in_id end;
+  if old_id is not null and new_id is not null and old_id is distinct from new_id then
+    if old_id < new_id then
+      perform pg_catalog.pg_advisory_xact_lock(hashtextextended(old_id::text, 404405));
+      perform pg_catalog.pg_advisory_xact_lock(hashtextextended(new_id::text, 404405));
+    else
+      perform pg_catalog.pg_advisory_xact_lock(hashtextextended(new_id::text, 404405));
+      perform pg_catalog.pg_advisory_xact_lock(hashtextextended(old_id::text, 404405));
+    end if;
+  else
+    perform pg_catalog.pg_advisory_xact_lock(hashtextextended(
+      coalesce(new_id, old_id)::text, 404405
+    ));
+  end if;
+  return case when tg_op = 'DELETE' then old else new end;
+end;
+$$;
+revoke all on function public.lock_group_weekly_share_mutation() from public;
+create trigger personal_weigh_in_shares_00_lock_weekly_mutation
+  before insert or update or delete on public.personal_weigh_in_group_shares
+  for each row execute function public.lock_group_weekly_share_mutation();
 
 create function public.capture_group_weekly_membership()
 returns trigger language plpgsql security definer
@@ -602,6 +663,20 @@ revoke all on function public.group_weekly_u16(bytea, integer),
 grant execute on function public.persist_group_weekly_result_events(),
   public.ack_group_weekly_result_events() to service_role;
 
+create function public.group_weekly_rollout_cutoff_is_future(
+  target_sunday date,
+  target_now timestamptz
+)
+returns boolean language sql immutable strict
+set search_path = pg_catalog
+as $$
+  select extract(dow from target_sunday) = 0
+    and ((target_sunday::timestamp + time '20:00')
+      at time zone 'Europe/Bucharest') > target_now
+$$;
+revoke all on function public.group_weekly_rollout_cutoff_is_future(date, timestamptz)
+  from public, anon, authenticated, service_role;
+
 create function public.initialize_group_weekly_results(target_effective_from_sunday date)
 returns void language plpgsql security definer
 set search_path = pg_catalog, public
@@ -616,6 +691,12 @@ begin
   if target_effective_from_sunday is null
      or extract(dow from target_effective_from_sunday) <> 0 then
     raise exception using errcode = '22023', message = 'A Sunday rollout date is required.';
+  end if;
+  if not public.group_weekly_rollout_cutoff_is_future(
+    target_effective_from_sunday, clock_timestamp()
+  ) then
+    raise exception using errcode = '22023',
+      message = 'The first eligible Sunday provisional cutoff must still be in the future.';
   end if;
   perform pg_advisory_xact_lock(404404, 2);
   if exists (select 1 from public.group_weekly_result_control) then

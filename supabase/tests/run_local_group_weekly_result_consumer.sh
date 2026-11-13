@@ -18,6 +18,38 @@ for task_migration in supabase/migrations/*.sql; do
 done
 "${task_psql[@]}" -f supabase/tests/group_weekly_result_consumer.sql
 task_expected_log="$task_cluster/expected-failure.log"
+"${task_psql[@]}" -c "begin; update public.personal_weigh_ins set weight_kg = 83 where id = '40400000-0000-4000-8000-000000000022'; select pg_sleep(0.25); commit" >"$task_cluster/source-update-delete.log" 2>&1 &
+task_source_update=$!
+sleep 0.05
+"${task_psql[@]}" -c "delete from public.personal_weigh_in_group_shares where personal_weigh_in_id = '40400000-0000-4000-8000-000000000022' and challenge_id = '40400000-0000-4000-8000-000000000001'" >"$task_cluster/share-delete.log" 2>&1 &
+task_share_delete=$!
+if ! wait "$task_source_update"; then cat "$task_cluster/source-update-delete.log" >&2; exit 1; fi
+if ! wait "$task_share_delete"; then cat "$task_cluster/share-delete.log" >&2; exit 1; fi
+for task_pass in 1 2 3 4; do
+  "${task_psql[@]}" -c 'set role service_role' \
+    -c 'select public.persist_group_weekly_result_events()' \
+    -c 'select public.ack_group_weekly_result_events()'
+done
+if [[ "$("${task_psql[@]}" -Atc "select payload ->> 'shared' from public.group_weekly_result_events where challenge_id = '40400000-0000-4000-8000-000000000001' and user_id = '00000000-0000-4000-8000-000000000002' and payload ->> 'recorded_date' = (current_date - 1)::text order by commit_lsn desc, transaction_ordinal desc limit 1")" != false ]]; then
+  echo 'ERROR: concurrent weigh-in update/share deletion left stale shared evidence' >&2
+  exit 1
+fi
+"${task_psql[@]}" -c "begin; update public.personal_weigh_ins set weight_kg = 84 where id = '40400000-0000-4000-8000-000000000022'; select pg_sleep(0.25); commit" >"$task_cluster/source-update-insert.log" 2>&1 &
+task_source_update=$!
+sleep 0.05
+"${task_psql[@]}" -c "insert into public.personal_weigh_in_group_shares(personal_weigh_in_id, challenge_id) values ('40400000-0000-4000-8000-000000000022', '40400000-0000-4000-8000-000000000001')" >"$task_cluster/share-insert.log" 2>&1 &
+task_share_insert=$!
+if ! wait "$task_source_update"; then cat "$task_cluster/source-update-insert.log" >&2; exit 1; fi
+if ! wait "$task_share_insert"; then cat "$task_cluster/share-insert.log" >&2; exit 1; fi
+for task_pass in 1 2 3 4; do
+  "${task_psql[@]}" -c 'set role service_role' \
+    -c 'select public.persist_group_weekly_result_events()' \
+    -c 'select public.ack_group_weekly_result_events()'
+done
+if [[ "$("${task_psql[@]}" -Atc "select (payload ->> 'shared') = 'true' and (payload ->> 'weight_kg')::numeric = 84 from public.group_weekly_result_events where challenge_id = '40400000-0000-4000-8000-000000000001' and user_id = '00000000-0000-4000-8000-000000000002' and payload ->> 'recorded_date' = (current_date - 1)::text order by commit_lsn desc, transaction_ordinal desc limit 1")" != t ]]; then
+  echo 'ERROR: concurrent weigh-in update/share insertion failed to snapshot committed state' >&2
+  exit 1
+fi
 "${task_psql[@]}" -c 'set role service_role' \
   -c 'select public.capture_group_weekly_barrier()'
 "${task_psql[@]}" -c 'set role service_role' \
