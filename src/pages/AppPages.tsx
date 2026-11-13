@@ -1995,46 +1995,54 @@ export function GroupDashboardPage() {
       ? weeklyResultDisplay.winnerDetails
       : weeklyWinnerNames.map((displayName) => ({
           displayName,
-          includesEstimated: false,
           memberKey: null,
         }))
-  const weeklyResultHeading = hasManagedWeeklyResult
-    ? weeklyResultDisplay?.state === 'finalized'
-      ? weeklyResultDisplay.winnerCount > 1
-        ? 'Final shared weekly winners'
-        : weeklyResultDisplay.winnerCount === 1
-          ? 'Final weekly winner'
-          : 'No eligible weekly winner'
-      : weeklyResultDisplay?.state === 'provisional'
-        ? weeklyResultDisplay.winnerCount > 1
-          ? 'Provisional shared weekly winners'
-          : weeklyResultDisplay.winnerCount === 1
-            ? 'Provisional weekly winner'
-            : 'No eligible provisional winner'
-        : weeklyResultDisplay?.state === 'not_announced'
-          ? 'Weekly result not announced yet'
-          : weeklyResultDisplayState === 'loading'
-            ? 'Loading weekly result status'
-            : weeklyResultDisplay
-              ? 'Weekly result pending finalization'
-              : 'Weekly result status unavailable'
-    : weeklyCelebration?.state === 'shared-winners'
-      ? 'Shared weekly winners'
-      : weeklyCelebration?.state === 'single-winner'
-        ? 'Weekly winner'
-        : 'No weekly winner yet'
+  const weeklyResultHeading = (() => {
+    if (!hasManagedWeeklyResult) {
+      if (weeklyCelebration?.state === 'shared-winners')
+        return 'Shared weekly winners'
+      if (weeklyCelebration?.state === 'single-winner') return 'Weekly winner'
+      return 'No weekly winner yet'
+    }
+    if (!weeklyResultDisplay) {
+      return weeklyResultDisplayState === 'loading'
+        ? 'Loading weekly result status'
+        : 'Weekly result status unavailable'
+    }
+    if (
+      weeklyResultDisplay.state !== 'finalized' &&
+      weeklyResultDisplay.state !== 'provisional'
+    ) {
+      return 'Weekly result status unavailable'
+    }
+    const phase =
+      weeklyResultDisplay.state === 'finalized' ? 'Final' : 'Provisional'
+    const participationSuffix =
+      weeklyResultDisplay.recordedParticipantCount <
+      weeklyResultDisplay.activeParticipantCount
+        ? ` — ${weeklyResultDisplay.recordedParticipantCount} of ${weeklyResultDisplay.activeParticipantCount} members recorded`
+        : ''
+    if (weeklyResultDisplay.winnerCount > 1)
+      return `${phase} shared weekly winners${participationSuffix}`
+    if (weeklyResultDisplay.winnerCount === 1)
+      return `${phase} weekly winner${participationSuffix}`
+    if (weeklyResultDisplay.resultOutcome === 'sole_participant')
+      return 'Solo challenge — no competitive win'
+    if (weeklyResultDisplay.resultOutcome === 'sole_eligible') {
+      return weeklyResultDisplay.recordedParticipantCount === 1
+        ? 'Only participant to record'
+        : 'Only eligible participant — no competitive win'
+    }
+    return 'No eligible result'
+  })()
   const weeklyResultMessage = hasManagedWeeklyResult
     ? weeklyResultDisplay?.state === 'provisional'
-      ? `Based on ${weeklyResultDisplay.eligibleParticipantCount} eligible active members. The result may change until Monday at 20:00 Europe/Bucharest.`
+      ? `${weeklyResultDisplay.recordedParticipantCount} of ${weeklyResultDisplay.activeParticipantCount} active members checked in this Sunday; ${weeklyResultDisplay.eligibleParticipantCount} have both consecutive Sunday records. The provisional result locks at Sunday 20:00 Europe/Bucharest.`
       : weeklyResultDisplay?.state === 'finalized'
         ? `Finalized${weeklyResultDisplay.finalizedAt ? ` ${new Date(weeklyResultDisplay.finalizedAt).toLocaleString(undefined, { timeZone: 'Europe/Bucharest' })}` : ''}. This award is locked.`
-        : weeklyResultDisplay?.state === 'not_announced'
-          ? 'The provisional result will be announced Sunday at 20:00 Europe/Bucharest.'
-          : weeklyResultDisplayState === 'loading'
-            ? 'Checking the committed weekly result evidence.'
-            : weeklyResultDisplay
-              ? 'The Monday cutoff has passed. The result will remain pending until committed evidence is complete.'
-              : 'The weekly result status is unavailable. Try refreshing before relying on the displayed winner.'
+        : weeklyResultDisplayState === 'loading'
+          ? 'Checking the weekly result.'
+          : 'The weekly result status is unavailable. Try refreshing before relying on the displayed winner.'
     : weeklyCelebration?.message
   const displayedCurrentSunday =
     hasManagedWeeklyResult && data?.weeklyResultSunday
@@ -2381,11 +2389,6 @@ export function GroupDashboardPage() {
                                   displayName={winner.displayName}
                                 />
                                 <span>{winner.displayName}</span>
-                                {winner.includesEstimated ? (
-                                  <span className="ml-auto rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900">
-                                    Includes estimated weight
-                                  </span>
-                                ) : null}
                               </li>
                             )
                           })}

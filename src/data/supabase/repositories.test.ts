@@ -167,19 +167,20 @@ describe('Supabase repositories', () => {
         result_state: 'finalized',
         finalized_at: '2026-11-09T18:00:00.000Z',
         active_participant_count: 3,
+        recorded_participant_count: 2,
         eligible_participant_count: 2,
+        result_outcome: 'shared_winners',
+        sole_participant_name: null,
         winner_count: 2,
         winner_names: ['Ava', 'Ben'],
         winner_details: [
           {
             member_key: '11111111111111111111111111111111',
             display_name: 'Ava',
-            includes_estimated: false,
           },
           {
             member_key: '22222222222222222222222222222222',
             display_name: 'Ben',
-            includes_estimated: true,
           },
         ],
       },
@@ -195,17 +196,18 @@ describe('Supabase repositories', () => {
         state: 'finalized',
         finalizedAt: '2026-11-09T18:00:00.000Z',
         activeParticipantCount: 3,
+        recordedParticipantCount: 2,
         eligibleParticipantCount: 2,
+        resultOutcome: 'shared_winners',
+        soleParticipantName: null,
         winnerCount: 2,
         winnerDetails: [
           {
             displayName: 'Ava',
-            includesEstimated: false,
             memberKey: '11111111111111111111111111111111',
           },
           {
             displayName: 'Ben',
-            includesEstimated: true,
             memberKey: '22222222222222222222222222222222',
           },
         ],
@@ -224,14 +226,16 @@ describe('Supabase repositories', () => {
         result_state: 'finalized',
         finalized_at: '2026-11-09T18:00:00.000Z',
         active_participant_count: 1,
+        recorded_participant_count: 1,
         eligible_participant_count: 1,
+        result_outcome: 'sole_participant',
+        sole_participant_name: 'Ava',
         winner_count: 1,
         winner_names: ['Ava'],
         winner_details: [
           {
             member_key: '11111111111111111111111111111111',
             display_name: 'Ava',
-            includes_estimated: false,
           },
         ],
       },
@@ -245,24 +249,26 @@ describe('Supabase repositories', () => {
     if (!result) throw new Error('Weekly result RPC was unavailable')
     expect(result.state).toBe('success')
     if (result.state === 'success') {
-      expect(result.data.winnerDetails[0]?.includesEstimated).toBe(false)
+      expect(result.data.resultOutcome).toBe('sole_participant')
     }
   })
 
-  it('fails closed on malformed finalized estimate metadata', async () => {
+  it('fails closed on malformed finalized winner identity metadata', async () => {
     stubResponse([
       {
         result_state: 'finalized',
         finalized_at: '2026-11-09T18:00:00.000Z',
         active_participant_count: 1,
+        recorded_participant_count: 1,
         eligible_participant_count: 1,
+        result_outcome: 'sole_participant',
+        sole_participant_name: 'Ava',
         winner_count: 1,
         winner_names: ['Ava'],
         winner_details: [
           {
             member_key: 'raw-user-id',
             display_name: 'Ava',
-            includes_estimated: true,
           },
         ],
       },

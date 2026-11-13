@@ -781,8 +781,6 @@ export function createRepositories(client: DatabaseClient): Repositories {
             const validStates = [
               'disabled',
               'not_available',
-              'not_announced',
-              'pending',
               'provisional',
               'finalized',
             ]
@@ -794,14 +792,12 @@ export function createRepositories(client: DatabaseClient): Repositories {
                     Array.isArray(winner) ||
                     typeof winner.member_key !== 'string' ||
                     !/^[0-9a-f]{32}$/.test(winner.member_key) ||
-                    typeof winner.display_name !== 'string' ||
-                    typeof winner.includes_estimated !== 'boolean'
+                    typeof winner.display_name !== 'string'
                   ) {
                     throw new Error('Invalid finalized weekly winner detail')
                   }
                   return {
                     displayName: winner.display_name,
-                    includesEstimated: winner.includes_estimated,
                     memberKey: winner.member_key,
                   }
                 })
@@ -809,7 +805,9 @@ export function createRepositories(client: DatabaseClient): Repositories {
             if (
               !validStates.includes(row.result_state) ||
               !Number.isInteger(row.active_participant_count) ||
+              !Number.isInteger(row.recorded_participant_count) ||
               !Number.isInteger(row.eligible_participant_count) ||
+              typeof row.result_outcome !== 'string' ||
               !Number.isInteger(row.winner_count) ||
               row.winner_count !== row.winner_names.length ||
               row.winner_names.some((name) => typeof name !== 'string') ||
@@ -827,15 +825,13 @@ export function createRepositories(client: DatabaseClient): Repositories {
             }
             return {
               activeParticipantCount: row.active_participant_count,
+              recordedParticipantCount: row.recorded_participant_count,
               eligibleParticipantCount: row.eligible_participant_count,
               finalizedAt: row.finalized_at,
+              resultOutcome: row.result_outcome,
+              soleParticipantName: row.sole_participant_name,
               state: row.result_state as
-                | 'disabled'
-                | 'not_available'
-                | 'not_announced'
-                | 'pending'
-                | 'provisional'
-                | 'finalized',
+                'disabled' | 'not_available' | 'provisional' | 'finalized',
               winnerCount: row.winner_count,
               winnerDetails,
               winnerNames: [...row.winner_names],

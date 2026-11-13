@@ -1553,19 +1553,20 @@ describe('GroupDashboardPage', () => {
                         result_state: 'finalized',
                         finalized_at: '2026-11-09T18:00:00.000Z',
                         active_participant_count: 3,
+                        recorded_participant_count: 2,
                         eligible_participant_count: 2,
+                        result_outcome: 'shared_winners',
+                        sole_participant_name: null,
                         winner_count: 2,
                         winner_names: ['Ava', 'Ava'],
                         winner_details: [
                           {
                             member_key: '11111111111111111111111111111111',
                             display_name: 'Ava',
-                            includes_estimated: false,
                           },
                           {
                             member_key: '22222222222222222222222222222222',
                             display_name: 'Ava',
-                            includes_estimated: true,
                           },
                         ],
                       },
@@ -1607,7 +1608,9 @@ describe('GroupDashboardPage', () => {
     ).not.toBeInTheDocument()
     expect(screen.queryByText('48.5%')).not.toBeInTheDocument()
     expect(
-      await screen.findByText(/Final shared weekly winners/),
+      await screen.findByText(
+        'Final shared weekly winners — 2 of 3 members recorded',
+      ),
     ).toBeInTheDocument()
     const winnerList = screen.getByRole('list', { name: 'Weekly winners' })
     const winnerItems = within(winnerList).getAllByRole('listitem')
@@ -1618,11 +1621,8 @@ describe('GroupDashboardPage', () => {
       winnerItems[1]?.querySelector('[data-avatar-preset="male-02"]'),
     ).toBeInTheDocument()
     expect(
-      within(winnerItems[0]!).queryByText('Includes estimated weight'),
+      screen.queryByText('Includes estimated weight'),
     ).not.toBeInTheDocument()
-    expect(
-      within(winnerItems[1]!).getByText('Includes estimated weight'),
-    ).toBeInTheDocument()
     expect(screen.getByText(/This award is locked/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('link', { name: 'Members' }))
     expect(
@@ -1840,7 +1840,10 @@ describe('GroupDashboardPage', () => {
               result_state: 'disabled',
               finalized_at: null,
               active_participant_count: 0,
+              recorded_participant_count: 0,
               eligible_participant_count: 0,
+              result_outcome: 'no_eligible_candidates',
+              sole_participant_name: null,
               winner_count: 0,
               winner_details: [],
               winner_names: [],
@@ -2147,7 +2150,10 @@ describe('GroupDashboardPage', () => {
               result_state: 'disabled',
               finalized_at: null,
               active_participant_count: 0,
+              recorded_participant_count: 0,
               eligible_participant_count: 0,
+              result_outcome: 'no_eligible_candidates',
+              sole_participant_name: null,
               winner_count: 0,
               winner_details: [],
               winner_names: [],

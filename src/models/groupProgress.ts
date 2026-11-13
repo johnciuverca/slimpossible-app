@@ -27,15 +27,12 @@ export type GroupWeeklyWinCount = {
 
 export type GroupWeeklyResultDisplay = {
   activeParticipantCount: number
+  recordedParticipantCount: number
   eligibleParticipantCount: number
   finalizedAt: string | null
-  state:
-    | 'disabled'
-    | 'not_available'
-    | 'not_announced'
-    | 'pending'
-    | 'provisional'
-    | 'finalized'
+  resultOutcome: string
+  soleParticipantName: string | null
+  state: 'disabled' | 'not_available' | 'provisional' | 'finalized'
   winnerCount: number
   winnerDetails: GroupWeeklyResultWinner[]
   winnerNames: string[]
@@ -43,8 +40,7 @@ export type GroupWeeklyResultDisplay = {
 
 export type GroupWeeklyResultWinner = {
   displayName: string
-  includesEstimated: boolean
-  memberKey: string
+  memberKey: string | null
 }
 
 export function mostRecentSunday(date = new Date()) {
