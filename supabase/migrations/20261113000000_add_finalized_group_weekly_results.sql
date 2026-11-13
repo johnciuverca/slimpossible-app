@@ -58,6 +58,7 @@ create table public.group_weekly_result_winners (
   challenge_id uuid not null,
   sunday date not null,
   participant_id uuid not null,
+  member_key text not null check (member_key ~ '^[0-9a-f]{32}$'),
   display_name text not null,
   weight_change_kg numeric(8, 3) not null,
   previous_weight_kg numeric(8, 2) not null,
@@ -942,7 +943,7 @@ begin
       and (version.payload ->> 'withdrawn_at' is null
         or (version.payload ->> 'withdrawn_at')::timestamptz > cutoff)
   ), candidates as (
-    select member.participant_id, member.display_name,
+    select member.participant_id, member.user_id, member.display_name,
       previous_value.value ->> 'weight_kg' as previous_weight,
       current_value.value ->> 'weight_kg' as current_weight,
       (previous_value.value ->> 'estimated')::boolean as previous_estimated,
@@ -971,6 +972,7 @@ begin
     coalesce((select array_agg(winner.display_name order by winner.display_name) from winners as winner), '{}'),
     coalesce((select jsonb_agg(jsonb_build_object(
       'participant_id', winner.participant_id,
+      'member_key', md5(target_challenge_id::text || ':' || winner.user_id::text),
       'display_name', winner.display_name,
       'weight_change_kg', winner.weight_change,
       'previous_weight_kg', winner.previous_weight,
@@ -996,12 +998,13 @@ begin
   ) on conflict (challenge_id, sunday) do nothing;
 
   insert into public.group_weekly_result_winners(
-    challenge_id, sunday, participant_id, display_name, weight_change_kg,
+    challenge_id, sunday, participant_id, member_key, display_name, weight_change_kg,
     previous_weight_kg, current_weight_kg, previous_is_estimated,
     current_is_estimated, endpoint_evidence
   )
   select target_challenge_id, target_sunday,
     (winner.value ->> 'participant_id')::uuid,
+    winner.value ->> 'member_key',
     winner.value ->> 'display_name',
     (winner.value ->> 'weight_change_kg')::numeric,
     (winner.value ->> 'previous_weight_kg')::numeric,
@@ -1025,7 +1028,8 @@ returns table (
   active_participant_count integer,
   eligible_participant_count integer,
   winner_count integer,
-  winner_names text[]
+  winner_names text[],
+  winner_details jsonb
 )
 language plpgsql volatile security definer
 set search_path = pg_catalog, public, auth
@@ -1058,11 +1062,11 @@ begin
   select control.effective_from_sunday into effective_from
   from public.group_weekly_result_control as control where control.singleton;
   if not found or effective_from is null then
-    return query select 'disabled', null::timestamptz, 0, 0, 0, '{}'::text[];
+    return query select 'disabled', null::timestamptz, 0, 0, 0, '{}'::text[], '[]'::jsonb;
     return;
   end if;
   if target_sunday < effective_from then
-    return query select 'not_available', null::timestamptz, 0, 0, 0, '{}'::text[];
+    return query select 'not_available', null::timestamptz, 0, 0, 0, '{}'::text[], '[]'::jsonb;
     return;
   end if;
   provisional_at := (target_sunday::timestamp + time '20:00') at time zone 'Europe/Bucharest';
@@ -1070,16 +1074,25 @@ begin
 
   return query
   select 'finalized', result.finalized_at, result.active_participant_count,
-    result.eligible_participant_count, result.winner_count, result.winner_names
+    result.eligible_participant_count, result.winner_count, result.winner_names,
+    coalesce((
+      select jsonb_agg(jsonb_build_object(
+        'member_key', winner.member_key,
+        'display_name', winner.display_name,
+        'includes_estimated', winner.previous_is_estimated or winner.current_is_estimated
+      ) order by winner.display_name, winner.member_key)
+      from public.group_weekly_result_winners as winner
+      where winner.challenge_id = result.challenge_id and winner.sunday = result.sunday
+    ), '[]'::jsonb)
   from public.group_weekly_results as result
   where result.challenge_id = target_challenge_id and result.sunday = target_sunday;
   if found then return; end if;
   if now_at < provisional_at then
-    return query select 'not_announced', null::timestamptz, 0, 0, 0, '{}'::text[];
+    return query select 'not_announced', null::timestamptz, 0, 0, 0, '{}'::text[], '[]'::jsonb;
     return;
   end if;
   if now_at >= final_at then
-    return query select 'pending', null::timestamptz, 0, 0, 0, '{}'::text[];
+    return query select 'pending', null::timestamptz, 0, 0, 0, '{}'::text[], '[]'::jsonb;
     return;
   end if;
 
@@ -1124,7 +1137,8 @@ begin
     (select count(*)::integer from candidates),
     (select count(*)::integer from winners),
     coalesce((select array_agg(winner.display_name order by winner.display_name)
-      from winners as winner), '{}'::text[]);
+      from winners as winner), '{}'::text[]),
+    '[]'::jsonb;
 end;
 $$;
 

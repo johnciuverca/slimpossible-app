@@ -1498,7 +1498,7 @@ describe('GroupDashboardPage', () => {
             ? Promise.resolve(
                 response([
                   {
-                    member_key: 'opaque-a',
+                    member_key: '11111111111111111111111111111111',
                     display_name: 'Ava',
                     avatar_preset_id: 'female-03',
                     starting_weight_kg: 90,
@@ -1511,8 +1511,8 @@ describe('GroupDashboardPage', () => {
                     negative_progress_capped: false,
                   },
                   {
-                    member_key: 'opaque-b',
-                    display_name: 'Ben',
+                    member_key: '22222222222222222222222222222222',
+                    display_name: 'Ava',
                     avatar_preset_id: 'male-02',
                     starting_weight_kg: 90,
                     target_weight_kg: 80,
@@ -1555,7 +1555,19 @@ describe('GroupDashboardPage', () => {
                         active_participant_count: 3,
                         eligible_participant_count: 2,
                         winner_count: 2,
-                        winner_names: ['Ava', 'Ben'],
+                        winner_names: ['Ava', 'Ava'],
+                        winner_details: [
+                          {
+                            member_key: '11111111111111111111111111111111',
+                            display_name: 'Ava',
+                            includes_estimated: false,
+                          },
+                          {
+                            member_key: '22222222222222222222222222222222',
+                            display_name: 'Ava',
+                            includes_estimated: true,
+                          },
+                        ],
                       },
                     ]),
                   )
@@ -1598,11 +1610,18 @@ describe('GroupDashboardPage', () => {
       await screen.findByText(/Final shared weekly winners/),
     ).toBeInTheDocument()
     const winnerList = screen.getByRole('list', { name: 'Weekly winners' })
+    const winnerItems = within(winnerList).getAllByRole('listitem')
     expect(
-      winnerList.querySelector('[data-avatar-preset="female-03"]'),
+      winnerItems[0]?.querySelector('[data-avatar-preset="female-03"]'),
     ).toBeInTheDocument()
     expect(
-      winnerList.querySelector('[data-avatar-preset="male-02"]'),
+      winnerItems[1]?.querySelector('[data-avatar-preset="male-02"]'),
+    ).toBeInTheDocument()
+    expect(
+      within(winnerItems[0]!).queryByText('Includes estimated weight'),
+    ).not.toBeInTheDocument()
+    expect(
+      within(winnerItems[1]!).getByText('Includes estimated weight'),
     ).toBeInTheDocument()
     expect(screen.getByText(/This award is locked/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('link', { name: 'Members' }))
@@ -1624,8 +1643,8 @@ describe('GroupDashboardPage', () => {
     expect(
       screen.getByRole('list', { name: 'Challenge weeks won' }),
     ).toHaveTextContent('Ava2 weeksBen2 weeksCasey0 weeks')
-    expect(screen.getAllByText('Ava')).toHaveLength(3)
-    expect(screen.getAllByText('Ben')).toHaveLength(3)
+    expect(screen.getAllByText('Ava')).toHaveLength(4)
+    expect(screen.getAllByText('Ben')).toHaveLength(2)
     expect(
       screen.getByRole('heading', { name: 'Provisional leader' }),
     ).toBeInTheDocument()
@@ -1700,8 +1719,7 @@ describe('GroupDashboardPage', () => {
     expect(finalizedWeeklyResult).toHaveTextContent(
       'Final shared weekly winners',
     )
-    expect(finalizedWeeklyResult).toHaveTextContent('Ava')
-    expect(finalizedWeeklyResult).toHaveTextContent('Ben')
+    expect(within(finalizedWeeklyResult).getAllByText('Ava')).toHaveLength(2)
     expect(finalizedWeeklyResult).not.toHaveTextContent('Casey')
     await waitFor(() =>
       expect(
@@ -1824,6 +1842,7 @@ describe('GroupDashboardPage', () => {
               active_participant_count: 0,
               eligible_participant_count: 0,
               winner_count: 0,
+              winner_details: [],
               winner_names: [],
             },
           ])
@@ -2130,6 +2149,7 @@ describe('GroupDashboardPage', () => {
               active_participant_count: 0,
               eligible_participant_count: 0,
               winner_count: 0,
+              winner_details: [],
               winner_names: [],
             },
           ])

@@ -37,7 +37,14 @@ export type GroupWeeklyResultDisplay = {
     | 'provisional'
     | 'finalized'
   winnerCount: number
+  winnerDetails: GroupWeeklyResultWinner[]
   winnerNames: string[]
+}
+
+export type GroupWeeklyResultWinner = {
+  displayName: string
+  includesEstimated: boolean
+  memberKey: string
 }
 
 export function mostRecentSunday(date = new Date()) {

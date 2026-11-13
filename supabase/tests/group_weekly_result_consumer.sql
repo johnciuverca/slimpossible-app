@@ -306,7 +306,7 @@ begin
     ('40400000-0000-4000-8000-000000000103', '40400000-0000-4000-8000-000000000001', 'weigh_in', '00000000-0000-4000-8000-000000000001', '9902', 1, durable_position, (base_sunday + 8)::timestamp at time zone 'UTC', jsonb_build_object('event_id','40400000-0000-4000-8000-000000000103','kind','weigh_in','challenge_id','40400000-0000-4000-8000-000000000001','user_id','00000000-0000-4000-8000-000000000001','recorded_date',base_sunday + 7,'weight_kg',80,'shared',true)),
     ('40400000-0000-4000-8000-000000000104', '40400000-0000-4000-8000-000000000001', 'weigh_in', '00000000-0000-4000-8000-000000000002', '9902', 2, durable_position, (base_sunday + 8)::timestamp at time zone 'UTC', jsonb_build_object('event_id','40400000-0000-4000-8000-000000000104','kind','weigh_in','challenge_id','40400000-0000-4000-8000-000000000001','user_id','00000000-0000-4000-8000-000000000002','recorded_date',base_sunday + 7,'weight_kg',82,'shared',true)),
     ('40400000-0000-4000-8000-000000000105', '40400000-0000-4000-8000-000000000001', 'weigh_in', '00000000-0000-4000-8000-000000000001', '9903', 1, durable_position, (base_sunday + 15)::timestamp at time zone 'UTC', jsonb_build_object('event_id','40400000-0000-4000-8000-000000000105','kind','weigh_in','challenge_id','40400000-0000-4000-8000-000000000001','user_id','00000000-0000-4000-8000-000000000001','recorded_date',base_sunday + 14,'weight_kg',78,'shared',true)),
-    ('40400000-0000-4000-8000-000000000106', '40400000-0000-4000-8000-000000000001', 'weigh_in', '00000000-0000-4000-8000-000000000002', '9903', 2, durable_position, (base_sunday + 15)::timestamp at time zone 'UTC', jsonb_build_object('event_id','40400000-0000-4000-8000-000000000106','kind','weigh_in','challenge_id','40400000-0000-4000-8000-000000000001','user_id','00000000-0000-4000-8000-000000000002','recorded_date',base_sunday + 14,'weight_kg',80,'shared',true));
+    ('40400000-0000-4000-8000-000000000106', '40400000-0000-4000-8000-000000000001', 'weigh_in', '00000000-0000-4000-8000-000000000002', '9903', 2, durable_position, (base_sunday + 15)::timestamp at time zone 'UTC', jsonb_build_object('event_id','40400000-0000-4000-8000-000000000106','kind','weigh_in','challenge_id','40400000-0000-4000-8000-000000000001','user_id','00000000-0000-4000-8000-000000000002','recorded_date',base_sunday + 14,'shared',false));
 
   finalized := public.finalize_group_weekly_result(
     '40400000-0000-4000-8000-000000000001', base_sunday + 7
@@ -319,6 +319,18 @@ begin
      or result_row.eligible_participant_count <> 0 then
     raise exception 'Missing Sunday endpoints did not finalize as no eligible candidates.';
   end if;
+
+  -- The owner has an estimated previous Sunday; the member has an estimated
+  -- current Sunday. Both retain tied scores so UI identity/labels are mixed.
+  insert into public.group_weekly_result_events(
+    event_id, challenge_id, event_kind, user_id, source_xid,
+    transaction_ordinal, commit_lsn, committed_at, payload
+  ) values
+    ('40400000-0000-4000-8000-000000000112', '40400000-0000-4000-8000-000000000001', 'weigh_in', '00000000-0000-4000-8000-000000000002', '9912', 1, durable_position, (base_sunday + 15)::timestamp at time zone 'UTC', jsonb_build_object('event_id','40400000-0000-4000-8000-000000000112','kind','weigh_in','challenge_id','40400000-0000-4000-8000-000000000001','user_id','00000000-0000-4000-8000-000000000002','recorded_date',base_sunday + 13,'weight_kg',79,'shared',true)),
+    ('40400000-0000-4000-8000-000000000113', '40400000-0000-4000-8000-000000000001', 'weigh_in', '00000000-0000-4000-8000-000000000002', '9912', 2, durable_position, (base_sunday + 15)::timestamp at time zone 'UTC', jsonb_build_object('event_id','40400000-0000-4000-8000-000000000113','kind','weigh_in','challenge_id','40400000-0000-4000-8000-000000000001','user_id','00000000-0000-4000-8000-000000000002','recorded_date',base_sunday + 15,'weight_kg',81,'shared',true)),
+    ('40400000-0000-4000-8000-000000000114', '40400000-0000-4000-8000-000000000001', 'weigh_in', '00000000-0000-4000-8000-000000000001', '9913', 1, durable_position, (base_sunday + 15)::timestamp at time zone 'UTC' + interval '1 minute', jsonb_build_object('event_id','40400000-0000-4000-8000-000000000114','kind','weigh_in','challenge_id','40400000-0000-4000-8000-000000000001','user_id','00000000-0000-4000-8000-000000000001','recorded_date',base_sunday + 7,'shared',false)),
+    ('40400000-0000-4000-8000-000000000115', '40400000-0000-4000-8000-000000000001', 'weigh_in', '00000000-0000-4000-8000-000000000001', '9913', 2, durable_position, (base_sunday + 15)::timestamp at time zone 'UTC' + interval '1 minute', jsonb_build_object('event_id','40400000-0000-4000-8000-000000000115','kind','weigh_in','challenge_id','40400000-0000-4000-8000-000000000001','user_id','00000000-0000-4000-8000-000000000001','recorded_date',base_sunday + 6,'weight_kg',81,'shared',true)),
+    ('40400000-0000-4000-8000-000000000116', '40400000-0000-4000-8000-000000000001', 'weigh_in', '00000000-0000-4000-8000-000000000001', '9913', 3, durable_position, (base_sunday + 15)::timestamp at time zone 'UTC' + interval '1 minute', jsonb_build_object('event_id','40400000-0000-4000-8000-000000000116','kind','weigh_in','challenge_id','40400000-0000-4000-8000-000000000001','user_id','00000000-0000-4000-8000-000000000001','recorded_date',base_sunday + 8,'weight_kg',79,'shared',true));
 
   finalized := public.finalize_group_weekly_result(
     '40400000-0000-4000-8000-000000000001', base_sunday + 14
@@ -437,6 +449,32 @@ begin
      or display_row.winner_names <> array['Weekly member', 'Weekly owner']::text[] then
     raise exception 'The public display RPC did not return the immutable result.';
   end if;
+  if not exists (
+    select 1 from jsonb_array_elements(display_row.winner_details) as detail(value)
+    where detail.value ->> 'member_key' = md5(
+      '40400000-0000-4000-8000-000000000001:00000000-0000-4000-8000-000000000002'
+    ) and detail.value ->> 'display_name' = 'Weekly member'
+      and detail.value ->> 'includes_estimated' = 'true'
+  ) or not exists (
+    select 1 from jsonb_array_elements(display_row.winner_details) as detail(value)
+    where detail.value ->> 'member_key' = md5(
+      '40400000-0000-4000-8000-000000000001:00000000-0000-4000-8000-000000000001'
+    ) and detail.value ->> 'display_name' = 'Weekly owner'
+      and detail.value ->> 'includes_estimated' = 'true'
+  ) then raise exception 'Finalized ties did not retain per-winner estimate flags and opaque identities: %', display_row.winner_details; end if;
+  if not exists (
+    select 1 from public.group_weekly_result_winners as winner
+    where winner.challenge_id = '40400000-0000-4000-8000-000000000001'
+      and winner.sunday = base_sunday + 14
+      and winner.display_name = 'Weekly member'
+      and not winner.previous_is_estimated and winner.current_is_estimated
+  ) or not exists (
+    select 1 from public.group_weekly_result_winners as winner
+    where winner.challenge_id = '40400000-0000-4000-8000-000000000001'
+      and winner.sunday = base_sunday + 14
+      and winner.display_name = 'Weekly owner'
+      and winner.previous_is_estimated and not winner.current_is_estimated
+  ) then raise exception 'The synthetic ties did not cover separate previous and current interpolation evidence.'; end if;
   select jsonb_agg(jsonb_build_object('name', counts.display_name, 'wins', counts.win_count)
     order by counts.display_name) into win_counts
   from public.get_group_weekly_win_counts('40400000-0000-4000-8000-000000000001') as counts;

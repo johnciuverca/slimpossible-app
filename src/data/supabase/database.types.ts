@@ -321,6 +321,7 @@ export type Database = {
           finalized_at: string | null
           result_state: string
           winner_count: number
+          winner_details: Json
           winner_names: string[]
         }[]
       }

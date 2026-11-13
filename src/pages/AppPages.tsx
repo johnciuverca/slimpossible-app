@@ -1990,6 +1990,14 @@ export function GroupDashboardPage() {
   const weeklyWinnerNames = hasManagedWeeklyResult
     ? (weeklyResultDisplay?.winnerNames ?? [])
     : (weeklyCelebration?.winnerNames ?? [])
+  const weeklyWinnerEntries =
+    hasManagedWeeklyResult && weeklyResultDisplay?.state === 'finalized'
+      ? weeklyResultDisplay.winnerDetails
+      : weeklyWinnerNames.map((displayName) => ({
+          displayName,
+          includesEstimated: false,
+          memberKey: null,
+        }))
   const weeklyResultHeading = hasManagedWeeklyResult
     ? weeklyResultDisplay?.state === 'finalized'
       ? weeklyResultDisplay.winnerCount > 1
@@ -2344,14 +2352,17 @@ export function GroupDashboardPage() {
                       <p className="mt-2 text-sm leading-6 text-slate-700">
                         {weeklyResultMessage}
                       </p>
-                      {weeklyWinnerNames.length > 0 ? (
+                      {weeklyWinnerEntries.length > 0 ? (
                         <ul
                           aria-label="Weekly winners"
                           className="mt-3 space-y-2"
                         >
-                          {weeklyWinnerNames.map((name, index) => {
+                          {weeklyWinnerEntries.map((winner, index) => {
                             const matchingMembers = memberProgress.filter(
-                              (member) => member.displayName === name,
+                              (member) =>
+                                winner.memberKey
+                                  ? member.memberKey === winner.memberKey
+                                  : member.displayName === winner.displayName,
                             )
                             const avatarMember =
                               matchingMembers.length === 1
@@ -2360,13 +2371,21 @@ export function GroupDashboardPage() {
                             return (
                               <li
                                 className="flex items-center gap-3 rounded-xl bg-emerald-50 px-4 py-3 font-semibold text-slate-900"
-                                key={`${name}-${index}`}
+                                key={
+                                  winner.memberKey ??
+                                  `${winner.displayName}-${index}`
+                                }
                               >
                                 <GroupParticipantAvatar
                                   avatarPresetId={avatarMember?.avatarPresetId}
-                                  displayName={name}
+                                  displayName={winner.displayName}
                                 />
-                                {name}
+                                <span>{winner.displayName}</span>
+                                {winner.includesEstimated ? (
+                                  <span className="ml-auto rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900">
+                                    Includes estimated weight
+                                  </span>
+                                ) : null}
                               </li>
                             )
                           })}

@@ -6,6 +6,7 @@
 - An actual shared Sunday value wins over an estimate. A missing Sunday may interpolate between the nearest eligible shared actual records on either side, rounded to 0.05 kg. The calculation never extrapolates or uses an estimate as an endpoint.
 - Membership and endpoint eligibility are evaluated as of the cutoff. Pre-join endpoints are excluded. Only source events with PostgreSQL commit timestamps strictly before the cutoff qualify.
 - The provisional dashboard state begins Sunday at 20:00 Europe/Bucharest. It remains revisable through Monday at 20:00. Finalization requires a durable post-cutoff barrier, then writes a challenge-scoped immutable award. Retries leave that award unchanged.
+- Finalized winner details retain an opaque member key and whether either locked Sunday value was interpolated. The dashboard labels only those winners with “Includes estimated weight”; later weigh-in edits cannot change the award label.
 - Historical weekly counts continue using the existing calculation before the configured rollout Sunday. New weeks contribute only finalized awards; provisional results do not change standings. No historical awards are generated automatically.
 - `effective_from_sunday` stays unset until the owner chooses the first eligible rollout Sunday through the restricted initializer. Its Sunday 20:00 Bucharest provisional cutoff must still be in the future when initialized. That exact Sunday is eligible for immutable finalization; earlier Sundays remain on the unchanged legacy path and are never backfilled.
 
