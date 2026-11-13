@@ -220,6 +220,37 @@ describe('Supabase repositories', () => {
     )
   })
 
+  it('preserves pending state when a required snapshot is missing', async () => {
+    stubResponse([
+      {
+        result_state: 'pending',
+        finalized_at: null,
+        active_participant_count: 0,
+        recorded_participant_count: 0,
+        eligible_participant_count: 0,
+        result_outcome: 'no_eligible_candidates',
+        sole_participant_name: null,
+        winner_count: 0,
+        winner_names: [],
+        winner_details: [],
+      },
+    ])
+
+    const result = await createRepositories(
+      client,
+    ).groupProgress.getWeeklyResultDisplay?.('group-1', '2026-11-08')
+
+    expect(result).toMatchObject({
+      state: 'success',
+      data: {
+        state: 'pending',
+        finalizedAt: null,
+        winnerCount: 0,
+        winnerDetails: [],
+      },
+    })
+  })
+
   it('maps actual-only finalized winners without estimate labels', async () => {
     stubResponse([
       {

@@ -21,6 +21,7 @@ create table public.group_weekly_candidates (
   sunday date not null,
   user_id uuid not null,
   participant_id uuid not null,
+  joined_at timestamptz,
   display_name text not null,
   is_active boolean not null,
   actual_weight_kg numeric(6, 2),
@@ -178,13 +179,17 @@ begin
   if not found or week.snapshot_ready then return; end if;
 
   insert into public.group_weekly_candidates(
-    challenge_id, sunday, user_id, participant_id, display_name,
+    challenge_id, sunday, user_id, participant_id, joined_at, display_name,
     is_active, actual_weight_kg
   )
   select target_challenge_id, target_sunday,
-    participant.user_id, participant.id, participant.display_name,
+    participant.user_id, participant.id, participant.joined_at, participant.display_name,
     participant.status = 'active',
-    case when share.personal_weigh_in_id is not null then personal.weight_kg end
+    case when share.personal_weigh_in_id is not null
+      and participant.joined_at is not null
+      and personal.recorded_date >= (participant.joined_at at time zone 'Europe/Bucharest')::date
+      and greatest(personal.created_at, personal.updated_at) >= participant.joined_at
+      then personal.weight_kg end
   from public.participants as participant
   left join public.personal_weigh_ins as personal
     on personal.user_id = participant.user_id
@@ -195,6 +200,7 @@ begin
   where participant.challenge_id = target_challenge_id
   on conflict (challenge_id, sunday, user_id) do update set
     participant_id = excluded.participant_id,
+    joined_at = excluded.joined_at,
     display_name = excluded.display_name,
     is_active = excluded.is_active,
     actual_weight_kg = excluded.actual_weight_kg;
@@ -223,13 +229,17 @@ begin
   loop
     perform public._group_weekly_ensure_snapshot(scope.challenge_id, scope.sunday);
     insert into public.group_weekly_candidates(
-      challenge_id, sunday, user_id, participant_id, display_name,
+      challenge_id, sunday, user_id, participant_id, joined_at, display_name,
       is_active, actual_weight_kg
     )
     select scope.challenge_id, scope.sunday,
-      participant.user_id, participant.id, participant.display_name,
+      participant.user_id, participant.id, participant.joined_at, participant.display_name,
       participant.status = 'active',
-      case when share.personal_weigh_in_id is not null then personal.weight_kg end
+      case when share.personal_weigh_in_id is not null
+        and participant.joined_at is not null
+        and personal.recorded_date >= (participant.joined_at at time zone 'Europe/Bucharest')::date
+        and greatest(personal.created_at, personal.updated_at) >= participant.joined_at
+        then personal.weight_kg end
     from public.participants as participant
     left join public.personal_weigh_ins as personal
       on personal.user_id = participant.user_id
@@ -240,6 +250,7 @@ begin
     where participant.challenge_id = scope.challenge_id
     on conflict (challenge_id, sunday, user_id) do update set
       participant_id = excluded.participant_id,
+      joined_at = excluded.joined_at,
       display_name = excluded.display_name,
       is_active = excluded.is_active,
       actual_weight_kg = excluded.actual_weight_kg;
@@ -299,8 +310,8 @@ begin
     new_sunday := new.recorded_date;
   end if;
   if tg_op = 'UPDATE' and old.id is distinct from new.id then
-    perform pg_catalog.pg_advisory_xact_lock(hashtextextended(old.id::text, 404405));
-    perform pg_catalog.pg_advisory_xact_lock(hashtextextended(new.id::text, 404405));
+    perform pg_catalog.pg_advisory_xact_lock(hashtextextended(least(old.id::text, new.id::text), 404405));
+    perform pg_catalog.pg_advisory_xact_lock(hashtextextended(greatest(old.id::text, new.id::text), 404405));
   else
     perform pg_catalog.pg_advisory_xact_lock(hashtextextended(entry_id::text, 404405));
   end if;
@@ -488,8 +499,55 @@ create function public._group_weekly_participant_after()
 returns trigger language plpgsql security definer
 set search_path = pg_catalog, public
 as $$
+declare
+  open_sunday date := public._group_weekly_upcoming_sunday();
+  effective_sunday date;
 begin
   perform public._group_weekly_refresh_accepted_scopes();
+  select control.effective_from_sunday into effective_sunday
+  from public.group_weekly_result_control as control where control.singleton;
+  if effective_sunday is not null then
+    open_sunday := greatest(open_sunday, effective_sunday);
+  end if;
+  if tg_op = 'DELETE' or (tg_op = 'UPDATE' and
+      (old.challenge_id, old.user_id) is distinct from (new.challenge_id, new.user_id)) then
+    delete from public.group_weekly_candidates as candidate
+    where candidate.challenge_id = old.challenge_id and candidate.user_id = old.user_id
+      and candidate.sunday >= open_sunday
+      and not exists (select 1 from public.group_weekly_results as result
+        where result.challenge_id = candidate.challenge_id and result.sunday = candidate.sunday);
+  end if;
+  if tg_op <> 'DELETE' then
+    insert into public.group_weekly_candidates(
+      challenge_id, sunday, user_id, participant_id, joined_at, display_name,
+      is_active, actual_weight_kg
+    )
+    select participant.challenge_id, week.sunday, participant.user_id,
+      participant.id, participant.joined_at, participant.display_name,
+      participant.status = 'active',
+      case when share.personal_weigh_in_id is not null
+        and participant.joined_at is not null
+        and personal.recorded_date >= (participant.joined_at at time zone 'Europe/Bucharest')::date
+        and greatest(personal.created_at, personal.updated_at) >= participant.joined_at
+        then personal.weight_kg end
+    from public.participants as participant
+    join public.group_weekly_candidate_weeks as week
+      on week.challenge_id = participant.challenge_id and week.sunday >= open_sunday
+    left join public.personal_weigh_ins as personal
+      on personal.user_id = participant.user_id and personal.recorded_date = week.sunday
+    left join public.personal_weigh_in_group_shares as share
+      on share.personal_weigh_in_id = personal.id
+     and share.challenge_id = participant.challenge_id
+    where (participant.challenge_id = new.challenge_id and participant.user_id = new.user_id)
+      and not exists (select 1 from public.group_weekly_results as result
+        where result.challenge_id = week.challenge_id and result.sunday = week.sunday)
+    on conflict (challenge_id, sunday, user_id) do update set
+      participant_id = excluded.participant_id,
+      joined_at = excluded.joined_at,
+      display_name = excluded.display_name,
+      is_active = excluded.is_active,
+      actual_weight_kg = excluded.actual_weight_kg;
+  end if;
   return case when tg_op = 'DELETE' then old else new end;
 end;
 $$;
@@ -526,8 +584,8 @@ begin
   if not public.group_weekly_rollout_cutoff_is_future(target_effective_from_sunday) then
     raise exception using errcode = '22023', message = 'Choose a Sunday whose 20:00 Bucharest cutoff is still ahead.';
   end if;
-  -- Match the source-write order used by save_personal_weigh_in: source rows,
-  -- shares, challenge rows, then participants.
+  -- Stop source, share, challenge, and participant writes while the initial
+  -- per-challenge Sunday snapshots and eligibility baseline are captured.
   lock table public.personal_weigh_ins in share row exclusive mode;
   lock table public.personal_weigh_in_group_shares in share row exclusive mode;
   lock table public.challenges in share row exclusive mode;
@@ -583,6 +641,10 @@ begin
   if effective_sunday is null then return new; end if;
   first_sunday := greatest(effective_sunday, public._group_weekly_upcoming_sunday());
   final_sunday := new.end_date - extract(dow from new.end_date)::integer;
+  if first_sunday > final_sunday then return new; end if;
+  insert into public.group_weekly_candidate_weeks(challenge_id, sunday)
+  values (new.id, first_sunday - 7) on conflict do nothing;
+  perform public._group_weekly_ensure_snapshot(new.id, first_sunday - 7);
   for target_sunday in
     select generate_series(first_sunday, final_sunday, interval '7 days')::date
   loop
@@ -631,6 +693,7 @@ as $$
     from current_rows as current_row
     join previous_rows as previous_row
       on previous_row.user_id = current_row.user_id
+     and previous_row.joined_at is not distinct from current_row.joined_at
     where current_row.is_active
       and current_row.actual_weight_kg is not null
       and previous_row.actual_weight_kg is not null
@@ -699,6 +762,16 @@ begin
     where result.challenge_id = target_challenge_id and result.sunday = target_sunday) then
     return false;
   end if;
+  if not exists (select 1 from public.group_weekly_candidate_weeks as week
+    where week.challenge_id = target_challenge_id and week.sunday = target_sunday
+      and week.snapshot_ready) then
+    return false;
+  end if;
+  if not exists (select 1 from public.group_weekly_candidate_weeks as week
+    where week.challenge_id = target_challenge_id and week.sunday = target_sunday - 7
+      and week.snapshot_ready) then
+    return false;
+  end if;
   select * into summary from public._group_weekly_snapshot_summary(
     target_challenge_id, target_sunday
   );
@@ -723,6 +796,7 @@ begin
   join public.group_weekly_candidates as previous_row
     on previous_row.challenge_id = current_row.challenge_id
    and previous_row.user_id = current_row.user_id
+   and previous_row.joined_at is not distinct from current_row.joined_at
    and previous_row.sunday = target_sunday - 7
   join public.group_weekly_candidates as winner
     on winner.challenge_id = current_row.challenge_id
@@ -739,20 +813,89 @@ begin
       join public.group_weekly_candidates as prior
         on prior.challenge_id = best.challenge_id
        and prior.user_id = best.user_id and prior.sunday = target_sunday - 7
+       and prior.joined_at is not distinct from best.joined_at
       where best.challenge_id = target_challenge_id and best.sunday = target_sunday
         and best.is_active and best.actual_weight_kg is not null
         and prior.actual_weight_kg is not null
     )
   on conflict do nothing;
-  delete from public.group_weekly_candidates as candidate
-  where candidate.challenge_id = target_challenge_id
-    and candidate.sunday < target_sunday - 7;
-  delete from public.group_weekly_candidate_weeks as week
-  where week.challenge_id = target_challenge_id and week.sunday < target_sunday - 7;
   return true;
 end;
 $$;
 revoke all on function public._finalize_group_weekly_result_locked(uuid, date)
+  from public, anon, authenticated, service_role;
+
+create function public._finalize_group_weekly_results_through(
+  target_challenge_id uuid,
+  target_sunday date
+)
+returns boolean language plpgsql volatile security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  effective_sunday date;
+  first_award_sunday date;
+  week_sunday date;
+  lock_scope record;
+begin
+  select control.effective_from_sunday into effective_sunday
+  from public.group_weekly_result_control as control where control.singleton;
+  if effective_sunday is null or target_sunday < effective_sunday then return false; end if;
+  select min(current_week.sunday) into first_award_sunday
+  from public.group_weekly_candidate_weeks as current_week
+  join public.group_weekly_candidate_weeks as previous_week
+    on previous_week.challenge_id = current_week.challenge_id
+   and previous_week.sunday = current_week.sunday - 7
+  where current_week.challenge_id = target_challenge_id
+    and current_week.sunday >= effective_sunday
+    and current_week.sunday <= target_sunday;
+  if first_award_sunday is null then
+    return not exists (select 1 from public.group_weekly_candidate_weeks as current_week
+      where current_week.challenge_id = target_challenge_id
+        and current_week.sunday = target_sunday
+        and (not current_week.snapshot_ready or not exists (
+          select 1 from public.group_weekly_candidate_weeks as previous_week
+          where previous_week.challenge_id = current_week.challenge_id
+            and previous_week.sunday = current_week.sunday - 7
+            and previous_week.snapshot_ready
+        )));
+  end if;
+  -- Reserve every due scope in the same lock-key order used by write triggers,
+  -- then finalize in calendar order while holding the complete due range.
+  for lock_scope in
+    select dates.sunday,
+      public._group_weekly_lock_key(target_challenge_id, dates.sunday::date) as lock_key
+    from generate_series(first_award_sunday, target_sunday, interval '7 days') as dates(sunday)
+    where pg_catalog.clock_timestamp() >= public.group_weekly_cutoff(dates.sunday::date)
+    order by lock_key, dates.sunday
+  loop
+    perform pg_catalog.pg_advisory_xact_lock(lock_scope.lock_key);
+  end loop;
+  week_sunday := first_award_sunday;
+  while week_sunday <= target_sunday loop
+    if pg_catalog.clock_timestamp() < public.group_weekly_cutoff(week_sunday) then
+      exit;
+    end if;
+    if not exists (select 1 from public.group_weekly_candidate_weeks as week
+      where week.challenge_id = target_challenge_id and week.sunday = week_sunday) then
+      return false;
+    end if;
+    if not exists (select 1 from public.group_weekly_candidate_weeks as week
+      where week.challenge_id = target_challenge_id and week.sunday = week_sunday
+        and week.snapshot_ready) then
+      return false;
+    end if;
+    if not public._finalize_group_weekly_result_locked(target_challenge_id, week_sunday)
+       and not exists (select 1 from public.group_weekly_results as result
+         where result.challenge_id = target_challenge_id and result.sunday = week_sunday) then
+      return false;
+    end if;
+    week_sunday := week_sunday + 7;
+  end loop;
+  return true;
+end;
+$$;
+revoke all on function public._finalize_group_weekly_results_through(uuid, date)
   from public, anon, authenticated, service_role;
 
 create function public.get_group_weekly_result_display(
@@ -778,6 +921,7 @@ declare
   effective_sunday date;
   summary record;
   now_at timestamptz;
+  challenge_start_date date;
   challenge_end_date date;
 begin
   if auth.uid() is null then
@@ -798,7 +942,8 @@ begin
   ) then
     raise exception using errcode = '42501', message = 'Group membership required.';
   end if;
-  select challenge.end_date into challenge_end_date
+  select challenge.start_date, challenge.end_date
+    into challenge_start_date, challenge_end_date
   from public.challenges as challenge where challenge.id = target_challenge_id;
   select control.effective_from_sunday into effective_sunday
   from public.group_weekly_result_control as control where control.singleton;
@@ -817,12 +962,31 @@ begin
       'no_eligible_candidates', null::text, 0, '[]'::jsonb, '{}'::text[];
     return;
   end if;
-  perform pg_catalog.pg_advisory_xact_lock(
-    public._group_weekly_lock_key(target_challenge_id, target_sunday)
-  );
+  if target_sunday < challenge_start_date then
+    return query select 0, 0, 0, null::timestamptz, 'not_available',
+      'no_eligible_candidates', null::text, 0, '[]'::jsonb, '{}'::text[];
+    return;
+  end if;
   now_at := pg_catalog.clock_timestamp();
   if now_at < public.group_weekly_cutoff(target_sunday) then
+    perform pg_catalog.pg_advisory_xact_lock(
+      public._group_weekly_lock_key(target_challenge_id, target_sunday)
+    );
     perform public._group_weekly_ensure_snapshot(target_challenge_id, target_sunday);
+    if not exists (select 1 from public.group_weekly_candidate_weeks as week
+      where week.challenge_id = target_challenge_id and week.sunday = target_sunday
+        and week.snapshot_ready) then
+      return query select 0, 0, 0, null::timestamptz, 'pending',
+        'no_eligible_candidates', null::text, 0, '[]'::jsonb, '{}'::text[];
+      return;
+    end if;
+    if not exists (select 1 from public.group_weekly_candidate_weeks as week
+      where week.challenge_id = target_challenge_id and week.sunday = target_sunday - 7
+        and week.snapshot_ready) then
+      return query select 0, 0, 0, null::timestamptz, 'pending',
+        'no_eligible_candidates', null::text, 0, '[]'::jsonb, '{}'::text[];
+      return;
+    end if;
     select * into summary from public._group_weekly_snapshot_summary(
       target_challenge_id, target_sunday
     );
@@ -831,7 +995,17 @@ begin
       summary.sole_name, summary.winner_count, summary.winner_details, summary.winner_names;
     return;
   end if;
-  perform public._finalize_group_weekly_result_locked(target_challenge_id, target_sunday);
+  if not public._finalize_group_weekly_results_through(target_challenge_id, target_sunday) then
+    return query select 0, 0, 0, null::timestamptz, 'pending',
+      'no_eligible_candidates', null::text, 0, '[]'::jsonb, '{}'::text[];
+    return;
+  end if;
+  if not exists (select 1 from public.group_weekly_results as result
+    where result.challenge_id = target_challenge_id and result.sunday = target_sunday) then
+    return query select 0, 0, 0, null::timestamptz, 'pending',
+      'no_eligible_candidates', null::text, 0, '[]'::jsonb, '{}'::text[];
+    return;
+  end if;
   return query select result.active_participant_count,
     result.recorded_participant_count, result.eligible_participant_count,
     result.finalized_at, 'finalized', result.result_outcome,
@@ -1111,11 +1285,13 @@ $$;
 
 create or replace function public.get_group_weekly_win_counts(target_challenge_id uuid)
 returns table(member_key text, display_name text, win_count bigint)
-language plpgsql stable security definer
+language plpgsql volatile security definer
 set search_path = pg_catalog, public, auth
 as $$
 declare
   effective_sunday date;
+  last_due_sunday date;
+  challenge_end_sunday date;
 begin
   if auth.uid() is null or not exists (
     select 1 from public.challenges as challenge
@@ -1130,6 +1306,24 @@ begin
   end if;
   select control.effective_from_sunday into effective_sunday
   from public.group_weekly_result_control as control where control.singleton;
+  if effective_sunday is not null then
+    select challenge.end_date - extract(dow from challenge.end_date)::integer
+      into challenge_end_sunday
+    from public.challenges as challenge where challenge.id = target_challenge_id;
+    last_due_sunday := (pg_catalog.clock_timestamp() at time zone 'Europe/Bucharest')::date
+      - extract(dow from pg_catalog.clock_timestamp() at time zone 'Europe/Bucharest')::integer;
+    if pg_catalog.clock_timestamp() < public.group_weekly_cutoff(last_due_sunday) then
+      last_due_sunday := last_due_sunday - 7;
+    end if;
+    last_due_sunday := least(last_due_sunday, challenge_end_sunday);
+    if last_due_sunday >= effective_sunday
+       and not public._finalize_group_weekly_results_through(
+         target_challenge_id, last_due_sunday
+       ) then
+      raise exception using errcode = '55000',
+        message = 'Weekly results are pending because a required Sunday snapshot is unavailable.';
+    end if;
+  end if;
   return query
   with active_members as (
     select participant.id, participant.user_id, participant.display_name
@@ -1173,5 +1367,171 @@ $$;
 revoke all on function public.get_group_weekly_win_counts(uuid)
   from public, anon;
 grant execute on function public.get_group_weekly_win_counts(uuid) to authenticated;
+
+-- Reserve challenge rows before source-row triggers acquire Sunday locks. This
+-- matches membership RPC order and prevents concurrent multi-group saves from
+-- taking disjoint share scopes in request-array order.
+create or replace function public.save_personal_weigh_in(
+  target_weigh_in_id uuid,
+  target_recorded_date date,
+  target_weight_kg numeric,
+  target_note text,
+  target_shared_challenge_ids uuid[]
+)
+returns table (
+  id uuid,
+  user_id uuid,
+  recorded_date date,
+  weight_kg numeric,
+  note text,
+  created_at timestamptz,
+  updated_at timestamptz,
+  shared_challenge_ids uuid[]
+)
+language plpgsql security definer
+set search_path = pg_catalog, public, auth
+as $$
+declare
+  actor_id uuid := auth.uid();
+  saved_id uuid;
+  requested_ids uuid[] := coalesce(target_shared_challenge_ids, '{}'::uuid[]);
+  requested_count integer;
+  eligible_count integer;
+  source_scope_id uuid;
+begin
+  if actor_id is null then
+    raise exception using errcode = '42501', message = 'Sign-in required.';
+  end if;
+  if target_recorded_date is null or target_recorded_date > current_date
+     or target_weight_kg is null or target_weight_kg <= 0 then
+    raise exception using errcode = '22023', message = 'Invalid weigh-in values.';
+  end if;
+  if cardinality(requested_ids) <> (
+    select count(distinct selected.challenge_id)
+    from unnest(requested_ids) as selected(challenge_id)
+  ) then
+    raise exception using errcode = '22023', message = 'Duplicate group selection.';
+  end if;
+  requested_count := cardinality(requested_ids);
+
+  if target_weigh_in_id is null then
+    select personal.id into source_scope_id
+    from public.personal_weigh_ins as personal
+    where personal.user_id = actor_id and personal.recorded_date = target_recorded_date;
+  else
+    source_scope_id := target_weigh_in_id;
+    if not exists (select 1 from public.personal_weigh_ins as personal
+      where personal.id = target_weigh_in_id and personal.user_id = actor_id) then
+      raise exception using errcode = '42501', message = 'Weigh-in ownership required.';
+    end if;
+  end if;
+  if source_scope_id is null then
+    perform pg_catalog.pg_advisory_xact_lock(hashtextextended(
+      actor_id::text || ':' || target_recorded_date::text, 404406
+    ));
+    select personal.id into source_scope_id
+    from public.personal_weigh_ins as personal
+    where personal.user_id = actor_id and personal.recorded_date = target_recorded_date;
+  else
+    -- Serialize this RPC per source independently of the source-row trigger's
+    -- 404405 lock, which is necessarily acquired after PostgreSQL row locking.
+    perform pg_catalog.pg_advisory_xact_lock(hashtextextended(source_scope_id::text, 404406));
+  end if;
+  if source_scope_id is not null then
+    perform challenge.id
+    from public.challenges as challenge
+    where challenge.id = any(requested_ids)
+       or exists (select 1 from public.personal_weigh_in_group_shares as share
+         where share.personal_weigh_in_id = source_scope_id
+           and share.challenge_id = challenge.id)
+    order by challenge.id
+    for update of challenge;
+  else
+    perform challenge.id
+    from public.challenges as challenge
+    where challenge.id = any(requested_ids)
+    order by challenge.id
+    for update of challenge;
+  end if;
+
+  if target_weigh_in_id is null then
+    insert into public.personal_weigh_ins as current_entry (
+      user_id, recorded_date, weight_kg, note
+    ) values (
+      actor_id, target_recorded_date, target_weight_kg, nullif(btrim(target_note), '')
+    )
+    on conflict on constraint personal_weigh_ins_user_date_unique do update set
+      weight_kg = excluded.weight_kg,
+      note = excluded.note,
+      updated_at = now()
+    returning current_entry.id into saved_id;
+  else
+    update public.personal_weigh_ins as current_entry
+    set recorded_date = target_recorded_date,
+        weight_kg = target_weight_kg,
+        note = nullif(btrim(target_note), ''),
+        updated_at = now()
+    where current_entry.id = target_weigh_in_id and current_entry.user_id = actor_id
+    returning current_entry.id into saved_id;
+    if saved_id is null then
+      raise exception using errcode = '42501', message = 'Weigh-in ownership required.';
+    end if;
+  end if;
+
+  perform challenge.id
+  from public.challenges as challenge
+  where challenge.id = any(requested_ids)
+     or exists (select 1 from public.personal_weigh_in_group_shares as share
+       where share.personal_weigh_in_id = saved_id and share.challenge_id = challenge.id)
+  order by challenge.id
+  for update of challenge;
+
+  select count(*) into eligible_count
+  from public.challenges as challenge
+  where challenge.id = any(requested_ids)
+    and challenge.challenge_kind is distinct from 'personal'
+    and (
+      (challenge.status in ('draft', 'active') and (
+        challenge.owner_id = actor_id
+        or exists (select 1 from public.participants as participant
+          where participant.challenge_id = challenge.id and participant.user_id = actor_id
+            and participant.status = 'active')
+      ))
+      or (challenge.status = 'archived' and exists (
+        select 1 from public.personal_weigh_in_group_shares as prior_share
+        where prior_share.personal_weigh_in_id = saved_id
+          and prior_share.challenge_id = challenge.id
+      ))
+    );
+  if eligible_count <> requested_count then
+    raise exception using errcode = '42501', message = 'Group selection is no longer eligible.';
+  end if;
+
+  delete from public.personal_weigh_in_group_shares as share
+  using public.challenges as challenge
+  where share.personal_weigh_in_id = saved_id
+    and challenge.id = share.challenge_id and challenge.status <> 'archived';
+
+  insert into public.personal_weigh_in_group_shares(personal_weigh_in_id, challenge_id)
+  select saved_id, selected.challenge_id
+  from unnest(requested_ids) as selected(challenge_id)
+  join public.challenges as challenge on challenge.id = selected.challenge_id
+  where challenge.status in ('draft', 'active')
+  order by public._group_weekly_lock_key(selected.challenge_id, target_recorded_date),
+    selected.challenge_id
+  on conflict do nothing;
+
+  return query
+  select personal.id, personal.user_id, personal.recorded_date,
+    personal.weight_kg, personal.note, personal.created_at, personal.updated_at,
+    coalesce(array_agg(share.challenge_id order by share.challenge_id)
+      filter (where share.challenge_id is not null), '{}'::uuid[])
+  from public.personal_weigh_ins as personal
+  left join public.personal_weigh_in_group_shares as share
+    on share.personal_weigh_in_id = personal.id
+  where personal.id = saved_id
+  group by personal.id;
+end;
+$$;
 
 commit;

@@ -29,4 +29,19 @@ sleep 0.05
 task_lock_b=$!
 if ! wait "$task_lock_a"; then cat "$task_cluster/lock-a.log" "$task_cluster/lock-b.log" >&2; exit 1; fi
 if ! wait "$task_lock_b"; then cat "$task_cluster/lock-a.log" "$task_cluster/lock-b.log" >&2; exit 1; fi
-printf 'PASS local weekly result migration, cutoff, immutability and lock-order proof\n'
+
+# Exercise the real authenticated save RPC with two users selecting the same
+# challenges in opposite orders. The RPC and its source-row triggers must sort
+# their row and challenge locks consistently under actual concurrent writes.
+task_rpc_sunday="$("${task_psql[@]}" -Atc "select (clock_timestamp() at time zone 'Europe/Bucharest')::date - extract(dow from clock_timestamp() at time zone 'Europe/Bucharest')::integer - 14")"
+task_save_a="set role authenticated; select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000001', false); select id from public.save_personal_weigh_in('40400000-0000-4000-8000-000000000022', '$task_rpc_sunday', 78, null, array['40400000-0000-4000-8000-000000000001'::uuid, '40400000-0000-4000-8000-000000000002'::uuid]);"
+task_save_b="set role authenticated; select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000002', false); select id from public.save_personal_weigh_in('40400000-0000-4000-8000-000000000024', '$task_rpc_sunday', 83, null, array['40400000-0000-4000-8000-000000000002'::uuid, '40400000-0000-4000-8000-000000000001'::uuid]);"
+"${task_psql[@]}" -c "$task_save_a" >"$task_cluster/save-a.log" 2>&1 &
+task_save_a_pid=$!
+"${task_psql[@]}" -c "$task_save_b" >"$task_cluster/save-b.log" 2>&1 &
+task_save_b_pid=$!
+if ! wait "$task_save_a_pid"; then cat "$task_cluster/save-a.log" "$task_cluster/save-b.log" >&2; exit 1; fi
+if ! wait "$task_save_b_pid"; then cat "$task_cluster/save-a.log" "$task_cluster/save-b.log" >&2; exit 1; fi
+task_share_count="$("${task_psql[@]}" -Atc "select count(*) from public.personal_weigh_in_group_shares where personal_weigh_in_id in ('40400000-0000-4000-8000-000000000022', '40400000-0000-4000-8000-000000000024') and challenge_id in ('40400000-0000-4000-8000-000000000001', '40400000-0000-4000-8000-000000000002')")"
+[[ "$task_share_count" == 4 ]] || { printf 'Unexpected concurrent RPC share rows: %s\n' "$task_share_count" >&2; exit 1; }
+printf 'PASS local weekly snapshots, chronology, membership episodes, cutoff, immutable awards and concurrent RPC lock ordering\n'

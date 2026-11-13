@@ -781,6 +781,7 @@ export function createRepositories(client: DatabaseClient): Repositories {
             const validStates = [
               'disabled',
               'not_available',
+              'pending',
               'provisional',
               'finalized',
             ]
@@ -831,7 +832,11 @@ export function createRepositories(client: DatabaseClient): Repositories {
               resultOutcome: row.result_outcome,
               soleParticipantName: row.sole_participant_name,
               state: row.result_state as
-                'disabled' | 'not_available' | 'provisional' | 'finalized',
+                | 'disabled'
+                | 'not_available'
+                | 'pending'
+                | 'provisional'
+                | 'finalized',
               winnerCount: row.winner_count,
               winnerDetails,
               winnerNames: [...row.winner_names],

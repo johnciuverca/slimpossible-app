@@ -1861,7 +1861,7 @@ describe('GroupDashboardPage', () => {
 
     expect(await screen.findByText('35%')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('link', { name: 'Weekly results' }))
-    expect(screen.getAllByText('Owner')).toHaveLength(2)
+    expect(await screen.findAllByText('Owner')).toHaveLength(2)
     expect(
       screen.queryByText(/Shared progress is unavailable for this challenge/),
     ).not.toBeInTheDocument()

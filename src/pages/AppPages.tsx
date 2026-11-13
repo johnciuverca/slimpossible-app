@@ -2040,9 +2040,11 @@ export function GroupDashboardPage() {
       ? `${weeklyResultDisplay.recordedParticipantCount} of ${weeklyResultDisplay.activeParticipantCount} active members checked in this Sunday; ${weeklyResultDisplay.eligibleParticipantCount} have both consecutive Sunday records. The provisional result locks at Sunday 20:00 Europe/Bucharest.`
       : weeklyResultDisplay?.state === 'finalized'
         ? `Finalized${weeklyResultDisplay.finalizedAt ? ` ${new Date(weeklyResultDisplay.finalizedAt).toLocaleString(undefined, { timeZone: 'Europe/Bucharest' })}` : ''}. This award is locked.`
-        : weeklyResultDisplayState === 'loading'
-          ? 'Checking the weekly result.'
-          : 'The weekly result status is unavailable. Try refreshing before relying on the displayed winner.'
+        : weeklyResultDisplay?.state === 'pending'
+          ? 'The weekly result is pending because a required Sunday snapshot is unavailable.'
+          : weeklyResultDisplayState === 'loading'
+            ? 'Checking the weekly result.'
+            : 'The weekly result status is unavailable. Try refreshing before relying on the displayed winner.'
     : weeklyCelebration?.message
   const displayedCurrentSunday =
     hasManagedWeeklyResult && data?.weeklyResultSunday

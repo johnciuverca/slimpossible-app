@@ -32,7 +32,7 @@ export type GroupWeeklyResultDisplay = {
   finalizedAt: string | null
   resultOutcome: string
   soleParticipantName: string | null
-  state: 'disabled' | 'not_available' | 'provisional' | 'finalized'
+  state: 'disabled' | 'not_available' | 'pending' | 'provisional' | 'finalized'
   winnerCount: number
   winnerDetails: GroupWeeklyResultWinner[]
   winnerNames: string[]
