@@ -64,6 +64,7 @@ import type { PersonalWeighIn } from '../models/personalWeighIn'
 import {
   mostRecentSunday,
   type GroupWeeklyWinCount,
+  type GroupWeeklyResultDisplay,
   type GroupProgressSummary,
   type GroupWeighInHistoryEntry,
 } from '../models/groupProgress'
@@ -72,6 +73,10 @@ import {
   type ProvisionalGroupLeaderSummary,
 } from '../models/provisionalGroupLeader'
 import { createSavedWeeklyWinCelebration } from '../models/weeklyCelebrations'
+import {
+  mostRecentWeeklySunday,
+  previousWeeklySunday,
+} from '../models/weeklyFinalization'
 import { calculateDailyWeightChange } from '../models/weightChange'
 import { calculatePersonalWeeklyChange } from '../models/personalWeeklyChange'
 import { workspaceSection } from '../models/workspaceNavigation'
@@ -147,6 +152,9 @@ type GroupDashboardData = {
   summary: GroupProgressSummary
   weeklyWinCounts: GroupWeeklyWinCount[]
   weeklyWinCountsState: 'error' | 'loading' | 'ready'
+  weeklyResultDisplay: GroupWeeklyResultDisplay | null
+  weeklyResultDisplayState: 'error' | 'loading' | 'ready'
+  weeklyResultSunday: string
 }
 
 type PersonalDashboardSnapshot = {
@@ -1616,7 +1624,83 @@ export function GroupDashboardPage() {
     return () => {
       current = false
     }
-  }, [data?.challenge.id, persistence])
+  }, [data?.challenge.id, data?.weeklyResultDisplay?.state, persistence])
+
+  useEffect(() => {
+    let current = true
+    const challengeId = data?.challenge.id
+    const currentSunday = data?.summary.currentSunday
+    const loadDisplay =
+      persistence.mode === 'remote'
+        ? persistence.repositories.groupProgress.getWeeklyResultDisplay
+        : undefined
+    if (!challengeId || !currentSunday || !loadDisplay) {
+      if (challengeId) {
+        setData((currentData) =>
+          currentData?.challenge.id === challengeId
+            ? {
+                ...currentData,
+                weeklyResultDisplay: null,
+                weeklyResultDisplayState: 'ready',
+              }
+            : currentData,
+        )
+      }
+      return () => {
+        current = false
+      }
+    }
+    setData((currentData) =>
+      currentData?.challenge.id === challengeId
+        ? { ...currentData, weeklyResultDisplayState: 'loading' }
+        : currentData,
+    )
+    const refreshDisplay = () => {
+      const resultSunday = mostRecentWeeklySunday()
+      setData((currentData) =>
+        currentData?.challenge.id === challengeId
+          ? currentData.weeklyResultSunday === resultSunday
+            ? currentData
+            : { ...currentData, weeklyResultSunday: resultSunday }
+          : currentData,
+      )
+      void loadDisplay(challengeId, resultSunday)
+        .then((result) => {
+          if (!current) return
+          setData((currentData) =>
+            currentData?.challenge.id === challengeId
+              ? {
+                  ...currentData,
+                  weeklyResultDisplay:
+                    result.state === 'success' ? result.data : null,
+                  weeklyResultDisplayState:
+                    result.state === 'success' || result.state === 'empty'
+                      ? 'ready'
+                      : 'error',
+                }
+              : currentData,
+          )
+        })
+        .catch(() => {
+          if (!current) return
+          setData((currentData) =>
+            currentData?.challenge.id === challengeId
+              ? {
+                  ...currentData,
+                  weeklyResultDisplay: null,
+                  weeklyResultDisplayState: 'error',
+                }
+              : currentData,
+          )
+        })
+    }
+    refreshDisplay()
+    const refreshInterval = window.setInterval(refreshDisplay, 60_000)
+    return () => {
+      current = false
+      window.clearInterval(refreshInterval)
+    }
+  }, [data?.challenge.id, data?.summary.currentSunday, persistence])
 
   const ownMemberKey =
     data && ownerId ? ownGroupMemberKey(data.challenge.id, ownerId) : null
@@ -1819,9 +1903,14 @@ export function GroupDashboardPage() {
           summary: result.data,
           weeklyWinCounts: [],
           weeklyWinCountsState: 'loading',
+          weeklyResultDisplay: null,
+          weeklyResultDisplayState: 'loading',
+          weeklyResultSunday: result.data.currentSunday,
         })
         setWeeklyAnnouncement(
-          reconcileWeeklyWinCelebration(ownerId, weeklyCelebration),
+          persistence.repositories.groupProgress.getWeeklyResultDisplay
+            ? ''
+            : reconcileWeeklyWinCelebration(ownerId, weeklyCelebration),
         )
         setMessage('')
         setMessageTone('info')
@@ -1885,6 +1974,85 @@ export function GroupDashboardPage() {
   const weeklyCelebration = summary
     ? createSavedWeeklyWinCelebration(summary)
     : null
+  const weeklyResultDisplay = data?.weeklyResultDisplay
+  const weeklyResultDisplayState = data?.weeklyResultDisplayState ?? 'loading'
+  const weeklyResultApiAvailable =
+    persistence.mode === 'remote' &&
+    Boolean(persistence.repositories.groupProgress.getWeeklyResultDisplay)
+  const hasManagedWeeklyResult = Boolean(
+    weeklyResultApiAvailable &&
+    !(
+      data?.weeklyResultDisplayState === 'ready' &&
+      weeklyResultDisplay &&
+      ['disabled', 'not_available'].includes(weeklyResultDisplay.state)
+    ),
+  )
+  const weeklyWinnerNames = hasManagedWeeklyResult
+    ? (weeklyResultDisplay?.winnerNames ?? [])
+    : (weeklyCelebration?.winnerNames ?? [])
+  const weeklyWinnerEntries =
+    hasManagedWeeklyResult && weeklyResultDisplay?.state === 'finalized'
+      ? weeklyResultDisplay.winnerDetails
+      : weeklyWinnerNames.map((displayName) => ({
+          displayName,
+          memberKey: null,
+        }))
+  const weeklyResultHeading = (() => {
+    if (!hasManagedWeeklyResult) {
+      if (weeklyCelebration?.state === 'shared-winners')
+        return 'Shared weekly winners'
+      if (weeklyCelebration?.state === 'single-winner') return 'Weekly winner'
+      return 'No weekly winner yet'
+    }
+    if (!weeklyResultDisplay) {
+      return weeklyResultDisplayState === 'loading'
+        ? 'Loading weekly result status'
+        : 'Weekly result status unavailable'
+    }
+    if (
+      weeklyResultDisplay.state !== 'finalized' &&
+      weeklyResultDisplay.state !== 'provisional'
+    ) {
+      return 'Weekly result status unavailable'
+    }
+    const phase =
+      weeklyResultDisplay.state === 'finalized' ? 'Final' : 'Provisional'
+    const participationSuffix =
+      weeklyResultDisplay.recordedParticipantCount <
+      weeklyResultDisplay.activeParticipantCount
+        ? ` — ${weeklyResultDisplay.recordedParticipantCount} of ${weeklyResultDisplay.activeParticipantCount} members recorded`
+        : ''
+    if (weeklyResultDisplay.winnerCount > 1)
+      return `${phase} shared weekly winners${participationSuffix}`
+    if (weeklyResultDisplay.winnerCount === 1)
+      return `${phase} weekly winner${participationSuffix}`
+    if (weeklyResultDisplay.resultOutcome === 'sole_participant')
+      return 'Solo challenge — no competitive win'
+    if (weeklyResultDisplay.resultOutcome === 'sole_eligible') {
+      return weeklyResultDisplay.recordedParticipantCount === 1
+        ? 'Only participant to record'
+        : 'Only eligible participant — no competitive win'
+    }
+    return 'No eligible result'
+  })()
+  const weeklyResultMessage = hasManagedWeeklyResult
+    ? weeklyResultDisplay?.state === 'provisional'
+      ? `${weeklyResultDisplay.recordedParticipantCount} of ${weeklyResultDisplay.activeParticipantCount} active members checked in this Sunday; ${weeklyResultDisplay.eligibleParticipantCount} have both consecutive Sunday records. The provisional result locks at Sunday 20:00 Europe/Bucharest.`
+      : weeklyResultDisplay?.state === 'finalized'
+        ? `Finalized${weeklyResultDisplay.finalizedAt ? ` ${new Date(weeklyResultDisplay.finalizedAt).toLocaleString(undefined, { timeZone: 'Europe/Bucharest' })}` : ''}. This award is locked.`
+        : weeklyResultDisplay?.state === 'pending'
+          ? 'The weekly result is pending because a required Sunday snapshot is unavailable.'
+          : weeklyResultDisplayState === 'loading'
+            ? 'Checking the weekly result.'
+            : 'The weekly result status is unavailable. Try refreshing before relying on the displayed winner.'
+    : weeklyCelebration?.message
+  const displayedCurrentSunday =
+    hasManagedWeeklyResult && data?.weeklyResultSunday
+      ? data.weeklyResultSunday
+      : summary?.currentSunday
+  const displayedPreviousSunday = displayedCurrentSunday
+    ? previousWeeklySunday(displayedCurrentSunday)
+    : summary?.previousSunday
   const selectedChallengeId =
     challengeParam ||
     data?.challenge.id ||
@@ -2170,39 +2338,41 @@ export function GroupDashboardPage() {
                       </h2>
                       <p className="mt-2 text-sm text-slate-600">
                         Based on consecutive Sunday check-ins:{' '}
-                        <time dateTime={summary.previousSunday}>
-                          {formatDate(summary.previousSunday)}
+                        <time dateTime={displayedPreviousSunday}>
+                          {formatDate(
+                            displayedPreviousSunday ?? summary.previousSunday,
+                          )}
                         </time>{' '}
                         to{' '}
-                        <time dateTime={summary.currentSunday}>
-                          {formatDate(summary.currentSunday)}
+                        <time dateTime={displayedCurrentSunday}>
+                          {formatDate(
+                            displayedCurrentSunday ?? summary.currentSunday,
+                          )}
                         </time>
                         .
                       </p>
-                      {weeklyAnnouncement ? (
+                      {weeklyAnnouncement && !hasManagedWeeklyResult ? (
                         <p aria-live="polite" className="sr-only" role="status">
                           {weeklyAnnouncement}
                         </p>
                       ) : null}
                       <p className="mt-4 text-sm font-semibold text-slate-900">
-                        {weeklyCelebration?.state === 'shared-winners'
-                          ? 'Shared weekly winners'
-                          : weeklyCelebration?.state === 'single-winner'
-                            ? 'Weekly winner'
-                            : 'No weekly winner yet'}
+                        {weeklyResultHeading}
                       </p>
                       <p className="mt-2 text-sm leading-6 text-slate-700">
-                        {weeklyCelebration?.message}
+                        {weeklyResultMessage}
                       </p>
-                      {weeklyCelebration &&
-                      weeklyCelebration.state !== 'no-eligible-candidates' ? (
+                      {weeklyWinnerEntries.length > 0 ? (
                         <ul
                           aria-label="Weekly winners"
                           className="mt-3 space-y-2"
                         >
-                          {weeklyCelebration.winnerNames.map((name, index) => {
+                          {weeklyWinnerEntries.map((winner, index) => {
                             const matchingMembers = memberProgress.filter(
-                              (member) => member.displayName === name,
+                              (member) =>
+                                winner.memberKey
+                                  ? member.memberKey === winner.memberKey
+                                  : member.displayName === winner.displayName,
                             )
                             const avatarMember =
                               matchingMembers.length === 1
@@ -2211,13 +2381,16 @@ export function GroupDashboardPage() {
                             return (
                               <li
                                 className="flex items-center gap-3 rounded-xl bg-emerald-50 px-4 py-3 font-semibold text-slate-900"
-                                key={`${name}-${index}`}
+                                key={
+                                  winner.memberKey ??
+                                  `${winner.displayName}-${index}`
+                                }
                               >
                                 <GroupParticipantAvatar
                                   avatarPresetId={avatarMember?.avatarPresetId}
-                                  displayName={name}
+                                  displayName={winner.displayName}
                                 />
-                                {name}
+                                <span>{winner.displayName}</span>
                               </li>
                             )
                           })}
@@ -2278,10 +2451,15 @@ export function GroupDashboardPage() {
                     >
                       <span className="font-semibold">This week’s winners</span>
                       <span className="text-ink-muted">
-                        {weeklyCelebration?.state === 'no-eligible-candidates'
-                          ? 'No result yet'
-                          : weeklyCelebration?.winnerNames.join(', ') ||
-                            'No result yet'}
+                        {hasManagedWeeklyResult
+                          ? weeklyResultDisplay?.winnerCount === 0
+                            ? 'No result yet'
+                            : weeklyWinnerNames.join(', ')
+                          : weeklyCelebration?.state ===
+                              'no-eligible-candidates'
+                            ? 'No result yet'
+                            : weeklyCelebration?.winnerNames.join(', ') ||
+                              'No result yet'}
                       </span>
                     </div>
                   </section>

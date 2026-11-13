@@ -25,6 +25,24 @@ export type GroupWeeklyWinCount = {
   winCount: number
 }
 
+export type GroupWeeklyResultDisplay = {
+  activeParticipantCount: number
+  recordedParticipantCount: number
+  eligibleParticipantCount: number
+  finalizedAt: string | null
+  resultOutcome: string
+  soleParticipantName: string | null
+  state: 'disabled' | 'not_available' | 'pending' | 'provisional' | 'finalized'
+  winnerCount: number
+  winnerDetails: GroupWeeklyResultWinner[]
+  winnerNames: string[]
+}
+
+export type GroupWeeklyResultWinner = {
+  displayName: string
+  memberKey: string | null
+}
+
 export function mostRecentSunday(date = new Date()) {
   const sunday = new Date(date)
   sunday.setHours(0, 0, 0, 0)

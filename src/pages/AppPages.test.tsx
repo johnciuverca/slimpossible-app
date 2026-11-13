@@ -1498,7 +1498,7 @@ describe('GroupDashboardPage', () => {
             ? Promise.resolve(
                 response([
                   {
-                    member_key: 'opaque-a',
+                    member_key: '11111111111111111111111111111111',
                     display_name: 'Ava',
                     avatar_preset_id: 'female-03',
                     starting_weight_kg: 90,
@@ -1511,8 +1511,8 @@ describe('GroupDashboardPage', () => {
                     negative_progress_capped: false,
                   },
                   {
-                    member_key: 'opaque-b',
-                    display_name: 'Ben',
+                    member_key: '22222222222222222222222222222222',
+                    display_name: 'Ava',
                     avatar_preset_id: 'male-02',
                     starting_weight_kg: 90,
                     target_weight_kg: 80,
@@ -1546,7 +1546,33 @@ describe('GroupDashboardPage', () => {
                     { member_key: 'c', display_name: 'Casey', win_count: 0 },
                   ]),
                 )
-              : fetchMock(url, init),
+              : String(url).includes('/rpc/get_group_weekly_result_display')
+                ? Promise.resolve(
+                    response([
+                      {
+                        result_state: 'finalized',
+                        finalized_at: '2026-11-09T18:00:00.000Z',
+                        active_participant_count: 3,
+                        recorded_participant_count: 2,
+                        eligible_participant_count: 2,
+                        result_outcome: 'shared_winners',
+                        sole_participant_name: null,
+                        winner_count: 2,
+                        winner_names: ['Ava', 'Ava'],
+                        winner_details: [
+                          {
+                            member_key: '11111111111111111111111111111111',
+                            display_name: 'Ava',
+                          },
+                          {
+                            member_key: '22222222222222222222222222222222',
+                            display_name: 'Ava',
+                          },
+                        ],
+                      },
+                    ]),
+                  )
+                : fetchMock(url, init),
       ),
       '/group?challenge=',
     )
@@ -1581,17 +1607,23 @@ describe('GroupDashboardPage', () => {
       screen.queryByRole('link', { name: /Personal ·/ }),
     ).not.toBeInTheDocument()
     expect(screen.queryByText('48.5%')).not.toBeInTheDocument()
-    expect(screen.getByText(/Shared weekly winners/)).toBeInTheDocument()
+    expect(
+      await screen.findByText(
+        'Final shared weekly winners — 2 of 3 members recorded',
+      ),
+    ).toBeInTheDocument()
     const winnerList = screen.getByRole('list', { name: 'Weekly winners' })
+    const winnerItems = within(winnerList).getAllByRole('listitem')
     expect(
-      winnerList.querySelector('[data-avatar-preset="female-03"]'),
+      winnerItems[0]?.querySelector('[data-avatar-preset="female-03"]'),
     ).toBeInTheDocument()
     expect(
-      winnerList.querySelector('[data-avatar-preset="male-02"]'),
+      winnerItems[1]?.querySelector('[data-avatar-preset="male-02"]'),
     ).toBeInTheDocument()
     expect(
-      screen.getByText(/based on 2 of 3 active members/),
-    ).toBeInTheDocument()
+      screen.queryByText('Includes estimated weight'),
+    ).not.toBeInTheDocument()
+    expect(screen.getByText(/This award is locked/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('link', { name: 'Members' }))
     expect(
       document.querySelector(
@@ -1611,8 +1643,8 @@ describe('GroupDashboardPage', () => {
     expect(
       screen.getByRole('list', { name: 'Challenge weeks won' }),
     ).toHaveTextContent('Ava2 weeksBen2 weeksCasey0 weeks')
-    expect(screen.getAllByText('Ava')).toHaveLength(3)
-    expect(screen.getAllByText('Ben')).toHaveLength(3)
+    expect(screen.getAllByText('Ava')).toHaveLength(4)
+    expect(screen.getAllByText('Ben')).toHaveLength(2)
     expect(
       screen.getByRole('heading', { name: 'Provisional leader' }),
     ).toBeInTheDocument()
@@ -1681,19 +1713,20 @@ describe('GroupDashboardPage', () => {
       screen.getByRole('button', { name: 'Refresh shared progress' }),
     )
     expect(await screen.findByText('Casey')).toBeInTheDocument()
-    expect(
-      within(screen.getByRole('region', { name: 'Weekly result' })).queryByText(
-        'Ava',
-      ),
-    ).not.toBeInTheDocument()
+    const finalizedWeeklyResult = screen.getByRole('region', {
+      name: 'Weekly result',
+    })
+    expect(finalizedWeeklyResult).toHaveTextContent(
+      'Final shared weekly winners',
+    )
+    expect(within(finalizedWeeklyResult).getAllByText('Ava')).toHaveLength(2)
+    expect(finalizedWeeklyResult).not.toHaveTextContent('Casey')
     await waitFor(() =>
       expect(
         screen.getByRole('region', { name: 'Provisional leader' }),
       ).toHaveTextContent('No provisional leader is available yet'),
     )
-    expect(
-      await screen.findByText('Weekly result updated: Casey.'),
-    ).toHaveAttribute('role', 'status')
+    expect(screen.queryByText('Weekly result updated: Casey.')).toBeNull()
 
     fireEvent.click(
       screen.getByRole('button', { name: 'Refresh shared progress' }),
@@ -1800,6 +1833,24 @@ describe('GroupDashboardPage', () => {
           leaderNames: ['Owner'],
         }),
       )
+    fetchMock.mockImplementation((input: RequestInfo | URL) =>
+      String(input).includes('/rpc/get_group_weekly_result_display')
+        ? response([
+            {
+              result_state: 'disabled',
+              finalized_at: null,
+              active_participant_count: 0,
+              recorded_participant_count: 0,
+              eligible_participant_count: 0,
+              result_outcome: 'no_eligible_candidates',
+              sole_participant_name: null,
+              winner_count: 0,
+              winner_details: [],
+              winner_names: [],
+            },
+          ])
+        : response([]),
+    )
 
     renderDashboard(
       <GroupDashboardPage />,
@@ -1810,7 +1861,7 @@ describe('GroupDashboardPage', () => {
 
     expect(await screen.findByText('35%')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('link', { name: 'Weekly results' }))
-    expect(screen.getAllByText('Owner')).toHaveLength(2)
+    expect(await screen.findAllByText('Owner')).toHaveLength(2)
     expect(
       screen.queryByText(/Shared progress is unavailable for this challenge/),
     ).not.toBeInTheDocument()
@@ -2092,6 +2143,24 @@ describe('GroupDashboardPage', () => {
           state: 'solo-challenge',
         }),
       )
+    fetchMock.mockImplementation((input: RequestInfo | URL) =>
+      String(input).includes('/rpc/get_group_weekly_result_display')
+        ? response([
+            {
+              result_state: 'disabled',
+              finalized_at: null,
+              active_participant_count: 0,
+              recorded_participant_count: 0,
+              eligible_participant_count: 0,
+              result_outcome: 'no_eligible_candidates',
+              sole_participant_name: null,
+              winner_count: 0,
+              winner_details: [],
+              winner_names: [],
+            },
+          ])
+        : response([]),
+    )
 
     renderDashboard(
       <GroupDashboardPage />,
