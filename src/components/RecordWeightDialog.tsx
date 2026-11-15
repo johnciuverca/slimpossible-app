@@ -11,6 +11,7 @@ import type { PersonalWorkspace } from '../data/usePersonalWorkspace'
 import {
   personalWeighInToday,
   validatePersonalWeighIn,
+  parsePersonalWeighInWeight,
   type PersonalWeighIn,
 } from '../models/personalWeighIn'
 
@@ -141,7 +142,9 @@ export function RecordWeightDialog({
           viewport.height > 500 &&
           viewport.scale <= 1.05))
     if (wideViewport)
-      element?.querySelector<HTMLInputElement>('input[type="number"]')?.focus()
+      element
+        ?.querySelector<HTMLInputElement>('#personal-weigh-in-weight')
+        ?.focus()
     else element?.focus()
     return () => {
       active.current = false
@@ -242,7 +245,7 @@ export function RecordWeightDialog({
     const validation = validatePersonalWeighIn({
       ...(entry ? { id: entry.id } : {}),
       date: values.date,
-      weightKg: Number(values.weightKg),
+      weightKg: parsePersonalWeighInWeight(values.weightKg) ?? Number.NaN,
       note: values.note.trim() || undefined,
       sharedChallengeIds: values.sharedChallengeIds.filter((id) =>
         eligibleIds.has(id),

@@ -65,7 +65,7 @@ for (const width of [1280, 390]) {
         const wheelDelta = scrollBefore > 0 ? -500 : 500
         await page.mouse.wheel(0, wheelDelta)
         await expect(weight).toHaveValue(baseline)
-        await expect(weight).not.toBeFocused()
+        await expect(weight).toBeFocused()
         if (surface === 'page') {
           await expect
             .poll(() => page.evaluate(() => window.scrollY))

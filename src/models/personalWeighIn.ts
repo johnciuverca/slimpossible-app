@@ -26,6 +26,15 @@ export type PersonalWeighInValidationResult =
   | { issues: PersonalWeighInValidationIssue[]; success: false }
 
 const dateOnlyPattern = /^\d{4}-\d{2}-\d{2}$/
+const weightTextPattern = /^(?:\d+(?:[.,]\d{0,2})?|[.,]\d{1,2})$/
+
+/** Parses the editor's decimal text without accepting partial or ambiguous numbers. */
+export function parsePersonalWeighInWeight(value: string): number | null {
+  const trimmed = value.trim()
+  if (!weightTextPattern.test(trimmed)) return null
+  const parsed = Number(trimmed.replace(',', '.'))
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
 
 export function personalWeighInToday(date = new Date()): DateOnly {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`

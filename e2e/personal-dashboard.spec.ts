@@ -342,8 +342,28 @@ test('Dashboard chart opens edit/create drafts and only an explicit save records
   const edit = page.getByRole('dialog', { name: 'Edit weight' })
   await expect(edit.getByLabel('Date')).toHaveValue(firstDate)
   await expect(edit.getByLabel('Weight in kg')).toHaveValue('90')
-  await edit.getByRole('button', { name: 'Close' }).click()
+  await expect(edit.getByLabel('Weight in kg')).toHaveAttribute('type', 'text')
+  await edit.getByLabel('Weight in kg').fill('90,75')
+  await edit.getByRole('button', { name: 'Update weight' }).click()
   await expect(edit).toHaveCount(0)
+  expect(
+    await page.evaluate(
+      (date) =>
+        JSON.parse(
+          localStorage.getItem('slimpossible.local.personal-weigh-ins') ?? '[]',
+        ).find((entry: { date: string }) => entry.date === date)?.weightKg,
+      firstDate,
+    ),
+  ).toBe(90.75)
+  await actual.click()
+  await page
+    .getByRole('group', { name: /Chart point details/ })
+    .getByRole('button', { name: 'Edit weight', exact: true })
+    .click()
+  const restore = page.getByRole('dialog', { name: 'Edit weight' })
+  await restore.getByLabel('Weight in kg').fill('90')
+  await restore.getByRole('button', { name: 'Update weight' }).click()
+  await expect(restore).toHaveCount(0)
 
   const estimate = chart.locator(
     `circle[data-date="${estimateDate}"][data-point-kind="estimated"]`,
