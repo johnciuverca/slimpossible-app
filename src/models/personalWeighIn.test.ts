@@ -1,11 +1,30 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  parsePersonalWeighInWeight,
   personalWeighInToday,
   validatePersonalWeighIn,
 } from './personalWeighIn'
 
 describe('validatePersonalWeighIn', () => {
+  it('parses comma and dot decimals strictly at the save boundary', () => {
+    expect(parsePersonalWeighInWeight('89,5')).toBe(89.5)
+    expect(parsePersonalWeighInWeight('89.5')).toBe(89.5)
+    expect(parsePersonalWeighInWeight('89,')).toBe(89)
+    for (const value of [
+      '',
+      '89,5.2',
+      '89.5,2',
+      '89,,5',
+      '1,234',
+      '89kg',
+      '0',
+      'Infinity',
+    ]) {
+      expect(parsePersonalWeighInWeight(value), value).toBeNull()
+    }
+  })
+
   it('uses the local calendar date rather than the UTC date boundary', () => {
     expect(personalWeighInToday(new Date(2026, 9, 7))).toBe('2026-10-07')
   })
