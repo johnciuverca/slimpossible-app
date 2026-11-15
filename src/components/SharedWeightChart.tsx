@@ -40,6 +40,7 @@ export type SharedChartSeries = {
 
 export type SharedChartLine = {
   id: string
+  seriesId?: string
   from: { date: string; value: number }
   to: { date: string; value: number }
   color: string
@@ -76,6 +77,7 @@ export function SharedWeightChart({
   points = [],
   series = [],
   lines = [],
+  hiddenSeriesIds,
   onPointActivate,
   canEditPoint,
   yLabel,
@@ -99,6 +101,7 @@ export function SharedWeightChart({
   points?: SharedChartPoint[]
   series?: SharedChartSeries[]
   lines?: SharedChartLine[]
+  hiddenSeriesIds?: ReadonlySet<string>
   onPointActivate?: (point: SharedChartPoint, seriesId?: string) => void
   canEditPoint?: (point: SharedChartPoint, seriesId?: string) => boolean
   yLabel: string
@@ -424,6 +427,11 @@ export function SharedWeightChart({
       return inRange(point.date) ? [point] : []
     }),
   }))
+  // Hidden members still define dates and axis bounds; only rendered content
+  // and interaction targets are filtered so comparisons do not jump.
+  const renderedSeries = visibleSeries.filter(
+    (item) => !hiddenSeriesIds?.has(item.id),
+  )
   const extremeSeriesPointIds = new Set<string>()
   if (labelSeriesExtremesOnly) {
     visibleSeries.forEach((item) => {
@@ -468,7 +476,7 @@ export function SharedWeightChart({
       point,
       seriesId: undefined as string | undefined,
     })),
-    ...visibleSeries.flatMap((item) =>
+    ...renderedSeries.flatMap((item) =>
       item.points.map((point, index) => ({
         id: `series:${item.id}:${point.date}:${index}`,
         point,
@@ -476,6 +484,17 @@ export function SharedWeightChart({
       })),
     ),
   ]
+  useEffect(() => {
+    const isHiddenSeriesPoint = (pointId: string | null) =>
+      pointId !== null &&
+      Array.from(hiddenSeriesIds ?? []).some((seriesId) =>
+        pointId.startsWith(`series:${seriesId}:`),
+      )
+    if (selectedPoint && isHiddenSeriesPoint(selectedPoint.id))
+      setSelectedPoint(null)
+    if (isHiddenSeriesPoint(hoveredPointId)) setHoveredPointId(null)
+    if (isHiddenSeriesPoint(focusedPointId)) setFocusedPointId(null)
+  }, [selectedPoint, hoveredPointId, focusedPointId, hiddenSeriesIds])
   const visiblePointId = selectedPoint?.id ?? hoveredPointId
   const highlightedPointId = visiblePointId ?? focusedPointId
   const visibleActivePoint = visiblePointId
@@ -604,7 +623,7 @@ export function SharedWeightChart({
   const chartValueLabelPositions = new Map(
     layoutChartValueLabels(
       [
-        ...visibleSeries.flatMap((item) =>
+        ...renderedSeries.flatMap((item) =>
           item.points.flatMap((point, index) =>
             point.label &&
             (!labelSeriesExtremesOnly ||
@@ -647,18 +666,12 @@ export function SharedWeightChart({
     pointX: number,
     pointY: number,
   ) => chartValueLabelPositions.get(pointId) ?? { x: pointX, y: pointY - 12 }
-  const referenceLinesOutsideRange = adaptiveWeightTicks
-    ? visibleLines.filter(
-        (line) =>
-          line.kind === 'reference' &&
-          (line.from.value < yMinimum ||
-            line.from.value > yMaximum ||
-            line.to.value < yMinimum ||
-            line.to.value > yMaximum),
-      )
-    : []
   const renderedLines = visibleLines
-    .filter((line) => !referenceLinesOutsideRange.includes(line))
+    .filter(
+      (line) =>
+        line.kind === 'trend' &&
+        (!line.seriesId || !hiddenSeriesIds?.has(line.seriesId)),
+    )
     .flatMap((line) => {
       if (!compactOlderHistory) return [line]
       const from = day(line.from.date)
@@ -1108,27 +1121,20 @@ export function SharedWeightChart({
             </g>
           ))}
           {renderedLines.map((line) => {
-            const yy =
-              line.kind === 'reference' ? y(line.from.value) : undefined
             return (
               <line
                 key={line.id}
-                data-series={
-                  line.kind === 'trend' ? 'derived-trend' : 'target-reference'
-                }
+                data-series="derived-trend"
                 data-chart-line-kind={line.kind}
-                data-chart-trend={line.kind === 'trend' ? '' : undefined}
-                data-chart-reference={
-                  line.kind === 'reference' ? '' : undefined
-                }
+                data-chart-series-id={line.seriesId}
+                data-chart-trend=""
                 x1={x(line.from.date)}
-                y1={yy ?? y(line.from.value)}
+                y1={y(line.from.value)}
                 x2={x(line.to.date)}
-                y2={yy ?? y(line.to.value)}
+                y2={y(line.to.value)}
                 stroke={line.color}
                 strokeWidth="2"
-                strokeDasharray={line.kind === 'trend' ? '3 6' : '9 5'}
-                opacity={line.kind === 'trend' ? 0.35 : undefined}
+                opacity={sharedChartTheme.trendOpacity}
               >
                 {line.title ? <title>{line.title}</title> : null}
               </line>
@@ -1152,7 +1158,7 @@ export function SharedWeightChart({
               />
             )
           })}
-          {visibleSeries.map((item) => (
+          {renderedSeries.map((item) => (
             <g key={item.id}>
               {item.points.slice(1).map((point, index) => {
                 const previous = item.points[index]
@@ -1166,6 +1172,7 @@ export function SharedWeightChart({
                 return (
                   <path
                     key={`line-${previous.date}-${point.date}`}
+                    data-chart-series-id={item.id}
                     data-series={
                       point.weeklySummary || previous.weeklySummary
                         ? 'weekly-summary-connection'
@@ -1322,6 +1329,7 @@ export function SharedWeightChart({
                           className="chart-value"
                           fontSize={compactLayout ? '9' : '6.6'}
                           fontWeight="700"
+                          data-chart-series-id={item.id}
                           data-date={point.date}
                           data-value={point.value}
                         >

@@ -4,7 +4,7 @@ import {
   usePersonalWorkspace,
   type PersonalWorkspace,
 } from '../data/usePersonalWorkspace'
-import { Card, FeedbackPanel, PageHeader, StatusPill } from '../components/ui'
+import { Card, FeedbackPanel } from '../components/ui'
 import {
   workspaceSection,
   workspaceSectionLink,
@@ -18,7 +18,6 @@ import {
 import { personalWeighInToday } from '../models/personalWeighIn'
 import { PersonalHistoryContent } from './PersonalHistoryContent'
 import { DashboardGoals } from '../components/DashboardGoals'
-import { personalGoalChoices } from '../models/personalGoalChoices'
 import { formatChartDate } from '../models/chartDate'
 
 export function PersonalDashboardPage() {
@@ -98,36 +97,6 @@ export function PersonalDashboardWorkspace({
   ])
   const today = personalWeighInToday()
   const { latest } = personalHistory(workspace.personal.data, today)
-  const todayEntry = workspace.personal.data.find(
-    (entry) => entry.date === today,
-  )
-  const choices =
-    workspace.contexts.state === 'ready'
-      ? personalGoalChoices(
-          workspace.userId,
-          workspace.contexts.data.challenges,
-          workspace.contexts.data.participants,
-        )
-      : []
-  const selected = params.get('challenge')
-    ? choices.find((challenge) => challenge.id === params.get('challenge'))
-    : choices[0]
-  const member = selected
-    ? workspace.contexts.data.participants.find(
-        (row) =>
-          row.challengeId === selected.id &&
-          row.userId === workspace.userId &&
-          row.status === 'active',
-      )
-    : undefined
-  const referenceWeightKg =
-    member &&
-    Number.isFinite(member.targetWeightKg) &&
-    member.targetWeightKg > 0 &&
-    (selected?.kind !== 'group' ||
-      member.targetWeightKg <= member.startingWeightKg)
-      ? member.targetWeightKg
-      : undefined
   const recordAction = (
     <RecordWeightAction
       workspace={workspace}
@@ -146,44 +115,41 @@ export function PersonalDashboardWorkspace({
     <section
       data-weight-page-header
       aria-labelledby="dashboard-title"
-      className="dashboard-workspace mx-auto w-full max-w-6xl space-y-4"
+      className="dashboard-workspace mx-auto w-full max-w-6xl"
     >
-      <header>
-        <PageHeader
-          title="Dashboard"
-          titleId="dashboard-title"
-          titleTrailing={
-            <div className="dashboard-save-confirmation-slot">
-              {saveConfirmation?.ownerKey === workspace.ownerKey &&
-              saveConfirmation.count ? (
-                <>
-                  <p
-                    key={saveConfirmation.count}
-                    className="dashboard-save-confirmation"
-                    role="status"
-                    aria-live="polite"
-                    aria-atomic="true"
-                  >
-                    Personal weight saved.
-                  </p>
-                  <button
-                    aria-label="Dismiss save confirmation"
-                    className="dashboard-save-confirmation-dismiss"
-                    onClick={() => setSaveConfirmation(null)}
-                    type="button"
-                  >
-                    Dismiss
-                  </button>
-                </>
-              ) : null}
-            </div>
-          }
-        />
+      <header className="dashboard-page-header">
+        <h1 className="sr-only" id="dashboard-title">
+          Dashboard
+        </h1>
+        <div className="dashboard-save-confirmation-slot">
+          {saveConfirmation?.ownerKey === workspace.ownerKey &&
+          saveConfirmation.count ? (
+            <>
+              <p
+                key={saveConfirmation.count}
+                className="dashboard-save-confirmation"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+              >
+                Personal weight saved.
+              </p>
+              <button
+                aria-label="Dismiss save confirmation"
+                className="dashboard-save-confirmation-dismiss"
+                onClick={() => setSaveConfirmation(null)}
+                type="button"
+              >
+                Dismiss
+              </button>
+            </>
+          ) : null}
+        </div>
       </header>
       {section === 'overview' ? (
         <div id="dashboard-overview-panel" className="space-y-4">
           <div className="dashboard-top-grid">
-            <Card className="dashboard-latest p-4">
+            <Card className="dashboard-latest p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   {workspace.personal.state === 'loading' ? (
@@ -200,7 +166,7 @@ export function PersonalDashboardWorkspace({
                         Latest weight
                       </h2>
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                        <p className="text-3xl font-extrabold tracking-tight">
+                        <p className="text-2xl font-extrabold tracking-tight">
                           {latest
                             ? formatPersonalWeight(latest.weightKg)
                             : 'No record yet'}
@@ -213,9 +179,6 @@ export function PersonalDashboardWorkspace({
                             {formatChartDate(latest.date)}
                           </time>
                         ) : null}
-                        <StatusPill>
-                          {todayEntry ? 'Logged today' : 'Not logged today'}
-                        </StatusPill>
                       </div>
                     </>
                   )}
@@ -233,8 +196,6 @@ export function PersonalDashboardWorkspace({
             <PersonalHistoryContent
               key={`history:${workspace.ownerKey}`}
               workspace={workspace}
-              referenceWeightKg={referenceWeightKg}
-              referenceLabel={selected ? `${selected.name} target` : undefined}
             >
               <DashboardGoals
                 key={`goals:${workspace.ownerKey}`}
@@ -245,11 +206,13 @@ export function PersonalDashboardWorkspace({
         </div>
       ) : null}
       {params.get('navigation') === 'challenge-unavailable' ? (
-        <FeedbackPanel tone="info">
-          That challenge is not available to this account. You are viewing your
-          personal Dashboard; choose an authorized Group from the Group
-          workspace if needed.
-        </FeedbackPanel>
+        <div className="mt-4">
+          <FeedbackPanel tone="info">
+            That challenge is not available to this account. You are viewing
+            your personal Dashboard; choose an authorized Group from the Group
+            workspace if needed.
+          </FeedbackPanel>
+        </div>
       ) : null}
     </section>
   )

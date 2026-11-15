@@ -66,10 +66,21 @@ for (const width of [1280, 390]) {
       ),
     ).toHaveCount(5)
     await expect(chart.locator('[data-chart-trend]')).not.toHaveCount(0)
-    await expect(chart.locator('[data-chart-reference]')).not.toHaveCount(0)
+    await expect(chart.locator('[data-chart-reference]')).toHaveCount(0)
     await expect(chart.locator('[data-chart-trend]').first()).toHaveAttribute(
       'opacity',
-      '0.35',
+      '0.32',
+    )
+    await expect(
+      chart.locator('[data-chart-trend]').first(),
+    ).not.toHaveAttribute('stroke-dasharray')
+    const dataLineColor = await chart
+      .locator('path[data-chart-series-id="personal-history"]')
+      .first()
+      .getAttribute('stroke')
+    await expect(chart.locator('[data-chart-trend]').first()).toHaveAttribute(
+      'stroke',
+      dataLineColor!,
     )
     const mappedTrend = await chart
       .locator('[data-chart-trend]')
@@ -86,15 +97,6 @@ for (const width of [1280, 390]) {
       expect(mappedTrend[index].x1).toBe(mappedTrend[index - 1].x2)
       expect(mappedTrend[index].y1).toBe(mappedTrend[index - 1].y2)
     }
-    expect(
-      await chart
-        .locator('[data-chart-reference]')
-        .evaluateAll((segments) =>
-          segments.every(
-            (line) => line.getAttribute('y1') === line.getAttribute('y2'),
-          ),
-        ),
-    ).toBe(true)
     await expect(chart.locator('.chart-legend')).toHaveCount(0)
     await expect(chart).toHaveAccessibleDescription(
       /The trend uses only saved records/,

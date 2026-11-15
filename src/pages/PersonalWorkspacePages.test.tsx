@@ -242,7 +242,7 @@ describe('personal Dashboard and My Progress', () => {
           ? within(await screen.findByRole('dialog', { name: 'Edit weight' }))
           : within(screen.getByRole('form', { name: 'Personal weigh-in form' }))
       const weight = editor.getByLabelText('Weight in kg')
-      expect(weight).toHaveValue(88.85)
+      expect(weight).toHaveValue('88.85')
       expect(weight).toHaveAttribute('step', '0.01')
       const noteInput = editor.getByLabelText(/Private note/)
       expect((noteInput as HTMLTextAreaElement).value === privateNote).toBe(
@@ -539,14 +539,14 @@ describe('personal Dashboard and My Progress', () => {
       expect(
         screen.getByRole('dialog', { name: 'Edit weight' }),
       ).toBeInTheDocument()
-      expect(screen.getByLabelText('Weight in kg')).toHaveValue(81)
+      expect(screen.getByLabelText('Weight in kg')).toHaveValue('81')
     },
   )
 
   it('records a private entry with no challenge and updates logged-today state', async () => {
     render(page(<PersonalDashboardPage />))
     await screen.findByText('No record yet')
-    expect(screen.getByText('Not logged today')).toBeInTheDocument()
+    expect(screen.queryByText('Not logged today')).not.toBeInTheDocument()
     expect(
       screen.queryByRole('button', { name: 'Edit weight' }),
     ).not.toBeInTheDocument()
@@ -561,7 +561,7 @@ describe('personal Dashboard and My Progress', () => {
     })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save weight' }))
     await screen.findAllByText('82.1 kg')
-    expect(screen.getByText('Logged today')).toBeInTheDocument()
+    expect(screen.queryByText('Logged today')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Record weight' })).toBeEnabled()
     expect(
       screen.queryByRole('button', { name: 'Edit weight' }),
@@ -584,6 +584,14 @@ describe('personal Dashboard and My Progress', () => {
   it('keeps Dashboard save confirmation over the Create column, supports dismissal, and expires repeat saves', async () => {
     render(page(<PersonalDashboardPage />))
     await screen.findByText('No record yet')
+    const heading = screen.getByRole('heading', {
+      name: 'Dashboard',
+      level: 1,
+    })
+    expect(heading).toHaveClass('sr-only')
+    expect(
+      screen.getByRole('region', { name: 'Dashboard' }),
+    ).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Record weight' }))
     let dialog = screen.getByRole('dialog', { name: 'Record weight' })
     fireEvent.change(within(dialog).getByLabelText('Weight in kg'), {
@@ -594,9 +602,9 @@ describe('personal Dashboard and My Progress', () => {
     let confirmation = await screen.findByText('Personal weight saved.', {
       selector: '.dashboard-save-confirmation',
     })
-    expect(document.querySelector('.page-title-row')).toContainElement(
-      confirmation,
-    )
+    expect(
+      document.querySelector('.dashboard-save-confirmation-slot'),
+    ).toContainElement(confirmation)
     expect(
       document.querySelector('.dashboard-save-confirmation-slot'),
     ).toBeInTheDocument()
@@ -625,9 +633,9 @@ describe('personal Dashboard and My Progress', () => {
     confirmation = await screen.findByText('Personal weight saved.', {
       selector: '.dashboard-save-confirmation',
     })
-    expect(document.querySelector('.page-title-row')).toContainElement(
-      confirmation,
-    )
+    expect(
+      document.querySelector('.dashboard-save-confirmation-slot'),
+    ).toContainElement(confirmation)
     expect(
       await local().repositories.personalWeighIns.listForUser('user-alex'),
     ).toMatchObject({ data: [{ weightKg: 82.2 }] })
@@ -833,7 +841,7 @@ describe('personal Dashboard and My Progress', () => {
         name: `Edit weight ${personalWeighInToday()}`,
       }),
     )
-    expect(screen.getByLabelText('Weight in kg')).toHaveValue(85)
+    expect(screen.getByLabelText('Weight in kg')).toHaveValue('85')
     rendered.rerender(
       page(<PersonalWeighInsPage />, 'second-user', '/weigh-ins'),
     )

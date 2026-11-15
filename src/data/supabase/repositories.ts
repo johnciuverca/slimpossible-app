@@ -17,6 +17,7 @@ import type {
 import type { WeighIn } from '../../models/weighIn'
 import type { GroupChartEntry } from '../../models/groupChartHistory'
 import type { GroupMemberProgress } from '../../models/groupMemberProgress'
+import { isProfileAvatarPresetId } from '../../auth/profileAvatar'
 import type {
   GroupProgressSummary,
   GroupWeeklyWinCount,
@@ -814,6 +815,9 @@ export function createRepositories(client: DatabaseClient): Repositories {
             return {
               memberKey: row.member_key,
               displayName: row.display_name,
+              avatarPresetId: isProfileAvatarPresetId(row.avatar_preset_id)
+                ? row.avatar_preset_id
+                : null,
               startingWeightKg: row.starting_weight_kg,
               targetWeightKg: row.target_weight_kg,
               completionPercentage: row.completion_percentage,

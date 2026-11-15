@@ -32,6 +32,7 @@ async function installGroupFixtures(
     privateEntrySharedWithOtherGroup?: boolean
     duplicateEstimateOnSave?: boolean
     holdPersonalContexts?: boolean
+    participantAvatars?: boolean
   } = {},
 ) {
   const challengeId = ownEntries ? ownGroupId : 'e2e-challenge'
@@ -308,12 +309,14 @@ async function installGroupFixtures(
         target_challenge_id: string
       }
       const name = target_challenge_id === challengeId ? 'Ava' : 'Jo'
-      const ownKey = ownEntries
-        ? memberKey(target_challenge_id, viewerId)
-        : 'opaque-member-a'
-      const otherKey = ownEntries
-        ? memberKey(target_challenge_id, otherViewerId)
-        : 'opaque-member-b'
+      const ownKey =
+        ownEntries || options.participantAvatars
+          ? memberKey(target_challenge_id, viewerId)
+          : 'opaque-member-a'
+      const otherKey =
+        ownEntries || options.participantAvatars
+          ? memberKey(target_challenge_id, otherViewerId)
+          : 'opaque-member-b'
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify([
@@ -517,10 +520,21 @@ async function installGroupFixtures(
         body: JSON.stringify([
           {
             member_key: ownKey,
-            display_name:
-              body.target_challenge_id === challengeId
+            display_name: options.participantAvatars
+              ? body.target_challenge_id === challengeId
+                ? 'Ava'
+                : 'Jo'
+              : body.target_challenge_id === challengeId
                 ? 'Same display name'
                 : 'Second group member',
+            ...(options.participantAvatars
+              ? {
+                  avatar_preset_id:
+                    body.target_challenge_id === challengeId
+                      ? 'female-03'
+                      : 'female-04',
+                }
+              : {}),
             starting_weight_kg:
               body.target_challenge_id === challengeId
                 ? ownStartingWeight
@@ -559,10 +573,21 @@ async function installGroupFixtures(
           },
           {
             member_key: otherKey,
-            display_name:
-              body.target_challenge_id === challengeId
+            display_name: options.participantAvatars
+              ? body.target_challenge_id === challengeId
+                ? 'Ben'
+                : 'Kim'
+              : body.target_challenge_id === challengeId
                 ? 'Same display name'
                 : 'Second group member',
+            ...(options.participantAvatars
+              ? {
+                  avatar_preset_id:
+                    body.target_challenge_id === challengeId
+                      ? 'male-02'
+                      : 'male-05',
+                }
+              : {}),
             starting_weight_kg: 100,
             target_weight_kg: ownTarget,
             latest_recorded_date: '2026-09-22',
@@ -984,6 +1009,49 @@ for (const width of [320, 390, 430, 1280]) {
       },
     )
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    const chart = page.getByRole('img', {
+      name: 'Weight (kg) — shared group history',
+    })
+    const expectTrendStyles = async () => {
+      await expect(chart).toBeVisible()
+      await expect(chart.locator('[data-chart-trend]')).not.toHaveCount(0)
+      await expect(chart.locator('[data-chart-reference]')).toHaveCount(0)
+      await expect(
+        chart.locator('[data-series="target-reference"]'),
+      ).toHaveCount(0)
+      const styles = await chart
+        .locator('[data-chart-trend]')
+        .evaluateAll((trends) =>
+          trends.map((trend) => {
+            const seriesId = trend.getAttribute('data-chart-series-id')
+            const seriesLine = Array.from(
+              trend
+                .closest('svg')!
+                .querySelectorAll('path[data-chart-series-id]'),
+            ).find(
+              (path) => path.getAttribute('data-chart-series-id') === seriesId,
+            )
+            return {
+              seriesId,
+              stroke: trend.getAttribute('stroke'),
+              seriesStroke: seriesLine?.getAttribute('stroke'),
+              opacity: trend.getAttribute('opacity'),
+              dash: trend.getAttribute('stroke-dasharray'),
+            }
+          }),
+        )
+      expect(styles.length).toBeGreaterThan(0)
+      for (const style of styles) {
+        expect(style.seriesId).toBeTruthy()
+        expect(style.stroke).toBe(style.seriesStroke)
+        expect(style.opacity).toBe('0.32')
+        expect(style.dash).toBeNull()
+      }
+    }
+    await expectTrendStyles()
+    await chart.screenshot({
+      path: testInfo.outputPath(`group-comparison-chart-${width}.png`),
+    })
     const expectVisibleCollapse = async (surface: string) => {
       const controls = page.getByRole('group', {
         name: 'Chart date range controls',
@@ -1184,6 +1252,7 @@ for (const width of [320, 390, 430, 1280]) {
     })
     await page.getByRole('button', { name: 'Back to weekly averages' }).click()
     await page.getByRole('link', { name: 'Charts', exact: true }).click()
+    await expectTrendStyles()
     await expect(
       page.getByRole('tab', { name: 'All members', exact: true }),
     ).toHaveAttribute('aria-selected', 'true')
@@ -1225,6 +1294,16 @@ for (const width of [320, 390, 430, 1280]) {
     ).toHaveAttribute('aria-valuenow', selectedStart!)
     await page.screenshot({
       path: testInfo.outputPath(`weekly-charts-range-${width}.png`),
+      fullPage: true,
+    })
+    await page.getByRole('tab', { name: 'Ava', exact: true }).click()
+    await expect(chart.locator('[data-chart-trend]')).toHaveCount(1)
+    await expectTrendStyles()
+    await chart.screenshot({
+      path: testInfo.outputPath(`group-member-chart-${width}.png`),
+    })
+    await page.screenshot({
+      path: testInfo.outputPath(`weekly-member-chart-${width}.png`),
       fullPage: true,
     })
   })
@@ -1618,6 +1697,248 @@ for (const width of [1280, 390]) {
   })
 }
 
+for (const layout of [
+  { label: 'desktop', width: 1280, hasTouch: false },
+  { label: 'mobile touch', width: 390, hasTouch: true },
+]) {
+  test(`Group comparison legend hides and restores member data on ${layout.label}`, async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({
+      viewport: { width: layout.width, height: 900 },
+      hasTouch: layout.hasTouch,
+    })
+    try {
+      const page = await context.newPage()
+      await installGroupFixtures(
+        page,
+        true,
+        false,
+        false,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        'e2e-owner',
+        { participantAvatars: true },
+      )
+      await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+
+      const activate = async (target: ReturnType<typeof page.getByRole>) => {
+        if (!layout.hasTouch) {
+          await target.click()
+          return
+        }
+        await target.scrollIntoViewIfNeeded()
+        const bounds = (await target.boundingBox())!
+        await page.touchscreen.tap(
+          bounds.x + bounds.width / 2,
+          bounds.y + bounds.height / 2,
+        )
+      }
+      const chartDates = async (chart: ReturnType<typeof page.getByRole>) =>
+        chart
+          .locator('[data-chart-date-tick]')
+          .evaluateAll((ticks) =>
+            ticks.map((tick) => tick.getAttribute('data-chart-date-tick')),
+          )
+      const chartTicks = async (chart: ReturnType<typeof page.getByRole>) =>
+        chart
+          .locator('[data-chart-tick]')
+          .evaluateAll((ticks) =>
+            ticks.map((tick) => tick.getAttribute('data-chart-tick')),
+          )
+      const markerPositions = async (
+        chart: ReturnType<typeof page.getByRole>,
+        seriesId: string,
+      ) =>
+        chart
+          .locator(`circle[data-chart-point][data-series-id="${seriesId}"]`)
+          .evaluateAll((markers) =>
+            markers.map((marker) => ({
+              date: marker.getAttribute('data-date'),
+              x: marker.getAttribute('cx'),
+              y: marker.getAttribute('cy'),
+              kind: marker.getAttribute('data-point-kind'),
+            })),
+          )
+
+      for (const sectionName of ['Overview', 'Charts']) {
+        if (sectionName === 'Charts') {
+          const chartsLink = page
+            .getByRole('navigation', { name: 'Group sections' })
+            .getByRole('link', { name: 'Charts', exact: true })
+          await chartsLink.click()
+          await expect(chartsLink).toHaveAttribute('aria-current', 'page')
+          await expect(
+            page.getByRole('tab', { name: 'All members', exact: true }),
+          ).toBeVisible()
+        }
+        const chart = page.getByRole('img', {
+          name: 'Weight (kg) — shared group history',
+        })
+        await expect(chart).toBeVisible()
+        const legend = page.getByRole('list', { name: 'Group chart legend' })
+        const toggles = legend.getByRole('button')
+        await expect(toggles).toHaveCount(2)
+        const firstToggle = toggles.nth(0)
+        const secondToggle = toggles.nth(1)
+        const firstAvatar = firstToggle.locator(
+          '[data-avatar-preset="female-03"] > span[style]',
+        )
+        const firstSwatch = firstToggle.locator(':scope > span').nth(0)
+        const firstName = firstToggle.locator(':scope > span').last()
+        await activate(firstAvatar)
+        await expect(firstToggle).toHaveAttribute('aria-pressed', 'false')
+        await activate(firstSwatch)
+        await expect(firstToggle).toHaveAttribute('aria-pressed', 'true')
+        await activate(firstName)
+        await expect(firstToggle).toHaveAttribute('aria-pressed', 'false')
+        await activate(firstToggle)
+        await expect(firstToggle).toHaveAttribute('aria-pressed', 'true')
+        await expect(firstToggle).toBeVisible()
+        if (sectionName === 'Charts') {
+          for (const toggle of [firstToggle, secondToggle]) {
+            if ((await toggle.getAttribute('aria-pressed')) === 'false')
+              await activate(toggle)
+            await expect(toggle).toHaveAttribute('aria-pressed', 'true')
+          }
+        }
+        const seriesIds = await chart
+          .locator('circle[data-chart-point][data-series-id]')
+          .evaluateAll((markers) =>
+            Array.from(
+              new Set(
+                markers.map((marker) => marker.getAttribute('data-series-id')),
+              ),
+            ).filter((id): id is string => Boolean(id)),
+          )
+        expect(seriesIds).toHaveLength(2)
+
+        const datesBefore = await chartDates(chart)
+        const ticksBefore = await chartTicks(chart)
+        const weeklySummary = chart
+          .locator('circle[data-point-kind="weekly-summary"][data-chart-point]')
+          .first()
+        if (await weeklySummary.count()) {
+          await activate(weeklySummary)
+          await page
+            .getByRole('group', { name: /Chart point details/ })
+            .getByRole('button', { name: 'Expand week', exact: true })
+            .click()
+          await expect(
+            page.getByRole('button', { name: 'Back to weekly averages' }),
+          ).toBeVisible()
+        }
+        const positionsBefore = new Map(
+          await Promise.all(
+            seriesIds.map(
+              async (seriesId) =>
+                [seriesId, await markerPositions(chart, seriesId)] as const,
+            ),
+          ),
+        )
+
+        const activeMarker = chart
+          .locator('circle[data-chart-point][data-series-id]')
+          .first()
+        await activate(activeMarker)
+        const details = page.getByRole('group', {
+          name: /Chart point details/,
+        })
+        await expect(details).toBeVisible()
+        const initialColor = await firstToggle.evaluate(
+          (toggle) => toggle.firstElementChild?.getAttribute('style') ?? null,
+        )
+        expect(initialColor).not.toBeNull()
+
+        const firstBounds = (await firstToggle.boundingBox())!
+        if (layout.hasTouch)
+          expect(firstBounds.height).toBeGreaterThanOrEqual(44)
+        await activate(firstToggle)
+        await expect(firstToggle).toHaveAttribute('aria-pressed', 'false')
+        await expect(details).toHaveCount(0)
+        const hiddenSeriesIds = await Promise.all(
+          seriesIds.map(async (seriesId) =>
+            (await chart.locator(`[data-series-id="${seriesId}"]`).count()) ===
+            0
+              ? seriesId
+              : null,
+          ),
+        ).then((ids) => ids.filter((id): id is string => id !== null))
+        expect(hiddenSeriesIds).toHaveLength(1)
+        const hiddenSeriesId = hiddenSeriesIds[0]
+        const remainingSeriesId = seriesIds.find(
+          (seriesId) => seriesId !== hiddenSeriesId,
+        )!
+        await expect(
+          chart.locator(`[data-chart-series-id="${hiddenSeriesId}"]`),
+        ).toHaveCount(0)
+        await expect(
+          chart.locator('circle[data-chart-point][data-series-id]'),
+        ).not.toHaveCount(0)
+        expect(await markerPositions(chart, remainingSeriesId)).toEqual(
+          positionsBefore.get(remainingSeriesId),
+        )
+        expect(await chartDates(chart)).toEqual(datesBefore)
+        expect(await chartTicks(chart)).toEqual(ticksBefore)
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= window.innerWidth,
+          ),
+        ).toBe(true)
+
+        firstToggle.focus()
+        await page.keyboard.press('Space')
+        await expect(firstToggle).toHaveAttribute('aria-pressed', 'true')
+        await expect(
+          chart.locator('circle[data-chart-point][data-series-id]'),
+        ).not.toHaveCount(0)
+        const restoredColor = await firstToggle.evaluate(
+          (toggle) => toggle.firstElementChild?.getAttribute('style') ?? null,
+        )
+        expect(restoredColor).toBe(initialColor)
+
+        await secondToggle.focus()
+        await expect(secondToggle).toBeFocused()
+        await secondToggle.press('Enter')
+        await expect(secondToggle).toHaveAttribute('aria-pressed', 'false')
+        await activate(firstToggle)
+        await expect(firstToggle).toHaveAttribute('aria-pressed', 'false')
+        await expect(
+          page.getByRole('status', { name: 'Chart visibility status' }),
+        ).toContainText('All participants are hidden')
+        await expect(toggles).toHaveCount(2)
+        await expect(firstToggle).toBeVisible()
+        await expect(secondToggle).toBeVisible()
+        if (
+          await page
+            .getByRole('button', { name: 'Back to weekly averages' })
+            .count()
+        )
+          await expect(
+            page.getByRole('button', { name: 'Back to weekly averages' }),
+          ).toBeVisible()
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= window.innerWidth,
+          ),
+        ).toBe(true)
+
+        await activate(secondToggle)
+        await expect(secondToggle).toHaveAttribute('aria-pressed', 'true')
+        await expect(
+          chart.locator('circle[data-chart-point][data-series-id]'),
+        ).not.toHaveCount(0)
+        expect(await chartDates(chart)).toEqual(datesBefore)
+        expect(await chartTicks(chart)).toEqual(ticksBefore)
+      }
+    } finally {
+      await context.close()
+    }
+  })
+}
+
 for (const viewport of [
   { label: 'desktop', width: 1280 },
   { label: 'mobile', width: 390 },
@@ -1982,10 +2303,14 @@ for (const viewport of [
     const groupLegend = page.getByRole('list', {
       name: 'Group chart legend',
     })
-    await expect(groupLegend.locator('li')).toHaveText([
-      'Ava (member 1)',
-      'Ava (member 2)',
-    ])
+    await expect(
+      groupLegend.locator('li > button > span:last-child'),
+    ).toHaveText(['Ava (member 1)', 'Ava (member 2)'])
+    // The preview may still be backed by the pre-migration RPC, which omits
+    // avatar_preset_id. In that case show a neutral initial until staging is migrated.
+    await expect(
+      groupLegend.locator('li [data-avatar-preset="default"]'),
+    ).toHaveText(['A', 'A'])
     const chartRegion = page.getByRole('region', {
       name: 'Group comparison chart',
     })
@@ -2182,7 +2507,9 @@ for (const viewport of [
     await expect(page.getByRole('tooltip')).toContainText(
       /Ava \(member 2\).*20\.09\.2026.*70 kg/,
     )
-    await expect(groupLegend.locator('li')).toHaveText(['Ava (member 2)'])
+    await expect(groupLegend.locator('li > span > span:last-child')).toHaveText(
+      ['Ava (member 2)'],
+    )
     await expectLegendCentered()
     await expect(
       individualChart.locator('circle[data-point-kind="recorded"][data-date]'),
@@ -2482,13 +2809,33 @@ for (const viewport of [
     page,
   }) => {
     await page.setViewportSize({ height: 900, width: viewport.width })
-    const requests = await installGroupFixtures(page)
+    const requests = await installGroupFixtures(
+      page,
+      false,
+      false,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'e2e-owner',
+      { participantAvatars: true },
+    )
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
 
     await expect(
       page.getByRole('heading', { name: 'E2E authorized group', exact: true }),
     ).toBeVisible()
     await expect(page.getByText('42.5%', { exact: true })).toBeVisible()
+    const overviewLegend = page.getByRole('list', {
+      name: 'Group chart legend',
+    })
+    await expect(
+      overviewLegend.locator('[data-avatar-preset="female-03"]'),
+    ).toBeVisible()
+    await expect(
+      overviewLegend.locator('[data-avatar-preset="male-02"]'),
+    ).toBeVisible()
     await page
       .getByRole('navigation', { name: 'Group sections' })
       .getByRole('link', { name: 'Weekly results' })
@@ -2500,6 +2847,27 @@ for (const viewport of [
     await expect(
       page.getByRole('list', { name: 'Weekly winners' }),
     ).toContainText('Ben')
+    await expect(
+      page
+        .getByRole('list', { name: 'Weekly winners' })
+        .locator('[data-avatar-preset="female-03"]'),
+    ).toBeVisible()
+    await expect(
+      page
+        .getByRole('list', { name: 'Weekly winners' })
+        .locator('[data-avatar-preset="male-02"]'),
+    ).toBeVisible()
+
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Members', exact: true })
+      .click()
+    await expect(
+      page.locator('#group-progress [data-avatar-preset="female-03"]'),
+    ).toBeVisible()
+    await expect(
+      page.locator('#group-progress [data-avatar-preset="male-02"]'),
+    ).toBeVisible()
 
     await page
       .getByRole('navigation', { name: 'Group sections' })
@@ -2595,7 +2963,7 @@ for (const viewport of [
       .locator('circle[data-chart-point]')
       .count()
     await expect(historyPanel.getByRole('button')).toHaveCount(
-      5 + chartPointCount,
+      7 + chartPointCount,
     )
 
     await expect(
@@ -3823,6 +4191,7 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
     const manageBox = (await manage.boundingBox())!
     expect(manageBox.width).toBeGreaterThanOrEqual(44)
     expect(manageBox.height).toBeGreaterThanOrEqual(44)
+    await expect(manage).toHaveCSS('font-size', '12.6px')
     await page.getByRole('link', { name: /Group · testtest/ }).focus()
     await page.keyboard.press('Tab')
     await expect(manage).toBeFocused()
@@ -3926,7 +4295,7 @@ test('shows the challenge owner badge only in Members and fits on mobile', async
       height: bounds.height,
     }
   })
-  expect(badgeMetrics.fontSize).toBe('12px')
+  expect(badgeMetrics.fontSize).toBe('9px')
   expect(badgeMetrics.height).toBeGreaterThanOrEqual(20)
   expect(
     await page.evaluate(
