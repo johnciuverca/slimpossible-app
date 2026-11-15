@@ -255,7 +255,7 @@ describe('ProgressPage', () => {
     expect(within(editor).getByLabelText(/Private note/)).toHaveValue(
       'Second challenge private note',
     )
-    expect(within(editor).getByLabelText('Weight in kg')).toHaveValue(88)
+    expect(within(editor).getByLabelText('Weight in kg')).toHaveValue('88')
     const shared = await screen.findByRole('table', {
       name: 'Shared group weigh-ins',
     })

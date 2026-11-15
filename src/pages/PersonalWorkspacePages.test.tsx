@@ -242,7 +242,7 @@ describe('personal Dashboard and My Progress', () => {
           ? within(await screen.findByRole('dialog', { name: 'Edit weight' }))
           : within(screen.getByRole('form', { name: 'Personal weigh-in form' }))
       const weight = editor.getByLabelText('Weight in kg')
-      expect(weight).toHaveValue(88.85)
+      expect(weight).toHaveValue('88.85')
       expect(weight).toHaveAttribute('step', '0.01')
       const noteInput = editor.getByLabelText(/Private note/)
       expect((noteInput as HTMLTextAreaElement).value === privateNote).toBe(
@@ -539,7 +539,7 @@ describe('personal Dashboard and My Progress', () => {
       expect(
         screen.getByRole('dialog', { name: 'Edit weight' }),
       ).toBeInTheDocument()
-      expect(screen.getByLabelText('Weight in kg')).toHaveValue(81)
+      expect(screen.getByLabelText('Weight in kg')).toHaveValue('81')
     },
   )
 
@@ -841,7 +841,7 @@ describe('personal Dashboard and My Progress', () => {
         name: `Edit weight ${personalWeighInToday()}`,
       }),
     )
-    expect(screen.getByLabelText('Weight in kg')).toHaveValue(85)
+    expect(screen.getByLabelText('Weight in kg')).toHaveValue('85')
     rendered.rerender(
       page(<PersonalWeighInsPage />, 'second-user', '/weigh-ins'),
     )
