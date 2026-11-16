@@ -105,6 +105,21 @@ begin
     'first_week_actual', target_sunday - 4
   );
 
+  perform set_config('request.jwt.claim.sub', '', true);
+  perform set_config('request.jwt.claim.role', 'service_role', true);
+  perform public.begin_account_erasure('00000000-0000-4000-8000-000000000006');
+  perform set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000006', true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  if public.profile_avatar_upload_allowed() then
+    raise exception 'Avatar uploads remained enabled after account erasure began.';
+  end if;
+  perform set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000002', true);
+  if not public.profile_avatar_upload_allowed() then
+    raise exception 'Another member avatar upload was incorrectly blocked.';
+  end if;
+  perform set_config('request.jwt.claim.sub', '', true);
+  perform set_config('request.jwt.claim.role', '', true);
+
   update public.challenges set status = 'archived'
   where id = target_challenge;
   delete from auth.users where id = '00000000-0000-4000-8000-000000000006';
@@ -160,15 +175,21 @@ begin
   end if;
 
   perform set_config('request.jwt.claim.role', 'authenticated', true);
-  if not public.delete_archived_group_challenge(target_challenge) then
-    raise exception 'An active member could not delete the archived ownerless group.';
-  end if;
-  if exists (select 1 from public.group_weekly_results where challenge_id = target_challenge)
-     or exists (select 1 from public.group_weekly_result_winners where challenge_id = target_challenge)
-     or exists (select 1 from public.group_weekly_candidates where challenge_id = target_challenge) then
-    raise exception 'Permanent challenge deletion left weekly award or evidence rows.';
+  begin
+    perform public.delete_archived_group_challenge(target_challenge);
+    raise exception 'An active member unexpectedly gained owner-only deletion rights.';
+  exception when insufficient_privilege then
+    null;
+  end;
+  if not exists (select 1 from public.challenges where id = target_challenge
+      and owner_id is null and status = 'archived')
+     or not exists (select 1 from public.group_weekly_results where challenge_id = target_challenge
+      and sunday = target_sunday and winner_count = 1)
+     or not exists (select 1 from public.group_weekly_result_winners where challenge_id = target_challenge
+      and sunday = target_sunday and user_id is null and display_name = 'Deleted member') then
+    raise exception 'Ownerless challenge or anonymous award did not survive the denied member deletion.';
   end if;
 end;
 $$;
 
-\echo PASS account erasure removes personal data and scoring evidence while preserving anonymous awards and challenge cascades
+\echo PASS account erasure removes personal data and scoring evidence while preserving anonymous awards and owner-only challenge deletion

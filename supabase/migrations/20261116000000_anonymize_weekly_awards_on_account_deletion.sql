@@ -21,6 +21,66 @@ $$;
 revoke all on function public._account_erasure_is_active(uuid)
   from public, anon, authenticated, service_role;
 
+create function public._profile_avatar_erasure_lock_key(target_user_id uuid)
+returns bigint language sql immutable
+set search_path = pg_catalog
+as $$
+  select pg_catalog.hashtextextended(
+    'profile-avatar-erasure:' || target_user_id::text, 0
+  )
+$$;
+revoke all on function public._profile_avatar_erasure_lock_key(uuid)
+  from public, anon, authenticated, service_role;
+
+-- Mark erasure before the Edge Function scans Storage. Avatar uploads use the
+-- same transaction lock and then check this context, preventing a racing
+-- upload from appearing after cleanup has completed.
+create function public.begin_account_erasure(target_user_id uuid)
+returns void language plpgsql security definer
+set search_path = pg_catalog, public, auth
+as $$
+begin
+  if auth.role() <> 'service_role' then
+    raise exception using errcode = '42501', message = 'Service role required.';
+  end if;
+  perform pg_catalog.pg_advisory_xact_lock(
+    public._profile_avatar_erasure_lock_key(target_user_id)
+  );
+  insert into public.account_erasure_context(user_id) values (target_user_id)
+  on conflict (user_id) do nothing;
+end;
+$$;
+revoke all on function public.begin_account_erasure(uuid)
+  from public, anon, authenticated, service_role;
+grant execute on function public.begin_account_erasure(uuid) to service_role;
+
+create function public.profile_avatar_upload_allowed()
+returns boolean language plpgsql volatile security definer
+set search_path = pg_catalog, public, auth
+as $$
+declare
+  actor_id uuid := auth.uid();
+begin
+  if actor_id is null then return false; end if;
+  perform pg_catalog.pg_advisory_xact_lock(
+    public._profile_avatar_erasure_lock_key(actor_id)
+  );
+  return not public._account_erasure_is_active(actor_id);
+end;
+$$;
+revoke all on function public.profile_avatar_upload_allowed()
+  from public, anon, authenticated, service_role;
+grant execute on function public.profile_avatar_upload_allowed() to authenticated;
+
+drop policy if exists profile_avatars_insert_own on storage.objects;
+create policy profile_avatars_insert_own
+  on storage.objects for insert to authenticated
+  with check (
+    bucket_id = 'profile-avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+    and public.profile_avatar_upload_allowed()
+  );
+
 alter table public.challenges
   alter column owner_id drop not null,
   alter column created_by drop not null,
@@ -101,6 +161,9 @@ as $$
 declare
   scope record;
 begin
+  perform pg_catalog.pg_advisory_xact_lock(
+    public._profile_avatar_erasure_lock_key(old.id)
+  );
   insert into public.account_erasure_context(user_id) values (old.id)
   on conflict (user_id) do nothing;
 
@@ -188,10 +251,8 @@ create trigger auth_users_scrub_weekly_awards_before_delete
 before delete on auth.users
 for each row execute function public._scrub_account_before_auth_delete();
 
--- Account erasure can leave a challenge without its original owner. Keep the
--- existing owner-only delete rule, with a narrow fallback for an archived
--- ownerless group: an active remaining member may remove that group and its
--- challenge-scoped awards through the established cascade.
+-- Challenge deletion stays owner-only. Owner references are nullable after
+-- erasure, so use a null-safe comparison to deny deletion of ownerless groups.
 create or replace function public.delete_archived_group_challenge(target_challenge_id uuid)
 returns boolean language plpgsql security definer
 set search_path = pg_catalog, public, auth
@@ -199,8 +260,6 @@ as $$
 declare
   actor_id uuid := auth.uid();
   challenge_row public.challenges%rowtype;
-  actor_owns boolean;
-  actor_is_active_member boolean;
 begin
   if actor_id is null then
     raise exception using errcode = '42501', message = 'Sign-in required.';
@@ -209,39 +268,31 @@ begin
   from public.challenges as challenge
   where challenge.id = target_challenge_id
   for update;
-  if not found or challenge_row.challenge_kind = 'personal' then
-    raise exception using errcode = '42501', message = 'Archived group challenge ownership required.';
+  if not found or challenge_row.owner_id is distinct from actor_id
+     or challenge_row.challenge_kind = 'personal' then
+    raise exception using errcode = '42501',
+      message = 'Archived group challenge ownership required.';
   end if;
   if challenge_row.status <> 'archived' then
-    raise exception using errcode = '22023', message = 'Only archived group challenges can be permanently deleted.';
-  end if;
-  actor_owns := challenge_row.owner_id = actor_id;
-  actor_is_active_member := challenge_row.owner_id is null and exists (
-    select 1 from public.participants as participant
-    where participant.challenge_id = challenge_row.id
-      and participant.user_id = actor_id and participant.status = 'active'
-  );
-  if not actor_owns and not actor_is_active_member then
-    raise exception using errcode = '42501', message = 'Archived group challenge ownership required.';
+    raise exception using errcode = '22023',
+      message = 'Only archived group challenges can be permanently deleted.';
   end if;
 
   delete from public.challenges as challenge
   where challenge.id = target_challenge_id
-    and challenge.owner_id is not distinct from challenge_row.owner_id
-    and (challenge.owner_id = actor_id or (challenge.owner_id is null and exists (
-      select 1 from public.participants as participant
-      where participant.challenge_id = challenge.id
-        and participant.user_id = actor_id and participant.status = 'active'
-    )))
+    and challenge.owner_id = actor_id
     and challenge.status = 'archived'
     and challenge.challenge_kind is distinct from 'personal';
   if not found then
-    raise exception using errcode = '40001', message = 'Challenge state changed; refresh and try again.';
+    raise exception using errcode = '40001',
+      message = 'Challenge state changed; refresh and try again.';
   end if;
   return true;
 end;
 $$;
-revoke all on function public.delete_archived_group_challenge(uuid) from public, anon;
-grant execute on function public.delete_archived_group_challenge(uuid) to authenticated;
+revoke all on function public.delete_archived_group_challenge(uuid)
+  from public, anon;
+grant execute on function public.delete_archived_group_challenge(uuid)
+  to authenticated;
 
 commit;

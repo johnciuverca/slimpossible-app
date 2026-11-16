@@ -1,90 +1,55 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.116.0'
+import {
+  type AccountDeletionServices,
+  createDeleteAccountHandler,
+} from './handler.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Headers':
-    'authorization, apikey, content-type, x-client-info',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Origin': '*',
-}
+const projectUrl = Deno.env.get('SUPABASE_URL')
+const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
+const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+const configured = Boolean(projectUrl && anonKey && serviceRoleKey)
 
-function respond(status: number, body: { error?: string; success?: boolean }) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
-}
-
-Deno.serve(async (request) => {
-  if (request.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
-  if (request.method !== 'POST')
-    return respond(405, { error: 'Method not allowed.' })
-
-  const authorization = request.headers.get('Authorization')
-  const projectUrl = Deno.env.get('SUPABASE_URL')
-  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  if (
-    !authorization?.startsWith('Bearer ') ||
-    !projectUrl ||
-    !anonKey ||
-    !serviceRoleKey
-  ) {
-    return respond(401, {
-      error: 'Sign in again before deleting your account.',
-    })
-  }
-
-  const caller = createClient(projectUrl, anonKey, {
+function callerFor(authorization: string) {
+  return createClient(projectUrl!, anonKey!, {
     auth: { persistSession: false, autoRefreshToken: false },
     global: { headers: { Authorization: authorization } },
   })
-  const { data: userData, error: userError } = await caller.auth.getUser()
-  if (userError || !userData.user) {
-    return respond(401, {
-      error: 'Sign in again before deleting your account.',
-    })
-  }
+}
 
-  const admin = createClient(projectUrl, serviceRoleKey, {
+function adminClient() {
+  return createClient(projectUrl!, serviceRoleKey!, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
-  const bucket = admin.storage.from('profile-avatars')
-  const pageSize = 100
-  for (;;) {
-    const { data: objects, error: listError } = await bucket.list(
-      userData.user.id,
-      {
-        limit: pageSize,
-        offset: 0,
-      },
-    )
-    if (listError)
-      return respond(503, {
-        error: 'Account data could not be fully removed. Try again.',
-      })
-    const paths = (objects ?? [])
-      .filter((object) => object.id !== null)
-      .map((object) => `${userData.user.id}/${object.name}`)
-    if (paths.length > 0) {
-      const { error: removeError } = await bucket.remove(paths)
-      if (removeError)
-        return respond(503, {
-          error: 'Account data could not be fully removed. Try again.',
-        })
-    }
-    if (!objects || objects.length < pageSize || paths.length === 0) break
-  }
+}
 
-  // The Auth deletion trigger scrubs relational personal/scoring evidence and
-  // keeps each finalized challenge award under the generic Deleted member label.
-  const { error: deleteError } = await admin.auth.admin.deleteUser(
-    userData.user.id,
-  )
-  if (deleteError)
-    return respond(503, {
-      error: 'Account data could not be fully removed. Try again.',
+const services: AccountDeletionServices = {
+  configured,
+  async getUser(authorization) {
+    const { data, error } = await callerFor(authorization).auth.getUser()
+    return error || !data.user ? null : { id: data.user.id }
+  },
+  async beginErasure(userId) {
+    const { error } = await adminClient().rpc('begin_account_erasure', {
+      target_user_id: userId,
     })
-  return respond(200, { success: true })
-})
+    return error
+  },
+  async listAvatarObjects(userId, folder, limit, offset) {
+    const { data, error } = await adminClient()
+      .storage.from('profile-avatars')
+      .list(folder, { limit, offset })
+    return { objects: data, error }
+  },
+  async removeAvatarObjects(paths) {
+    const { error } = await adminClient()
+      .storage.from('profile-avatars')
+      .remove(paths)
+    return { error }
+  },
+  async deleteAuthUser(userId) {
+    const { error } = await adminClient().auth.admin.deleteUser(userId)
+    return { error }
+  },
+}
+
+Deno.serve(createDeleteAccountHandler(services))

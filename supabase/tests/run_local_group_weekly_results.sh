@@ -45,4 +45,19 @@ if ! wait "$task_save_a_pid"; then cat "$task_cluster/save-a.log" "$task_cluster
 if ! wait "$task_save_b_pid"; then cat "$task_cluster/save-a.log" "$task_cluster/save-b.log" >&2; exit 1; fi
 task_share_count="$("${task_psql[@]}" -Atc "select count(*) from public.personal_weigh_in_group_shares where personal_weigh_in_id in ('40400000-0000-4000-8000-000000000022', '40400000-0000-4000-8000-000000000024') and challenge_id in ('40400000-0000-4000-8000-000000000001', '40400000-0000-4000-8000-000000000002')")"
 [[ "$task_share_count" == 4 ]] || { printf 'Unexpected concurrent RPC share rows: %s\n' "$task_share_count" >&2; exit 1; }
+
+# An in-flight avatar upload holds the per-user advisory lock. Erasure waits
+# for its commit, then leaves a marker that rejects later uploads.
+task_avatar_upload="begin; select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000002', false); select set_config('request.jwt.claim.role', 'authenticated', false); set role authenticated; select public.profile_avatar_upload_allowed(); select pg_sleep(0.8); commit"
+task_avatar_erasure="begin; select set_config('request.jwt.claim.role', 'service_role', false); set role service_role; do \$\$ declare started_at timestamptz := clock_timestamp(); begin perform public.begin_account_erasure('00000000-0000-4000-8000-000000000002'); if clock_timestamp() - started_at < interval '400 milliseconds' then raise exception 'Account erasure did not wait for the in-flight avatar upload.'; end if; end \$\$; commit"
+"${task_psql[@]}" -c "$task_avatar_upload" >"$task_cluster/avatar-upload.log" 2>&1 &
+task_avatar_upload_pid=$!
+sleep 0.1
+"${task_psql[@]}" -c "$task_avatar_erasure" >"$task_cluster/avatar-erasure.log" 2>&1 &
+task_avatar_erasure_pid=$!
+if ! wait "$task_avatar_upload_pid"; then cat "$task_cluster/avatar-upload.log" "$task_cluster/avatar-erasure.log" >&2; exit 1; fi
+if ! wait "$task_avatar_erasure_pid"; then cat "$task_cluster/avatar-upload.log" "$task_cluster/avatar-erasure.log" >&2; exit 1; fi
+task_later_upload_allowed="$("${task_psql[@]}" -Atc "select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000002', false); select set_config('request.jwt.claim.role', 'authenticated', false); select public.profile_avatar_upload_allowed()" | tail -n 1)"
+[[ "$task_later_upload_allowed" == f ]] || { printf 'A later avatar upload was not blocked after erasure began.\n' >&2; exit 1; }
+"${task_psql[@]}" -c "delete from public.account_erasure_context where user_id = '00000000-0000-4000-8000-000000000002'" >/dev/null
 printf 'PASS local weekly snapshots, chronology, membership episodes, cutoff, immutable awards and concurrent RPC lock ordering\n'
