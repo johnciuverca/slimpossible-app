@@ -19,6 +19,7 @@ import { participantFixture } from '../models/fixtures'
 import type { PersonalWeighIn } from '../models/personalWeighIn'
 import {
   personalWeighInToday,
+  parsePersonalWeighInWeight,
   validatePersonalWeighIn,
 } from '../models/personalWeighIn'
 
@@ -69,7 +70,7 @@ export function PersonalWeighInsPage() {
       behavior: 'instant',
     })
     editorRegion.current
-      ?.querySelector<HTMLInputElement>('input[type="number"]')
+      ?.querySelector<HTMLInputElement>('#personal-weigh-in-weight')
       ?.focus({ preventScroll: true })
   }, [focusRevision])
 
@@ -183,7 +184,7 @@ export function PersonalWeighInsPage() {
       behavior: 'instant',
     })
     editorRegion.current
-      ?.querySelector<HTMLInputElement>('input[type="number"]')
+      ?.querySelector<HTMLInputElement>('#personal-weigh-in-weight')
       ?.focus({ preventScroll: true })
   }
 
@@ -212,7 +213,7 @@ export function PersonalWeighInsPage() {
       behavior: 'instant',
     })
     editorRegion.current
-      ?.querySelector<HTMLInputElement>('input[type="number"]')
+      ?.querySelector<HTMLInputElement>('#personal-weigh-in-weight')
       ?.focus({ preventScroll: true })
   }
 
@@ -246,7 +247,7 @@ export function PersonalWeighInsPage() {
       date: values.date,
       note: values.note.trim() || undefined,
       sharedChallengeIds: values.sharedChallengeIds,
-      weightKg: Number(values.weightKg),
+      weightKg: parsePersonalWeighInWeight(values.weightKg) ?? Number.NaN,
     }
     const validation = validatePersonalWeighIn(input)
     if (!validation.success) {

@@ -103,10 +103,9 @@ export function PersonalWeighInEditor({
               label="Weight in kg"
               min="0"
               onChange={(event) => onChange('weightKg', event.target.value)}
-              onWheel={(event) => event.currentTarget.blur()}
               shellClassName={`record-weight-field-shell${errors.weightKg ? ' has-error' : ''}`}
               step="0.01"
-              type="number"
+              type="text"
               value={values.weightKg}
             />
           </div>
@@ -131,9 +130,8 @@ export function PersonalWeighInEditor({
             label="Weight in kg"
             min="0"
             onChange={(event) => onChange('weightKg', event.target.value)}
-            onWheel={(event) => event.currentTarget.blur()}
             step="0.01"
-            type="number"
+            type="text"
             value={values.weightKg}
           />
         </>
