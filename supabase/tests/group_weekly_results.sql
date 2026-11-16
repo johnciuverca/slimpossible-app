@@ -1,9 +1,17 @@
 -- LOCAL disposable PostgreSQL only. No logical slots, cron or hosted database.
 \set ON_ERROR_STOP on
 
+insert into auth.users(id, created_at) values
+  ('00000000-0000-4000-8000-000000000004', now()),
+  ('00000000-0000-4000-8000-000000000005', now())
+on conflict (id) do nothing;
+
 insert into public.profiles(id, display_name) values
   ('00000000-0000-4000-8000-000000000001', 'Weekly owner'),
-  ('00000000-0000-4000-8000-000000000002', 'Weekly member')
+  ('00000000-0000-4000-8000-000000000002', 'Weekly member'),
+  ('00000000-0000-4000-8000-000000000003', 'Interpolation member'),
+  ('00000000-0000-4000-8000-000000000004', 'First entry member'),
+  ('00000000-0000-4000-8000-000000000005', 'Sunday only member')
 on conflict (id) do nothing;
 
 do $$
@@ -112,16 +120,69 @@ begin
         and result.sunday between target_sunday - 14 and target_sunday) <> 3 then
     raise exception 'Latest-first finalization did not preserve all three missed award weeks.';
   end if;
+
+  insert into public.personal_weigh_ins(id, user_id, recorded_date, weight_kg, note) values
+    ('40400000-0000-4000-8000-000000000031', '00000000-0000-4000-8000-000000000003', target_sunday - 10, 85, 'local'),
+    ('40400000-0000-4000-8000-000000000032', '00000000-0000-4000-8000-000000000003', target_sunday - 4, 79, 'local'),
+    ('40400000-0000-4000-8000-000000000036', '00000000-0000-4000-8000-000000000003', target_sunday - 7, 70, 'private'),
+    ('40400000-0000-4000-8000-000000000033', '00000000-0000-4000-8000-000000000004', target_sunday + 3, 90, 'local'),
+    ('40400000-0000-4000-8000-000000000035', '00000000-0000-4000-8000-000000000004', target_sunday + 7, 89.5, 'local'),
+    ('40400000-0000-4000-8000-000000000034', '00000000-0000-4000-8000-000000000005', target_sunday, 88, 'local');
+  insert into public.personal_weigh_in_group_shares(personal_weigh_in_id, challenge_id) values
+    ('40400000-0000-4000-8000-000000000031', test_challenge_id),
+    ('40400000-0000-4000-8000-000000000032', test_challenge_id),
+    ('40400000-0000-4000-8000-000000000033', test_challenge_id),
+    ('40400000-0000-4000-8000-000000000035', test_challenge_id),
+    ('40400000-0000-4000-8000-000000000034', test_challenge_id);
+  if (select baseline.baseline_weight from public._group_weekly_baseline(
+      test_challenge_id, target_sunday, '00000000-0000-4000-8000-000000000003',
+      now() - interval '60 days') as baseline) <> 82
+     or (select baseline.baseline_source from public._group_weekly_baseline(
+      test_challenge_id, target_sunday, '00000000-0000-4000-8000-000000000003',
+      now() - interval '60 days') as baseline) <> 'interpolated' then
+    raise exception 'Shared records bracketing last Sunday were not interpolated linearly.';
+  end if;
+  if (select baseline.baseline_weight from public._group_weekly_baseline(
+      test_challenge_id, target_sunday + 7, '00000000-0000-4000-8000-000000000004',
+      now() - interval '60 days') as baseline) <> 90
+     or (select baseline.baseline_source from public._group_weekly_baseline(
+      test_challenge_id, target_sunday + 7, '00000000-0000-4000-8000-000000000004',
+      now() - interval '60 days') as baseline) <> 'first_week_actual' then
+    raise exception 'First Monday-Saturday actual entry was not used as the weekly baseline.';
+  end if;
+  if (select personal.weight_kg - baseline.baseline_weight
+      from public.personal_weigh_ins as personal
+      cross join lateral public._group_weekly_baseline(
+        test_challenge_id, target_sunday + 7,
+        '00000000-0000-4000-8000-000000000004', now() - interval '60 days'
+      ) as baseline
+      where personal.id = '40400000-0000-4000-8000-000000000035') <> -0.5 then
+    raise exception 'First Wednesday baseline must score the actual Sunday result exactly.';
+  end if;
+  if (select baseline.baseline_weight from public._group_weekly_baseline(
+      test_challenge_id, target_sunday, '00000000-0000-4000-8000-000000000005',
+      now() - interval '60 days') as baseline) is not null
+     or (select baseline.baseline_source from public._group_weekly_baseline(
+      test_challenge_id, target_sunday, '00000000-0000-4000-8000-000000000005',
+      now() - interval '60 days') as baseline) <> 'current_sunday_only' then
+    raise exception 'A first-ever Sunday entry incorrectly qualified as a baseline.';
+  end if;
   if not exists (select 1 from public.group_weekly_results as result
     where result.challenge_id = test_challenge_id and result.sunday = target_sunday
       and result_outcome = 'shared_winners' and winner_count = 2
       and active_participant_count = 2 and recorded_participant_count = 2
       and eligible_participant_count = 2) then
-    raise exception 'Expected an actual-only tied award for two eligible members.';
+    raise exception 'Expected the tied award from two actual Sunday records and usable baselines.';
   end if;
   if (select count(*) from public.group_weekly_result_winners as winner
       where winner.challenge_id = test_challenge_id and winner.sunday = target_sunday) <> 2 then
     raise exception 'Tied winners were not frozen.';
+  end if;
+  if exists (select 1 from public.group_weekly_result_winners as winner
+      where winner.challenge_id = test_challenge_id and winner.sunday = target_sunday
+        and (winner.baseline_source <> 'previous_sunday_actual'
+          or winner.previous_weight_kg not in (80, 85))) then
+    raise exception 'Winner records did not retain the exact baseline source and value.';
   end if;
 
   update public.personal_weigh_ins set weight_kg = 70
@@ -135,6 +196,12 @@ begin
      or (select result.result_outcome from public.group_weekly_results as result
       where result.challenge_id = test_challenge_id and result.sunday = target_sunday) <> 'shared_winners' then
     raise exception 'Edits after finalization changed the immutable award.';
+  end if;
+  if exists (select 1 from public.group_weekly_result_winners as winner
+      where winner.challenge_id = test_challenge_id and winner.sunday = target_sunday
+        and (winner.baseline_source <> 'previous_sunday_actual'
+          or winner.previous_weight_kg not in (80, 85))) then
+    raise exception 'Post-cutoff edits changed frozen winner baseline evidence.';
   end if;
   if not exists (select 1 from public.group_weekly_result_winners as winner
     where winner.challenge_id = test_challenge_id and winner.sunday = target_sunday

@@ -2037,7 +2037,7 @@ export function GroupDashboardPage() {
   })()
   const weeklyResultMessage = hasManagedWeeklyResult
     ? weeklyResultDisplay?.state === 'provisional'
-      ? `${weeklyResultDisplay.recordedParticipantCount} of ${weeklyResultDisplay.activeParticipantCount} active members checked in this Sunday; ${weeklyResultDisplay.eligibleParticipantCount} have both consecutive Sunday records. The provisional result locks at Sunday 20:00 Europe/Bucharest.`
+      ? `${weeklyResultDisplay.recordedParticipantCount} of ${weeklyResultDisplay.activeParticipantCount} active members have an actual Sunday weigh-in; ${weeklyResultDisplay.eligibleParticipantCount} have a usable baseline. The result locks at Sunday 20:00 Europe/Bucharest.`
       : weeklyResultDisplay?.state === 'finalized'
         ? `Finalized${weeklyResultDisplay.finalizedAt ? ` ${new Date(weeklyResultDisplay.finalizedAt).toLocaleString(undefined, { timeZone: 'Europe/Bucharest' })}` : ''}. This award is locked.`
         : weeklyResultDisplay?.state === 'pending'
@@ -2337,7 +2337,8 @@ export function GroupDashboardPage() {
                         Weekly result
                       </h2>
                       <p className="mt-2 text-sm text-slate-600">
-                        Based on consecutive Sunday check-ins:{' '}
+                        Based on the actual Sunday weigh-in and the available
+                        shared baseline:{' '}
                         <time dateTime={displayedPreviousSunday}>
                           {formatDate(
                             displayedPreviousSunday ?? summary.previousSunday,

@@ -1,4 +1,4 @@
--- Store private actual-Sunday candidates for provisional views and locked awards.
+-- Store private Sunday candidates and cutoff-selected actual baselines for awards.
 begin;
 
 create table public.group_weekly_result_control (
@@ -25,6 +25,15 @@ create table public.group_weekly_candidates (
   display_name text not null,
   is_active boolean not null,
   actual_weight_kg numeric(6, 2),
+  baseline_weight_kg numeric,
+  baseline_source text not null default 'none' check (baseline_source in (
+    'none', 'previous_sunday_actual', 'interpolated', 'first_week_actual', 'current_sunday_only'
+  )),
+  baseline_source_date date,
+  baseline_before_date date,
+  baseline_before_weight_kg numeric,
+  baseline_after_date date,
+  baseline_after_weight_kg numeric,
   primary key (challenge_id, sunday, user_id),
   foreign key (challenge_id, sunday)
     references public.group_weekly_candidate_weeks(challenge_id, sunday) on delete cascade
@@ -58,9 +67,18 @@ create table public.group_weekly_result_winners (
   participant_id uuid not null,
   member_key text not null check (member_key ~ '^[0-9a-f]{32}$'),
   display_name text not null,
-  weight_change_kg numeric(8, 3) not null,
-  previous_weight_kg numeric(6, 2) not null,
+  weight_change_kg numeric not null,
+  previous_weight_kg numeric not null,
   current_weight_kg numeric(6, 2) not null,
+  baseline_source text not null,
+  baseline_source_date date,
+  baseline_before_date date,
+  baseline_before_weight_kg numeric,
+  baseline_after_date date,
+  baseline_after_weight_kg numeric,
+  check (baseline_source in (
+    'previous_sunday_actual', 'interpolated', 'first_week_actual'
+  )),
   primary key (challenge_id, sunday, user_id),
   foreign key (challenge_id, sunday)
     references public.group_weekly_results(challenge_id, sunday) on delete cascade
@@ -161,6 +179,74 @@ $$;
 revoke all on function public._group_weekly_lock_scopes(jsonb)
   from public, anon, authenticated, service_role;
 
+create function public._group_weekly_baseline(
+  target_challenge_id uuid, target_sunday date, target_user_id uuid,
+  target_joined_at timestamptz
+)
+returns table (
+  baseline_weight numeric, baseline_source text, source_date date,
+  before_date date, before_weight numeric, after_date date, after_weight numeric
+)
+language sql stable security definer
+set search_path = pg_catalog, public
+as $$
+  with eligible_records as (
+    select personal.recorded_date, personal.weight_kg::numeric as weight_kg
+    from public.personal_weigh_ins as personal
+    join public.personal_weigh_in_group_shares as share
+      on share.personal_weigh_in_id = personal.id
+     and share.challenge_id = target_challenge_id
+    where personal.user_id = target_user_id
+      and personal.recorded_date <= target_sunday
+      and target_joined_at is not null
+      and personal.recorded_date >= (target_joined_at at time zone 'Europe/Bucharest')::date
+      and greatest(personal.created_at, personal.updated_at) >= target_joined_at
+  ), exact_previous as (
+    select * from eligible_records where recorded_date = target_sunday - 7 limit 1
+  ), earlier as (
+    select * from eligible_records where recorded_date < target_sunday - 7
+    order by recorded_date desc limit 1
+  ), later as (
+    select * from eligible_records where recorded_date > target_sunday - 7
+    order by recorded_date limit 1
+  ), first_current_week as (
+    select * from eligible_records
+    where recorded_date between target_sunday - 6 and target_sunday - 1
+    order by recorded_date limit 1
+  ), sunday_only as (
+    select * from eligible_records where recorded_date = target_sunday limit 1
+  )
+  select
+    case
+      when exists (select 1 from exact_previous) then (select weight_kg from exact_previous)
+      when exists (select 1 from earlier) and exists (select 1 from later) then
+        (select earlier.weight_kg + (later.weight_kg - earlier.weight_kg)
+          * ((target_sunday - 7 - earlier.recorded_date)::numeric
+            / (later.recorded_date - earlier.recorded_date)::numeric)
+         from earlier cross join later)
+      when not exists (select 1 from eligible_records where recorded_date < target_sunday - 7)
+        and exists (select 1 from first_current_week)
+        then (select weight_kg from first_current_week)
+      else null
+    end,
+    case
+      when exists (select 1 from exact_previous) then 'previous_sunday_actual'
+      when exists (select 1 from earlier) and exists (select 1 from later) then 'interpolated'
+      when not exists (select 1 from eligible_records where recorded_date < target_sunday - 7)
+        and exists (select 1 from first_current_week) then 'first_week_actual'
+      when exists (select 1 from sunday_only) then 'current_sunday_only'
+      else 'none'
+    end,
+    case when exists (select 1 from exact_previous) then target_sunday - 7
+      when exists (select 1 from first_current_week) then (select recorded_date from first_current_week)
+      when exists (select 1 from sunday_only) then target_sunday
+      else null end,
+    (select recorded_date from earlier), (select weight_kg from earlier),
+    (select recorded_date from later), (select weight_kg from later)
+$$;
+revoke all on function public._group_weekly_baseline(uuid,date,uuid,timestamptz)
+  from public, anon, authenticated, service_role;
+
 create function public._group_weekly_ensure_snapshot(
   target_challenge_id uuid,
   target_sunday date
@@ -180,7 +266,9 @@ begin
 
   insert into public.group_weekly_candidates(
     challenge_id, sunday, user_id, participant_id, joined_at, display_name,
-    is_active, actual_weight_kg
+    is_active, actual_weight_kg, baseline_weight_kg, baseline_source,
+    baseline_source_date, baseline_before_date, baseline_before_weight_kg,
+    baseline_after_date, baseline_after_weight_kg
   )
   select target_challenge_id, target_sunday,
     participant.user_id, participant.id, participant.joined_at, participant.display_name,
@@ -189,7 +277,9 @@ begin
       and participant.joined_at is not null
       and personal.recorded_date >= (participant.joined_at at time zone 'Europe/Bucharest')::date
       and greatest(personal.created_at, personal.updated_at) >= participant.joined_at
-      then personal.weight_kg end
+      then personal.weight_kg end,
+    baseline.baseline_weight, baseline.baseline_source, baseline.source_date,
+    baseline.before_date, baseline.before_weight, baseline.after_date, baseline.after_weight
   from public.participants as participant
   left join public.personal_weigh_ins as personal
     on personal.user_id = participant.user_id
@@ -197,13 +287,23 @@ begin
   left join public.personal_weigh_in_group_shares as share
     on share.personal_weigh_in_id = personal.id
    and share.challenge_id = target_challenge_id
+  cross join lateral public._group_weekly_baseline(
+    target_challenge_id, target_sunday, participant.user_id, participant.joined_at
+  ) as baseline
   where participant.challenge_id = target_challenge_id
   on conflict (challenge_id, sunday, user_id) do update set
     participant_id = excluded.participant_id,
     joined_at = excluded.joined_at,
     display_name = excluded.display_name,
     is_active = excluded.is_active,
-    actual_weight_kg = excluded.actual_weight_kg;
+    actual_weight_kg = excluded.actual_weight_kg,
+    baseline_weight_kg = excluded.baseline_weight_kg,
+    baseline_source = excluded.baseline_source,
+    baseline_source_date = excluded.baseline_source_date,
+    baseline_before_date = excluded.baseline_before_date,
+    baseline_before_weight_kg = excluded.baseline_before_weight_kg,
+    baseline_after_date = excluded.baseline_after_date,
+    baseline_after_weight_kg = excluded.baseline_after_weight_kg;
 
   update public.group_weekly_candidate_weeks
   set snapshot_ready = true
@@ -227,10 +327,15 @@ begin
     where week.accepted_xid = transaction_id
     order by public._group_weekly_lock_key(week.challenge_id, week.sunday)
   loop
+    update public.group_weekly_candidate_weeks as week
+    set snapshot_ready = false
+    where week.challenge_id = scope.challenge_id and week.sunday = scope.sunday;
     perform public._group_weekly_ensure_snapshot(scope.challenge_id, scope.sunday);
     insert into public.group_weekly_candidates(
       challenge_id, sunday, user_id, participant_id, joined_at, display_name,
-      is_active, actual_weight_kg
+      is_active, actual_weight_kg, baseline_weight_kg, baseline_source,
+      baseline_source_date, baseline_before_date, baseline_before_weight_kg,
+      baseline_after_date, baseline_after_weight_kg
     )
     select scope.challenge_id, scope.sunday,
       participant.user_id, participant.id, participant.joined_at, participant.display_name,
@@ -239,7 +344,9 @@ begin
         and participant.joined_at is not null
         and personal.recorded_date >= (participant.joined_at at time zone 'Europe/Bucharest')::date
         and greatest(personal.created_at, personal.updated_at) >= participant.joined_at
-        then personal.weight_kg end
+        then personal.weight_kg end,
+      baseline.baseline_weight, baseline.baseline_source, baseline.source_date,
+      baseline.before_date, baseline.before_weight, baseline.after_date, baseline.after_weight
     from public.participants as participant
     left join public.personal_weigh_ins as personal
       on personal.user_id = participant.user_id
@@ -247,13 +354,23 @@ begin
     left join public.personal_weigh_in_group_shares as share
       on share.personal_weigh_in_id = personal.id
      and share.challenge_id = scope.challenge_id
+    cross join lateral public._group_weekly_baseline(
+      scope.challenge_id, scope.sunday, participant.user_id, participant.joined_at
+    ) as baseline
     where participant.challenge_id = scope.challenge_id
     on conflict (challenge_id, sunday, user_id) do update set
       participant_id = excluded.participant_id,
       joined_at = excluded.joined_at,
       display_name = excluded.display_name,
       is_active = excluded.is_active,
-      actual_weight_kg = excluded.actual_weight_kg;
+      actual_weight_kg = excluded.actual_weight_kg,
+      baseline_weight_kg = excluded.baseline_weight_kg,
+      baseline_source = excluded.baseline_source,
+      baseline_source_date = excluded.baseline_source_date,
+      baseline_before_date = excluded.baseline_before_date,
+      baseline_before_weight_kg = excluded.baseline_before_weight_kg,
+      baseline_after_date = excluded.baseline_after_date,
+      baseline_after_weight_kg = excluded.baseline_after_weight_kg;
 
     delete from public.group_weekly_candidates as candidate
     where candidate.challenge_id = scope.challenge_id
@@ -294,20 +411,16 @@ as $$
 declare
   entry_id uuid;
   source_ids uuid[] := '{}'::uuid[];
-  old_sunday date;
-  new_sunday date;
   scopes jsonb := '[]'::jsonb;
   scope record;
 begin
   if tg_op <> 'INSERT' then
     entry_id := old.id;
     source_ids := array_append(source_ids, old.id);
-    old_sunday := old.recorded_date;
   end if;
   if tg_op <> 'DELETE' then
     entry_id := new.id;
     source_ids := array_append(source_ids, new.id);
-    new_sunday := new.recorded_date;
   end if;
   if tg_op = 'UPDATE' and old.id is distinct from new.id then
     perform pg_catalog.pg_advisory_xact_lock(hashtextextended(least(old.id::text, new.id::text), 404405));
@@ -317,13 +430,16 @@ begin
   end if;
 
   for scope in
-    select distinct share.challenge_id, target.sunday,
-      public._group_weekly_lock_key(share.challenge_id, target.sunday) as lock_key
+    select distinct share.challenge_id, week.sunday,
+      public._group_weekly_lock_key(share.challenge_id, week.sunday) as lock_key
     from public.personal_weigh_in_group_shares as share
-    cross join lateral (values (old_sunday), (new_sunday)) as target(sunday)
+    join public.group_weekly_candidate_weeks as week
+      on week.challenge_id = share.challenge_id
     where share.personal_weigh_in_id = any(source_ids)
-      and target.sunday is not null and extract(dow from target.sunday) = 0
-    order by lock_key
+      and week.sunday >= public._group_weekly_upcoming_sunday()
+      and not exists (select 1 from public.group_weekly_results as result
+        where result.challenge_id = week.challenge_id and result.sunday = week.sunday)
+    order by public._group_weekly_lock_key(share.challenge_id, week.sunday)
   loop
     scopes := scopes || jsonb_build_array(jsonb_build_object(
       'challenge_id', scope.challenge_id, 'sunday', scope.sunday
@@ -384,11 +500,14 @@ begin
       if tg_op <> 'UPDATE' or old.personal_weigh_in_id = new.personal_weigh_in_id then
         perform pg_catalog.pg_advisory_xact_lock(hashtextextended(old_id::text, 404405));
       end if;
-      if extract(dow from old_entry.recorded_date) = 0 then
-        scopes := scopes || jsonb_build_array(jsonb_build_object(
-          'challenge_id', old.challenge_id, 'sunday', old_entry.recorded_date
-        ));
-      end if;
+      for scope in select week.challenge_id, week.sunday
+        from public.group_weekly_candidate_weeks as week
+        where week.challenge_id = old.challenge_id
+          and week.sunday >= public._group_weekly_upcoming_sunday()
+          and not exists (select 1 from public.group_weekly_results as result
+            where result.challenge_id = week.challenge_id and result.sunday = week.sunday)
+      loop scopes := scopes || jsonb_build_array(jsonb_build_object(
+        'challenge_id', scope.challenge_id, 'sunday', scope.sunday)); end loop;
     end if;
   end if;
   if tg_op <> 'DELETE' then
@@ -399,11 +518,14 @@ begin
       if tg_op <> 'UPDATE' or old.personal_weigh_in_id = new.personal_weigh_in_id then
         perform pg_catalog.pg_advisory_xact_lock(hashtextextended(new_id::text, 404405));
       end if;
-      if extract(dow from new_entry.recorded_date) = 0 then
-        scopes := scopes || jsonb_build_array(jsonb_build_object(
-          'challenge_id', new.challenge_id, 'sunday', new_entry.recorded_date
-        ));
-      end if;
+      for scope in select week.challenge_id, week.sunday
+        from public.group_weekly_candidate_weeks as week
+        where week.challenge_id = new.challenge_id
+          and week.sunday >= public._group_weekly_upcoming_sunday()
+          and not exists (select 1 from public.group_weekly_results as result
+            where result.challenge_id = week.challenge_id and result.sunday = week.sunday)
+      loop scopes := scopes || jsonb_build_array(jsonb_build_object(
+        'challenge_id', scope.challenge_id, 'sunday', scope.sunday)); end loop;
     end if;
   end if;
   perform public._group_weekly_lock_scopes(scopes);
@@ -538,6 +660,9 @@ begin
     left join public.personal_weigh_in_group_shares as share
       on share.personal_weigh_in_id = personal.id
      and share.challenge_id = participant.challenge_id
+    cross join lateral public._group_weekly_baseline(
+      participant.challenge_id, week.sunday, participant.user_id, participant.joined_at
+    ) as baseline
     where (participant.challenge_id = new.challenge_id and participant.user_id = new.user_id)
       and not exists (select 1 from public.group_weekly_results as result
         where result.challenge_id = week.challenge_id and result.sunday = week.sunday)
@@ -546,7 +671,14 @@ begin
       joined_at = excluded.joined_at,
       display_name = excluded.display_name,
       is_active = excluded.is_active,
-      actual_weight_kg = excluded.actual_weight_kg;
+      actual_weight_kg = excluded.actual_weight_kg,
+      baseline_weight_kg = excluded.baseline_weight_kg,
+      baseline_source = excluded.baseline_source,
+      baseline_source_date = excluded.baseline_source_date,
+      baseline_before_date = excluded.baseline_before_date,
+      baseline_before_weight_kg = excluded.baseline_before_weight_kg,
+      baseline_after_date = excluded.baseline_after_date,
+      baseline_after_weight_kg = excluded.baseline_after_weight_kg;
   end if;
   return case when tg_op = 'DELETE' then old else new end;
 end;
@@ -681,22 +813,15 @@ as $$
     select candidate.* from public.group_weekly_candidates as candidate
     where candidate.challenge_id = target_challenge_id
       and candidate.sunday = target_sunday
-  ), previous_rows as (
-    select candidate.* from public.group_weekly_candidates as candidate
-    where candidate.challenge_id = target_challenge_id
-      and candidate.sunday = target_sunday - 7
   ), eligible as (
     select current_row.user_id, current_row.display_name,
-      current_row.actual_weight_kg - previous_row.actual_weight_kg as loss_change,
-      previous_row.actual_weight_kg as previous_weight,
+      current_row.actual_weight_kg - current_row.baseline_weight_kg as loss_change,
+      current_row.baseline_weight_kg as previous_weight,
       current_row.actual_weight_kg as current_weight
     from current_rows as current_row
-    join previous_rows as previous_row
-      on previous_row.user_id = current_row.user_id
-     and previous_row.joined_at is not distinct from current_row.joined_at
     where current_row.is_active
       and current_row.actual_weight_kg is not null
-      and previous_row.actual_weight_kg is not null
+      and current_row.baseline_weight_kg is not null
   ), summary as (
     select (select count(*)::integer from current_rows where is_active) as active_count,
       (select count(*)::integer from current_rows
@@ -786,18 +911,18 @@ begin
   ) on conflict do nothing;
   insert into public.group_weekly_result_winners(
     challenge_id, sunday, user_id, participant_id, member_key, display_name,
-    weight_change_kg, previous_weight_kg, current_weight_kg
+    weight_change_kg, previous_weight_kg, current_weight_kg, baseline_source,
+    baseline_source_date, baseline_before_date, baseline_before_weight_kg,
+    baseline_after_date, baseline_after_weight_kg
   )
   select target_challenge_id, target_sunday, winner.user_id, winner.participant_id,
     md5(target_challenge_id::text || ':' || winner.user_id::text),
-    winner.display_name, current_row.actual_weight_kg - previous_row.actual_weight_kg,
-    previous_row.actual_weight_kg, current_row.actual_weight_kg
+    winner.display_name, winner.actual_weight_kg - winner.baseline_weight_kg,
+    winner.baseline_weight_kg, winner.actual_weight_kg, winner.baseline_source,
+    winner.baseline_source_date, winner.baseline_before_date,
+    winner.baseline_before_weight_kg, winner.baseline_after_date,
+    winner.baseline_after_weight_kg
   from public.group_weekly_candidates as current_row
-  join public.group_weekly_candidates as previous_row
-    on previous_row.challenge_id = current_row.challenge_id
-   and previous_row.user_id = current_row.user_id
-   and previous_row.joined_at is not distinct from current_row.joined_at
-   and previous_row.sunday = target_sunday - 7
   join public.group_weekly_candidates as winner
     on winner.challenge_id = current_row.challenge_id
    and winner.user_id = current_row.user_id and winner.sunday = target_sunday
@@ -805,18 +930,14 @@ begin
     and current_row.sunday = target_sunday
     and winner.is_active
     and current_row.actual_weight_kg is not null
-    and previous_row.actual_weight_kg is not null
+    and winner.baseline_weight_kg is not null
     and summary.eligible_count > 1
-    and current_row.actual_weight_kg - previous_row.actual_weight_kg = (
-      select min(best.actual_weight_kg - prior.actual_weight_kg)
+    and winner.actual_weight_kg - winner.baseline_weight_kg = (
+      select min(best.actual_weight_kg - best.baseline_weight_kg)
       from public.group_weekly_candidates as best
-      join public.group_weekly_candidates as prior
-        on prior.challenge_id = best.challenge_id
-       and prior.user_id = best.user_id and prior.sunday = target_sunday - 7
-       and prior.joined_at is not distinct from best.joined_at
       where best.challenge_id = target_challenge_id and best.sunday = target_sunday
         and best.is_active and best.actual_weight_kg is not null
-        and prior.actual_weight_kg is not null
+        and best.baseline_weight_kg is not null
     )
   on conflict do nothing;
   return true;
