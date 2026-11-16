@@ -61,28 +61,32 @@ create table public.group_weekly_results (
 );
 
 create table public.group_weekly_result_winners (
+  award_id uuid primary key default gen_random_uuid(),
   challenge_id uuid not null,
   sunday date not null,
-  user_id uuid not null,
-  participant_id uuid not null,
-  member_key text not null check (member_key ~ '^[0-9a-f]{32}$'),
+  user_id uuid,
+  participant_id uuid,
+  member_key text check (member_key is null or member_key ~ '^[0-9a-f]{32}$'),
   display_name text not null,
-  weight_change_kg numeric not null,
-  previous_weight_kg numeric not null,
-  current_weight_kg numeric(6, 2) not null,
-  baseline_source text not null,
+  weight_change_kg numeric,
+  previous_weight_kg numeric,
+  current_weight_kg numeric(6, 2),
+  baseline_source text,
   baseline_source_date date,
   baseline_before_date date,
   baseline_before_weight_kg numeric,
   baseline_after_date date,
   baseline_after_weight_kg numeric,
-  check (baseline_source in (
+  check (baseline_source is null or baseline_source in (
     'previous_sunday_actual', 'interpolated', 'first_week_actual'
   )),
-  primary key (challenge_id, sunday, user_id),
   foreign key (challenge_id, sunday)
     references public.group_weekly_results(challenge_id, sunday) on delete cascade
 );
+
+create unique index group_weekly_result_winners_user_idx
+  on public.group_weekly_result_winners(challenge_id, sunday, user_id)
+  where user_id is not null;
 
 alter table public.group_weekly_result_control enable row level security;
 alter table public.group_weekly_candidate_weeks enable row level security;
@@ -1132,7 +1136,9 @@ begin
     result.finalized_at, 'finalized', result.result_outcome,
     result.sole_participant_name, result.winner_count,
     coalesce((select jsonb_agg(jsonb_build_object(
-      'member_key', winner.member_key, 'display_name', winner.display_name
+      'member_key', coalesce(winner.member_key,
+        md5('anonymous-weekly-award:' || winner.award_id::text)),
+      'display_name', winner.display_name
     ) order by winner.display_name, winner.member_key)
       from public.group_weekly_result_winners as winner
       where winner.challenge_id = result.challenge_id and winner.sunday = result.sunday), '[]'::jsonb),
@@ -1475,14 +1481,28 @@ begin
     where winner.challenge_id = target_challenge_id
       and (effective_sunday is null or winner.sunday >= effective_sunday)
     group by participant.id
+  ), anonymous_wins as (
+    select count(*) as wins
+    from public.group_weekly_result_winners as winner
+    where winner.challenge_id = target_challenge_id
+      and winner.user_id is null
+      and (effective_sunday is null or winner.sunday >= effective_sunday)
   )
-  select md5(target_challenge_id::text || ':' || member.user_id::text),
-    member.display_name,
-    coalesce(legacy.wins, 0) + coalesce(finalized.wins, 0)
-  from active_members as member
-  left join legacy_wins as legacy on legacy.participant_id = member.id
-  left join finalized_wins as finalized on finalized.participant_id = member.id
-  order by member.display_name, member.id;
+  select counts.member_key, counts.display_name, counts.win_count
+  from (
+    select md5(target_challenge_id::text || ':' || member.user_id::text) as member_key,
+      member.display_name,
+      coalesce(legacy.wins, 0) + coalesce(finalized.wins, 0) as win_count
+    from active_members as member
+    left join legacy_wins as legacy on legacy.participant_id = member.id
+    left join finalized_wins as finalized on finalized.participant_id = member.id
+    union all
+    select md5(target_challenge_id::text || ':deleted-member-awards'),
+      'Deleted member', anonymous.wins
+    from anonymous_wins as anonymous
+    where anonymous.wins > 0
+  ) as counts
+  order by counts.display_name, counts.member_key;
 end;
 $$;
 revoke all on function public.get_group_weekly_win_counts(uuid)

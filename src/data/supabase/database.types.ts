@@ -13,13 +13,13 @@ export type Database = {
         Row: {
           challenge_kind: 'personal' | 'group' | null
           created_at: string
-          created_by: string
+          created_by: string | null
           description: string | null
           archived_from_status: 'draft' | 'active' | 'completed' | null
           end_date: string
           id: string
           name: string
-          owner_id: string
+          owner_id: string | null
           start_date: string
           status: 'draft' | 'active' | 'completed' | 'archived'
           target_weight_kg: number | null
@@ -28,13 +28,13 @@ export type Database = {
         Insert: {
           challenge_kind?: 'personal' | 'group' | null
           created_at?: string
-          created_by: string
+          created_by: string | null
           description?: string | null
           archived_from_status?: 'draft' | 'active' | 'completed' | null
           end_date: string
           id?: string
           name: string
-          owner_id: string
+          owner_id: string | null
           start_date: string
           status?: 'draft' | 'active' | 'completed' | 'archived'
           target_weight_kg?: number | null
@@ -43,13 +43,13 @@ export type Database = {
         Update: {
           challenge_kind?: 'personal' | 'group' | null
           created_at?: string
-          created_by?: string
+          created_by?: string | null
           description?: string | null
           archived_from_status?: 'draft' | 'active' | 'completed' | null
           end_date?: string
           id?: string
           name?: string
-          owner_id?: string
+          owner_id?: string | null
           start_date?: string
           status?: 'draft' | 'active' | 'completed' | 'archived'
           target_weight_kg?: number | null

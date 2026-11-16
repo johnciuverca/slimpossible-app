@@ -296,13 +296,13 @@ function mapChallenge(row: ChallengeRow): Challenge {
   return {
     kind: row.challenge_kind ?? 'group',
     createdAt: row.created_at,
-    createdBy: row.created_by,
+    createdBy: row.created_by ?? '',
     ...(row.description === null ? {} : { description: row.description }),
     archivedFromStatus: row.archived_from_status,
     endDate: row.end_date,
     id: row.id,
     name: row.name,
-    ownerId: row.owner_id,
+    ownerId: row.owner_id ?? '',
     startDate: row.start_date,
     status: row.status,
     ...(row.target_weight_kg === null

@@ -17,6 +17,7 @@ for task_migration in supabase/migrations/*.sql; do
   "${task_psql[@]}" -f "$task_migration" >/dev/null
 done
 "${task_psql[@]}" -f supabase/tests/group_weekly_results.sql
+"${task_psql[@]}" -f supabase/tests/weekly_account_erasure.sql
 
 # Callers can submit multiple scopes in different input orders; both must lock
 # the same deterministic order and complete without a deadlock.
