@@ -3,21 +3,22 @@ import {
   type AccountDeletionServices,
   createDeleteAccountHandler,
 } from './handler.ts'
+import { readNamedKey } from './keyConfig.ts'
 
 const projectUrl = Deno.env.get('SUPABASE_URL')
-const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
-const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-const configured = Boolean(projectUrl && anonKey && serviceRoleKey)
+const publishableKey = readNamedKey(Deno.env.get('SUPABASE_PUBLISHABLE_KEYS'))
+const secretKey = readNamedKey(Deno.env.get('SUPABASE_SECRET_KEYS'))
+const configured = Boolean(projectUrl && publishableKey && secretKey)
 
 function callerFor(authorization: string) {
-  return createClient(projectUrl!, anonKey!, {
+  return createClient(projectUrl!, publishableKey!, {
     auth: { persistSession: false, autoRefreshToken: false },
     global: { headers: { Authorization: authorization } },
   })
 }
 
 function adminClient() {
-  return createClient(projectUrl!, serviceRoleKey!, {
+  return createClient(projectUrl!, secretKey!, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 }

@@ -37,6 +37,19 @@ describe('getSupabaseConfiguration', () => {
     })
   })
 
+  it('accepts a publishable key through the existing Production env name', () => {
+    expect(
+      getSupabaseConfiguration({
+        VITE_SUPABASE_ANON_KEY: 'publishable-placeholder',
+        VITE_SUPABASE_URL: 'https://project.supabase.co',
+      }),
+    ).toEqual({
+      anonKey: 'publishable-placeholder',
+      state: 'configured',
+      url: 'https://project.supabase.co',
+    })
+  })
+
   it('labels the authentication mode from the public configuration', () => {
     expect(getAuthenticationEnvironmentLabel({})).toBe(localAuthenticationLabel)
     expect(
