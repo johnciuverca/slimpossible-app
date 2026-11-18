@@ -672,12 +672,15 @@ export function GroupChartHistory({
                     <table
                       aria-label="Shared group weight history"
                       className="group-history-table table-fixed border-collapse text-left text-xs"
-                      style={{ width: 120 + series.length * 156 }}
+                      style={{
+                        width: '100%',
+                        minWidth: `max(100%, ${120 + series.length * 156}px)`,
+                      }}
                     >
                       <colgroup>
                         <col style={{ width: 120 }} />
                         {series.map((member) => (
-                          <col key={member.memberKey} style={{ width: 156 }} />
+                          <col key={member.memberKey} />
                         ))}
                       </colgroup>
                       <caption className="p-3 text-left font-semibold">

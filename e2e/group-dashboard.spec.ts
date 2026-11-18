@@ -747,9 +747,16 @@ for (const layout of [
           .getByRole('columnheader', { name: 'Recorded date' })
           .boundingBox())!.width,
       ).toBe(120)
+      const memberColumnWidths = await matrix
+        .getByRole('columnheader')
+        .evaluateAll((headers) =>
+          headers
+            .slice(1)
+            .map((header) => header.getBoundingClientRect().width),
+        )
       expect(
-        (await matrix.getByRole('columnheader').nth(1).boundingBox())!.width,
-      ).toBe(156)
+        Math.max(...memberColumnWidths) - Math.min(...memberColumnWidths),
+      ).toBeLessThan(1)
       await expect(
         matrix.getByRole('rowheader', { name: '2026-09-22' }).locator('time'),
       ).toHaveAttribute('title', '2026-09-22')
@@ -4334,6 +4341,84 @@ test('group selector matches the member tabs container surface on Charts', async
   ])
   expect(selectorBackground).toBe(memberTabsBackground)
 })
+
+for (const viewport of [
+  { label: 'desktop', width: 1280 },
+  { label: 'phone', width: 390 },
+]) {
+  for (const memberCount of [1, 2, 4]) {
+    test(`Records columns fill the container for ${memberCount} members on ${viewport.label}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: viewport.width, height: 900 })
+      await installGroupFixtures(page)
+      await page.route(
+        `${supabaseRestUrl}/rpc/get_group_chart_history`,
+        async (route) => {
+          const rows = Array.from({ length: memberCount }, (_, index) =>
+            ['2026-09-20', '2026-09-22'].map((recorded_date, dayIndex) => ({
+              member_key: `layout-member-${index + 1}`,
+              display_name: `Member ${index + 1}`,
+              recorded_date,
+              weight_kg: 90 - index - dayIndex,
+            })),
+          ).flat()
+          await route.fulfill({
+            contentType: 'application/json',
+            body: JSON.stringify(rows),
+          })
+        },
+      )
+      await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+      await page
+        .getByRole('navigation', { name: 'Group sections' })
+        .getByRole('link', { name: 'Records', exact: true })
+        .click()
+
+      const table = page.getByRole('table', {
+        name: 'Shared group weight history',
+      })
+      await expect(table.getByRole('columnheader')).toHaveCount(memberCount + 1)
+      const metrics = await table.evaluate((element) => {
+        const headers = Array.from(element.querySelectorAll('thead th'))
+        const bounds = element.getBoundingClientRect()
+        return {
+          tableWidth: bounds.width,
+          containerWidth: element.parentElement!.clientWidth,
+          scrollWidth: element.parentElement!.scrollWidth,
+          columnWidths: headers.map(
+            (header) => header.getBoundingClientRect().width,
+          ),
+        }
+      })
+      expect(metrics.tableWidth).toBeGreaterThanOrEqual(
+        metrics.containerWidth - 1,
+      )
+      expect(
+        Math.max(...metrics.columnWidths.slice(1)) -
+          Math.min(...metrics.columnWidths.slice(1)),
+      ).toBeLessThan(1)
+      if (memberCount === 1 || memberCount === 4) {
+        await page.screenshot({
+          path: test
+            .info()
+            .outputPath(`records-${memberCount}-members-${viewport.width}.png`),
+          fullPage: true,
+        })
+      }
+      if (viewport.width === 1280) {
+        expect(metrics.tableWidth).toBeCloseTo(metrics.containerWidth, 0)
+      } else if (memberCount === 1) {
+        expect(metrics.tableWidth).toBeCloseTo(metrics.containerWidth, 0)
+      } else {
+        expect(metrics.scrollWidth).toBeGreaterThan(metrics.containerWidth)
+        expect(
+          Math.min(...metrics.columnWidths.slice(1)),
+        ).toBeGreaterThanOrEqual(155)
+      }
+    })
+  }
+}
 
 test('shows the challenge owner badge only in Members and fits on mobile', async ({
   page,
