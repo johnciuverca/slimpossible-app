@@ -4419,11 +4419,44 @@ for (const viewport of [
         Math.max(...memberTabMetrics.widths) -
           Math.min(...memberTabMetrics.widths),
       ).toBeLessThan(1)
+      const memberContentCenters = await page
+        .getByRole('tablist', { name: 'Shared group members' })
+        .evaluate((element) =>
+          Array.from(element.querySelectorAll('[role="tab"]')).map((tab) => {
+            const content = tab.querySelector<HTMLElement>(
+              '[data-member-tab-content]',
+            )!
+            const tabBounds = tab.getBoundingClientRect()
+            const contentBounds = content.getBoundingClientRect()
+            return {
+              horizontalOffset: Math.abs(
+                tabBounds.left +
+                  tabBounds.width / 2 -
+                  (contentBounds.left + contentBounds.width / 2),
+              ),
+              verticalOffset: Math.abs(
+                tabBounds.top +
+                  tabBounds.height / 2 -
+                  (contentBounds.top + contentBounds.height / 2),
+              ),
+            }
+          }),
+        )
+      expect(
+        Math.max(
+          ...memberContentCenters.map((center) => center.horizontalOffset),
+        ),
+      ).toBeLessThanOrEqual(2)
+      expect(
+        Math.max(
+          ...memberContentCenters.map((center) => center.verticalOffset),
+        ),
+      ).toBeLessThanOrEqual(2)
       if (viewport.width === 390 && memberCount === 4) {
         expect(memberTabMetrics.scrollWidth).toBeGreaterThan(
           memberTabMetrics.clientWidth,
         )
-        expect(Math.min(...memberTabMetrics.widths)).toBeGreaterThanOrEqual(76)
+        expect(Math.min(...memberTabMetrics.widths)).toBeGreaterThanOrEqual(104)
       } else {
         expect(memberTabMetrics.scrollWidth).toBeLessThanOrEqual(
           memberTabMetrics.clientWidth,
@@ -4441,6 +4474,15 @@ for (const viewport of [
           listWidth: list.getBoundingClientRect().width,
           itemWidth: listItem.getBoundingClientRect().width,
           linkWidth: link.getBoundingClientRect().width,
+          linkCenter:
+            link.getBoundingClientRect().left +
+            link.getBoundingClientRect().width / 2,
+          textCenter: (() => {
+            const range = document.createRange()
+            range.selectNodeContents(link)
+            const bounds = range.getBoundingClientRect()
+            return bounds.left + bounds.width / 2
+          })(),
           itemCount: list.children.length,
           scrollWidth: list.parentElement!.scrollWidth,
           clientWidth: list.parentElement!.clientWidth,
@@ -4450,6 +4492,9 @@ for (const viewport of [
         filterGeometry.listWidth / filterGeometry.itemCount - 1,
       )
       expect(filterGeometry.linkWidth).toBeCloseTo(filterGeometry.itemWidth, 0)
+      expect(
+        Math.abs(filterGeometry.linkCenter - filterGeometry.textCenter),
+      ).toBeLessThanOrEqual(2)
       expect(filterGeometry.scrollWidth).toBeLessThanOrEqual(
         filterGeometry.clientWidth,
       )
@@ -4469,6 +4514,57 @@ for (const viewport of [
       expect(recordCardWidths.length).toBeGreaterThan(0)
       expect(Math.max(...recordCardWidths)).toBeLessThanOrEqual(10)
       expect(Math.min(...recordCardWidths)).toBeGreaterThanOrEqual(-1)
+      const recordContentCenters = await table
+        .locator('tbody td [class~="group/weight"]')
+        .evaluateAll((cards) =>
+          cards.map((card) => {
+            const visibleChildren = Array.from(card.children).filter(
+              (child) => !child.classList.contains('sr-only'),
+            )
+            const bounds = visibleChildren.map((child) =>
+              child.getBoundingClientRect(),
+            )
+            const left = Math.min(...bounds.map((box) => box.left))
+            const right = Math.max(...bounds.map((box) => box.right))
+            const top = Math.min(...bounds.map((box) => box.top))
+            const bottom = Math.max(...bounds.map((box) => box.bottom))
+            const cardBounds = card.getBoundingClientRect()
+            return {
+              horizontalOffset: Math.abs(
+                cardBounds.left + cardBounds.width / 2 - (left + right) / 2,
+              ),
+              verticalOffset: Math.abs(
+                cardBounds.top + cardBounds.height / 2 - (top + bottom) / 2,
+              ),
+            }
+          }),
+        )
+      expect(
+        Math.max(
+          ...recordContentCenters.map((center) => center.horizontalOffset),
+        ),
+      ).toBeLessThanOrEqual(3)
+      expect(
+        Math.max(
+          ...recordContentCenters.map((center) => center.verticalOffset),
+        ),
+      ).toBeLessThanOrEqual(3)
+      const memberHeaderCenters = await table
+        .locator('thead th:not(:first-child)')
+        .evaluateAll((headers) =>
+          headers.map((header) => {
+            const range = document.createRange()
+            range.selectNodeContents(header)
+            const textBounds = range.getBoundingClientRect()
+            const headerBounds = header.getBoundingClientRect()
+            return Math.abs(
+              headerBounds.left +
+                headerBounds.width / 2 -
+                (textBounds.left + textBounds.width / 2),
+            )
+          }),
+        )
+      expect(Math.max(...memberHeaderCenters)).toBeLessThanOrEqual(2)
       if (memberCount === 1 || memberCount === 4) {
         await page.screenshot({
           path: test
