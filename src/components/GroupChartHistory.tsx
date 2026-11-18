@@ -25,7 +25,16 @@ import {
 
 const noHiddenMembers = new Set<string>()
 const day = (date: string) => Date.parse(`${date}T00:00:00Z`) / 86400000
-const signed = (value: number) => `${value > 0 ? '+' : ''}${value} kg`
+const signed = (value: number) =>
+  value === 0 || Object.is(value, -0)
+    ? '0 kg'
+    : `${value > 0 ? '+' : ''}${value} kg`
+const sharedChangeColor = (changeKg: number | null) =>
+  changeKg === null || changeKg === 0 || Object.is(changeKg, -0)
+    ? 'text-ink'
+    : changeKg < 0
+      ? 'text-forest-800'
+      : 'text-danger-800'
 const formatWeight = (value: number) =>
   new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value)
 
@@ -760,6 +769,13 @@ export function GroupChartHistory({
                                           ? '!w-full !justify-center'
                                           : undefined
                                       }
+                                      valueClassName={
+                                        view === 'records'
+                                          ? sharedChangeColor(
+                                              point.previousSharedChangeKg,
+                                            )
+                                          : undefined
+                                      }
                                     >
                                       <span className="sr-only">
                                         ; change from first shared entry{' '}
@@ -786,8 +802,9 @@ export function GroupChartHistory({
                                         />
                                       ) : null}
                                     </WeightEntryCard>{' '}
-                                    <span className="block text-[10px] text-ink-muted">
-                                      Previous shared entry:{' '}
+                                    <span
+                                      className={`block text-center text-[10px] ${sharedChangeColor(point.previousSharedChangeKg)}`}
+                                    >
                                       {point.previousSharedChangeKg === null
                                         ? '—'
                                         : signed(point.previousSharedChangeKg)}

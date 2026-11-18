@@ -2506,7 +2506,7 @@ for (const viewport of [
       .filter({ has: page.getByRole('rowheader', { name: '2026-09-21' }) })
     await expect(missing.getByRole('cell')).toHaveText([
       '—',
-      '71.00 kg; change from first shared entry +1 kg Previous shared entry: +1 kg',
+      '71.00 kg; change from first shared entry +1 kg +1 kg',
     ])
     const tabs = page.getByRole('tablist', { name: 'Shared group members' })
     const all = tabs.getByRole('tab', { name: 'All members' })
@@ -4549,6 +4549,20 @@ for (const viewport of [
           ...recordContentCenters.map((center) => center.verticalOffset),
         ),
       ).toBeLessThanOrEqual(3)
+      const comparisonCenterOffsets = await table
+        .locator('tbody td [class~="group/weight"]')
+        .evaluateAll((cards) =>
+          cards.map((card) => {
+            const comparison = card.nextElementSibling!.getBoundingClientRect()
+            const cardBounds = card.getBoundingClientRect()
+            return Math.abs(
+              cardBounds.left +
+                cardBounds.width / 2 -
+                (comparison.left + comparison.width / 2),
+            )
+          }),
+        )
+      expect(Math.max(...comparisonCenterOffsets)).toBeLessThanOrEqual(2)
       const memberHeaderCenters = await table
         .locator('thead th:not(:first-child)')
         .evaluateAll((headers) =>
