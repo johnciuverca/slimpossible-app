@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 62684)
-Total output lines: 6564
-
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import type { Persistence } from '../data/persistence'
 import { usePersonalWorkspace } from '../data/usePersonalWorkspace'
