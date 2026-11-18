@@ -29,12 +29,14 @@ const signed = (value: number) =>
   value === 0 || Object.is(value, -0)
     ? '0 kg'
     : `${value > 0 ? '+' : ''}${value} kg`
-const sharedChangeColor = (changeKg: number | null) =>
+const sharedChangeColor = (changeKg: number | null, records = false) =>
   changeKg === null || changeKg === 0 || Object.is(changeKg, -0)
     ? 'text-ink'
     : changeKg < 0
       ? 'text-forest-800'
-      : 'text-danger-800'
+      : records
+        ? 'text-record-gain'
+        : 'text-danger-800'
 const formatWeight = (value: number) =>
   new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value)
 
@@ -773,6 +775,7 @@ export function GroupChartHistory({
                                         view === 'records'
                                           ? sharedChangeColor(
                                               point.previousSharedChangeKg,
+                                              true,
                                             )
                                           : undefined
                                       }
@@ -804,7 +807,7 @@ export function GroupChartHistory({
                                       ) : null}
                                     </WeightEntryCard>{' '}
                                     <span
-                                      className={`block text-center text-[10px] ${sharedChangeColor(point.previousSharedChangeKg)}`}
+                                      className={`block text-center text-[10px] ${sharedChangeColor(point.previousSharedChangeKg, view === 'records')}`}
                                     >
                                       {point.previousSharedChangeKg === null
                                         ? '—'

@@ -91,9 +91,9 @@ describe('Group chart history', () => {
     expect(loss.change).toHaveClass('text-center', 'text-forest-800')
 
     const gain = comparison('2026-09-03')
-    expect(gain.value).toHaveClass('text-danger-800')
+    expect(gain.value).toHaveClass('text-record-gain')
     expect(gain.change).toHaveTextContent('+1.25 kg')
-    expect(gain.change).toHaveClass('text-center', 'text-danger-800')
+    expect(gain.change).toHaveClass('text-center', 'text-record-gain')
 
     const unchanged = comparison('2026-09-04')
     expect(unchanged.value).toHaveClass('text-ink')
