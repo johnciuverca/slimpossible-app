@@ -12,12 +12,14 @@ export function WeightEntryActions({
   compact = false,
   memberLabel,
   requiredSharedChallengeId,
+  recordsDeleteIcon = false,
 }: {
   workspace: PersonalWorkspace
   date: string
   compact?: boolean
   memberLabel?: string
   requiredSharedChallengeId?: string
+  recordsDeleteIcon?: boolean
 }) {
   const [selection, setSelection] = useState<{
     key: string
@@ -85,7 +87,7 @@ export function WeightEntryActions({
           variant={compact ? 'ghost' : 'secondary'}
           className={
             compact
-              ? 'h-9 w-8 shrink-0 p-0! text-danger-800! sm:h-8 pointer-coarse:h-11 pointer-coarse:w-11'
+              ? `h-9 w-8 shrink-0 p-0! ${recordsDeleteIcon ? 'text-record-delete!' : 'text-danger-800!'} sm:h-8 pointer-coarse:h-11 pointer-coarse:w-11`
               : undefined
           }
           aria-label={`Delete ${date}${memberLabel ? ` for ${memberLabel}` : ''}`}

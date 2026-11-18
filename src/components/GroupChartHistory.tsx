@@ -796,6 +796,7 @@ export function GroupChartHistory({
                                           date={point.date}
                                           compact
                                           memberLabel={series[index].label}
+                                          recordsDeleteIcon
                                           requiredSharedChallengeId={
                                             challengeId
                                           }
