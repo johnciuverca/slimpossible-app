@@ -1236,6 +1236,8 @@ revoke all on function public.get_provisional_group_leader_summary(uuid, date)
   from public, anon;
 grant execute on function public.get_provisional_group_leader_summary(uuid, date)
   to authenticated;
+grant execute on function public.get_provisional_group_leader_summary(uuid, date)
+  to service_role;
 
 create function public._get_group_weekly_result_legacy(
   target_challenge_id uuid,
