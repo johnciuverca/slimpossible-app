@@ -29,6 +29,9 @@ create table auth.users (id uuid primary key, created_at timestamptz default now
 create function auth.uid() returns uuid language sql stable as $$
   select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid;
 $$;
+create function auth.role() returns text language sql stable as $$
+  select nullif(current_setting('request.jwt.claim.role', true), '');
+$$;
 grant usage on schema public, auth, extensions, storage to anon, authenticated, service_role;
 alter default privileges for role postgres in schema public
   grant all on tables to anon, authenticated, service_role;

@@ -33,6 +33,7 @@ async function installGroupFixtures(
     duplicateEstimateOnSave?: boolean
     holdPersonalContexts?: boolean
     participantAvatars?: boolean
+    finalizedWeeklyResultForPrimaryGroup?: boolean
   } = {},
 ) {
   const challengeId = ownEntries ? ownGroupId : 'e2e-challenge'
@@ -494,6 +495,59 @@ async function installGroupFixtures(
                 : ['Jo', 'Kim'],
             private_note: 'fixture private note must never render',
             raw_weigh_ins: [{ weight_kg: 91.5 }],
+          },
+        ]),
+      })
+      return
+    }
+
+    if (url.pathname === '/rest/v1/rpc/get_group_weekly_result_display') {
+      const body = request.postDataJSON() as {
+        target_challenge_id: string
+        target_sunday: string
+      }
+      expect([challengeId, ...(multiple ? [secondId] : [])]).toContain(
+        body.target_challenge_id,
+      )
+      const hasFinalizedResult =
+        options.finalizedWeeklyResultForPrimaryGroup === true &&
+        body.target_challenge_id === challengeId
+      const winnerNames =
+        body.target_challenge_id === challengeId
+          ? ['Ava', 'Ben']
+          : ['Jo', 'Kim']
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            active_participant_count: hasFinalizedResult ? 3 : 0,
+            recorded_participant_count: hasFinalizedResult ? 2 : 0,
+            eligible_participant_count: hasFinalizedResult ? 2 : 0,
+            finalized_at: hasFinalizedResult
+              ? '2026-09-21T17:00:00.000Z'
+              : null,
+            result_outcome: hasFinalizedResult
+              ? 'shared_winners'
+              : 'no_eligible_candidates',
+            result_state: hasFinalizedResult ? 'finalized' : 'disabled',
+            sole_participant_name: null,
+            winner_count: hasFinalizedResult ? 2 : 0,
+            winner_details: hasFinalizedResult
+              ? [
+                  {
+                    member_key: memberKey(body.target_challenge_id, viewerId),
+                    display_name: winnerNames[0],
+                  },
+                  {
+                    member_key: memberKey(
+                      body.target_challenge_id,
+                      otherViewerId,
+                    ),
+                    display_name: winnerNames[1],
+                  },
+                ]
+              : [],
+            winner_names: hasFinalizedResult ? winnerNames : [],
           },
         ]),
       })
@@ -2732,7 +2786,18 @@ for (const viewport of [
     page,
   }) => {
     await page.setViewportSize({ height: 900, width: viewport.width })
-    await installGroupFixtures(page, true)
+    await installGroupFixtures(
+      page,
+      true,
+      false,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { finalizedWeeklyResultForPrimaryGroup: true },
+    )
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
     await expect(page.getByText('42.5%', { exact: true })).toBeVisible()
     await page
@@ -2757,6 +2822,28 @@ for (const viewport of [
         .getByRole('navigation', { name: 'Group sections' })
         .getByRole('button', { name: 'Refresh shared progress' }),
     ).toBeVisible()
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Weekly results' })
+      .click()
+    const primaryWinnerList = page.getByRole('list', {
+      name: 'Weekly winners',
+    })
+    await expect(primaryWinnerList).toContainText('Ava')
+    await expect(primaryWinnerList).toContainText('Ben')
+    await expect(
+      page.getByText('Final shared weekly winners — 2 of 3 members recorded'),
+    ).toBeVisible()
+    await expect(
+      primaryWinnerList.getByRole('listitem').filter({ hasText: 'Ben' }),
+    ).toContainText('Ben')
+    await expect(primaryWinnerList).not.toContainText(
+      'Includes estimated weight',
+    )
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Charts', exact: true })
+      .click()
     const second = contexts.getByRole('link', {
       name: 'Group · Second authorized group',
       exact: true,

@@ -13,13 +13,13 @@ export type Database = {
         Row: {
           challenge_kind: 'personal' | 'group' | null
           created_at: string
-          created_by: string
+          created_by: string | null
           description: string | null
           archived_from_status: 'draft' | 'active' | 'completed' | null
           end_date: string
           id: string
           name: string
-          owner_id: string
+          owner_id: string | null
           start_date: string
           status: 'draft' | 'active' | 'completed' | 'archived'
           target_weight_kg: number | null
@@ -28,13 +28,13 @@ export type Database = {
         Insert: {
           challenge_kind?: 'personal' | 'group' | null
           created_at?: string
-          created_by: string
+          created_by: string | null
           description?: string | null
           archived_from_status?: 'draft' | 'active' | 'completed' | null
           end_date: string
           id?: string
           name: string
-          owner_id: string
+          owner_id: string | null
           start_date: string
           status?: 'draft' | 'active' | 'completed' | 'archived'
           target_weight_kg?: number | null
@@ -43,13 +43,13 @@ export type Database = {
         Update: {
           challenge_kind?: 'personal' | 'group' | null
           created_at?: string
-          created_by?: string
+          created_by?: string | null
           description?: string | null
           archived_from_status?: 'draft' | 'active' | 'completed' | null
           end_date?: string
           id?: string
           name?: string
-          owner_id?: string
+          owner_id?: string | null
           start_date?: string
           status?: 'draft' | 'active' | 'completed' | 'archived'
           target_weight_kg?: number | null
@@ -311,6 +311,21 @@ export type Database = {
           display_name: string
           member_key: string
           win_count: number
+        }[]
+      }
+      get_group_weekly_result_display: {
+        Args: { target_challenge_id: string; target_sunday: string }
+        Returns: {
+          active_participant_count: number
+          recorded_participant_count: number
+          eligible_participant_count: number
+          finalized_at: string | null
+          result_outcome: string
+          result_state: string
+          sole_participant_name: string | null
+          winner_count: number
+          winner_details: Json
+          winner_names: string[]
         }[]
       }
       get_group_weigh_in_history: {

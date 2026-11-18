@@ -35,6 +35,33 @@ insert into public.participants(
   ('20000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001', 'Owner in target', 'active', 90, 80, now()),
   ('20000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000001', 'Owner in other', 'active', 90, 80, now());
 
+insert into public.group_weekly_candidate_weeks(challenge_id, sunday, snapshot_ready)
+values ('10000000-0000-4000-8000-000000000001', '2026-11-08', true);
+insert into public.group_weekly_candidates(
+  challenge_id, sunday, user_id, participant_id, joined_at, display_name,
+  is_active, actual_weight_kg, baseline_weight_kg, baseline_source
+) values (
+  '10000000-0000-4000-8000-000000000001', '2026-11-08',
+  '00000000-0000-4000-8000-000000000001',
+  '20000000-0000-4000-8000-000000000001', now(), 'Owner in target',
+  true, 89, 90, 'previous_sunday_actual'
+);
+insert into public.group_weekly_results(
+  challenge_id, sunday, finalized_at, result_outcome, active_participant_count,
+  recorded_participant_count, eligible_participant_count, winner_count
+) values (
+  '10000000-0000-4000-8000-000000000001', '2026-11-08', now(), 'winner', 1, 1, 1, 1
+);
+insert into public.group_weekly_result_winners(
+  challenge_id, sunday, user_id, participant_id, member_key, display_name,
+  weight_change_kg, previous_weight_kg, current_weight_kg, baseline_source
+) values (
+  '10000000-0000-4000-8000-000000000001', '2026-11-08',
+  '00000000-0000-4000-8000-000000000001',
+  '20000000-0000-4000-8000-000000000001', repeat('a', 32), 'Owner in target',
+  -1, 90, 89, 'previous_sunday_actual'
+);
+
 insert into public.weigh_ins(id, participant_id, recorded_date, weight_kg, note)
 values
   ('30000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', current_date, 89, 'Target group note'),
@@ -112,6 +139,12 @@ do $$ begin
   end if;
   if exists (select 1 from public.participant_target_milestones where challenge_id = '10000000-0000-4000-8000-000000000001') then
     raise exception 'target milestone remains';
+  end if;
+  if exists (select 1 from public.group_weekly_candidate_weeks where challenge_id = '10000000-0000-4000-8000-000000000001')
+     or exists (select 1 from public.group_weekly_candidates where challenge_id = '10000000-0000-4000-8000-000000000001')
+     or exists (select 1 from public.group_weekly_results where challenge_id = '10000000-0000-4000-8000-000000000001')
+     or exists (select 1 from public.group_weekly_result_winners where challenge_id = '10000000-0000-4000-8000-000000000001') then
+    raise exception 'target weekly results or scoring evidence remain';
   end if;
   if exists (select 1 from public.personal_weigh_in_group_shares where challenge_id = '10000000-0000-4000-8000-000000000001') then
     raise exception 'target share remains';

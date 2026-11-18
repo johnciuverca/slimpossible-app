@@ -113,7 +113,7 @@ describe('RegisterPage', () => {
     await waitFor(() =>
       expect(
         screen.getByText(
-          'Remote authentication is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
+          'Remote authentication is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to a public anon or publishable key.',
         ),
       ).toBeInTheDocument(),
     )
