@@ -161,6 +161,160 @@ describe('Supabase repositories', () => {
     )
   })
 
+  it('maps finalized weekly result state without exposing endpoint evidence', async () => {
+    stubResponse([
+      {
+        result_state: 'finalized',
+        finalized_at: '2026-11-09T18:00:00.000Z',
+        active_participant_count: 3,
+        recorded_participant_count: 2,
+        eligible_participant_count: 2,
+        result_outcome: 'shared_winners',
+        sole_participant_name: null,
+        winner_count: 2,
+        winner_names: ['Ava', 'Ben'],
+        winner_details: [
+          {
+            member_key: '11111111111111111111111111111111',
+            display_name: 'Ava',
+          },
+          {
+            member_key: '22222222222222222222222222222222',
+            display_name: 'Ben',
+          },
+        ],
+      },
+    ])
+
+    const result = await createRepositories(
+      client,
+    ).groupProgress.getWeeklyResultDisplay?.('group-1', '2026-11-08')
+
+    expect(result).toEqual({
+      state: 'success',
+      data: {
+        state: 'finalized',
+        finalizedAt: '2026-11-09T18:00:00.000Z',
+        activeParticipantCount: 3,
+        recordedParticipantCount: 2,
+        eligibleParticipantCount: 2,
+        resultOutcome: 'shared_winners',
+        soleParticipantName: null,
+        winnerCount: 2,
+        winnerDetails: [
+          {
+            displayName: 'Ava',
+            memberKey: '11111111111111111111111111111111',
+          },
+          {
+            displayName: 'Ben',
+            memberKey: '22222222222222222222222222222222',
+          },
+        ],
+        winnerNames: ['Ava', 'Ben'],
+      },
+    })
+    expect(JSON.stringify(result)).not.toContain('weight_kg')
+    expect(String(vi.mocked(fetch).mock.calls[0]?.[0])).toContain(
+      '/rpc/get_group_weekly_result_display',
+    )
+  })
+
+  it('preserves pending state when a required snapshot is missing', async () => {
+    stubResponse([
+      {
+        result_state: 'pending',
+        finalized_at: null,
+        active_participant_count: 0,
+        recorded_participant_count: 0,
+        eligible_participant_count: 0,
+        result_outcome: 'no_eligible_candidates',
+        sole_participant_name: null,
+        winner_count: 0,
+        winner_names: [],
+        winner_details: [],
+      },
+    ])
+
+    const result = await createRepositories(
+      client,
+    ).groupProgress.getWeeklyResultDisplay?.('group-1', '2026-11-08')
+
+    expect(result).toMatchObject({
+      state: 'success',
+      data: {
+        state: 'pending',
+        finalizedAt: null,
+        winnerCount: 0,
+        winnerDetails: [],
+      },
+    })
+  })
+
+  it('maps actual-only finalized winners without estimate labels', async () => {
+    stubResponse([
+      {
+        result_state: 'finalized',
+        finalized_at: '2026-11-09T18:00:00.000Z',
+        active_participant_count: 1,
+        recorded_participant_count: 1,
+        eligible_participant_count: 1,
+        result_outcome: 'sole_participant',
+        sole_participant_name: 'Ava',
+        winner_count: 1,
+        winner_names: ['Ava'],
+        winner_details: [
+          {
+            member_key: '11111111111111111111111111111111',
+            display_name: 'Ava',
+          },
+        ],
+      },
+    ])
+
+    const result = await createRepositories(
+      client,
+    ).groupProgress.getWeeklyResultDisplay?.('group-1', '2026-11-08')
+
+    expect(result).toBeDefined()
+    if (!result) throw new Error('Weekly result RPC was unavailable')
+    expect(result.state).toBe('success')
+    if (result.state === 'success') {
+      expect(result.data.resultOutcome).toBe('sole_participant')
+    }
+  })
+
+  it('fails closed on malformed finalized winner identity metadata', async () => {
+    stubResponse([
+      {
+        result_state: 'finalized',
+        finalized_at: '2026-11-09T18:00:00.000Z',
+        active_participant_count: 1,
+        recorded_participant_count: 1,
+        eligible_participant_count: 1,
+        result_outcome: 'sole_participant',
+        sole_participant_name: 'Ava',
+        winner_count: 1,
+        winner_names: ['Ava'],
+        winner_details: [
+          {
+            member_key: 'raw-user-id',
+            display_name: 'Ava',
+          },
+        ],
+      },
+    ])
+
+    const result = await createRepositories(
+      client,
+    ).groupProgress.getWeeklyResultDisplay?.('group-1', '2026-11-08')
+
+    expect(result).toBeDefined()
+    if (!result) throw new Error('Weekly result RPC was unavailable')
+    expect(result.state).toBe('error')
+    expect(JSON.stringify(result)).not.toContain('raw-user-id')
+  })
+
   it('maps chart identity and exact shared values without notes, emails or raw identities', async () => {
     stubResponse([
       {
