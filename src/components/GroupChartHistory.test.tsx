@@ -71,20 +71,30 @@ describe('Group chart history', () => {
     }
     const comparison = (date: string) => {
       const cell = cellFor(date)
-      const card = cell.querySelector<HTMLElement>('[class~="group/weight"]')!
+      const pair = cell.querySelector<HTMLElement>('[data-record-pair]')!
+      const card = pair.querySelector<HTMLElement>(
+        '[class~="record-weight-box"]',
+      )!
+      const changeContainer = pair.querySelector<HTMLElement>(
+        '[data-record-comparison]',
+      )!
       return {
         cell,
+        pair,
         card,
-        value: card.querySelector<HTMLElement>(':scope > div > span')!,
-        change: card.querySelector<HTMLElement>(':scope > span > span')!,
-        changeContainer: card.querySelector<HTMLElement>(':scope > span')!,
+        value: card.querySelector<HTMLElement>(':scope > span')!,
+        change: changeContainer.querySelector<HTMLElement>('span')!,
+        changeContainer,
       }
     }
 
     const first = comparison('2026-09-01')
     expect(first.value).toHaveClass('text-ink')
     expect(first.change).toHaveTextContent('—')
-    expect(first.change.closest('[class~="group/weight"]')).toBe(first.card)
+    expect(first.change.closest('[data-record-pair]')).toBe(first.pair)
+    expect(first.card.parentElement).toBe(first.pair)
+    expect(first.changeContainer.parentElement).toBe(first.pair)
+    expect(first.pair).toHaveClass('grid')
     expect(first.change).toHaveClass('text-ink')
     expect(first.changeContainer).toHaveClass('text-center')
 

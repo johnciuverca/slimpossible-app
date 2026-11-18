@@ -713,7 +713,7 @@ export function GroupChartHistory({
                       className="group-history-table table-fixed border-collapse text-left text-xs"
                       style={{
                         width: '100%',
-                        minWidth: `max(100%, ${120 + series.length * 156}px)`,
+                        minWidth: `max(100%, ${120 + series.length * 216}px)`,
                       }}
                     >
                       <colgroup>
@@ -763,12 +763,40 @@ export function GroupChartHistory({
                                 className="relative z-0 px-1 py-1"
                               >
                                 {point ? (
-                                  <>
+                                  <div
+                                    data-record-pair={
+                                      view === 'records' ? '' : undefined
+                                    }
+                                    className={
+                                      view === 'records'
+                                        ? 'grid w-full grid-cols-[minmax(56px,0.7fr)_minmax(124px,2fr)] items-stretch gap-1 pointer-coarse:grid-cols-[minmax(56px,0.7fr)_minmax(148px,2fr)]'
+                                        : 'contents'
+                                    }
+                                  >
+                                    {view === 'records' ? (
+                                      <div
+                                        data-record-comparison
+                                        className="flex min-h-10 min-w-0 items-center justify-center rounded-lg border border-line bg-page px-1 text-center text-[10px] pointer-coarse:min-h-12"
+                                      >
+                                        <span
+                                          className={sharedChangeColor(
+                                            point.previousSharedChangeKg,
+                                            true,
+                                          )}
+                                        >
+                                          {point.previousSharedChangeKg === null
+                                            ? '—'
+                                            : signed(
+                                                point.previousSharedChangeKg,
+                                              )}
+                                        </span>
+                                      </div>
+                                    ) : null}
                                     <WeightEntryCard
                                       weightKg={point.weightKg}
                                       className={
                                         view === 'records'
-                                          ? '!w-full !justify-center'
+                                          ? 'record-weight-box !w-full !justify-center min-w-[124px] pointer-coarse:min-w-[148px]'
                                           : undefined
                                       }
                                       valueClassName={
@@ -778,23 +806,6 @@ export function GroupChartHistory({
                                               true,
                                             )
                                           : undefined
-                                      }
-                                      secondaryContent={
-                                        view === 'records' ? (
-                                          <span
-                                            className={sharedChangeColor(
-                                              point.previousSharedChangeKg,
-                                              true,
-                                            )}
-                                          >
-                                            {point.previousSharedChangeKg ===
-                                            null
-                                              ? '—'
-                                              : signed(
-                                                  point.previousSharedChangeKg,
-                                                )}
-                                          </span>
-                                        ) : undefined
                                       }
                                     >
                                       <span className="sr-only">
@@ -823,7 +834,7 @@ export function GroupChartHistory({
                                         />
                                       ) : null}
                                     </WeightEntryCard>
-                                  </>
+                                  </div>
                                 ) : (
                                   <span aria-label="No shared entry">—</span>
                                 )}

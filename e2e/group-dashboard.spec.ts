@@ -2504,10 +2504,14 @@ for (const viewport of [
     const missing = table
       .getByRole('row')
       .filter({ has: page.getByRole('rowheader', { name: '2026-09-21' }) })
-    await expect(missing.getByRole('cell')).toHaveText([
-      '—',
-      '71.00 kg; change from first shared entry +1 kg +1 kg',
-    ])
+    const missingCells = missing.getByRole('cell')
+    await expect(missingCells.first()).toHaveText('—')
+    await expect(
+      missingCells.nth(1).locator('[data-record-comparison]'),
+    ).toHaveText('+1 kg')
+    await expect(
+      missingCells.nth(1).locator('[class~="record-weight-box"]'),
+    ).toContainText('71.00 kg')
     const tabs = page.getByRole('tablist', { name: 'Shared group members' })
     const all = tabs.getByRole('tab', { name: 'All members' })
     await all.focus()
@@ -4499,25 +4503,32 @@ for (const viewport of [
         filterGeometry.clientWidth,
       )
 
-      const recordCardWidths = await table
+      const recordPairWidths = await table
         .locator('tbody td')
         .evaluateAll((cells) =>
           cells.flatMap((cell) => {
-            const card = cell.querySelector<HTMLElement>(
-              '[class~="group/weight"]',
-            )
-            return card
-              ? [cell.clientWidth - card.getBoundingClientRect().width]
+            const pair = cell.querySelector<HTMLElement>('[data-record-pair]')
+            return pair
+              ? [cell.clientWidth - pair.getBoundingClientRect().width]
               : []
           }),
         )
-      expect(recordCardWidths.length).toBeGreaterThan(0)
-      expect(Math.max(...recordCardWidths)).toBeLessThanOrEqual(10)
-      expect(Math.min(...recordCardWidths)).toBeGreaterThanOrEqual(-1)
-      const recordContentCenters = await table
-        .locator('tbody td [class~="group/weight"]')
-        .evaluateAll((cards) =>
-          cards.map((card) => {
+      expect(recordPairWidths.length).toBeGreaterThan(0)
+      expect(Math.max(...recordPairWidths)).toBeLessThanOrEqual(10)
+      expect(Math.min(...recordPairWidths)).toBeGreaterThanOrEqual(-1)
+      const recordBoxGeometry = await table
+        .locator('tbody td [data-record-pair]')
+        .evaluateAll((pairs) =>
+          pairs.map((pair) => {
+            const comparison = pair.querySelector('[data-record-comparison]')!
+            const card = pair.querySelector('[class~="record-weight-box"]')!
+            const comparisonBounds = comparison.getBoundingClientRect()
+            const cardBounds = card.getBoundingClientRect()
+            const pairBounds = pair.getBoundingClientRect()
+            const comparisonText = comparison.querySelector('span')!
+            const textRange = document.createRange()
+            textRange.selectNodeContents(comparisonText)
+            const comparisonTextBounds = textRange.getBoundingClientRect()
             const visibleChildren = Array.from(card.children).filter(
               (child) => !child.classList.contains('sr-only'),
             )
@@ -4526,45 +4537,40 @@ for (const viewport of [
             )
             const left = Math.min(...bounds.map((box) => box.left))
             const right = Math.max(...bounds.map((box) => box.right))
-            const top = Math.min(...bounds.map((box) => box.top))
-            const bottom = Math.max(...bounds.map((box) => box.bottom))
-            const cardBounds = card.getBoundingClientRect()
             return {
-              horizontalOffset: Math.abs(
-                cardBounds.left + cardBounds.width / 2 - (left + right) / 2,
+              sideBySide: comparisonBounds.right <= cardBounds.left,
+              pairContainsBoth:
+                comparisonBounds.left >= pairBounds.left &&
+                cardBounds.right <= pairBounds.right,
+              comparisonCenterOffset: Math.abs(
+                comparisonBounds.left +
+                  comparisonBounds.width / 2 -
+                  (comparisonTextBounds.left + comparisonTextBounds.width / 2),
               ),
-              verticalOffset: Math.abs(
-                cardBounds.top + cardBounds.height / 2 - (top + bottom) / 2,
+              cardCenterOffset: Math.abs(
+                cardBounds.left + cardBounds.width / 2 - (left + right) / 2,
               ),
             }
           }),
         )
+      expect(recordBoxGeometry.every((geometry) => geometry.sideBySide)).toBe(
+        true,
+      )
+      expect(
+        recordBoxGeometry.every((geometry) => geometry.pairContainsBoth),
+      ).toBe(true)
       expect(
         Math.max(
-          ...recordContentCenters.map((center) => center.horizontalOffset),
+          ...recordBoxGeometry.map(
+            (geometry) => geometry.comparisonCenterOffset,
+          ),
         ),
       ).toBeLessThanOrEqual(3)
       expect(
         Math.max(
-          ...recordContentCenters.map((center) => center.verticalOffset),
+          ...recordBoxGeometry.map((geometry) => geometry.cardCenterOffset),
         ),
       ).toBeLessThanOrEqual(3)
-      const comparisonCenterOffsets = await table
-        .locator('tbody td [class~="group/weight"]')
-        .evaluateAll((cards) =>
-          cards.map((card) => {
-            const comparison = card
-              .querySelector(':scope > span')!
-              .getBoundingClientRect()
-            const cardBounds = card.getBoundingClientRect()
-            return Math.abs(
-              cardBounds.left +
-                cardBounds.width / 2 -
-                (comparison.left + comparison.width / 2),
-            )
-          }),
-        )
-      expect(Math.max(...comparisonCenterOffsets)).toBeLessThanOrEqual(2)
       const memberHeaderCenters = await table
         .locator('thead th:not(:first-child)')
         .evaluateAll((headers) =>
@@ -4591,13 +4597,11 @@ for (const viewport of [
       }
       if (viewport.width === 1280) {
         expect(metrics.tableWidth).toBeCloseTo(metrics.containerWidth, 0)
-      } else if (memberCount === 1) {
-        expect(metrics.tableWidth).toBeCloseTo(metrics.containerWidth, 0)
       } else {
         expect(metrics.scrollWidth).toBeGreaterThan(metrics.containerWidth)
         expect(
           Math.min(...metrics.columnWidths.slice(1)),
-        ).toBeGreaterThanOrEqual(155)
+        ).toBeGreaterThanOrEqual(216)
       }
     })
   }
