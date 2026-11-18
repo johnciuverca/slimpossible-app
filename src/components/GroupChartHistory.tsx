@@ -212,7 +212,7 @@ export function GroupChartHistory({
             ref={tabs}
             role="tablist"
             aria-label="Shared group members"
-            className="app-nav-scroll flex max-w-full gap-2 overflow-x-auto p-3"
+            className={`app-nav-scroll flex min-w-0 gap-2 overflow-x-auto p-3 ${view === 'records' ? 'w-full items-stretch' : 'max-w-full'}`}
           >
             {choices.map((member, index) => (
               <button
@@ -224,7 +224,7 @@ export function GroupChartHistory({
                 disabled={!enabled}
                 tabIndex={selectedIndex === index ? 0 : -1}
                 type="button"
-                className={`group-member-tab min-h-11 shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 ${selectedIndex === index ? 'group-member-tab-active border-emerald-800 bg-emerald-800 text-white' : 'border-stone-300 bg-white text-emerald-800'}`}
+                className={`group-member-tab min-h-11 rounded-full border py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 ${view === 'records' ? 'min-w-[76px] flex-[1_0_76px] whitespace-normal break-words px-2 text-center' : 'shrink-0 whitespace-nowrap px-4'} ${selectedIndex === index ? 'group-member-tab-active border-emerald-800 bg-emerald-800 text-white' : 'border-stone-300 bg-white text-emerald-800'}`}
                 onClick={() =>
                   setSelection({ context, memberKey: member.memberKey })
                 }
@@ -725,7 +725,14 @@ export function GroupChartHistory({
                               >
                                 {point ? (
                                   <>
-                                    <WeightEntryCard weightKg={point.weightKg}>
+                                    <WeightEntryCard
+                                      weightKg={point.weightKg}
+                                      className={
+                                        view === 'records'
+                                          ? '!w-full'
+                                          : undefined
+                                      }
+                                    >
                                       <span className="sr-only">
                                         ; change from first shared entry{' '}
                                         {signed(point.changeKg)}

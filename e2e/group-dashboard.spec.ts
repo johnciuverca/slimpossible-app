@@ -783,6 +783,7 @@ for (const layout of [
           )
           return {
             width: bounds.width,
+            cellWidth: card.parentElement!.getBoundingClientRect().width,
             height: bounds.height,
             value: value.textContent,
             fits: value.scrollWidth <= value.clientWidth,
@@ -814,11 +815,9 @@ for (const layout of [
         ]),
       )
       for (const box of boxes) {
-        if (box.buttons.length)
-          expect(box.width).toBe(layout.hasTouch ? 148 : 124)
-        else {
-          expect(box.width).toBeCloseTo(box.valueWidth + 10, 1)
-          expect(box.leftPadding).toBeCloseTo(box.rightPadding, 1)
+        expect(box.width).toBeGreaterThan(box.cellWidth - 10)
+        expect(box.width).toBeLessThan(box.cellWidth - 6)
+        if (!box.buttons.length) {
           expect(box.numberFontSize).toBe('10px')
           expect(box.childCount).toBe(2)
         }
@@ -853,19 +852,16 @@ for (const layout of [
         own[1].buttons.map((button) => button.offset),
       )
       expect(boxes.filter((box) => box.buttons.length === 0)).toHaveLength(7)
-      const readonlyWidth = (label: string) =>
-        boxes.find((box) => !box.buttons.length && box.value === label)!.width
-      expect(readonlyWidth('9.00 kg')).toBeLessThan(readonlyWidth('99.95 kg'))
-      expect(readonlyWidth('99.95 kg')).toBeLessThan(readonlyWidth('105.25 kg'))
-      expect(readonlyWidth('105.25 kg')).toBeLessThan(
-        readonlyWidth('1000.50 kg'),
-      )
+      expect(
+        Math.max(...boxes.map((box) => box.width)) -
+          Math.min(...boxes.map((box) => box.width)),
+      ).toBeLessThan(1)
       const scroll = page.getByRole('region', {
         name: 'Scrollable shared group weights',
       })
       await scroll.scrollIntoViewIfNeeded()
       await scroll.screenshot({
-        path: test.info().outputPath('fixed-weight-cards.png'),
+        path: test.info().outputPath('expanded-weight-cards.png'),
       })
       if (layout.width >= 500)
         await scroll.evaluate((element) => {
@@ -2103,7 +2099,7 @@ for (const viewport of [
       .getByText('90.00 kg', { exact: true })
       .locator('xpath=..')
     await expect(ownReadonly.getByRole('button')).toHaveCount(0)
-    expect((await ownReadonly.boundingBox())!.width).toBeLessThan(80)
+    expect((await ownReadonly.boundingBox())!.width).toBeGreaterThan(100)
     const card = edit.locator('xpath=../..')
     const value = card.getByText('88.50 kg', { exact: true })
     const valueBox = (await value.boundingBox())!
@@ -4335,6 +4331,14 @@ test('group selector matches the member tabs container surface on Charts', async
   const memberTabs = page.locator('.group-history-workspace > .sticky')
   await expect(selector).toBeVisible()
   await expect(memberTabs).toBeVisible()
+  const chartContextWidths = await page
+    .getByRole('navigation', { name: 'Challenge contexts' })
+    .evaluate((navigation) => ({
+      link: navigation.querySelector('a')!.getBoundingClientRect().width,
+      row: navigation.querySelector(':scope > div')!.getBoundingClientRect()
+        .width,
+    }))
+  expect(chartContextWidths.link).toBeLessThan(chartContextWidths.row * 0.9)
   const [selectorBackground, memberTabsBackground] = await Promise.all([
     selector.evaluate((element) => getComputedStyle(element).backgroundColor),
     memberTabs.evaluate((element) => getComputedStyle(element).backgroundColor),
@@ -4398,6 +4402,73 @@ for (const viewport of [
         Math.max(...metrics.columnWidths.slice(1)) -
           Math.min(...metrics.columnWidths.slice(1)),
       ).toBeLessThan(1)
+
+      const memberTabMetrics = await page
+        .getByRole('tablist', { name: 'Shared group members' })
+        .evaluate((element) => {
+          const tabs = Array.from(element.querySelectorAll('[role="tab"]'))
+          const widths = tabs.map((tab) => tab.getBoundingClientRect().width)
+          return {
+            clientWidth: element.clientWidth,
+            scrollWidth: element.scrollWidth,
+            tabCount: tabs.length,
+            widths,
+          }
+        })
+      expect(
+        Math.max(...memberTabMetrics.widths) -
+          Math.min(...memberTabMetrics.widths),
+      ).toBeLessThan(1)
+      if (viewport.width === 390 && memberCount === 4) {
+        expect(memberTabMetrics.scrollWidth).toBeGreaterThan(
+          memberTabMetrics.clientWidth,
+        )
+        expect(Math.min(...memberTabMetrics.widths)).toBeGreaterThanOrEqual(76)
+      } else {
+        expect(memberTabMetrics.scrollWidth).toBeLessThanOrEqual(
+          memberTabMetrics.clientWidth,
+        )
+      }
+
+      const contextFilter = page.getByRole('navigation', {
+        name: 'Challenge contexts',
+      })
+      const filterGeometry = await contextFilter.evaluate((navigation) => {
+        const list = navigation.querySelector('ul')!
+        const listItem = list.querySelector('li')!
+        const link = listItem.querySelector('a')!
+        return {
+          listWidth: list.getBoundingClientRect().width,
+          itemWidth: listItem.getBoundingClientRect().width,
+          linkWidth: link.getBoundingClientRect().width,
+          itemCount: list.children.length,
+          scrollWidth: list.parentElement!.scrollWidth,
+          clientWidth: list.parentElement!.clientWidth,
+        }
+      })
+      expect(filterGeometry.itemWidth).toBeGreaterThanOrEqual(
+        filterGeometry.listWidth / filterGeometry.itemCount - 1,
+      )
+      expect(filterGeometry.linkWidth).toBeCloseTo(filterGeometry.itemWidth, 0)
+      expect(filterGeometry.scrollWidth).toBeLessThanOrEqual(
+        filterGeometry.clientWidth,
+      )
+
+      const recordCardWidths = await table
+        .locator('tbody td')
+        .evaluateAll((cells) =>
+          cells.flatMap((cell) => {
+            const card = cell.querySelector<HTMLElement>(
+              '[class~="group/weight"]',
+            )
+            return card
+              ? [cell.clientWidth - card.getBoundingClientRect().width]
+              : []
+          }),
+        )
+      expect(recordCardWidths.length).toBeGreaterThan(0)
+      expect(Math.max(...recordCardWidths)).toBeLessThanOrEqual(10)
+      expect(Math.min(...recordCardWidths)).toBeGreaterThanOrEqual(-1)
       if (memberCount === 1 || memberCount === 4) {
         await page.screenshot({
           path: test

@@ -2184,6 +2184,7 @@ export function GroupDashboardPage() {
             loading={isLoading}
             showPersonalTracking={false}
             compact
+            stretchItems={section === 'records'}
             managementOwnerId={ownerId}
           />
         )}
