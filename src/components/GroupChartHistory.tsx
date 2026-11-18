@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 62684)
+Total output lines: 6564
+
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import type { Persistence } from '../data/persistence'
 import { usePersonalWorkspace } from '../data/usePersonalWorkspace'
@@ -769,68 +772,80 @@ export function GroupChartHistory({
                                     }
                                     className={
                                       view === 'records'
-                                        ? 'grid w-full grid-cols-[minmax(64px,0.7fr)_minmax(124px,2fr)] items-stretch gap-1 pointer-coarse:grid-cols-[minmax(64px,0.7fr)_minmax(148px,2fr)]'
+                                        ? 'w-full rounded-xl border border-line bg-panel p-1'
                                         : 'contents'
                                     }
                                   >
-                                    {view === 'records' ? (
-                                      <div
-                                        data-record-comparison
-                                        className="flex min-h-10 min-w-0 items-center justify-center rounded-lg border border-line bg-page px-1 text-center text-[10px] pointer-coarse:min-h-12"
-                                      >
-                                        <span
-                                          className={`whitespace-nowrap ${sharedChangeColor(point.previousSharedChangeKg, true)}`}
-                                        >
-                                          {point.previousSharedChangeKg === null
-                                            ? '—'
-                                            : signed(
-                                                point.previousSharedChangeKg,
-                                              )}
-                                        </span>
-                                      </div>
-                                    ) : null}
-                                    <WeightEntryCard
-                                      weightKg={point.weightKg}
+                                    <div
+                                      data-record-pair-layout={
+                                        view === 'records' ? '' : undefined
+                                      }
                                       className={
                                         view === 'records'
-                                          ? 'record-weight-box !w-full !justify-center min-w-[124px] pointer-coarse:min-w-[148px]'
-                                          : undefined
-                                      }
-                                      valueClassName={
-                                        view === 'records'
-                                          ? sharedChangeColor(
-                                              point.previousSharedChangeKg,
-                                              true,
-                                            )
-                                          : undefined
+                                          ? 'grid w-full grid-cols-[minmax(64px,0.7fr)_minmax(124px,2fr)] items-stretch gap-1 pointer-coarse:grid-cols-[minmax(64px,0.7fr)_minmax(148px,2fr)]'
+                                          : 'contents'
                                       }
                                     >
-                                      <span className="sr-only">
-                                        ; change from first shared entry{' '}
-                                        {signed(point.changeKg)}
-                                      </span>
-                                      {point.memberKey === ownMemberKey &&
-                                      personalWorkspace.userId ===
-                                        viewerId.toLowerCase() &&
-                                      personalWorkspace.persistence.mode ===
-                                        'remote' &&
-                                      personalWorkspace.personal.state ===
-                                        'ready' &&
-                                      personalWorkspace.contexts.state ===
-                                        'ready' ? (
-                                        <WeightEntryActions
-                                          key={`${personalWorkspace.ownerKey}:${challengeId}:${point.date}`}
-                                          workspace={personalWorkspace}
-                                          date={point.date}
-                                          compact
-                                          memberLabel={series[index].label}
-                                          recordsDeleteIcon
-                                          requiredSharedChallengeId={
-                                            challengeId
-                                          }
-                                        />
+                                      {view === 'records' ? (
+                                        <div
+                                          data-record-comparison
+                                          className="flex min-h-10 min-w-0 items-center justify-center rounded-lg border border-line bg-page px-1 text-center text-[10px] pointer-coarse:min-h-12"
+                                        >
+                                          <span
+                                            className={`whitespace-nowrap ${sharedChangeColor(point.previousSharedChangeKg, true)}`}
+                                          >
+                                            {point.previousSharedChangeKg ===
+                                            null
+                                              ? '—'
+                                              : signed(
+                                                  point.previousSharedChangeKg,
+                                                )}
+                                          </span>
+                                        </div>
                                       ) : null}
-                                    </WeightEntryCard>
+                                      <WeightEntryCard
+                                        weightKg={point.weightKg}
+                                        className={
+                                          view === 'records'
+                                            ? 'record-weight-box !w-full !justify-center min-w-[124px] pointer-coarse:min-w-[148px]'
+                                            : undefined
+                                        }
+                                        valueClassName={
+                                          view === 'records'
+                                            ? sharedChangeColor(
+                                                point.previousSharedChangeKg,
+                                                true,
+                                              )
+                                            : undefined
+                                        }
+                                      >
+                                        <span className="sr-only">
+                                          ; change from first shared entry{' '}
+                                          {signed(point.changeKg)}
+                                        </span>
+                                        {point.memberKey === ownMemberKey &&
+                                        personalWorkspace.userId ===
+                                          viewerId.toLowerCase() &&
+                                        personalWorkspace.persistence.mode ===
+                                          'remote' &&
+                                        personalWorkspace.personal.state ===
+                                          'ready' &&
+                                        personalWorkspace.contexts.state ===
+                                          'ready' ? (
+                                          <WeightEntryActions
+                                            key={`${personalWorkspace.ownerKey}:${challengeId}:${point.date}`}
+                                            workspace={personalWorkspace}
+                                            date={point.date}
+                                            compact
+                                            memberLabel={series[index].label}
+                                            recordsDeleteIcon
+                                            requiredSharedChallengeId={
+                                              challengeId
+                                            }
+                                          />
+                                        ) : null}
+                                      </WeightEntryCard>
+                                    </div>
                                   </div>
                                 ) : (
                                   <span aria-label="No shared entry">—</span>
