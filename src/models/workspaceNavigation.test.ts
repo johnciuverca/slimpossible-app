@@ -19,9 +19,11 @@ describe('workspace navigation', () => {
       'weigh-ins',
     ],
     ['group', '/group', '?tab=progress', '', 'charts'],
+    ['group', '/group', '?tab=records', '', 'records'],
     ['group', '/group', '', '#group-progress', 'members'],
-    ['group', '/group', '', '#group-history', 'charts'],
-    ['group', '/group', '?tab=overview', '#group-history', 'charts'],
+    ['group', '/group', '', '#group-history', 'records'],
+    ['group', '/group', '?tab=overview', '#group-history', 'records'],
+    ['group', '/group', '', '#group-chart', 'charts'],
     ['group', '/group', '', '#weekly-winners-heading', 'weekly-results'],
     ['group', '/group', '?tab=unknown', '', 'overview'],
   ] as const)(
@@ -39,6 +41,13 @@ describe('workspace navigation', () => {
         '?challenge=group%2Fone&source=invite&tab=charts',
       ),
     ).toBe('/group?challenge=group%2Fone&source=invite&tab=members')
+    expect(
+      workspaceSectionLink(
+        'group',
+        'records',
+        '?challenge=group%2Fone&source=invite&tab=charts',
+      ),
+    ).toBe('/group?challenge=group%2Fone&source=invite&tab=records')
     expect(
       workspaceSectionLink(
         'dashboard',

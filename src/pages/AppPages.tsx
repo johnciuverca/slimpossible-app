@@ -2692,7 +2692,7 @@ export function GroupDashboardPage() {
           ) : null}
         </Card>
       ) : null}
-      {section === 'charts' ? (
+      {section === 'charts' || section === 'records' ? (
         <GroupChartHistory
           challengeId={data?.challenge.id ?? selectedChallengeId}
           viewerId={ownerId ?? ''}
@@ -2700,6 +2700,7 @@ export function GroupDashboardPage() {
           refreshVersion={reloadKey + weightRevision}
           enabled={Boolean(summary)}
           compactOverview={false}
+          view={section}
           memberProgress={memberProgressState === 'ready' ? memberProgress : []}
         />
       ) : null}

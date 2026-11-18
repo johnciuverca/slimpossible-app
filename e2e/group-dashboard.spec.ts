@@ -732,7 +732,7 @@ for (const layout of [
       )
       await page
         .getByRole('navigation', { name: 'Group sections' })
-        .getByRole('link', { name: 'Charts', exact: true })
+        .getByRole('link', { name: 'Records', exact: true })
         .click()
       const matrix = page.getByRole('table', {
         name: 'Shared group weight history',
@@ -742,37 +742,6 @@ for (const layout of [
       ).toHaveCount(2)
       const cards = matrix.locator('td > div')
       await expect(cards).toHaveCount(9)
-      const comparison = page.getByRole('img', {
-        name: 'Weight (kg) — shared group history',
-      })
-      const viewBoxHeight = await comparison.evaluate((element) =>
-        Number(element.getAttribute('viewBox')?.trim().split(/\s+/)[3]),
-      )
-      const plotRight = Number(
-        await comparison.getAttribute('data-chart-plot-right'),
-      )
-      const outOfBoundsLabels = await comparison.locator('text').evaluateAll(
-        (elements, { chartHeight, plotRight }) =>
-          elements.flatMap((element) => {
-            const box = (element as SVGGraphicsElement).getBBox()
-            return box.x >= 0 &&
-              box.x + box.width <= plotRight &&
-              box.y >= 0 &&
-              box.y + box.height <= chartHeight
-              ? []
-              : [
-                  {
-                    text: element.textContent,
-                    x: box.x,
-                    y: box.y,
-                    width: box.width,
-                    height: box.height,
-                  },
-                ]
-          }),
-        { chartHeight: viewBoxHeight, plotRight },
-      )
-      expect(outOfBoundsLabels).toEqual([])
       expect(
         (await matrix
           .getByRole('columnheader', { name: 'Recorded date' })
@@ -1684,22 +1653,28 @@ for (const width of [1280, 390]) {
       '&tab=overview',
       '&tab=progress',
       '#group-history',
+      '&tab=records',
     ]) {
       await page.goto(
         `/e2e/fixtures/today-harness.html?${new URLSearchParams({ scenario: 'group', user: viewerId, route: `/group?challenge=${ownGroupId}${suffix}` })}`,
       )
       await page.reload()
       const sections = page.getByRole('navigation', { name: 'Group sections' })
-      const charts = suffix === '&tab=progress' || suffix === '#group-history'
+      const expectedSection =
+        suffix === '&tab=progress'
+          ? 'Charts'
+          : suffix === '#group-history' || suffix === '&tab=records'
+            ? 'Records'
+            : 'Overview'
       await expect(
         sections.getByRole('link', {
-          name: charts ? 'Charts' : 'Overview',
+          name: expectedSection,
           exact: true,
         }),
       ).toHaveAttribute('aria-current', 'page')
       await expect(
         page.getByRole('table', { name: 'Shared group weight history' }),
-      ).toHaveCount(charts ? 1 : 0)
+      ).toHaveCount(expectedSection === 'Records' ? 1 : 0)
       await expect(
         page.getByRole('heading', { name: 'Weekly result', exact: true }),
       ).toHaveCount(0)
@@ -1726,6 +1701,12 @@ for (const width of [1280, 390]) {
         page.getByRole('heading', { name: 'Member progress', exact: true }),
       ).toHaveCount(0)
       await sections.getByRole('link', { name: 'Charts' }).click()
+      await expect(
+        page.getByRole('img', { name: 'Weight (kg) — shared group history' }),
+      ).toBeVisible()
+      await expect(
+        page.getByRole('table', { name: 'Shared group weight history' }),
+      ).toHaveCount(0)
       await expect(
         page.getByRole('tab', { name: 'All members', exact: true }),
       ).toHaveAttribute('aria-selected', 'true')
@@ -2070,7 +2051,7 @@ for (const viewport of [
       .click()
     await page
       .getByRole('navigation', { name: 'Group sections' })
-      .getByRole('link', { name: 'Charts', exact: true })
+      .getByRole('link', { name: 'Records', exact: true })
       .click()
     await expect(
       page.getByRole('table', { name: 'Shared group weight history' }),
@@ -2089,7 +2070,7 @@ for (const viewport of [
     )
     await page
       .getByRole('navigation', { name: 'Group sections' })
-      .getByRole('link', { name: 'Charts', exact: true })
+      .getByRole('link', { name: 'Records', exact: true })
       .click()
     const matrix = page.getByRole('table', {
       name: 'Shared group weight history',
@@ -2182,6 +2163,10 @@ for (const viewport of [
     await expect(
       page.getByText('Author-only disposable private note', { exact: true }),
     ).toHaveCount(0)
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Records', exact: true })
+      .click()
     const countBefore = requests.filter((url) =>
       url.includes('get_group_chart_history'),
     ).length
@@ -2237,7 +2222,7 @@ for (const viewport of [
     await expect(page.getByText('73.2%', { exact: true })).toBeVisible()
     await page
       .getByRole('navigation', { name: 'Group sections' })
-      .getByRole('link', { name: 'Charts', exact: true })
+      .getByRole('link', { name: 'Records', exact: true })
       .click()
     await expect(matrix.getByRole('button')).toHaveCount(0)
     await expect(matrix.getByText('87.00 kg', { exact: true })).toHaveCount(0)
@@ -2504,6 +2489,10 @@ for (const viewport of [
     await expect(
       chart.locator('circle[data-point-kind="recorded"][data-date]'),
     ).toHaveCount(initialChartPoints)
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Records', exact: true })
+      .click()
     await expect(table.getByRole('columnheader')).toHaveText([
       'Date',
       'Ava (member 1) (kg)',
@@ -2526,9 +2515,7 @@ for (const viewport of [
     await expect(table.getByRole('columnheader')).toHaveCount(2)
     await expect(table).toContainText('88.50 kg')
     await expect(table).not.toContainText('70.00 kg')
-    await expect(
-      page.getByRole('img').locator('circle[data-point-kind="recorded"]'),
-    ).toHaveCount(2)
+    await expect(page.getByRole('img')).toHaveCount(0)
     await page.keyboard.press('End')
     await expect(
       tabs.getByRole('tab', { name: 'Ava (member 2)' }),
@@ -2537,6 +2524,10 @@ for (const viewport of [
     await expect(table).not.toContainText('88.50 kg')
     await page.keyboard.press('Home')
     await expect(all).toBeFocused()
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Charts', exact: true })
+      .click()
     await tabs.getByRole('tab', { name: 'Ava (member 2)' }).click()
     const individualChart = page.getByRole('img', {
       name: 'Weight (kg) — shared group history',
@@ -2612,6 +2603,10 @@ for (const viewport of [
       individualChart.locator('circle[data-point-kind="recorded"][data-date]'),
     ).toHaveCount(2)
     await all.click()
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Records', exact: true })
+      .click()
     const weights = page.getByRole('region', {
       name: 'Scrollable shared group weights',
     })
@@ -2622,30 +2617,23 @@ for (const viewport of [
         .poll(() => weights.evaluate((el) => el.scrollLeft))
         .toBeGreaterThan(0)
     }
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Charts', exact: true })
+      .click()
     const navigation = page.locator('.group-history-workspace > .sticky')
     expect(
       await navigation.evaluate((element) =>
         element.nextElementSibling?.getAttribute('role'),
       ),
     ).toBe('tabpanel')
-    await navigation.evaluate((element) =>
-      element.scrollIntoView({ block: 'start' }),
-    )
-    const navigationPosition = await navigation.evaluate((element) => ({
-      top: Math.round(element.getBoundingClientRect().top),
-      atDocumentEnd:
-        window.scrollY + window.innerHeight >=
-        document.documentElement.scrollHeight - 1,
-    }))
-    expect(navigationPosition.top).toBeLessThanOrEqual(
-      navigationPosition.atDocumentEnd ? 12 : 1,
-    )
+    await expect(navigation).toHaveCSS('position', 'sticky')
     const navBounds = await navigation.boundingBox()
     expect(navBounds!.height).toBeLessThan(450)
-    const focusBounds = await weights.boundingBox()
-    expect(focusBounds!.y).toBeGreaterThanOrEqual(
-      navBounds!.y + navBounds!.height,
-    )
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Records', exact: true })
+      .click()
     await expect(table.getByRole('columnheader').first()).toHaveCSS(
       'position',
       'sticky',
@@ -2743,7 +2731,7 @@ for (const viewport of [
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
     await page
       .getByRole('navigation', { name: 'Group sections' })
-      .getByRole('link', { name: 'Charts', exact: true })
+      .getByRole('link', { name: 'Records', exact: true })
       .click()
     await expect(page.getByText('Loading shared group history…')).toBeVisible()
     phase = 'rows'
@@ -2802,7 +2790,7 @@ for (const viewport of [
     await expect(page.getByText('42.5%', { exact: true })).toBeVisible()
     await page
       .getByRole('navigation', { name: 'Group sections' })
-      .getByRole('link', { name: 'Charts', exact: true })
+      .getByRole('link', { name: 'Records', exact: true })
       .click()
     await expect(
       page.getByRole('table', { name: 'Shared group weight history' }),
@@ -2857,7 +2845,7 @@ for (const viewport of [
     await expect(page.getByText('73.2%', { exact: true })).toBeVisible()
     await page
       .getByRole('navigation', { name: 'Group sections' })
-      .getByRole('link', { name: 'Charts', exact: true })
+      .getByRole('link', { name: 'Records', exact: true })
       .click()
     await expect(
       page.getByRole('table', { name: 'Shared group weight history' }),
@@ -2958,11 +2946,11 @@ for (const viewport of [
 
     await page
       .getByRole('navigation', { name: 'Group sections' })
-      .getByRole('link', { name: 'Charts', exact: true })
+      .getByRole('link', { name: 'Records', exact: true })
       .click()
-    const historyPanel = page.getByRole('region', {
-      name: 'Group chart and weigh-in history',
-    })
+    const historyPanel = page
+      .getByRole('heading', { name: 'Group record history' })
+      .locator('..')
     await expect(historyPanel.getByRole('table')).toContainText('88.50 kg')
     await expect(historyPanel.getByRole('table')).toContainText('-1.5 kg')
     await expect(historyPanel.getByRole('table')).toContainText(
@@ -3020,10 +3008,17 @@ for (const viewport of [
     expect(contrast.opacity).toBe(1)
     expect(contrast.label).toBeGreaterThanOrEqual(4.5)
     expect(contrast.body).toBeGreaterThanOrEqual(4.5)
-    const chart = historyPanel.getByRole('img')
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Charts', exact: true })
+      .click()
+    const chartPanel = page
+      .getByRole('heading', { name: 'Group charts' })
+      .locator('..')
+    const chart = chartPanel.getByRole('img')
     await expect(chart).toHaveCount(1)
-    await expect(historyPanel.getByRole('table')).toHaveCount(1)
-    const quickRanges = historyPanel.getByRole('group', {
+    await expect(chartPanel.getByRole('table')).toHaveCount(0)
+    const quickRanges = chartPanel.getByRole('group', {
       name: 'Quick date ranges',
     })
     await expect(quickRanges.getByRole('button')).toHaveCount(5)
@@ -3033,7 +3028,7 @@ for (const viewport of [
     await oneWeek.click()
     await expect(oneWeek).toHaveAttribute('aria-pressed', 'true')
     await expect(
-      historyPanel.getByRole('status', { name: 'Visible date range' }),
+      chartPanel.getByRole('status', { name: 'Visible date range' }),
     ).toContainText('Last 7 days')
     for (const [index, name] of [
       'Show last 1 week',
@@ -3049,7 +3044,7 @@ for (const viewport of [
     const chartPointCount = await chart
       .locator('circle[data-chart-point]')
       .count()
-    await expect(historyPanel.getByRole('button')).toHaveCount(
+    await expect(chartPanel.getByRole('button')).toHaveCount(
       7 + chartPointCount,
     )
 

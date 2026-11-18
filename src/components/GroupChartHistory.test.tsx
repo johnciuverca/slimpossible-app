@@ -871,6 +871,7 @@ describe('Group chart history', () => {
         viewerId="one"
         persistence={remote}
         refreshVersion={0}
+        view="records"
       />,
     )
     await screen.findByRole('table')
@@ -880,6 +881,7 @@ describe('Group chart history', () => {
         viewerId="one"
         persistence={remote}
         refreshVersion={1}
+        view="records"
       />,
     )
     await screen.findByText('No entries have been shared with this group.')
@@ -890,13 +892,14 @@ describe('Group chart history', () => {
         viewerId="one"
         persistence={remote}
         refreshVersion={2}
+        view="records"
       />,
     )
     await screen.findByText(/Shared group history is unavailable/)
     expect(
       within(
         screen.getByRole('region', {
-          name: 'Group chart and weigh-in history',
+          name: 'Group record history',
         }),
       ).queryByRole('img'),
     ).not.toBeInTheDocument()
