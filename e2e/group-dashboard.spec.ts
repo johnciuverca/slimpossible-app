@@ -4601,7 +4601,7 @@ for (const viewport of [
         expect(metrics.scrollWidth).toBeGreaterThan(metrics.containerWidth)
         expect(
           Math.min(...metrics.columnWidths.slice(1)),
-        ).toBeGreaterThanOrEqual(216)
+        ).toBeGreaterThanOrEqual(224)
       }
     })
   }

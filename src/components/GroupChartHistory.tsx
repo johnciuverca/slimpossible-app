@@ -713,7 +713,7 @@ export function GroupChartHistory({
                       className="group-history-table table-fixed border-collapse text-left text-xs"
                       style={{
                         width: '100%',
-                        minWidth: `max(100%, ${120 + series.length * 216}px)`,
+                        minWidth: `max(100%, ${120 + series.length * 224}px)`,
                       }}
                     >
                       <colgroup>
@@ -769,7 +769,7 @@ export function GroupChartHistory({
                                     }
                                     className={
                                       view === 'records'
-                                        ? 'grid w-full grid-cols-[minmax(56px,0.7fr)_minmax(124px,2fr)] items-stretch gap-1 pointer-coarse:grid-cols-[minmax(56px,0.7fr)_minmax(148px,2fr)]'
+                                        ? 'grid w-full grid-cols-[minmax(64px,0.7fr)_minmax(124px,2fr)] items-stretch gap-1 pointer-coarse:grid-cols-[minmax(64px,0.7fr)_minmax(148px,2fr)]'
                                         : 'contents'
                                     }
                                   >
@@ -779,10 +779,7 @@ export function GroupChartHistory({
                                         className="flex min-h-10 min-w-0 items-center justify-center rounded-lg border border-line bg-page px-1 text-center text-[10px] pointer-coarse:min-h-12"
                                       >
                                         <span
-                                          className={sharedChangeColor(
-                                            point.previousSharedChangeKg,
-                                            true,
-                                          )}
+                                          className={`whitespace-nowrap ${sharedChangeColor(point.previousSharedChangeKg, true)}`}
                                         >
                                           {point.previousSharedChangeKg === null
                                             ? '—'
