@@ -71,34 +71,40 @@ describe('Group chart history', () => {
     }
     const comparison = (date: string) => {
       const cell = cellFor(date)
+      const card = cell.querySelector<HTMLElement>('[class~="group/weight"]')!
       return {
         cell,
-        value: cell.querySelector<HTMLElement>(
-          '[class~="group/weight"] > span',
-        )!,
-        change: cell.querySelector<HTMLElement>(':scope > span:last-child')!,
+        card,
+        value: card.querySelector<HTMLElement>(':scope > div > span')!,
+        change: card.querySelector<HTMLElement>(':scope > span > span')!,
+        changeContainer: card.querySelector<HTMLElement>(':scope > span')!,
       }
     }
 
     const first = comparison('2026-09-01')
     expect(first.value).toHaveClass('text-ink')
     expect(first.change).toHaveTextContent('—')
-    expect(first.change).toHaveClass('text-center', 'text-ink')
+    expect(first.change.closest('[class~="group/weight"]')).toBe(first.card)
+    expect(first.change).toHaveClass('text-ink')
+    expect(first.changeContainer).toHaveClass('text-center')
 
     const loss = comparison('2026-09-02')
     expect(loss.value).toHaveClass('text-forest-800')
     expect(loss.change).toHaveTextContent('-0.75 kg')
-    expect(loss.change).toHaveClass('text-center', 'text-forest-800')
+    expect(loss.change).toHaveClass('text-forest-800')
+    expect(loss.changeContainer).toHaveClass('text-center')
 
     const gain = comparison('2026-09-03')
     expect(gain.value).toHaveClass('text-record-gain')
     expect(gain.change).toHaveTextContent('+1.25 kg')
-    expect(gain.change).toHaveClass('text-center', 'text-record-gain')
+    expect(gain.change).toHaveClass('text-record-gain')
+    expect(gain.changeContainer).toHaveClass('text-center')
 
     const unchanged = comparison('2026-09-04')
     expect(unchanged.value).toHaveClass('text-ink')
     expect(unchanged.change).toHaveTextContent('0 kg')
-    expect(unchanged.change).toHaveClass('text-center', 'text-ink')
+    expect(unchanged.change).toHaveClass('text-ink')
+    expect(unchanged.changeContainer).toHaveClass('text-center')
 
     const roundedZero = comparison('2026-09-05')
     expect(roundedZero.value).toHaveClass('text-ink')

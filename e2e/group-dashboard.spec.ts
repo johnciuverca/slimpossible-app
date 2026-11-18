@@ -4553,7 +4553,9 @@ for (const viewport of [
         .locator('tbody td [class~="group/weight"]')
         .evaluateAll((cards) =>
           cards.map((card) => {
-            const comparison = card.nextElementSibling!.getBoundingClientRect()
+            const comparison = card
+              .querySelector(':scope > span')!
+              .getBoundingClientRect()
             const cardBounds = card.getBoundingClientRect()
             return Math.abs(
               cardBounds.left +

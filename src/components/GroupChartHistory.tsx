@@ -779,6 +779,23 @@ export function GroupChartHistory({
                                             )
                                           : undefined
                                       }
+                                      secondaryContent={
+                                        view === 'records' ? (
+                                          <span
+                                            className={sharedChangeColor(
+                                              point.previousSharedChangeKg,
+                                              true,
+                                            )}
+                                          >
+                                            {point.previousSharedChangeKg ===
+                                            null
+                                              ? '—'
+                                              : signed(
+                                                  point.previousSharedChangeKg,
+                                                )}
+                                          </span>
+                                        ) : undefined
+                                      }
                                     >
                                       <span className="sr-only">
                                         ; change from first shared entry{' '}
@@ -805,14 +822,7 @@ export function GroupChartHistory({
                                           }
                                         />
                                       ) : null}
-                                    </WeightEntryCard>{' '}
-                                    <span
-                                      className={`block text-center text-[10px] ${sharedChangeColor(point.previousSharedChangeKg, view === 'records')}`}
-                                    >
-                                      {point.previousSharedChangeKg === null
-                                        ? '—'
-                                        : signed(point.previousSharedChangeKg)}
-                                    </span>
+                                    </WeightEntryCard>
                                   </>
                                 ) : (
                                   <span aria-label="No shared entry">—</span>
