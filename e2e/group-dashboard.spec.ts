@@ -740,7 +740,7 @@ for (const layout of [
       await expect(
         matrix.getByRole('button', { name: /^Edit weight/ }),
       ).toHaveCount(2)
-      const cards = matrix.locator('td > div')
+      const cards = matrix.locator('tbody td .record-weight-box')
       await expect(cards).toHaveCount(9)
       expect(
         (await matrix
@@ -783,7 +783,15 @@ for (const layout of [
           )
           return {
             width: bounds.width,
-            cellWidth: card.parentElement!.getBoundingClientRect().width,
+            layoutWidth: card.parentElement!.getBoundingClientRect().width,
+            comparisonWidth: card
+              .parentElement!.querySelector('[data-record-comparison]')!
+              .getBoundingClientRect().width,
+            withinLayout:
+              bounds.left >=
+                card.parentElement!.getBoundingClientRect().left - 1 &&
+              bounds.right <=
+                card.parentElement!.getBoundingClientRect().right + 1,
             height: bounds.height,
             value: value.textContent,
             fits: value.scrollWidth <= value.clientWidth,
@@ -793,6 +801,7 @@ for (const layout of [
             rightPadding: bounds.right - valueBounds.right,
             unitRight: value.lastElementChild!.getBoundingClientRect().right,
             numberFontSize: getComputedStyle(value.firstElementChild!).fontSize,
+            numberLength: value.firstElementChild!.textContent!.length,
             numberWidth: value.firstElementChild!.getBoundingClientRect().width,
             numberFits:
               value.firstElementChild!.scrollWidth <=
@@ -815,16 +824,25 @@ for (const layout of [
         ]),
       )
       for (const box of boxes) {
-        expect(box.width).toBeGreaterThan(box.cellWidth - 10)
-        expect(box.width).toBeLessThan(box.cellWidth - 6)
+        expect(box.width).toBeGreaterThanOrEqual(124)
+        expect(box.width).toBeGreaterThan(box.comparisonWidth)
+        expect(box.width).toBeLessThan(box.layoutWidth)
+        expect(box.withinLayout).toBe(true)
+        if (box.numberLength <= 6) {
+          expect(box.numberFontSize).toBe('11.5px')
+        } else {
+          expect(
+            Number.parseFloat(box.numberFontSize) * box.numberLength,
+          ).toBeCloseTo(68, 1)
+        }
         if (!box.buttons.length) {
-          expect(box.numberFontSize).toBe('10px')
           expect(box.childCount).toBe(2)
         }
         expect(box.height).toBe(layout.hasTouch ? 48 : 40)
         if (box.buttons.length) {
           expect(box.valueWidth).toBe(50)
-          expect(box.numberWidth).toBe(36)
+          expect(box.numberWidth).toBeGreaterThan(34)
+          expect(box.numberWidth).toBeLessThanOrEqual(36)
           expect(box.buttons[0].iconLeft - box.unitRight).toBeCloseTo(
             box.buttons[1].iconLeft - box.buttons[0].iconRight,
             1,
@@ -4605,6 +4623,24 @@ for (const viewport of [
           }),
         )
       expect(Math.max(...memberHeaderCenters)).toBeLessThanOrEqual(2)
+      const headerFontSizes = await table
+        .locator('thead th button')
+        .evaluateAll((buttons) =>
+          buttons.map((button) => getComputedStyle(button).fontSize),
+        )
+      expect(new Set(headerFontSizes)).toEqual(new Set(['14px']))
+      const valueFontSizes = await table
+        .locator('tbody td .record-weight-box > span:not(.sr-only)')
+        .evaluateAll((values) =>
+          values.map((value) => getComputedStyle(value).fontSize),
+        )
+      const comparisonFontSizes = await table
+        .locator('tbody td [data-record-comparison] > span')
+        .evaluateAll((values) =>
+          values.map((value) => getComputedStyle(value).fontSize),
+        )
+      expect(new Set(valueFontSizes)).toEqual(new Set(['11.5px']))
+      expect(new Set(comparisonFontSizes)).toEqual(new Set(['11.5px']))
       if (memberCount === 1 || memberCount === 4) {
         await page.screenshot({
           path: test
@@ -4619,8 +4655,44 @@ for (const viewport of [
         expect(metrics.scrollWidth).toBeGreaterThan(metrics.containerWidth)
         expect(
           Math.min(...metrics.columnWidths.slice(1)),
-        ).toBeGreaterThanOrEqual(224)
+        ).toBeGreaterThanOrEqual(236)
       }
+      const initialUrl = page.url()
+      const memberTabs = page.getByRole('tablist', {
+        name: 'Shared group members',
+      })
+      const targetMemberNumber = memberCount === 4 ? 3 : 1
+      const heading = table.getByRole('button', {
+        name: `Show Records for Member ${targetMemberNumber}`,
+      })
+      await heading.click()
+      await expect(
+        memberTabs.getByRole('tab', {
+          name: `Member ${targetMemberNumber}`,
+        }),
+      ).toHaveAttribute('aria-selected', 'true')
+      await expect(table.getByRole('columnheader')).toHaveCount(2)
+      await expect(heading).toHaveAttribute('aria-pressed', 'true')
+      await expect(page).toHaveURL(initialUrl)
+      await memberTabs.getByRole('tab', { name: 'All members' }).click()
+      await expect(
+        memberTabs.getByRole('tab', { name: 'All members' }),
+      ).toHaveAttribute('aria-selected', 'true')
+      await expect(table.getByRole('columnheader')).toHaveCount(memberCount + 1)
+      if (memberCount === 4) {
+        await table
+          .getByRole('button', { name: 'Show Records for Member 4' })
+          .press('Enter')
+        await expect(
+          memberTabs.getByRole('tab', { name: 'Member 4' }),
+        ).toHaveAttribute('aria-selected', 'true')
+        await expect(
+          table.getByRole('button', { name: 'Show Records for Member 4' }),
+        ).toHaveAttribute('aria-pressed', 'true')
+        await memberTabs.getByRole('tab', { name: 'All members' }).click()
+        await expect(table.getByRole('columnheader')).toHaveCount(5)
+      }
+      await expect(page).toHaveURL(initialUrl)
     })
   }
 }

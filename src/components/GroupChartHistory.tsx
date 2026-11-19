@@ -713,7 +713,7 @@ export function GroupChartHistory({
                       className="group-history-table table-fixed border-collapse text-left text-xs"
                       style={{
                         width: '100%',
-                        minWidth: `max(100%, ${120 + series.length * 224}px)`,
+                        minWidth: `max(100%, ${120 + series.length * 236}px)`,
                       }}
                     >
                       <colgroup>
@@ -740,7 +740,20 @@ export function GroupChartHistory({
                               scope="col"
                               className="sticky top-0 z-20 break-words bg-stone-50 px-1 py-2 text-center align-middle"
                             >
-                              {member.label} (kg)
+                              <button
+                                type="button"
+                                aria-label={`Show Records for ${member.label}`}
+                                aria-pressed={selectedKey === member.memberKey}
+                                className="inline-flex min-h-11 items-center justify-center rounded px-1 text-[0.875rem] font-semibold text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+                                onClick={() =>
+                                  setSelection({
+                                    context,
+                                    memberKey: member.memberKey,
+                                  })
+                                }
+                              >
+                                {member.label} (kg)
+                              </button>
                             </th>
                           ))}
                         </tr>
@@ -786,7 +799,7 @@ export function GroupChartHistory({
                                       {view === 'records' ? (
                                         <div
                                           data-record-comparison
-                                          className="flex min-h-10 min-w-0 items-center justify-center rounded-lg border border-line bg-page px-1 text-center text-[10px] pointer-coarse:min-h-12"
+                                          className="flex min-h-10 min-w-0 items-center justify-center rounded-lg border border-line bg-page px-1 text-center text-[11.5px] pointer-coarse:min-h-12"
                                         >
                                           <span
                                             className={`whitespace-nowrap ${sharedChangeColor(point.previousSharedChangeKg, true)}`}
@@ -814,6 +827,14 @@ export function GroupChartHistory({
                                                 true,
                                               )
                                             : undefined
+                                        }
+                                        valueSizeClassName={
+                                          view === 'records'
+                                            ? 'text-[11.5px]'
+                                            : undefined
+                                        }
+                                        valueFontScale={
+                                          view === 'records' ? 68 : undefined
                                         }
                                       >
                                         <span className="sr-only">
