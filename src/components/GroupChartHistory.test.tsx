@@ -38,6 +38,99 @@ const legendName = (item: Element) => {
   return copy.textContent?.trim()
 }
 describe('Group chart history', () => {
+  it('centers shared-record comparisons and colors only prior actual shared changes', async () => {
+    const load = vi.fn().mockResolvedValue({
+      state: 'success',
+      data: [
+        { ...rows[0], date: '2026-09-01', weightKg: 90 },
+        { ...rows[0], date: '2026-09-02', weightKg: 89.25 },
+        { ...rows[0], date: '2026-09-03', weightKg: 90.5 },
+        { ...rows[0], date: '2026-09-04', weightKg: 90.5 },
+        { ...rows[0], date: '2026-09-05', weightKg: 90.496 },
+      ],
+    })
+    render(
+      <GroupChartHistory
+        challengeId="group"
+        viewerId="viewer"
+        persistence={persistence(load)}
+        refreshVersion={0}
+        view="records"
+      />,
+    )
+    const table = await screen.findByRole('table', {
+      name: 'Shared group weight history',
+    })
+    const cellFor = (date: string) => {
+      const row = within(table)
+        .getAllByRole('row')
+        .find((candidate) =>
+          within(candidate).queryByRole('rowheader', { name: date }),
+        )!
+      return within(row).getAllByRole('cell')[0]
+    }
+    const comparison = (date: string) => {
+      const cell = cellFor(date)
+      const pair = cell.querySelector<HTMLElement>('[data-record-pair]')!
+      const layout = pair.querySelector<HTMLElement>(
+        '[data-record-pair-layout]',
+      )!
+      const card = layout.querySelector<HTMLElement>(
+        '[class~="record-weight-box"]',
+      )!
+      const changeContainer = layout.querySelector<HTMLElement>(
+        '[data-record-comparison]',
+      )!
+      return {
+        cell,
+        pair,
+        layout,
+        card,
+        value: card.querySelector<HTMLElement>(':scope > span')!,
+        change: changeContainer.querySelector<HTMLElement>('span')!,
+        changeContainer,
+      }
+    }
+
+    const first = comparison('2026-09-01')
+    expect(first.value).toHaveClass('text-ink')
+    expect(first.change).toHaveTextContent('—')
+    expect(first.change.closest('[data-record-pair]')).toBe(first.pair)
+    expect(first.pair.parentElement).toBe(first.cell)
+    expect(first.card.parentElement).toBe(first.layout)
+    expect(first.changeContainer.parentElement).toBe(first.layout)
+    expect(first.pair).toHaveClass('rounded-xl', 'border', 'bg-panel')
+    expect(first.layout).toHaveClass('grid')
+    expect(first.change).toHaveClass('text-ink')
+    expect(first.changeContainer).toHaveClass('text-center')
+
+    const loss = comparison('2026-09-02')
+    expect(loss.value).toHaveClass('text-forest-800')
+    expect(loss.change).toHaveTextContent('-0.75 kg')
+    expect(loss.change).toHaveClass('text-forest-800')
+    expect(loss.changeContainer).toHaveClass('text-center')
+
+    const gain = comparison('2026-09-03')
+    expect(gain.value).toHaveClass('text-record-gain')
+    expect(gain.change).toHaveTextContent('+1.25 kg')
+    expect(gain.change).toHaveClass('text-record-gain')
+    expect(gain.changeContainer).toHaveClass('text-center')
+
+    const unchanged = comparison('2026-09-04')
+    expect(unchanged.value).toHaveClass('text-ink')
+    expect(unchanged.change).toHaveTextContent('0 kg')
+    expect(unchanged.change).toHaveClass('text-ink')
+    expect(unchanged.changeContainer).toHaveClass('text-center')
+
+    const roundedZero = comparison('2026-09-05')
+    expect(roundedZero.value).toHaveClass('text-ink')
+    expect(roundedZero.change).toHaveTextContent('0 kg')
+    expect(roundedZero.change).not.toHaveTextContent('-0 kg')
+    expect(table).not.toHaveTextContent('Previous shared entry')
+    expect(load).toHaveBeenCalledTimes(1)
+    expect(load).toHaveBeenCalledWith('group')
+  })
+
   it('lists challenge members, omits target references, and styles each trend with its series', async () => {
     const groupProgress: GroupMemberProgress[] = [
       {
@@ -871,6 +964,7 @@ describe('Group chart history', () => {
         viewerId="one"
         persistence={remote}
         refreshVersion={0}
+        view="records"
       />,
     )
     await screen.findByRole('table')
@@ -880,6 +974,7 @@ describe('Group chart history', () => {
         viewerId="one"
         persistence={remote}
         refreshVersion={1}
+        view="records"
       />,
     )
     await screen.findByText('No entries have been shared with this group.')
@@ -890,13 +985,14 @@ describe('Group chart history', () => {
         viewerId="one"
         persistence={remote}
         refreshVersion={2}
+        view="records"
       />,
     )
     await screen.findByText(/Shared group history is unavailable/)
     expect(
       within(
         screen.getByRole('region', {
-          name: 'Group chart and weigh-in history',
+          name: 'Group record history',
         }),
       ).queryByRole('img'),
     ).not.toBeInTheDocument()

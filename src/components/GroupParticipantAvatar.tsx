@@ -4,14 +4,16 @@ import type { ProfileAvatarPresetId } from '../auth/profileAvatar'
 export function GroupParticipantAvatar({
   avatarPresetId,
   displayName,
+  className = '',
 }: {
   avatarPresetId?: ProfileAvatarPresetId | null
   displayName: string
+  className?: string
 }) {
   return (
     <span
       aria-hidden="true"
-      className="inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-stone-300 bg-stone-100 text-sm font-semibold text-slate-700"
+      className={`inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-stone-300 bg-stone-100 text-sm font-semibold text-slate-700 ${className}`}
       data-avatar-preset={avatarPresetId ?? 'default'}
     >
       {avatarPresetId ? (

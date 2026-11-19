@@ -30,6 +30,8 @@
   --color-warning-800: #7a4b08;
   --color-danger-50: #fff0ee;
   --color-danger-800: #8f2c22;
+  --color-record-delete: #a34332;
+  --color-record-gain: #b42335;
   --radius-panel: 1.5rem;
   --shadow-panel: 0 18px 48px -30px rgb(27 42 32 / 32%);
 }
@@ -698,6 +700,8 @@ body {
   --color-warning-800: #ffd08a;
   --color-danger-50: #3b2229;
   --color-danger-800: #ffb5b5;
+  --color-record-delete: #e9a08d;
+  --color-record-gain: #ff304f;
   --radius-panel: 1rem;
   --shadow-panel: 0 12px 36px -24px #000;
   --chart-recorded: #31dbb0;
