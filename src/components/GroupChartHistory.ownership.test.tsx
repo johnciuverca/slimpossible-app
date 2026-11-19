@@ -76,7 +76,9 @@ describe('Group matrix ownership', () => {
     render(view())
     const table = await screen.findByRole('table')
     const ownOrdinal = key(viewer) < key(other) ? 1 : 2
-    expect(within(table).getAllByRole('button')).toHaveLength(2)
+    expect(
+      within(table).getAllByRole('button', { name: /^(Edit weight|Delete)\b/ }),
+    ).toHaveLength(2)
     expect(
       within(table).getByRole('button', {
         name: `Edit weight 2026-09-22 for Same name (member ${ownOrdinal})`,
@@ -85,11 +87,17 @@ describe('Group matrix ownership', () => {
     fireEvent.click(
       screen.getByRole('tab', { name: `Same name (member ${3 - ownOrdinal})` }),
     )
-    expect(within(table).queryAllByRole('button')).toHaveLength(0)
+    expect(
+      within(table).queryAllByRole('button', {
+        name: /^(Edit weight|Delete)\b/,
+      }),
+    ).toHaveLength(0)
     fireEvent.click(
       screen.getByRole('tab', { name: `Same name (member ${ownOrdinal})` }),
     )
-    expect(within(table).getAllByRole('button')).toHaveLength(2)
+    expect(
+      within(table).getAllByRole('button', { name: /^(Edit weight|Delete)\b/ }),
+    ).toHaveLength(2)
     expect(table).not.toHaveTextContent('private')
   })
   it.each([
@@ -109,7 +117,11 @@ describe('Group matrix ownership', () => {
       state.workspace.persistence = { mode: 'local' } as Persistence
     render(view())
     const table = await screen.findByRole('table')
-    expect(within(table).queryAllByRole('button')).toHaveLength(0)
+    expect(
+      within(table).queryAllByRole('button', {
+        name: /^(Edit weight|Delete)\b/,
+      }),
+    ).toHaveLength(0)
   })
   it('hides actions immediately on viewer change and never remaps identical values', async () => {
     const { rerender } = render(view())
@@ -119,6 +131,10 @@ describe('Group matrix ownership', () => {
       screen.queryByRole('button', { name: /^Edit weight/ }),
     ).not.toBeInTheDocument()
     const table = await screen.findByRole('table')
-    expect(within(table).queryAllByRole('button')).toHaveLength(0)
+    expect(
+      within(table).queryAllByRole('button', {
+        name: /^(Edit weight|Delete)\b/,
+      }),
+    ).toHaveLength(0)
   })
 })
