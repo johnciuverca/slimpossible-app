@@ -55,14 +55,14 @@ describe('Group chart history', () => {
     const estimateCard = estimate.closest('[data-record-estimate]')
     expect(estimateCard).toHaveAttribute('data-estimate-date', '2026-09-02')
     expect(estimateCard).toHaveClass(
-      'border-2',
+      'border',
       'border-dashed',
-      'border-blue-600',
-      'bg-blue-50',
+      'border-slate-500/50',
+      'bg-slate-800/20',
     )
     expect(estimateCard).toHaveTextContent('89.25 kg')
     expect(estimateCard?.querySelector('[title="89.25 kg"]')).toHaveClass(
-      'text-blue-950',
+      'text-slate-300',
     )
     expect(estimateCard).not.toHaveTextContent('Record weight')
     const table = screen.getByRole('table', {
@@ -132,8 +132,14 @@ describe('Group chart history', () => {
     expect(first.pair.parentElement).toBe(first.cell)
     expect(first.card.parentElement).toBe(first.layout)
     expect(first.changeContainer.parentElement).toBe(first.layout)
-    expect(first.pair).toHaveClass('rounded-xl', 'border', 'bg-panel')
+    expect(first.pair).toHaveClass(
+      'rounded-xl',
+      'border',
+      'border-slate-700',
+      'bg-slate-800',
+    )
     expect(first.layout).toHaveClass('grid')
+    expect(first.card).toHaveClass('bg-slate-900', '!border-slate-700')
     expect(first.change).toHaveClass('text-ink')
     expect(first.changeContainer).toHaveClass('text-center')
 

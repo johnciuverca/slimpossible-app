@@ -18,14 +18,14 @@ export function PersonalWeightRecordCard({
   disabled?: boolean
 }) {
   return (
-    <li className="min-w-0 rounded-xl border border-line bg-page p-3">
+    <li className="min-w-0 rounded-xl border border-slate-700 bg-slate-800 p-3 text-slate-100">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xl font-bold tracking-tight text-ink">
+          <p className="text-xl font-bold tracking-tight text-slate-50">
             {formatPersonalWeight(entry.weightKg)}
           </p>
           <time
-            className="mt-1 block text-sm text-ink-muted"
+            className="mt-1 block text-sm text-slate-300"
             dateTime={entry.date}
           >
             {formatChartDate(entry.date)}
@@ -40,17 +40,17 @@ export function PersonalWeightRecordCard({
         />
       </div>
       {entry.note ? (
-        <p className="mt-4 whitespace-pre-wrap break-words text-sm text-ink-muted">
+        <p className="mt-4 whitespace-pre-wrap break-words text-sm text-slate-300">
           {entry.note}
         </p>
       ) : null}
-      <p className="mt-3 break-words text-xs text-ink-muted">
+      <p className="mt-3 break-words text-xs text-slate-300">
         {entry.sharedChallengeIds.length
           ? `Shared with ${entry.sharedChallengeIds.map(groupName).join(', ')}`
           : 'Private'}
       </p>
       {deleting ? (
-        <p role="status" className="mt-3 text-sm text-ink-muted">
+        <p role="status" className="mt-3 text-sm text-slate-300">
           Deleting entry and group shares…
         </p>
       ) : null}
@@ -70,17 +70,17 @@ export function EstimatedPersonalWeightRecordCard({
   return (
     <li
       data-estimated-weigh-in=""
-      className="min-w-0 rounded-xl border-2 border-dashed border-blue-600 bg-blue-50 p-3"
+      className="min-w-0 rounded-xl border border-dashed border-slate-500/50 bg-slate-800/20 p-3"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <span className="mb-1 inline-flex rounded-full border border-blue-700 bg-white px-2 py-0.5 text-[11px] font-bold leading-4 text-blue-950">
+          <span className="mb-1 inline-flex text-[10px] font-semibold tracking-wide text-slate-400">
             Estimated
           </span>
-          <p className="text-xl font-bold tracking-tight text-blue-950">
+          <p className="text-xl font-bold tracking-tight text-slate-300">
             {formatPersonalWeight(weightKg)}
           </p>
-          <time className="mt-1 block text-sm text-ink" dateTime={date}>
+          <time className="mt-1 block text-sm text-slate-400" dateTime={date}>
             {formatChartDate(date)}
           </time>
         </div>
@@ -88,7 +88,7 @@ export function EstimatedPersonalWeightRecordCard({
           type="button"
           aria-label={`Record estimated weight ${formatPersonalWeight(weightKg)} on ${date}`}
           onClick={onRecord}
-          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-line bg-page px-3 text-sm font-semibold text-forest-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-600 bg-slate-900/60 px-3 text-sm font-semibold text-forest-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700"
         >
           Record weight
         </button>

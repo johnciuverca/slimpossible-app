@@ -72,11 +72,17 @@ describe('PersonalWeighInsPage', () => {
     const estimatedCard = estimate.closest('[data-estimated-weigh-in]')
     expect(estimatedCard).toHaveAttribute('data-estimated-weigh-in', '')
     expect(estimatedCard).toHaveClass(
-      'border-2',
+      'border',
       'border-dashed',
-      'border-blue-600',
-      'bg-blue-50',
+      'border-slate-500/50',
+      'bg-slate-800/20',
     )
+    expect(estimatedCard?.querySelector('p.text-xl')).toHaveClass(
+      'text-slate-300',
+    )
+    const actualCard = screen.getByText('80 kg').closest('li')
+    expect(actualCard).toHaveClass('bg-slate-800', 'border-slate-700')
+    expect(actualCard?.querySelector('p.text-xl')).toHaveClass('text-slate-50')
     expect(
       within(estimatedCard as HTMLElement).getByText('79.5 kg'),
     ).toBeInTheDocument()

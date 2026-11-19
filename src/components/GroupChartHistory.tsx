@@ -827,15 +827,15 @@ export function GroupChartHistory({
                                       <div
                                         data-record-estimate=""
                                         data-estimate-date={point.date}
-                                        className="flex min-w-0 flex-col items-center gap-1 rounded-xl border-2 border-dashed border-blue-600 bg-blue-50 p-2 text-center"
+                                        className="flex min-w-0 flex-col items-center gap-1 rounded-xl border border-dashed border-slate-500/50 bg-slate-800/20 p-2 text-center"
                                       >
-                                        <span className="rounded-full border border-blue-700 bg-white px-2 py-0.5 text-[10px] font-bold leading-4 text-blue-950">
+                                        <span className="text-[10px] font-semibold tracking-wide text-slate-400">
                                           Estimated
                                         </span>
                                         <WeightEntryCard
                                           weightKg={point.weightKg}
-                                          className="!h-10 !w-full !justify-center !border-2 !border-dashed !border-blue-500 min-w-[124px] bg-white pointer-coarse:min-w-[148px]"
-                                          valueClassName="text-blue-950"
+                                          className="!h-10 !w-full !justify-center !border-dashed !border-slate-500/50 min-w-[124px] bg-slate-900/40 pointer-coarse:min-w-[148px]"
+                                          valueClassName="text-slate-300"
                                           valueSizeClassName="text-[11.5px]"
                                           valueFontScale={68}
                                         />
@@ -872,7 +872,7 @@ export function GroupChartHistory({
                                         }
                                         className={
                                           view === 'records'
-                                            ? 'w-full rounded-xl border border-line bg-panel p-1'
+                                            ? 'w-full rounded-xl border border-slate-700 bg-slate-800 p-1'
                                             : 'contents'
                                         }
                                       >
@@ -889,7 +889,7 @@ export function GroupChartHistory({
                                           {view === 'records' ? (
                                             <div
                                               data-record-comparison
-                                              className="flex min-h-10 min-w-0 items-center justify-center rounded-lg border border-line bg-page px-1 text-center text-[11.5px] pointer-coarse:min-h-12"
+                                              className="flex min-h-10 min-w-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-900 px-1 text-center text-[11.5px] pointer-coarse:min-h-12"
                                             >
                                               <span
                                                 className={`whitespace-nowrap ${sharedChangeColor(point.previousSharedChangeKg, true)}`}
@@ -907,7 +907,7 @@ export function GroupChartHistory({
                                             weightKg={point.weightKg}
                                             className={
                                               view === 'records'
-                                                ? 'record-weight-box !w-full !justify-center min-w-[124px] pointer-coarse:min-w-[148px]'
+                                                ? 'record-weight-box !w-full !justify-center !border-slate-700 min-w-[124px] bg-slate-900 pointer-coarse:min-w-[148px]'
                                                 : undefined
                                             }
                                             valueClassName={
