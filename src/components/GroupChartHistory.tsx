@@ -827,15 +827,15 @@ export function GroupChartHistory({
                                       <div
                                         data-record-estimate=""
                                         data-estimate-date={point.date}
-                                        className="flex min-w-0 flex-col items-center gap-1 rounded-xl border border-dashed border-line bg-page p-2 text-center"
+                                        className="flex min-w-0 flex-col items-center gap-1 rounded-xl border-2 border-dashed border-blue-600 bg-blue-50 p-2 text-center"
                                       >
-                                        <span className="text-[10px] font-semibold text-ink-muted">
+                                        <span className="rounded-full border border-blue-700 bg-white px-2 py-0.5 text-[10px] font-bold leading-4 text-blue-950">
                                           Estimated
                                         </span>
                                         <WeightEntryCard
                                           weightKg={point.weightKg}
-                                          className="!h-10 !w-full !justify-center !border-dashed min-w-[124px] bg-panel pointer-coarse:min-w-[148px]"
-                                          valueClassName="text-ink-muted"
+                                          className="!h-10 !w-full !justify-center !border-2 !border-dashed !border-blue-500 min-w-[124px] bg-white pointer-coarse:min-w-[148px]"
+                                          valueClassName="text-blue-950"
                                           valueSizeClassName="text-[11.5px]"
                                           valueFontScale={68}
                                         />

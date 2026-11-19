@@ -70,19 +70,19 @@ export function EstimatedPersonalWeightRecordCard({
   return (
     <li
       data-estimated-weigh-in=""
-      className="min-w-0 rounded-xl border border-dashed border-line bg-panel p-3"
+      className="min-w-0 rounded-xl border-2 border-dashed border-blue-600 bg-blue-50 p-3"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xl font-bold tracking-tight text-ink-muted">
+          <span className="mb-1 inline-flex rounded-full border border-blue-700 bg-white px-2 py-0.5 text-[11px] font-bold leading-4 text-blue-950">
+            Estimated
+          </span>
+          <p className="text-xl font-bold tracking-tight text-blue-950">
             {formatPersonalWeight(weightKg)}
           </p>
-          <time className="mt-1 block text-sm text-ink-muted" dateTime={date}>
+          <time className="mt-1 block text-sm text-ink" dateTime={date}>
             {formatChartDate(date)}
           </time>
-          <p className="mt-2 text-xs font-semibold text-ink-muted">
-            Estimated · not saved
-          </p>
         </div>
         <button
           type="button"

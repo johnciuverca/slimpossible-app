@@ -68,9 +68,15 @@ describe('PersonalWeighInsPage', () => {
     )
     renderPage()
 
-    const estimate = await screen.findByText('Estimated · not saved')
+    const estimate = await screen.findByText('Estimated', { exact: true })
     const estimatedCard = estimate.closest('[data-estimated-weigh-in]')
     expect(estimatedCard).toHaveAttribute('data-estimated-weigh-in', '')
+    expect(estimatedCard).toHaveClass(
+      'border-2',
+      'border-dashed',
+      'border-blue-600',
+      'bg-blue-50',
+    )
     expect(
       within(estimatedCard as HTMLElement).getByText('79.5 kg'),
     ).toBeInTheDocument()
@@ -97,7 +103,9 @@ describe('PersonalWeighInsPage', () => {
         }),
       ]),
     })
-    expect(screen.queryByText('Estimated · not saved')).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('Estimated', { exact: true }),
+    ).not.toBeInTheDocument()
   })
 
   it('announces pending deletion and preserves the card if deletion is not confirmed', async () => {

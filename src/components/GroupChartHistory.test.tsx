@@ -54,7 +54,16 @@ describe('Group chart history', () => {
     const estimate = await screen.findByText('Estimated')
     const estimateCard = estimate.closest('[data-record-estimate]')
     expect(estimateCard).toHaveAttribute('data-estimate-date', '2026-09-02')
+    expect(estimateCard).toHaveClass(
+      'border-2',
+      'border-dashed',
+      'border-blue-600',
+      'bg-blue-50',
+    )
     expect(estimateCard).toHaveTextContent('89.25 kg')
+    expect(estimateCard?.querySelector('[title="89.25 kg"]')).toHaveClass(
+      'text-blue-950',
+    )
     expect(estimateCard).not.toHaveTextContent('Record weight')
     const table = screen.getByRole('table', {
       name: 'Shared group weight history',
