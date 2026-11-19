@@ -57,17 +57,25 @@ describe('Group chart history', () => {
     expect(estimateCard).toHaveClass(
       'border',
       'border-dashed',
-      'border-slate-500/50',
-      'bg-slate-800/20',
+      'border-slate-700',
+      'bg-slate-800',
     )
     expect(estimateCard).toHaveTextContent('89.25 kg')
+    expect(estimateCard).toHaveTextContent('≈')
     expect(estimateCard?.querySelector('[title="89.25 kg"]')).toHaveClass(
-      'text-slate-300',
+      'font-normal',
+      'text-slate-100',
     )
     expect(estimateCard).not.toHaveTextContent('Record weight')
     const table = screen.getByRole('table', {
       name: 'Shared group weight history',
     })
+    const actualWeight = table.querySelector('[title="88.5 kg"]')
+    expect(actualWeight).toHaveClass('font-bold')
+    expect(actualWeight?.closest('.record-weight-box')).toHaveClass(
+      '!border-solid',
+      '!border-slate-700',
+    )
     expect(within(table).getAllByRole('row')).toHaveLength(4)
   })
 

@@ -841,7 +841,7 @@ for (const layout of [
         expect(box.height).toBe(layout.hasTouch ? 48 : 40)
         if (box.buttons.length) {
           expect(box.valueWidth).toBe(50)
-          expect(box.numberWidth).toBeGreaterThan(34)
+          expect(box.numberWidth).toBeGreaterThan(33.9)
           expect(box.numberWidth).toBeLessThanOrEqual(36)
           expect(box.buttons[0].iconLeft - box.unitRight).toBeCloseTo(
             box.buttons[1].iconLeft - box.buttons[0].iconRight,

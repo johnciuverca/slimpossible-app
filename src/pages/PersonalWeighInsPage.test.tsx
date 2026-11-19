@@ -74,17 +74,25 @@ describe('PersonalWeighInsPage', () => {
     expect(estimatedCard).toHaveClass(
       'border',
       'border-dashed',
-      'border-slate-500/50',
-      'bg-slate-800/20',
+      'border-slate-700',
+      'bg-slate-800',
     )
     expect(estimatedCard?.querySelector('p.text-xl')).toHaveClass(
-      'text-slate-300',
+      'font-normal',
+      'text-slate-100',
     )
     const actualCard = screen.getByText('80 kg').closest('li')
-    expect(actualCard).toHaveClass('bg-slate-800', 'border-slate-700')
-    expect(actualCard?.querySelector('p.text-xl')).toHaveClass('text-slate-50')
+    expect(actualCard).toHaveClass(
+      'bg-slate-800',
+      'border-solid',
+      'border-slate-700',
+    )
+    expect(actualCard?.querySelector('p.text-xl')).toHaveClass(
+      'font-bold',
+      'text-slate-50',
+    )
     expect(
-      within(estimatedCard as HTMLElement).getByText('79.5 kg'),
+      within(estimatedCard as HTMLElement).getByText('≈ 79.5 kg'),
     ).toBeInTheDocument()
     fireEvent.click(
       within(estimatedCard as HTMLElement).getByRole('button', {

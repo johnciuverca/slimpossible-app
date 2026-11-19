@@ -18,7 +18,7 @@ export function PersonalWeightRecordCard({
   disabled?: boolean
 }) {
   return (
-    <li className="min-w-0 rounded-xl border border-slate-700 bg-slate-800 p-3 text-slate-100">
+    <li className="min-w-0 rounded-xl border border-solid border-slate-700 bg-slate-800 p-3 text-slate-100">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xl font-bold tracking-tight text-slate-50">
@@ -70,15 +70,15 @@ export function EstimatedPersonalWeightRecordCard({
   return (
     <li
       data-estimated-weigh-in=""
-      className="min-w-0 rounded-xl border border-dashed border-slate-500/50 bg-slate-800/20 p-3"
+      className="min-w-0 rounded-xl border border-dashed border-slate-700 bg-slate-800 p-3 text-slate-100"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <span className="mb-1 inline-flex text-[10px] font-semibold tracking-wide text-slate-400">
             Estimated
           </span>
-          <p className="text-xl font-bold tracking-tight text-slate-300">
-            {formatPersonalWeight(weightKg)}
+          <p className="text-xl font-normal tracking-tight text-slate-100">
+            ≈ {formatPersonalWeight(weightKg)}
           </p>
           <time className="mt-1 block text-sm text-slate-400" dateTime={date}>
             {formatChartDate(date)}

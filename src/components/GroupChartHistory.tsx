@@ -827,15 +827,16 @@ export function GroupChartHistory({
                                       <div
                                         data-record-estimate=""
                                         data-estimate-date={point.date}
-                                        className="flex min-w-0 flex-col items-center gap-1 rounded-xl border border-dashed border-slate-500/50 bg-slate-800/20 p-2 text-center"
+                                        className="flex min-w-0 flex-col items-center gap-1 rounded-xl border border-dashed border-slate-700 bg-slate-800 p-2 text-center"
                                       >
                                         <span className="text-[10px] font-semibold tracking-wide text-slate-400">
                                           Estimated
                                         </span>
                                         <WeightEntryCard
                                           weightKg={point.weightKg}
-                                          className="!h-10 !w-full !justify-center !border-dashed !border-slate-500/50 min-w-[124px] bg-slate-900/40 pointer-coarse:min-w-[148px]"
-                                          valueClassName="text-slate-300"
+                                          className="!h-10 !w-full !justify-center !border-dashed !border-slate-700 min-w-[124px] bg-slate-900 pointer-coarse:min-w-[148px]"
+                                          valuePrefix="≈"
+                                          valueClassName="font-normal text-slate-100"
                                           valueSizeClassName="text-[11.5px]"
                                           valueFontScale={68}
                                         />
@@ -907,15 +908,15 @@ export function GroupChartHistory({
                                             weightKg={point.weightKg}
                                             className={
                                               view === 'records'
-                                                ? 'record-weight-box !w-full !justify-center !border-slate-700 min-w-[124px] bg-slate-900 pointer-coarse:min-w-[148px]'
+                                                ? 'record-weight-box !w-full !justify-center !border-solid !border-slate-700 min-w-[124px] bg-slate-900 pointer-coarse:min-w-[148px]'
                                                 : undefined
                                             }
                                             valueClassName={
                                               view === 'records'
-                                                ? sharedChangeColor(
+                                                ? `font-bold ${sharedChangeColor(
                                                     point.previousSharedChangeKg,
                                                     true,
-                                                  )
+                                                  )}`
                                                 : undefined
                                             }
                                             valueSizeClassName={

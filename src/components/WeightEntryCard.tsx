@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 /** Shared compact weight label; actual rendered controls determine editable sizing. */
 export function WeightEntryCard({
   weightKg,
+  valuePrefix = '',
   children,
   className = '',
   valueClassName = '',
@@ -10,6 +11,7 @@ export function WeightEntryCard({
   valueFontScale = 60,
 }: {
   weightKg: number
+  valuePrefix?: string
   children?: ReactNode
   className?: string
   valueClassName?: string
@@ -25,6 +27,7 @@ export function WeightEntryCard({
         className={`inline-flex shrink-0 items-baseline justify-end gap-0.5 whitespace-nowrap text-[10px] group-has-[button]/weight:w-[50px] ${valueClassName} ${valueSizeClassName}`}
         title={`${weightKg} kg`}
       >
+        {valuePrefix ? <span>{valuePrefix}</span> : null}
         <span
           className="text-right tabular-nums group-has-[button]/weight:w-9"
           style={
