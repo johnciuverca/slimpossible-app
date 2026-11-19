@@ -764,6 +764,7 @@ for (const layout of [
         elements.map((card) => {
           const bounds = card.getBoundingClientRect()
           const value = card.firstElementChild!
+          const number = value.querySelector('[data-weight-value]')!
           const valueBounds = value.getBoundingClientRect()
           const buttons = Array.from(card.querySelectorAll('button')).map(
             (button) => {
@@ -800,15 +801,13 @@ for (const layout of [
             leftPadding: valueBounds.left - bounds.left,
             rightPadding: bounds.right - valueBounds.right,
             unitRight: value.lastElementChild!.getBoundingClientRect().right,
-            numberFontSize: getComputedStyle(value.firstElementChild!).fontSize,
-            numberLength: value.firstElementChild!.textContent!.length,
-            numberWidth: value.firstElementChild!.getBoundingClientRect().width,
-            numberFits:
-              value.firstElementChild!.scrollWidth <=
-              value.firstElementChild!.clientWidth,
+            numberFontSize: getComputedStyle(number).fontSize,
+            numberLength: number.textContent!.length,
+            numberWidth: number.getBoundingClientRect().width,
+            numberFits: number.scrollWidth <= number.clientWidth,
             unitOffset:
               value.lastElementChild!.getBoundingClientRect().x - bounds.x,
-            numberAlign: getComputedStyle(value.firstElementChild!).textAlign,
+            numberAlign: getComputedStyle(number).textAlign,
             childCount: card.children.length,
             buttons,
           }
@@ -829,7 +828,7 @@ for (const layout of [
         expect(box.width).toBeLessThan(box.layoutWidth)
         expect(box.withinLayout).toBe(true)
         if (box.numberLength <= 6) {
-          expect(box.numberFontSize).toBe('11.5px')
+          expect(box.numberFontSize).toBe('12px')
         } else {
           expect(
             Number.parseFloat(box.numberFontSize) * box.numberLength,
@@ -840,7 +839,7 @@ for (const layout of [
         }
         expect(box.height).toBe(layout.hasTouch ? 48 : 40)
         if (box.buttons.length) {
-          expect(box.valueWidth).toBe(50)
+          expect(box.valueWidth).toBe(56)
           expect(box.numberWidth).toBeGreaterThan(33.9)
           expect(box.numberWidth).toBeLessThanOrEqual(36)
           expect(box.buttons[0].iconLeft - box.unitRight).toBeCloseTo(
@@ -2115,7 +2114,9 @@ for (const viewport of [
       matrix.getByRole('button', { name: /^(Edit weight|Delete)\b/ }),
     ).toHaveCount(2)
     await expect(matrix.getByText('88.50 kg', { exact: true })).toHaveCount(2)
-    await expect(matrix.locator('[data-record-estimate]')).toContainText('≈')
+    await expect(
+      matrix.locator('[data-record-estimate] [data-weight-marker="estimated"]'),
+    ).toHaveAttribute('aria-hidden', 'true')
     const ownReadonly = matrix
       .getByText('90.00 kg', { exact: true })
       .locator('xpath=..')
@@ -2184,8 +2185,10 @@ for (const viewport of [
     await editor.getByLabel('Weight in kg').fill('87')
     await editor.getByRole('button', { name: 'Update weight' }).click()
     await expect(matrix.getByText('87.00 kg', { exact: true })).toBeVisible()
-    await expect(matrix.getByText('88.50 kg', { exact: true })).toHaveCount(1)
-    await expect(matrix.locator('[data-record-estimate]')).toContainText('≈')
+    await expect(matrix.getByText('88.50 kg', { exact: true })).toHaveCount(2)
+    await expect(
+      matrix.locator('[data-record-estimate] [data-weight-marker="estimated"]'),
+    ).toHaveAttribute('aria-hidden', 'true')
     await expect(
       matrix.locator('[data-record-estimate] [title="88.5 kg"]'),
     ).toBeVisible()
@@ -4659,7 +4662,7 @@ for (const viewport of [
         .evaluateAll((values) =>
           values.map((value) => getComputedStyle(value).fontSize),
         )
-      expect(new Set(valueFontSizes)).toEqual(new Set(['11.5px']))
+      expect(new Set(valueFontSizes)).toEqual(new Set(['12px']))
       expect(new Set(comparisonFontSizes)).toEqual(new Set(['11.5px']))
       if (memberCount === 1 || memberCount === 4) {
         await page.screenshot({

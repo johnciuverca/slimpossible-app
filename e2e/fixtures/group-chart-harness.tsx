@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { GroupChartHistory } from '../../src/components/GroupChartHistory'
 import type { Persistence } from '../../src/data/persistence'
 import '../../src/index.css'
+const view = new URLSearchParams(window.location.search).get('view')
 const persistence = {
   mode: 'remote',
   repositories: {
@@ -62,6 +63,7 @@ createRoot(document.getElementById('root')!).render(
         viewerId="synthetic-viewer"
         persistence={persistence}
         refreshVersion={0}
+        view={view === 'records' ? 'records' : 'combined'}
       />
     </section>
   </main>,

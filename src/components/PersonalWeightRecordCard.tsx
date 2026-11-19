@@ -22,6 +22,11 @@ export function PersonalWeightRecordCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xl font-bold tracking-tight text-slate-50">
+            <span
+              aria-hidden="true"
+              data-weight-marker="actual"
+              className="mr-2 inline-block size-2.5 rounded-full bg-current align-middle"
+            />
             {formatPersonalWeight(entry.weightKg)}
           </p>
           <time
@@ -77,8 +82,13 @@ export function EstimatedPersonalWeightRecordCard({
           <span className="mb-1 inline-flex text-[10px] font-semibold tracking-wide text-slate-400">
             Estimated
           </span>
-          <p className="text-xl font-normal tracking-tight text-slate-100">
-            ≈ {formatPersonalWeight(weightKg)}
+          <p className="text-lg font-normal tracking-tight text-slate-100">
+            <span
+              aria-hidden="true"
+              data-weight-marker="estimated"
+              className="mr-2 inline-block size-2.5 rounded-full border border-current bg-transparent align-middle"
+            />
+            {formatPersonalWeight(weightKg)}
           </p>
           <time className="mt-1 block text-sm text-slate-400" dateTime={date}>
             {formatChartDate(date)}
