@@ -81,28 +81,17 @@ describe('PersonalWeighInsPage', () => {
       'font-normal',
       'text-slate-100',
     )
-    expect(
-      estimatedCard?.querySelector('[data-weight-marker="estimated"]'),
-    ).toHaveClass('border', 'bg-transparent')
-    expect(
-      estimatedCard?.querySelector('[data-weight-marker="estimated"]'),
-    ).toHaveAttribute('aria-hidden', 'true')
     const actualCard = screen.getByText('80 kg').closest('li')
     expect(actualCard).toHaveClass(
       'bg-slate-800',
       'border-solid',
       'border-slate-700',
     )
-    expect(actualCard?.querySelector('p.text-xl')).toHaveClass(
+    expect(actualCard?.querySelector('p.text-3xl')).toHaveClass(
       'font-bold',
+      'text-center',
       'text-slate-50',
     )
-    expect(
-      actualCard?.querySelector('[data-weight-marker="actual"]'),
-    ).toHaveClass('bg-current')
-    expect(
-      actualCard?.querySelector('[data-weight-marker="actual"]'),
-    ).toHaveAttribute('aria-hidden', 'true')
     expect(
       within(estimatedCard as HTMLElement).getByText('79.5 kg'),
     ).toBeInTheDocument()

@@ -61,12 +61,6 @@ describe('Group chart history', () => {
       'bg-slate-800',
     )
     expect(estimateCard).toHaveTextContent('89.25 kg')
-    expect(
-      estimateCard?.querySelector('[data-weight-marker="estimated"]'),
-    ).toHaveClass('border', 'bg-transparent')
-    expect(
-      estimateCard?.querySelector('[data-weight-marker="estimated"]'),
-    ).toHaveAttribute('aria-hidden', 'true')
     expect(estimateCard?.querySelector('[title="89.25 kg"]')).toHaveClass(
       'font-normal',
       'text-slate-100',
@@ -76,13 +70,8 @@ describe('Group chart history', () => {
       name: 'Shared group weight history',
     })
     const actualWeight = table.querySelector('[title="88.5 kg"]')
-    expect(actualWeight).toHaveClass('font-bold', 'text-[12px]')
-    expect(
-      actualWeight?.querySelector('[data-weight-marker="actual"]'),
-    ).toHaveClass('bg-current')
-    expect(
-      actualWeight?.querySelector('[data-weight-marker="actual"]'),
-    ).toHaveAttribute('aria-hidden', 'true')
+    expect(actualWeight).toHaveClass('font-bold', 'text-[18px]', 'text-center')
+    expect(actualWeight).toHaveAttribute('data-record-value', '')
     expect(actualWeight?.closest('.record-weight-box')).toHaveClass(
       '!border-solid',
       '!border-slate-700',

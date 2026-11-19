@@ -763,7 +763,7 @@ for (const layout of [
       const boxes = await cards.evaluateAll((elements) =>
         elements.map((card) => {
           const bounds = card.getBoundingClientRect()
-          const value = card.firstElementChild!
+          const value = card.querySelector('[data-record-value]')!
           const number = value.querySelector('[data-weight-value]')!
           const valueBounds = value.getBoundingClientRect()
           const buttons = Array.from(card.querySelectorAll('button')).map(
@@ -798,6 +798,9 @@ for (const layout of [
             fits: value.scrollWidth <= value.clientWidth,
             center: valueBounds.y + valueBounds.height / 2,
             valueWidth: valueBounds.width,
+            centerX: valueBounds.left + valueBounds.width / 2,
+            containerCenterX: bounds.left + bounds.width / 2,
+            valueBottom: valueBounds.bottom,
             leftPadding: valueBounds.left - bounds.left,
             rightPadding: bounds.right - valueBounds.right,
             unitRight: value.lastElementChild!.getBoundingClientRect().right,
@@ -828,35 +831,35 @@ for (const layout of [
         expect(box.width).toBeLessThan(box.layoutWidth)
         expect(box.withinLayout).toBe(true)
         if (box.numberLength <= 6) {
-          expect(box.numberFontSize).toBe('12px')
+          expect(box.numberFontSize).toBe('18px')
         } else {
           expect(
             Number.parseFloat(box.numberFontSize) * box.numberLength,
-          ).toBeCloseTo(68, 1)
+          ).toBeCloseTo(126, 1)
         }
         if (!box.buttons.length) {
           expect(box.childCount).toBe(2)
         }
-        expect(box.height).toBe(layout.hasTouch ? 48 : 40)
+        expect(box.height).toBeGreaterThanOrEqual(layout.hasTouch ? 80 : 72)
         if (box.buttons.length) {
-          expect(box.valueWidth).toBe(56)
-          expect(box.numberWidth).toBeGreaterThan(33.9)
-          expect(box.numberWidth).toBeLessThanOrEqual(36)
-          expect(box.buttons[0].iconLeft - box.unitRight).toBeCloseTo(
-            box.buttons[1].iconLeft - box.buttons[0].iconRight,
-            1,
-          )
+          expect(box.centerX).toBeCloseTo(box.containerCenterX, 1)
+          expect(box.numberWidth).toBeGreaterThan(35)
+          expect(box.valueWidth).toBeGreaterThan(box.numberWidth)
+          expect(box.buttons[0].center).toBeGreaterThan(box.valueBottom)
+          expect(
+            box.buttons[1].offset + box.buttons[1].width,
+          ).toBeLessThanOrEqual(box.width)
+          expect(box.buttons[0].center).toBeCloseTo(box.buttons[1].center, 1)
         }
         expect(box.numberFits).toBe(true)
-        expect(box.numberAlign).toBe('right')
-        expect(box.fits, `${box.value} fits the compact value area`).toBe(true)
+        expect(box.numberAlign).toBe('center')
+        expect(box.fits, `${box.value} fits the centered value area`).toBe(true)
         for (const button of box.buttons) {
           expect(button.iconInsideTarget).toBe(true)
           expect(button.width).toBe(layout.hasTouch ? 44 : 32)
           expect(button.height).toBeGreaterThanOrEqual(
             layout.hasTouch ? 44 : 32,
           )
-          expect(Math.abs(button.center - box.center)).toBeLessThan(1)
         }
       }
       const own = boxes.filter((box) => box.buttons.length > 0)
@@ -2114,33 +2117,30 @@ for (const viewport of [
       matrix.getByRole('button', { name: /^(Edit weight|Delete)\b/ }),
     ).toHaveCount(2)
     await expect(matrix.getByText('88.50 kg', { exact: true })).toHaveCount(2)
-    await expect(
-      matrix.locator('[data-record-estimate] [data-weight-marker="estimated"]'),
-    ).toHaveAttribute('aria-hidden', 'true')
+    await expect(matrix.locator('[data-weight-marker]')).toHaveCount(0)
     const ownReadonly = matrix
       .getByText('90.00 kg', { exact: true })
       .locator('xpath=..')
     await expect(ownReadonly.getByRole('button')).toHaveCount(0)
     expect((await ownReadonly.boundingBox())!.width).toBeGreaterThan(100)
-    const card = edit.locator('xpath=../..')
-    const value = card.getByText('88.50 kg', { exact: true })
+    const card = edit.locator('xpath=../../..')
+    const value = card.locator('[data-record-value]')
     const valueBox = (await value.boundingBox())!
     const editBox = (await edit.boundingBox())!
     const deleteBox = (await remove.boundingBox())!
     const cardBox = (await card.boundingBox())!
-    expect(editBox.x).toBeGreaterThanOrEqual(valueBox.x + valueBox.width)
+    expect(valueBox.x + valueBox.width / 2).toBeCloseTo(
+      cardBox.x + cardBox.width / 2,
+      1,
+    )
     expect(deleteBox.x).toBeGreaterThanOrEqual(editBox.x + editBox.width)
-    expect(
-      Math.abs(
-        valueBox.y + valueBox.height / 2 - editBox.y - editBox.height / 2,
-      ),
-    ).toBeLessThan(1)
+    expect(editBox.y).toBeGreaterThanOrEqual(valueBox.y + valueBox.height)
     expect(
       Math.abs(
         editBox.y + editBox.height / 2 - deleteBox.y - deleteBox.height / 2,
       ),
     ).toBeLessThan(1)
-    expect(cardBox.height).toBeLessThanOrEqual(50)
+    expect(cardBox.height).toBeGreaterThanOrEqual(72)
     expect(editBox.width).toBeGreaterThanOrEqual(32)
     expect(deleteBox.width).toBeGreaterThanOrEqual(32)
     await edit.focus()
@@ -2186,9 +2186,7 @@ for (const viewport of [
     await editor.getByRole('button', { name: 'Update weight' }).click()
     await expect(matrix.getByText('87.00 kg', { exact: true })).toBeVisible()
     await expect(matrix.getByText('88.50 kg', { exact: true })).toHaveCount(2)
-    await expect(
-      matrix.locator('[data-record-estimate] [data-weight-marker="estimated"]'),
-    ).toHaveAttribute('aria-hidden', 'true')
+    await expect(matrix.locator('[data-weight-marker]')).toHaveCount(0)
     await expect(
       matrix.locator('[data-record-estimate] [title="88.5 kg"]'),
     ).toBeVisible()
@@ -4662,7 +4660,7 @@ for (const viewport of [
         .evaluateAll((values) =>
           values.map((value) => getComputedStyle(value).fontSize),
         )
-      expect(new Set(valueFontSizes)).toEqual(new Set(['12px']))
+      expect(new Set(valueFontSizes)).toEqual(new Set(['18px']))
       expect(new Set(comparisonFontSizes)).toEqual(new Set(['11.5px']))
       if (memberCount === 1 || memberCount === 4) {
         await page.screenshot({

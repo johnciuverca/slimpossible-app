@@ -834,7 +834,6 @@ export function GroupChartHistory({
                                         </span>
                                         <WeightEntryCard
                                           weightKg={point.weightKg}
-                                          valueMarker="estimated"
                                           className="!h-10 !w-full !justify-center !border-dashed !border-slate-700 min-w-[124px] bg-slate-900 pointer-coarse:min-w-[148px]"
                                           valueClassName="font-normal text-slate-100"
                                           valueSizeClassName="text-[11px]"
@@ -906,11 +905,7 @@ export function GroupChartHistory({
                                           ) : null}
                                           <WeightEntryCard
                                             weightKg={point.weightKg}
-                                            valueMarker={
-                                              view === 'records'
-                                                ? 'actual'
-                                                : undefined
-                                            }
+                                            centerValue={view === 'records'}
                                             className={
                                               view === 'records'
                                                 ? 'record-weight-box !w-full !justify-center !border-solid !border-slate-700 min-w-[124px] bg-slate-900 pointer-coarse:min-w-[148px]'
@@ -926,12 +921,12 @@ export function GroupChartHistory({
                                             }
                                             valueSizeClassName={
                                               view === 'records'
-                                                ? 'text-[12px]'
+                                                ? 'text-[18px]'
                                                 : undefined
                                             }
                                             valueFontScale={
                                               view === 'records'
-                                                ? 68
+                                                ? 126
                                                 : undefined
                                             }
                                           >
