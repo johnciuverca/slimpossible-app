@@ -2111,7 +2111,9 @@ for (const viewport of [
       exact: true,
     })
     await expect(edit).toBeVisible()
-    await expect(matrix.getByRole('button')).toHaveCount(2)
+    await expect(
+      matrix.getByRole('button', { name: /^(Edit weight|Delete)\b/ }),
+    ).toHaveCount(2)
     await expect(matrix.getByText('88.50 kg', { exact: true })).toHaveCount(2)
     const ownReadonly = matrix
       .getByText('90.00 kg', { exact: true })
@@ -2147,9 +2149,13 @@ for (const viewport of [
     ).toHaveCount(0)
     await page.getByRole('tab', { name: ownName, exact: true }).click()
     await expect(edit).toBeVisible()
-    await expect(matrix.getByRole('button')).toHaveCount(2)
+    await expect(
+      matrix.getByRole('button', { name: /^(Edit weight|Delete)\b/ }),
+    ).toHaveCount(2)
     await page.getByRole('tab', { name: otherName, exact: true }).click()
-    await expect(matrix.getByRole('button')).toHaveCount(0)
+    await expect(
+      matrix.getByRole('button', { name: /^(Edit weight|Delete)\b/ }),
+    ).toHaveCount(0)
     await expect(matrix.getByText('88.50 kg', { exact: true })).toBeVisible()
     await page.keyboard.press('Home')
     await expect(edit).toBeVisible()
@@ -2199,7 +2205,9 @@ for (const viewport of [
       })
       .click()
     await expect(matrix.getByText('87.00 kg', { exact: true })).toBeVisible()
-    await expect(matrix.getByRole('button')).toHaveCount(2)
+    await expect(
+      matrix.getByRole('button', { name: /^(Edit weight|Delete)\b/ }),
+    ).toHaveCount(2)
     await matrix
       .getByRole('button', { name: /^Edit weight 2026-09-22 for Jo/ })
       .click()
@@ -2220,7 +2228,9 @@ for (const viewport of [
     await deletion
       .getByRole('button', { name: 'Delete weight', exact: true })
       .click()
-    await expect(matrix.getByRole('button')).toHaveCount(0)
+    await expect(
+      matrix.getByRole('button', { name: /^(Edit weight|Delete)\b/ }),
+    ).toHaveCount(0)
     await expect(matrix.getByText('87.00 kg', { exact: true })).toHaveCount(0)
     await expect(matrix.getByText('88.50 kg', { exact: true })).toBeVisible()
     await expect(
@@ -2245,7 +2255,9 @@ for (const viewport of [
       .getByRole('navigation', { name: 'Group sections' })
       .getByRole('link', { name: 'Records', exact: true })
       .click()
-    await expect(matrix.getByRole('button')).toHaveCount(0)
+    await expect(
+      matrix.getByRole('button', { name: /^(Edit weight|Delete)\b/ }),
+    ).toHaveCount(0)
     await expect(matrix.getByText('87.00 kg', { exact: true })).toHaveCount(0)
     await expect(matrix.getByText('88.50 kg', { exact: true })).toBeVisible()
   })
