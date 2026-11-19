@@ -2115,6 +2115,7 @@ for (const viewport of [
       matrix.getByRole('button', { name: /^(Edit weight|Delete)\b/ }),
     ).toHaveCount(2)
     await expect(matrix.getByText('88.50 kg', { exact: true })).toHaveCount(2)
+    await expect(matrix.locator('[data-record-estimate]')).toContainText('≈')
     const ownReadonly = matrix
       .getByText('90.00 kg', { exact: true })
       .locator('xpath=..')
@@ -2183,11 +2184,10 @@ for (const viewport of [
     await editor.getByLabel('Weight in kg').fill('87')
     await editor.getByRole('button', { name: 'Update weight' }).click()
     await expect(matrix.getByText('87.00 kg', { exact: true })).toBeVisible()
-    await expect(matrix.getByText('88.50 kg', { exact: true })).toHaveCount(2)
+    await expect(matrix.getByText('88.50 kg', { exact: true })).toHaveCount(1)
+    await expect(matrix.locator('[data-record-estimate]')).toContainText('≈')
     await expect(
-      matrix.locator('[data-record-estimate]').getByText('88.50 kg', {
-        exact: true,
-      }),
+      matrix.locator('[data-record-estimate] [title="88.5 kg"]'),
     ).toBeVisible()
     await expect(
       page.getByRole('button', { name: 'Record weight', exact: true }),
