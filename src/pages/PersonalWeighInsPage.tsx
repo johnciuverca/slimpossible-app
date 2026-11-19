@@ -3,7 +3,10 @@ import { Link } from 'react-router-dom'
 
 import { Button, Card, PageHeader, StatusPill } from '../components/ui'
 import { WeightPageHeader } from '../components/WeightPageHeader'
-import { PersonalWeightRecordCard } from '../components/PersonalWeightRecordCard'
+import {
+  EstimatedPersonalWeightRecordCard,
+  PersonalWeightRecordCard,
+} from '../components/PersonalWeightRecordCard'
 import { DeleteWeightDialog } from '../components/DeleteWeightDialog'
 import { usePersonalWorkspace } from '../data/usePersonalWorkspace'
 import { notifyPersonalWeightChange } from '../data/personalWeightChanges'
@@ -17,6 +20,10 @@ import type { Challenge } from '../models/challenge'
 import { isEligibleSharingGroup } from '../models/groupSharingEligibility'
 import { participantFixture } from '../models/fixtures'
 import type { PersonalWeighIn } from '../models/personalWeighIn'
+import {
+  estimatedHistoryDatePage,
+  interpolateMissingWeightsForDates,
+} from '../models/estimatedWeighIns'
 import {
   personalWeighInToday,
   parsePersonalWeighInWeight,
@@ -60,9 +67,28 @@ export function PersonalWeighInsPage() {
   const [submitError, setSubmitError] = useState('')
   const [sharesWarning, setSharesWarning] = useState('')
   const [success, setSuccess] = useState('')
+  const [estimateNotice, setEstimateNotice] = useState('')
+  const [historyPageIndex, setHistoryPageIndex] = useState(0)
   const editorRegion = useRef<HTMLDivElement>(null)
   const draftChanged = useRef(false)
   const [focusRevision, setFocusRevision] = useState(0)
+  const historyPage = useMemo(
+    () => estimatedHistoryDatePage(entries, historyPageIndex),
+    [entries, historyPageIndex],
+  )
+  const actualByDate = useMemo(
+    () => new Map(entries.map((entry) => [entry.date, entry])),
+    [entries],
+  )
+  const estimatedByDate = useMemo(
+    () =>
+      new Map(
+        interpolateMissingWeightsForDates(entries, historyPage.dates).map(
+          (entry) => [entry.date, entry],
+        ),
+      ),
+    [entries, historyPage.dates],
+  )
   useEffect(() => {
     if (!focusRevision) return
     editorRegion.current?.scrollIntoView?.({
@@ -89,6 +115,8 @@ export function PersonalWeighInsPage() {
     setSubmitError('')
     setSharesWarning('')
     setSuccess('')
+    setEstimateNotice('')
+    setHistoryPageIndex(0)
 
     async function load() {
       if (persistence.mode === 'unavailable') {
@@ -161,6 +189,7 @@ export function PersonalWeighInsPage() {
       (id) => !eligibleIds.has(id),
     )
     setEditingId(entry.id)
+    setEstimateNotice('')
     setFocusRevision((value) => value + 1)
     draftChanged.current = false
     setValues({
@@ -191,11 +220,31 @@ export function PersonalWeighInsPage() {
   function cancelEditing() {
     draftChanged.current = false
     setEditingId(null)
+    setEstimateNotice('')
     setValues(emptyForm)
     setErrors({})
     setSubmitError('')
     setSharesWarning('')
     setSuccess('')
+  }
+
+  function startEstimate(estimate: { date: string; weightKg: number }) {
+    draftChanged.current = true
+    setEditingId(null)
+    setValues({
+      date: estimate.date,
+      note: '',
+      sharedChallengeIds: [],
+      weightKg: String(estimate.weightKg),
+    })
+    setErrors({})
+    setSubmitError('')
+    setSharesWarning('')
+    setSuccess('')
+    setEstimateNotice(
+      'Estimated from your surrounding saved weigh-ins. Saving adds a real weigh-in; no groups are selected.',
+    )
+    setFocusRevision((value) => value + 1)
   }
 
   function recordWeight() {
@@ -305,6 +354,8 @@ export function PersonalWeighInsPage() {
         ? 'Personal weigh-in saved.'
         : 'Personal weigh-in saved in this browser.',
     )
+    setEstimateNotice('')
+    setEstimateNotice('')
   }
 
   return (
@@ -343,6 +394,11 @@ export function PersonalWeighInsPage() {
             {groupsError ? (
               <p className="mb-4 text-sm text-amber-800" role="status">
                 {groupsError}
+              </p>
+            ) : null}
+            {estimateNotice ? (
+              <p className="mb-4 text-sm text-ink-muted" role="status">
+                {estimateNotice}
               </p>
             ) : null}
             {loadError ? (
@@ -417,25 +473,65 @@ export function PersonalWeighInsPage() {
               aria-label="Personal weigh-in history"
               className="mt-4 space-y-2"
             >
-              {[...entries]
-                .sort((a, b) => b.date.localeCompare(a.date))
-                .map((entry) => (
-                  <PersonalWeightRecordCard
-                    key={entry.id}
-                    entry={entry}
-                    groupName={(id) =>
-                      groups.find((group) => group.id === id)?.name ??
-                      'an unavailable group'
-                    }
-                    onEdit={() => startEditing(entry)}
-                    onDelete={() =>
-                      setDeleteTarget({ key: workspace.ownerKey, entry })
-                    }
-                    disabled={isSaving}
+              {historyPage.dates.map((date) => {
+                const entry = actualByDate.get(date)
+                if (entry)
+                  return (
+                    <PersonalWeightRecordCard
+                      key={entry.id}
+                      entry={entry}
+                      groupName={(id) =>
+                        groups.find((group) => group.id === id)?.name ??
+                        'an unavailable group'
+                      }
+                      onEdit={() => startEditing(entry)}
+                      onDelete={() =>
+                        setDeleteTarget({ key: workspace.ownerKey, entry })
+                      }
+                      disabled={isSaving}
+                    />
+                  )
+                const estimate = estimatedByDate.get(date)
+                return estimate ? (
+                  <EstimatedPersonalWeightRecordCard
+                    key={`estimated:${date}`}
+                    date={date}
+                    weightKg={estimate.weightKg}
+                    onRecord={() => startEstimate(estimate)}
                   />
-                ))}
+                ) : null
+              })}
             </ul>
           )}
+          {!isLoading && historyPage.pageCount > 1 ? (
+            <nav
+              aria-label="Personal weigh-in history pages"
+              className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3"
+            >
+              <button
+                type="button"
+                disabled={historyPage.pageIndex === 0}
+                onClick={() =>
+                  setHistoryPageIndex((page) => Math.max(0, page - 1))
+                }
+                className="min-h-11 rounded-lg border border-line px-3 text-sm font-semibold text-forest-800 disabled:opacity-50"
+              >
+                Newer dates
+              </button>
+              <span className="text-xs text-ink-muted" aria-live="polite">
+                Dates {historyPage.firstPosition}–{historyPage.lastPosition} of{' '}
+                {historyPage.totalDates} · newest first
+              </span>
+              <button
+                type="button"
+                disabled={historyPage.pageIndex >= historyPage.pageCount - 1}
+                onClick={() => setHistoryPageIndex((page) => page + 1)}
+                className="min-h-11 rounded-lg border border-line px-3 text-sm font-semibold text-forest-800 disabled:opacity-50"
+              >
+                Older dates
+              </button>
+            </nav>
+          ) : null}
         </Card>
       </div>
 

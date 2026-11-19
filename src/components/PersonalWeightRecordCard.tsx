@@ -58,6 +58,45 @@ export function PersonalWeightRecordCard({
   )
 }
 
+export function EstimatedPersonalWeightRecordCard({
+  date,
+  weightKg,
+  onRecord,
+}: {
+  date: string
+  weightKg: number
+  onRecord: () => void
+}) {
+  return (
+    <li
+      data-estimated-weigh-in=""
+      className="min-w-0 rounded-xl border border-dashed border-line bg-panel p-3"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xl font-bold tracking-tight text-ink-muted">
+            {formatPersonalWeight(weightKg)}
+          </p>
+          <time className="mt-1 block text-sm text-ink-muted" dateTime={date}>
+            {formatChartDate(date)}
+          </time>
+          <p className="mt-2 text-xs font-semibold text-ink-muted">
+            Estimated · not saved
+          </p>
+        </div>
+        <button
+          type="button"
+          aria-label={`Record estimated weight ${formatPersonalWeight(weightKg)} on ${date}`}
+          onClick={onRecord}
+          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-line bg-page px-3 text-sm font-semibold text-forest-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700"
+        >
+          Record weight
+        </button>
+      </div>
+    </li>
+  )
+}
+
 export function PersonalWeightRecordActions({
   entry,
   onEdit,

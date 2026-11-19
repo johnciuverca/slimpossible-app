@@ -5,7 +5,6 @@ import { ownGroupMemberKey } from '../models/ownGroupMemberKey'
 import { WeightEntryActions } from './WeightEntryActions'
 import {
   createGroupChartHistory,
-  createGroupHistoryMatrix,
   type GroupChartEntry,
 } from '../models/groupChartHistory'
 import { localDateOnly } from '../models/provisionalGroupLeader'
@@ -17,7 +16,11 @@ import { createGroupMemberChartColorMap } from '../models/groupMemberChartColors
 import { SharedWeightChart } from './SharedWeightChart'
 import { GroupParticipantAvatar } from './GroupParticipantAvatar'
 import { sharedChartTheme } from './sharedChartTheme'
-import { interpolateMissingWeights } from '../models/estimatedWeighIns'
+import {
+  estimatedHistoryDatePageForSeries,
+  interpolateMissingWeights,
+  interpolateMissingWeightsForDates,
+} from '../models/estimatedWeighIns'
 import {
   ChartWeightPointEditor,
   type ChartWeightPointSelection,
@@ -93,6 +96,7 @@ export function GroupChartHistory({
   const [chartAction, setChartAction] = useState<
     (ChartWeightPointSelection & { context: string }) | null
   >(null)
+  const [recordPageIndex, setRecordPageIndex] = useState(0)
   const activeChartAction =
     chartAction?.context === context ? chartAction : null
   useEffect(() => {
@@ -140,7 +144,38 @@ export function GroupChartHistory({
   const selectedIndex = choices.findIndex(
     (member) => member.memberKey === selectedKey,
   )
-  const matrix = createGroupHistoryMatrix(series)
+  const recordPage = estimatedHistoryDatePageForSeries(
+    series.map((member) => member.points),
+    recordPageIndex,
+  )
+  const actualPointsByMember = series.map(
+    ({ points }) => new Map(points.map((point) => [point.date, point])),
+  )
+  const estimatedPointsByMember = series.map(
+    ({ points }) =>
+      new Map(
+        interpolateMissingWeightsForDates(points, recordPage.dates).map(
+          (point) => [point.date, point],
+        ),
+      ),
+  )
+  const matrix = recordPage.dates.map((date) => ({
+    date,
+    cells: series.map((member, index) => {
+      const actual = actualPointsByMember[index].get(date)
+      if (actual) return { ...actual, estimated: false as const }
+      const estimate = estimatedPointsByMember[index].get(date)
+      return estimate
+        ? {
+            date,
+            displayName: member.label,
+            memberKey: member.memberKey,
+            weightKg: estimate.weightKg,
+            estimated: true as const,
+          }
+        : null
+    }),
+  }))
   const avatarByMemberKey = new Map(
     memberProgress.map((member) => [member.memberKey, member]),
   )
@@ -162,6 +197,13 @@ export function GroupChartHistory({
       setSelection({ context, memberKey: '' })
     }
   }, [data, context, selection])
+  useEffect(() => {
+    setRecordPageIndex(0)
+  }, [context, selectedKey])
+  useEffect(() => {
+    if (recordPage.pageIndex !== recordPageIndex)
+      setRecordPageIndex(recordPage.pageIndex)
+  }, [recordPage.pageIndex, recordPageIndex])
   useEffect(() => {
     const element = navigationRef.current
     if (!element) return
@@ -366,7 +408,7 @@ export function GroupChartHistory({
                       <SharedWeightChart
                         compactOlderHistory={!selectedKey}
                         title="Weight (kg) — shared group history"
-                        description={`Each member is plotted at their actual shared weight in kilograms. ${selectedKey ? 'Points represent shared dates; lines connect only consecutive days.' : 'The latest 7 calendar dates stay detailed. Larger older points show Monday–Sunday averages of actual shared records; activate them to expand daily points.'}${compactOverview ? '' : ' The Records tab provides every exact recorded weight.'}`}
+                        description={`Each member is plotted at their actual shared weight in kilograms. ${selectedKey ? 'Points represent shared dates; lines connect only consecutive days.' : 'The latest 7 calendar dates stay detailed. Larger older points show Monday–Sunday averages of actual shared records; activate them to expand daily points.'}${compactOverview ? '' : ' The Records tab provides exact shared weights and labels estimates between them.'}`}
                         yLabel="Weight (kg)"
                         min={min}
                         max={max}
@@ -504,7 +546,8 @@ export function GroupChartHistory({
                           Each member is plotted at their actual shared weight
                           in kilograms. Points represent shared dates; lines
                           connect only consecutive days. The Records tab
-                          provides every exact recorded weight.
+                          provides exact shared weights and labels estimates
+                          between them.
                         </desc>
                         <text x={plotLeft} y={14} fontSize={12}>
                           Weight (kg)
@@ -702,145 +745,100 @@ export function GroupChartHistory({
                   </>
                 ) : null}
                 {showRecords ? (
-                  <div
-                    role="region"
-                    aria-label="Scrollable shared group weights"
-                    tabIndex={0}
-                    className="relative isolate mt-5 max-h-[28rem] overflow-auto rounded-xl border border-stone-200 focus-visible:outline-2 focus-visible:outline-emerald-700"
-                  >
-                    <table
-                      aria-label="Shared group weight history"
-                      className="group-history-table table-fixed border-collapse text-left text-xs"
-                      style={{
-                        width: '100%',
-                        minWidth: `max(100%, ${120 + series.length * 236}px)`,
-                      }}
+                  <>
+                    <div
+                      role="region"
+                      aria-label="Scrollable shared group weights"
+                      tabIndex={0}
+                      className="relative isolate mt-5 max-h-[28rem] overflow-auto rounded-xl border border-stone-200 focus-visible:outline-2 focus-visible:outline-emerald-700"
                     >
-                      <colgroup>
-                        <col style={{ width: 120 }} />
-                        {series.map((member) => (
-                          <col key={member.memberKey} />
-                        ))}
-                      </colgroup>
-                      <caption className="p-3 text-left font-semibold">
-                        Exact shared weights (kg). A dash means no shared entry.
-                      </caption>
-                      <thead className="bg-stone-50">
-                        <tr>
-                          <th
-                            scope="col"
-                            aria-label="Recorded date"
-                            className="sticky left-0 top-0 z-30 bg-stone-50 px-2 py-2"
-                          >
-                            Date
-                          </th>
+                      <table
+                        aria-label="Shared group weight history"
+                        className="group-history-table table-fixed border-collapse text-left text-xs"
+                        style={{
+                          width: '100%',
+                          minWidth: `max(100%, ${120 + series.length * 236}px)`,
+                        }}
+                      >
+                        <colgroup>
+                          <col style={{ width: 120 }} />
                           {series.map((member) => (
-                            <th
-                              key={member.memberKey}
-                              scope="col"
-                              className="sticky top-0 z-20 break-words bg-stone-50 px-1 py-2 text-center align-middle"
-                            >
-                              <button
-                                type="button"
-                                aria-label={`Show Records for ${member.label}`}
-                                aria-pressed={selectedKey === member.memberKey}
-                                className="inline-flex min-h-11 items-center justify-center rounded px-1 text-[0.875rem] font-semibold text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
-                                onClick={() =>
-                                  setSelection({
-                                    context,
-                                    memberKey: member.memberKey,
-                                  })
-                                }
-                              >
-                                {member.label} (kg)
-                              </button>
-                            </th>
+                            <col key={member.memberKey} />
                           ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-stone-200">
-                        {matrix.map((row) => (
-                          <tr key={row.date}>
+                        </colgroup>
+                        <caption className="p-3 text-left font-semibold">
+                          Shared weights (kg). Dashed cards are estimates;
+                          dashes mean no shared value is available.
+                        </caption>
+                        <thead className="bg-stone-50">
+                          <tr>
                             <th
-                              scope="row"
-                              aria-label={row.date}
-                              className="sticky left-0 z-10 whitespace-nowrap bg-white px-2 py-1 font-medium"
+                              scope="col"
+                              aria-label="Recorded date"
+                              className="sticky left-0 top-0 z-30 bg-stone-50 px-2 py-2"
                             >
-                              <time dateTime={row.date} title={row.date}>
-                                {row.date}
-                              </time>
+                              Date
                             </th>
-                            {row.cells.map((point, index) => (
-                              <td
-                                key={series[index].memberKey}
-                                className="relative z-0 px-1 py-1"
+                            {series.map((member) => (
+                              <th
+                                key={member.memberKey}
+                                scope="col"
+                                className="sticky top-0 z-20 break-words bg-stone-50 px-1 py-2 text-center align-middle"
                               >
-                                {point ? (
-                                  <div
-                                    data-record-pair={
-                                      view === 'records' ? '' : undefined
-                                    }
-                                    className={
-                                      view === 'records'
-                                        ? 'w-full rounded-xl border border-line bg-panel p-1'
-                                        : 'contents'
-                                    }
-                                  >
-                                    <div
-                                      data-record-pair-layout={
-                                        view === 'records' ? '' : undefined
-                                      }
-                                      className={
-                                        view === 'records'
-                                          ? 'grid w-full grid-cols-[minmax(64px,0.7fr)_minmax(124px,2fr)] items-stretch gap-1 pointer-coarse:grid-cols-[minmax(64px,0.7fr)_minmax(148px,2fr)]'
-                                          : 'contents'
-                                      }
-                                    >
-                                      {view === 'records' ? (
-                                        <div
-                                          data-record-comparison
-                                          className="flex min-h-10 min-w-0 items-center justify-center rounded-lg border border-line bg-page px-1 text-center text-[11.5px] pointer-coarse:min-h-12"
-                                        >
-                                          <span
-                                            className={`whitespace-nowrap ${sharedChangeColor(point.previousSharedChangeKg, true)}`}
-                                          >
-                                            {point.previousSharedChangeKg ===
-                                            null
-                                              ? '—'
-                                              : signed(
-                                                  point.previousSharedChangeKg,
-                                                )}
-                                          </span>
-                                        </div>
-                                      ) : null}
-                                      <WeightEntryCard
-                                        weightKg={point.weightKg}
-                                        className={
-                                          view === 'records'
-                                            ? 'record-weight-box !w-full !justify-center min-w-[124px] pointer-coarse:min-w-[148px]'
-                                            : undefined
-                                        }
-                                        valueClassName={
-                                          view === 'records'
-                                            ? sharedChangeColor(
-                                                point.previousSharedChangeKg,
-                                                true,
-                                              )
-                                            : undefined
-                                        }
-                                        valueSizeClassName={
-                                          view === 'records'
-                                            ? 'text-[11.5px]'
-                                            : undefined
-                                        }
-                                        valueFontScale={
-                                          view === 'records' ? 68 : undefined
-                                        }
+                                <button
+                                  type="button"
+                                  aria-label={`Show Records for ${member.label}`}
+                                  aria-pressed={
+                                    selectedKey === member.memberKey
+                                  }
+                                  className="inline-flex min-h-11 items-center justify-center rounded px-1 text-[0.875rem] font-semibold text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+                                  onClick={() =>
+                                    setSelection({
+                                      context,
+                                      memberKey: member.memberKey,
+                                    })
+                                  }
+                                >
+                                  {member.label} (kg)
+                                </button>
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-stone-200">
+                          {matrix.map((row) => (
+                            <tr key={row.date}>
+                              <th
+                                scope="row"
+                                aria-label={row.date}
+                                className="sticky left-0 z-10 whitespace-nowrap bg-white px-2 py-1 font-medium"
+                              >
+                                <time dateTime={row.date} title={row.date}>
+                                  {row.date}
+                                </time>
+                              </th>
+                              {row.cells.map((point, index) => (
+                                <td
+                                  key={series[index].memberKey}
+                                  className="relative z-0 px-1 py-1"
+                                >
+                                  {point ? (
+                                    point.estimated ? (
+                                      <div
+                                        data-record-estimate=""
+                                        data-estimate-date={point.date}
+                                        className="flex min-w-0 flex-col items-center gap-1 rounded-xl border border-dashed border-line bg-page p-2 text-center"
                                       >
-                                        <span className="sr-only">
-                                          ; change from first shared entry{' '}
-                                          {signed(point.changeKg)}
+                                        <span className="text-[10px] font-semibold text-ink-muted">
+                                          Estimated
                                         </span>
+                                        <WeightEntryCard
+                                          weightKg={point.weightKg}
+                                          className="!h-10 !w-full !justify-center !border-dashed min-w-[124px] bg-panel pointer-coarse:min-w-[148px]"
+                                          valueClassName="text-ink-muted"
+                                          valueSizeClassName="text-[11.5px]"
+                                          valueFontScale={68}
+                                        />
                                         {point.memberKey === ownMemberKey &&
                                         personalWorkspace.userId ===
                                           viewerId.toLowerCase() &&
@@ -850,31 +848,163 @@ export function GroupChartHistory({
                                           'ready' &&
                                         personalWorkspace.contexts.state ===
                                           'ready' ? (
-                                          <WeightEntryActions
-                                            key={`${personalWorkspace.ownerKey}:${challengeId}:${point.date}`}
-                                            workspace={personalWorkspace}
-                                            date={point.date}
-                                            compact
-                                            memberLabel={series[index].label}
-                                            recordsDeleteIcon
-                                            requiredSharedChallengeId={
-                                              challengeId
+                                          <button
+                                            type="button"
+                                            aria-label={`Record estimated weight ${point.weightKg} kg on ${point.date} for ${series[index].label}`}
+                                            className="min-h-11 w-full rounded-lg px-2 text-xs font-semibold text-forest-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+                                            onClick={() =>
+                                              setChartAction({
+                                                context,
+                                                date: point.date,
+                                                value: point.weightKg,
+                                                estimated: true,
+                                              })
                                             }
-                                          />
+                                          >
+                                            Record weight
+                                          </button>
                                         ) : null}
-                                      </WeightEntryCard>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <span aria-label="No shared entry">—</span>
-                                )}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                                      </div>
+                                    ) : (
+                                      <div
+                                        data-record-pair={
+                                          view === 'records' ? '' : undefined
+                                        }
+                                        className={
+                                          view === 'records'
+                                            ? 'w-full rounded-xl border border-line bg-panel p-1'
+                                            : 'contents'
+                                        }
+                                      >
+                                        <div
+                                          data-record-pair-layout={
+                                            view === 'records' ? '' : undefined
+                                          }
+                                          className={
+                                            view === 'records'
+                                              ? 'grid w-full grid-cols-[minmax(64px,0.7fr)_minmax(124px,2fr)] items-stretch gap-1 pointer-coarse:grid-cols-[minmax(64px,0.7fr)_minmax(148px,2fr)]'
+                                              : 'contents'
+                                          }
+                                        >
+                                          {view === 'records' ? (
+                                            <div
+                                              data-record-comparison
+                                              className="flex min-h-10 min-w-0 items-center justify-center rounded-lg border border-line bg-page px-1 text-center text-[11.5px] pointer-coarse:min-h-12"
+                                            >
+                                              <span
+                                                className={`whitespace-nowrap ${sharedChangeColor(point.previousSharedChangeKg, true)}`}
+                                              >
+                                                {point.previousSharedChangeKg ===
+                                                null
+                                                  ? '—'
+                                                  : signed(
+                                                      point.previousSharedChangeKg,
+                                                    )}
+                                              </span>
+                                            </div>
+                                          ) : null}
+                                          <WeightEntryCard
+                                            weightKg={point.weightKg}
+                                            className={
+                                              view === 'records'
+                                                ? 'record-weight-box !w-full !justify-center min-w-[124px] pointer-coarse:min-w-[148px]'
+                                                : undefined
+                                            }
+                                            valueClassName={
+                                              view === 'records'
+                                                ? sharedChangeColor(
+                                                    point.previousSharedChangeKg,
+                                                    true,
+                                                  )
+                                                : undefined
+                                            }
+                                            valueSizeClassName={
+                                              view === 'records'
+                                                ? 'text-[11.5px]'
+                                                : undefined
+                                            }
+                                            valueFontScale={
+                                              view === 'records'
+                                                ? 68
+                                                : undefined
+                                            }
+                                          >
+                                            <span className="sr-only">
+                                              ; change from first shared entry{' '}
+                                              {signed(point.changeKg)}
+                                            </span>
+                                            {point.memberKey === ownMemberKey &&
+                                            personalWorkspace.userId ===
+                                              viewerId.toLowerCase() &&
+                                            personalWorkspace.persistence
+                                              .mode === 'remote' &&
+                                            personalWorkspace.personal.state ===
+                                              'ready' &&
+                                            personalWorkspace.contexts.state ===
+                                              'ready' ? (
+                                              <WeightEntryActions
+                                                key={`${personalWorkspace.ownerKey}:${challengeId}:${point.date}`}
+                                                workspace={personalWorkspace}
+                                                date={point.date}
+                                                compact
+                                                memberLabel={
+                                                  series[index].label
+                                                }
+                                                recordsDeleteIcon
+                                                requiredSharedChallengeId={
+                                                  challengeId
+                                                }
+                                              />
+                                            ) : null}
+                                          </WeightEntryCard>
+                                        </div>
+                                      </div>
+                                    )
+                                  ) : (
+                                    <span aria-label="No shared entry">—</span>
+                                  )}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {recordPage.pageCount > 1 ? (
+                      <nav
+                        aria-label="Shared group weight history pages"
+                        className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm"
+                      >
+                        <button
+                          type="button"
+                          disabled={recordPage.pageIndex === 0}
+                          onClick={() =>
+                            setRecordPageIndex(recordPage.pageIndex - 1)
+                          }
+                          className="min-h-11 rounded-lg border border-line px-3 font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Newer dates
+                        </button>
+                        <span aria-live="polite" className="text-ink-muted">
+                          Dates {recordPage.firstPosition}–
+                          {recordPage.lastPosition} of {recordPage.totalDates}
+                          {' · '}newest first
+                        </span>
+                        <button
+                          type="button"
+                          disabled={
+                            recordPage.pageIndex >= recordPage.pageCount - 1
+                          }
+                          onClick={() =>
+                            setRecordPageIndex(recordPage.pageIndex + 1)
+                          }
+                          className="min-h-11 rounded-lg border border-line px-3 font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Older dates
+                        </button>
+                      </nav>
+                    ) : null}
+                  </>
                 ) : null}
               </>
             )}

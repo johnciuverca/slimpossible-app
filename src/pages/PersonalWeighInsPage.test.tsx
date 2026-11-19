@@ -44,6 +44,62 @@ function renderPage() {
 }
 
 describe('PersonalWeighInsPage', () => {
+  it('shows personal estimates and saves one as a private actual weigh-in', async () => {
+    const persistence = createPersistence({
+      status: 'signed-out',
+      error: null,
+      user: null,
+    })
+    if (persistence.mode !== 'local') throw new Error('Expected local mode')
+    const olderDate = dateOffset(-3)
+    const newerDate = dateOffset(-1)
+    await persistence.repositories.personalWeighIns.save('user-alex', {
+      date: olderDate,
+      weightKg: 80,
+      sharedChallengeIds: [],
+    })
+    await persistence.repositories.personalWeighIns.save('user-alex', {
+      date: newerDate,
+      weightKg: 79,
+      sharedChallengeIds: [],
+    })
+    vi.spyOn(persistenceModule, 'createPersistence').mockReturnValue(
+      persistence,
+    )
+    renderPage()
+
+    const estimate = await screen.findByText('Estimated · not saved')
+    const estimatedCard = estimate.closest('[data-estimated-weigh-in]')
+    expect(estimatedCard).toHaveAttribute('data-estimated-weigh-in', '')
+    expect(
+      within(estimatedCard as HTMLElement).getByText('79.5 kg'),
+    ).toBeInTheDocument()
+    fireEvent.click(
+      within(estimatedCard as HTMLElement).getByRole('button', {
+        name: new RegExp(`on ${dateOffset(-2)}`),
+      }),
+    )
+    expect(screen.getByLabelText('Date')).toHaveValue(dateOffset(-2))
+    expect(screen.getByLabelText('Weight in kg')).toHaveValue('79.5')
+    expect(screen.getByText(/no groups are selected/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Save weight' }))
+
+    await screen.findByText('Personal weigh-in saved in this browser.')
+    expect(
+      await persistence.repositories.personalWeighIns.listForUser('user-alex'),
+    ).toMatchObject({
+      state: 'success',
+      data: expect.arrayContaining([
+        expect.objectContaining({
+          date: dateOffset(-2),
+          weightKg: 79.5,
+          sharedChallengeIds: [],
+        }),
+      ]),
+    })
+    expect(screen.queryByText('Estimated · not saved')).not.toBeInTheDocument()
+  })
+
   it('announces pending deletion and preserves the card if deletion is not confirmed', async () => {
     const persistence = createPersistence({
       status: 'signed-out',
