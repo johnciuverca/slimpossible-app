@@ -2183,7 +2183,12 @@ for (const viewport of [
     await editor.getByLabel('Weight in kg').fill('87')
     await editor.getByRole('button', { name: 'Update weight' }).click()
     await expect(matrix.getByText('87.00 kg', { exact: true })).toBeVisible()
-    await expect(matrix.getByText('88.50 kg', { exact: true })).toBeVisible()
+    await expect(matrix.getByText('88.50 kg', { exact: true })).toHaveCount(2)
+    await expect(
+      matrix.locator('[data-record-estimate]').getByText('88.50 kg', {
+        exact: true,
+      }),
+    ).toBeVisible()
     await expect(
       page.getByRole('button', { name: 'Record weight', exact: true }),
     ).toBeFocused()
@@ -2535,7 +2540,10 @@ for (const viewport of [
       .getByRole('row')
       .filter({ has: page.getByRole('rowheader', { name: '2026-09-21' }) })
     const missingCells = missing.getByRole('cell')
-    await expect(missingCells.first()).toHaveText('—')
+    const ownEstimate = missingCells.first().locator('[data-record-estimate]')
+    await expect(ownEstimate).toContainText('Estimated')
+    await expect(ownEstimate).toContainText('89.25 kg')
+    await expect(ownEstimate.getByRole('button')).toHaveCount(0)
     await expect(
       missingCells.nth(1).locator('[data-record-comparison]'),
     ).toHaveText('+1 kg')
