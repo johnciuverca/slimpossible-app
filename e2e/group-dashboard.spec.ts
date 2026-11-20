@@ -732,7 +732,7 @@ for (const layout of [
       )
       await page
         .getByRole('navigation', { name: 'Group sections' })
-        .getByRole('link', { name: 'Charts', exact: true })
+        .getByRole('link', { name: 'Records', exact: true })
         .click()
       const matrix = page.getByRole('table', {
         name: 'Shared group weight history',
@@ -740,61 +740,53 @@ for (const layout of [
       await expect(
         matrix.getByRole('button', { name: /^Edit weight/ }),
       ).toHaveCount(2)
-      const cards = matrix.locator('td > div')
+      const cards = matrix.locator('tbody td .record-weight-box')
       await expect(cards).toHaveCount(9)
-      const comparison = page.getByRole('img', {
-        name: 'Weight (kg) — shared group history',
-      })
-      const viewBoxHeight = await comparison.evaluate((element) =>
-        Number(element.getAttribute('viewBox')?.trim().split(/\s+/)[3]),
-      )
-      const plotRight = Number(
-        await comparison.getAttribute('data-chart-plot-right'),
-      )
-      const outOfBoundsLabels = await comparison.locator('text').evaluateAll(
-        (elements, { chartHeight, plotRight }) =>
-          elements.flatMap((element) => {
-            const box = (element as SVGGraphicsElement).getBBox()
-            return box.x >= 0 &&
-              box.x + box.width <= plotRight &&
-              box.y >= 0 &&
-              box.y + box.height <= chartHeight
-              ? []
-              : [
-                  {
-                    text: element.textContent,
-                    x: box.x,
-                    y: box.y,
-                    width: box.width,
-                    height: box.height,
-                  },
-                ]
-          }),
-        { chartHeight: viewBoxHeight, plotRight },
-      )
-      expect(outOfBoundsLabels).toEqual([])
       expect(
         (await matrix
           .getByRole('columnheader', { name: 'Recorded date' })
           .boundingBox())!.width,
       ).toBe(120)
+      const memberColumnWidths = await matrix
+        .getByRole('columnheader')
+        .evaluateAll((headers) =>
+          headers
+            .slice(1)
+            .map((header) => header.getBoundingClientRect().width),
+        )
       expect(
-        (await matrix.getByRole('columnheader').nth(1).boundingBox())!.width,
-      ).toBe(156)
+        Math.max(...memberColumnWidths) - Math.min(...memberColumnWidths),
+      ).toBeLessThan(1)
       await expect(
         matrix.getByRole('rowheader', { name: '2026-09-22' }).locator('time'),
       ).toHaveAttribute('title', '2026-09-22')
       const boxes = await cards.evaluateAll((elements) =>
         elements.map((card) => {
           const bounds = card.getBoundingClientRect()
-          const value = card.firstElementChild!
+          const value = card.querySelector('[data-record-value]')!
+          const number = value.querySelector('[data-weight-value]')!
           const valueBounds = value.getBoundingClientRect()
+          const visibleValueParts = Array.from(value.children).filter(
+            (child) => !child.classList.contains('sr-only'),
+          )
+          const visibleValueRects = visibleValueParts.map((part) => {
+            const range = document.createRange()
+            range.selectNodeContents(part)
+            return range.getBoundingClientRect()
+          })
+          const visibleValueLeft = Math.min(
+            ...visibleValueRects.map((rect) => rect.left),
+          )
+          const visibleValueRight = Math.max(
+            ...visibleValueRects.map((rect) => rect.right),
+          )
           const buttons = Array.from(card.querySelectorAll('button')).map(
             (button) => {
               const box = button.getBoundingClientRect()
               const icon = button.querySelector('svg')!.getBoundingClientRect()
               return {
                 offset: box.x - bounds.x,
+                left: box.left,
                 width: box.width,
                 height: box.height,
                 center: box.y + box.height / 2,
@@ -805,24 +797,55 @@ for (const layout of [
               }
             },
           )
+          const primaryTop = Math.min(
+            ...visibleValueRects.map((rect) => rect.top),
+            ...buttons.map((button) => button.center - button.height / 2),
+          )
+          const primaryBottom = Math.max(
+            ...visibleValueRects.map((rect) => rect.bottom),
+            ...buttons.map((button) => button.center + button.height / 2),
+          )
           return {
             width: bounds.width,
+            layoutWidth: card.parentElement!.getBoundingClientRect().width,
+            comparisonWidth: card
+              .parentElement!.querySelector('[data-record-comparison]')!
+              .getBoundingClientRect().width,
+            withinLayout:
+              bounds.left >=
+                card.parentElement!.getBoundingClientRect().left - 1 &&
+              bounds.right <=
+                card.parentElement!.getBoundingClientRect().right + 1,
             height: bounds.height,
             value: value.textContent,
             fits: value.scrollWidth <= value.clientWidth,
             center: valueBounds.y + valueBounds.height / 2,
             valueWidth: valueBounds.width,
+            valueLeft: valueBounds.left,
+            valueRight: valueBounds.right,
+            centerX: valueBounds.left + valueBounds.width / 2,
+            visibleValueCenterX: (visibleValueLeft + visibleValueRight) / 2,
+            containerCenterX: bounds.left + bounds.width / 2,
+            primaryCenterY: (primaryTop + primaryBottom) / 2,
+            containerCenterY: bounds.top + bounds.height / 2,
+            inlineControls: (() => {
+              const actions = card.querySelector('[data-record-actions]')
+              return actions
+                ? getComputedStyle(actions).position === 'absolute'
+                : false
+            })(),
+            valueBottom: valueBounds.bottom,
+            recordRowHeight: card.closest('tr')!.getBoundingClientRect().height,
             leftPadding: valueBounds.left - bounds.left,
             rightPadding: bounds.right - valueBounds.right,
             unitRight: value.lastElementChild!.getBoundingClientRect().right,
-            numberFontSize: getComputedStyle(value.firstElementChild!).fontSize,
-            numberWidth: value.firstElementChild!.getBoundingClientRect().width,
-            numberFits:
-              value.firstElementChild!.scrollWidth <=
-              value.firstElementChild!.clientWidth,
+            numberFontSize: getComputedStyle(number).fontSize,
+            numberLength: number.textContent!.length,
+            numberWidth: number.getBoundingClientRect().width,
+            numberFits: number.scrollWidth <= number.clientWidth,
             unitOffset:
               value.lastElementChild!.getBoundingClientRect().x - bounds.x,
-            numberAlign: getComputedStyle(value.firstElementChild!).textAlign,
+            numberAlign: getComputedStyle(number).textAlign,
             childCount: card.children.length,
             buttons,
           }
@@ -838,37 +861,165 @@ for (const layout of [
         ]),
       )
       for (const box of boxes) {
-        if (box.buttons.length)
-          expect(box.width).toBe(layout.hasTouch ? 148 : 124)
-        else {
-          expect(box.width).toBeCloseTo(box.valueWidth + 10, 1)
-          expect(box.leftPadding).toBeCloseTo(box.rightPadding, 1)
-          expect(box.numberFontSize).toBe('10px')
-          expect(box.childCount).toBe(2)
+        expect(box.width).toBeGreaterThanOrEqual(124)
+        expect(box.width).toBeGreaterThan(box.comparisonWidth)
+        expect(box.width).toBeLessThan(box.layoutWidth)
+        expect(box.withinLayout).toBe(true)
+        if (box.numberLength <= 6) {
+          expect(box.numberFontSize).toBe('18px')
+        } else {
+          expect(
+            Number.parseFloat(box.numberFontSize) * box.numberLength,
+          ).toBeCloseTo(126, 1)
         }
-        expect(box.height).toBe(layout.hasTouch ? 48 : 40)
+        if (!box.buttons.length) {
+          expect(box.childCount).toBe(2)
+          expect(box.height).toBeLessThanOrEqual(layout.hasTouch ? 46 : 42)
+        }
+        expect(box.height).toBeGreaterThanOrEqual(layout.hasTouch ? 44 : 40)
+        expect(
+          Math.abs(box.primaryCenterY - box.containerCenterY),
+        ).toBeLessThanOrEqual(2)
         if (box.buttons.length) {
-          expect(box.valueWidth).toBe(50)
-          expect(box.numberWidth).toBe(36)
-          expect(box.buttons[0].iconLeft - box.unitRight).toBeCloseTo(
-            box.buttons[1].iconLeft - box.buttons[0].iconRight,
-            1,
-          )
+          expect(box.centerX).toBeCloseTo(box.containerCenterX, 1)
+          expect(
+            Math.abs(box.visibleValueCenterX - box.containerCenterX),
+          ).toBeLessThanOrEqual(2)
+          expect(box.numberWidth).toBeGreaterThan(35)
+          expect(box.valueWidth).toBeGreaterThan(box.numberWidth)
+          expect(
+            box.buttons[1].offset + box.buttons[1].width,
+          ).toBeLessThanOrEqual(box.width)
+          expect(box.buttons[0].center).toBeCloseTo(box.buttons[1].center, 1)
+          if (box.inlineControls) {
+            expect(box.height).toBeLessThanOrEqual(layout.hasTouch ? 48 : 44)
+            expect(box.buttons[0].center).toBeCloseTo(box.center, 1)
+            expect(box.valueRight).toBeLessThanOrEqual(box.buttons[0].left + 1)
+          } else {
+            expect(box.height).toBeGreaterThanOrEqual(layout.hasTouch ? 72 : 60)
+            expect(box.height).toBeLessThanOrEqual(
+              layout.width >= 500 ? 66 : 76,
+            )
+            expect(box.buttons[0].center).toBeGreaterThan(box.valueBottom)
+          }
         }
         expect(box.numberFits).toBe(true)
-        expect(box.numberAlign).toBe('right')
-        expect(box.fits, `${box.value} fits the compact value area`).toBe(true)
+        expect(box.numberAlign).toBe('center')
+        expect(box.fits, `${box.value} fits the centered value area`).toBe(true)
         for (const button of box.buttons) {
           expect(button.iconInsideTarget).toBe(true)
           expect(button.width).toBe(layout.hasTouch ? 44 : 32)
           expect(button.height).toBeGreaterThanOrEqual(
             layout.hasTouch ? 44 : 32,
           )
-          expect(Math.abs(button.center - box.center)).toBeLessThan(1)
         }
       }
       const own = boxes.filter((box) => box.buttons.length > 0)
       expect(own).toHaveLength(2)
+      expect(
+        Math.max(...own.map((box) => box.recordRowHeight)),
+      ).toBeLessThanOrEqual(layout.width >= 500 ? 75 : 86)
+      const estimated = matrix
+        .locator('[data-record-estimate]:has([data-record-actions] button)')
+        .first()
+      const estimateGeometry = await estimated.evaluate((element) => {
+        const card = element.getBoundingClientRect()
+        const value = element
+          .querySelector('[data-record-estimate-value]')!
+          .getBoundingClientRect()
+        const valueElement = element.querySelector(
+          '[data-record-estimate-value]',
+        )!
+        const valueParts = Array.from(valueElement.children).map((part) => {
+          const range = document.createRange()
+          range.selectNodeContents(part)
+          return range.getBoundingClientRect()
+        })
+        const label = element
+          .querySelector('[data-record-estimate-value] span')!
+          .getBoundingClientRect()
+        const weight = element
+          .querySelector(
+            '[data-record-estimate-value] .record-estimate-weight',
+          )!
+          .getBoundingClientRect()
+        const actions = element
+          .querySelector('[data-record-actions]')!
+          .getBoundingClientRect()
+        const button = element.querySelector('button')!.getBoundingClientRect()
+        const row = element.closest('tr')!.getBoundingClientRect()
+        return {
+          cardHeight: card.height,
+          rowHeight: row.height,
+          cardCenterX: card.left + card.width / 2,
+          valueCenterX: value.left + value.width / 2,
+          valueTop: value.top,
+          valueBottom: value.bottom,
+          actionsCenterX: actions.left + actions.width / 2,
+          buttonRightInset: card.right - button.right,
+          buttonCenterX: button.left + button.width / 2,
+          buttonHeight: button.height,
+          buttonLeft: button.left,
+          buttonRight: button.right,
+          valueLeft: Math.min(...valueParts.map((rect) => rect.left)),
+          valueRight: Math.max(...valueParts.map((rect) => rect.right)),
+          cardLeft: card.left,
+          cardRight: card.right,
+          labelCenterY: label.top + label.height / 2,
+          weightCenterY: weight.top + weight.height / 2,
+          labelRight: label.right,
+          weightLeft: weight.left,
+          rowTop: row.top,
+          rowBottom: row.bottom,
+          actualRowHeights: Array.from(
+            document.querySelectorAll(
+              '.group-history-table .record-weight-box',
+            ),
+          )
+            .filter((card) => card.querySelectorAll('button').length > 0)
+            .map((card) => card.closest('tr')!.getBoundingClientRect().height),
+        }
+      })
+      expect(estimateGeometry.valueCenterX).toBeCloseTo(
+        estimateGeometry.cardCenterX,
+        0,
+      )
+      expect(estimateGeometry.buttonCenterX).toBeCloseTo(
+        estimateGeometry.actionsCenterX,
+        1,
+      )
+      expect(estimateGeometry.valueTop).toBeGreaterThanOrEqual(
+        estimateGeometry.rowTop,
+      )
+      expect(estimateGeometry.valueBottom).toBeLessThanOrEqual(
+        estimateGeometry.rowBottom,
+      )
+      expect(estimateGeometry.buttonHeight).toBeGreaterThanOrEqual(
+        layout.hasTouch ? 44 : 32,
+      )
+      expect(estimateGeometry.actualRowHeights.length).toBeGreaterThan(0)
+      expect(
+        Math.min(
+          ...estimateGeometry.actualRowHeights.map((height) =>
+            Math.abs(height - estimateGeometry.rowHeight),
+          ),
+        ),
+      ).toBeLessThanOrEqual(1)
+      expect(estimateGeometry.labelCenterY).toBeCloseTo(
+        estimateGeometry.weightCenterY,
+        1,
+      )
+      expect(estimateGeometry.labelRight).toBeLessThanOrEqual(
+        estimateGeometry.weightLeft,
+      )
+      expect(estimateGeometry.buttonLeft).toBeGreaterThanOrEqual(
+        estimateGeometry.valueRight,
+        JSON.stringify(estimateGeometry),
+      )
+      expect(estimateGeometry.buttonRight).toBeLessThanOrEqual(
+        estimateGeometry.cardRight,
+      )
+      expect(estimateGeometry.buttonRightInset).toBeCloseTo(3, 0)
       for (const box of own)
         expect(
           box.buttons[1].offset - box.buttons[0].offset - box.buttons[0].width,
@@ -877,19 +1028,16 @@ for (const layout of [
         own[1].buttons.map((button) => button.offset),
       )
       expect(boxes.filter((box) => box.buttons.length === 0)).toHaveLength(7)
-      const readonlyWidth = (label: string) =>
-        boxes.find((box) => !box.buttons.length && box.value === label)!.width
-      expect(readonlyWidth('9.00 kg')).toBeLessThan(readonlyWidth('99.95 kg'))
-      expect(readonlyWidth('99.95 kg')).toBeLessThan(readonlyWidth('105.25 kg'))
-      expect(readonlyWidth('105.25 kg')).toBeLessThan(
-        readonlyWidth('1000.50 kg'),
-      )
+      expect(
+        Math.max(...boxes.map((box) => box.width)) -
+          Math.min(...boxes.map((box) => box.width)),
+      ).toBeLessThan(1)
       const scroll = page.getByRole('region', {
         name: 'Scrollable shared group weights',
       })
       await scroll.scrollIntoViewIfNeeded()
       await scroll.screenshot({
-        path: test.info().outputPath('fixed-weight-cards.png'),
+        path: test.info().outputPath('expanded-weight-cards.png'),
       })
       if (layout.width >= 500)
         await scroll.evaluate((element) => {
@@ -1684,22 +1832,28 @@ for (const width of [1280, 390]) {
       '&tab=overview',
       '&tab=progress',
       '#group-history',
+      '&tab=records',
     ]) {
       await page.goto(
         `/e2e/fixtures/today-harness.html?${new URLSearchParams({ scenario: 'group', user: viewerId, route: `/group?challenge=${ownGroupId}${suffix}` })}`,
       )
       await page.reload()
       const sections = page.getByRole('navigation', { name: 'Group sections' })
-      const charts = suffix === '&tab=progress' || suffix === '#group-history'
+      const expectedSection =
+        suffix === '&tab=progress'
+          ? 'Charts'
+          : suffix === '#group-history' || suffix === '&tab=records'
+            ? 'Records'
+            : 'Overview'
       await expect(
         sections.getByRole('link', {
-          name: charts ? 'Charts' : 'Overview',
+          name: expectedSection,
           exact: true,
         }),
       ).toHaveAttribute('aria-current', 'page')
       await expect(
         page.getByRole('table', { name: 'Shared group weight history' }),
-      ).toHaveCount(charts ? 1 : 0)
+      ).toHaveCount(expectedSection === 'Records' ? 1 : 0)
       await expect(
         page.getByRole('heading', { name: 'Weekly result', exact: true }),
       ).toHaveCount(0)
@@ -1726,6 +1880,12 @@ for (const width of [1280, 390]) {
         page.getByRole('heading', { name: 'Member progress', exact: true }),
       ).toHaveCount(0)
       await sections.getByRole('link', { name: 'Charts' }).click()
+      await expect(
+        page.getByRole('img', { name: 'Weight (kg) — shared group history' }),
+      ).toBeVisible()
+      await expect(
+        page.getByRole('table', { name: 'Shared group weight history' }),
+      ).toHaveCount(0)
       await expect(
         page.getByRole('tab', { name: 'All members', exact: true }),
       ).toHaveAttribute('aria-selected', 'true')
@@ -2070,7 +2230,7 @@ for (const viewport of [
       .click()
     await page
       .getByRole('navigation', { name: 'Group sections' })
-      .getByRole('link', { name: 'Charts', exact: true })
+      .getByRole('link', { name: 'Records', exact: true })
       .click()
     await expect(
       page.getByRole('table', { name: 'Shared group weight history' }),
@@ -2089,7 +2249,7 @@ for (const viewport of [
     )
     await page
       .getByRole('navigation', { name: 'Group sections' })
-      .getByRole('link', { name: 'Charts', exact: true })
+      .getByRole('link', { name: 'Records', exact: true })
       .click()
     const matrix = page.getByRole('table', {
       name: 'Shared group weight history',
@@ -2109,32 +2269,47 @@ for (const viewport of [
       exact: true,
     })
     await expect(edit).toBeVisible()
-    await expect(matrix.getByRole('button')).toHaveCount(2)
+    await expect(
+      matrix.getByRole('button', { name: /^(Edit weight|Delete)\b/ }),
+    ).toHaveCount(2)
     await expect(matrix.getByText('88.50 kg', { exact: true })).toHaveCount(2)
+    await expect(matrix.locator('[data-weight-marker]')).toHaveCount(0)
     const ownReadonly = matrix
       .getByText('90.00 kg', { exact: true })
       .locator('xpath=..')
     await expect(ownReadonly.getByRole('button')).toHaveCount(0)
-    expect((await ownReadonly.boundingBox())!.width).toBeLessThan(80)
-    const card = edit.locator('xpath=../..')
-    const value = card.getByText('88.50 kg', { exact: true })
+    expect((await ownReadonly.boundingBox())!.width).toBeGreaterThan(100)
+    const card = edit.locator('xpath=../../..')
+    const value = card.locator('[data-record-value]')
     const valueBox = (await value.boundingBox())!
     const editBox = (await edit.boundingBox())!
     const deleteBox = (await remove.boundingBox())!
     const cardBox = (await card.boundingBox())!
-    expect(editBox.x).toBeGreaterThanOrEqual(valueBox.x + valueBox.width)
+    const actionsInline =
+      (await card
+        .locator('[data-record-actions]')
+        .evaluate((element) => getComputedStyle(element).position)) ===
+      'absolute'
+    expect(valueBox.x + valueBox.width / 2).toBeCloseTo(
+      cardBox.x + cardBox.width / 2,
+      1,
+    )
     expect(deleteBox.x).toBeGreaterThanOrEqual(editBox.x + editBox.width)
-    expect(
-      Math.abs(
-        valueBox.y + valueBox.height / 2 - editBox.y - editBox.height / 2,
-      ),
-    ).toBeLessThan(1)
+    if (actionsInline) {
+      expect(valueBox.y + valueBox.height / 2).toBeCloseTo(
+        editBox.y + editBox.height / 2,
+        1,
+      )
+      expect(valueBox.x + valueBox.width).toBeLessThanOrEqual(editBox.x)
+    } else {
+      expect(editBox.y).toBeGreaterThanOrEqual(valueBox.y + valueBox.height)
+    }
     expect(
       Math.abs(
         editBox.y + editBox.height / 2 - deleteBox.y - deleteBox.height / 2,
       ),
     ).toBeLessThan(1)
-    expect(cardBox.height).toBeLessThanOrEqual(50)
+    expect(cardBox.height).toBeGreaterThanOrEqual(actionsInline ? 40 : 72)
     expect(editBox.width).toBeGreaterThanOrEqual(32)
     expect(deleteBox.width).toBeGreaterThanOrEqual(32)
     await edit.focus()
@@ -2145,9 +2320,13 @@ for (const viewport of [
     ).toHaveCount(0)
     await page.getByRole('tab', { name: ownName, exact: true }).click()
     await expect(edit).toBeVisible()
-    await expect(matrix.getByRole('button')).toHaveCount(2)
+    await expect(
+      matrix.getByRole('button', { name: /^(Edit weight|Delete)\b/ }),
+    ).toHaveCount(2)
     await page.getByRole('tab', { name: otherName, exact: true }).click()
-    await expect(matrix.getByRole('button')).toHaveCount(0)
+    await expect(
+      matrix.getByRole('button', { name: /^(Edit weight|Delete)\b/ }),
+    ).toHaveCount(0)
     await expect(matrix.getByText('88.50 kg', { exact: true })).toBeVisible()
     await page.keyboard.press('Home')
     await expect(edit).toBeVisible()
@@ -2175,13 +2354,21 @@ for (const viewport of [
     await editor.getByLabel('Weight in kg').fill('87')
     await editor.getByRole('button', { name: 'Update weight' }).click()
     await expect(matrix.getByText('87.00 kg', { exact: true })).toBeVisible()
-    await expect(matrix.getByText('88.50 kg', { exact: true })).toBeVisible()
+    await expect(matrix.getByText('88.50 kg', { exact: true })).toHaveCount(2)
+    await expect(matrix.locator('[data-weight-marker]')).toHaveCount(0)
+    await expect(
+      matrix.locator('[data-record-estimate] [title="88.5 kg"]'),
+    ).toBeVisible()
     await expect(
       page.getByRole('button', { name: 'Record weight', exact: true }),
     ).toBeFocused()
     await expect(
       page.getByText('Author-only disposable private note', { exact: true }),
     ).toHaveCount(0)
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Records', exact: true })
+      .click()
     const countBefore = requests.filter((url) =>
       url.includes('get_group_chart_history'),
     ).length
@@ -2193,7 +2380,9 @@ for (const viewport of [
       })
       .click()
     await expect(matrix.getByText('87.00 kg', { exact: true })).toBeVisible()
-    await expect(matrix.getByRole('button')).toHaveCount(2)
+    await expect(
+      matrix.getByRole('button', { name: /^(Edit weight|Delete)\b/ }),
+    ).toHaveCount(2)
     await matrix
       .getByRole('button', { name: /^Edit weight 2026-09-22 for Jo/ })
       .click()
@@ -2214,7 +2403,9 @@ for (const viewport of [
     await deletion
       .getByRole('button', { name: 'Delete weight', exact: true })
       .click()
-    await expect(matrix.getByRole('button')).toHaveCount(0)
+    await expect(
+      matrix.getByRole('button', { name: /^(Edit weight|Delete)\b/ }),
+    ).toHaveCount(0)
     await expect(matrix.getByText('87.00 kg', { exact: true })).toHaveCount(0)
     await expect(matrix.getByText('88.50 kg', { exact: true })).toBeVisible()
     await expect(
@@ -2237,9 +2428,11 @@ for (const viewport of [
     await expect(page.getByText('73.2%', { exact: true })).toBeVisible()
     await page
       .getByRole('navigation', { name: 'Group sections' })
-      .getByRole('link', { name: 'Charts', exact: true })
+      .getByRole('link', { name: 'Records', exact: true })
       .click()
-    await expect(matrix.getByRole('button')).toHaveCount(0)
+    await expect(
+      matrix.getByRole('button', { name: /^(Edit weight|Delete)\b/ }),
+    ).toHaveCount(0)
     await expect(matrix.getByText('87.00 kg', { exact: true })).toHaveCount(0)
     await expect(matrix.getByText('88.50 kg', { exact: true })).toBeVisible()
   })
@@ -2504,6 +2697,10 @@ for (const viewport of [
     await expect(
       chart.locator('circle[data-point-kind="recorded"][data-date]'),
     ).toHaveCount(initialChartPoints)
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Records', exact: true })
+      .click()
     await expect(table.getByRole('columnheader')).toHaveText([
       'Date',
       'Ava (member 1) (kg)',
@@ -2512,10 +2709,17 @@ for (const viewport of [
     const missing = table
       .getByRole('row')
       .filter({ has: page.getByRole('rowheader', { name: '2026-09-21' }) })
-    await expect(missing.getByRole('cell')).toHaveText([
-      '—',
-      '71.00 kg; change from first shared entry +1 kg Previous shared entry: +1 kg',
-    ])
+    const missingCells = missing.getByRole('cell')
+    const ownEstimate = missingCells.first().locator('[data-record-estimate]')
+    await expect(ownEstimate).toContainText('Estimated')
+    await expect(ownEstimate).toContainText('89.25 kg')
+    await expect(ownEstimate.getByRole('button')).toHaveCount(0)
+    await expect(
+      missingCells.nth(1).locator('[data-record-comparison]'),
+    ).toHaveText('+1 kg')
+    await expect(
+      missingCells.nth(1).locator('[class~="record-weight-box"]'),
+    ).toContainText('71.00 kg')
     const tabs = page.getByRole('tablist', { name: 'Shared group members' })
     const all = tabs.getByRole('tab', { name: 'All members' })
     await all.focus()
@@ -2526,9 +2730,7 @@ for (const viewport of [
     await expect(table.getByRole('columnheader')).toHaveCount(2)
     await expect(table).toContainText('88.50 kg')
     await expect(table).not.toContainText('70.00 kg')
-    await expect(
-      page.getByRole('img').locator('circle[data-point-kind="recorded"]'),
-    ).toHaveCount(2)
+    await expect(page.getByRole('img')).toHaveCount(0)
     await page.keyboard.press('End')
     await expect(
       tabs.getByRole('tab', { name: 'Ava (member 2)' }),
@@ -2537,6 +2739,10 @@ for (const viewport of [
     await expect(table).not.toContainText('88.50 kg')
     await page.keyboard.press('Home')
     await expect(all).toBeFocused()
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Charts', exact: true })
+      .click()
     await tabs.getByRole('tab', { name: 'Ava (member 2)' }).click()
     const individualChart = page.getByRole('img', {
       name: 'Weight (kg) — shared group history',
@@ -2612,6 +2818,10 @@ for (const viewport of [
       individualChart.locator('circle[data-point-kind="recorded"][data-date]'),
     ).toHaveCount(2)
     await all.click()
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Records', exact: true })
+      .click()
     const weights = page.getByRole('region', {
       name: 'Scrollable shared group weights',
     })
@@ -2622,30 +2832,23 @@ for (const viewport of [
         .poll(() => weights.evaluate((el) => el.scrollLeft))
         .toBeGreaterThan(0)
     }
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Charts', exact: true })
+      .click()
     const navigation = page.locator('.group-history-workspace > .sticky')
     expect(
       await navigation.evaluate((element) =>
         element.nextElementSibling?.getAttribute('role'),
       ),
     ).toBe('tabpanel')
-    await navigation.evaluate((element) =>
-      element.scrollIntoView({ block: 'start' }),
-    )
-    const navigationPosition = await navigation.evaluate((element) => ({
-      top: Math.round(element.getBoundingClientRect().top),
-      atDocumentEnd:
-        window.scrollY + window.innerHeight >=
-        document.documentElement.scrollHeight - 1,
-    }))
-    expect(navigationPosition.top).toBeLessThanOrEqual(
-      navigationPosition.atDocumentEnd ? 12 : 1,
-    )
+    await expect(navigation).toHaveCSS('position', 'sticky')
     const navBounds = await navigation.boundingBox()
     expect(navBounds!.height).toBeLessThan(450)
-    const focusBounds = await weights.boundingBox()
-    expect(focusBounds!.y).toBeGreaterThanOrEqual(
-      navBounds!.y + navBounds!.height,
-    )
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Records', exact: true })
+      .click()
     await expect(table.getByRole('columnheader').first()).toHaveCSS(
       'position',
       'sticky',
@@ -2743,7 +2946,7 @@ for (const viewport of [
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
     await page
       .getByRole('navigation', { name: 'Group sections' })
-      .getByRole('link', { name: 'Charts', exact: true })
+      .getByRole('link', { name: 'Records', exact: true })
       .click()
     await expect(page.getByText('Loading shared group history…')).toBeVisible()
     phase = 'rows'
@@ -2802,7 +3005,7 @@ for (const viewport of [
     await expect(page.getByText('42.5%', { exact: true })).toBeVisible()
     await page
       .getByRole('navigation', { name: 'Group sections' })
-      .getByRole('link', { name: 'Charts', exact: true })
+      .getByRole('link', { name: 'Records', exact: true })
       .click()
     await expect(
       page.getByRole('table', { name: 'Shared group weight history' }),
@@ -2857,7 +3060,7 @@ for (const viewport of [
     await expect(page.getByText('73.2%', { exact: true })).toBeVisible()
     await page
       .getByRole('navigation', { name: 'Group sections' })
-      .getByRole('link', { name: 'Charts', exact: true })
+      .getByRole('link', { name: 'Records', exact: true })
       .click()
     await expect(
       page.getByRole('table', { name: 'Shared group weight history' }),
@@ -2958,11 +3161,11 @@ for (const viewport of [
 
     await page
       .getByRole('navigation', { name: 'Group sections' })
-      .getByRole('link', { name: 'Charts', exact: true })
+      .getByRole('link', { name: 'Records', exact: true })
       .click()
-    const historyPanel = page.getByRole('region', {
-      name: 'Group chart and weigh-in history',
-    })
+    const historyPanel = page
+      .getByRole('heading', { name: 'Group record history' })
+      .locator('..')
     await expect(historyPanel.getByRole('table')).toContainText('88.50 kg')
     await expect(historyPanel.getByRole('table')).toContainText('-1.5 kg')
     await expect(historyPanel.getByRole('table')).toContainText(
@@ -3020,10 +3223,17 @@ for (const viewport of [
     expect(contrast.opacity).toBe(1)
     expect(contrast.label).toBeGreaterThanOrEqual(4.5)
     expect(contrast.body).toBeGreaterThanOrEqual(4.5)
-    const chart = historyPanel.getByRole('img')
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Charts', exact: true })
+      .click()
+    const chartPanel = page
+      .getByRole('heading', { name: 'Group charts' })
+      .locator('..')
+    const chart = chartPanel.getByRole('img')
     await expect(chart).toHaveCount(1)
-    await expect(historyPanel.getByRole('table')).toHaveCount(1)
-    const quickRanges = historyPanel.getByRole('group', {
+    await expect(chartPanel.getByRole('table')).toHaveCount(0)
+    const quickRanges = chartPanel.getByRole('group', {
       name: 'Quick date ranges',
     })
     await expect(quickRanges.getByRole('button')).toHaveCount(5)
@@ -3033,7 +3243,7 @@ for (const viewport of [
     await oneWeek.click()
     await expect(oneWeek).toHaveAttribute('aria-pressed', 'true')
     await expect(
-      historyPanel.getByRole('status', { name: 'Visible date range' }),
+      chartPanel.getByRole('status', { name: 'Visible date range' }),
     ).toContainText('Last 7 days')
     for (const [index, name] of [
       'Show last 1 week',
@@ -3049,7 +3259,7 @@ for (const viewport of [
     const chartPointCount = await chart
       .locator('circle[data-chart-point]')
       .count()
-    await expect(historyPanel.getByRole('button')).toHaveCount(
+    await expect(chartPanel.getByRole('button')).toHaveCount(
       7 + chartPointCount,
     )
 
@@ -4333,12 +4543,382 @@ test('group selector matches the member tabs container surface on Charts', async
   const memberTabs = page.locator('.group-history-workspace > .sticky')
   await expect(selector).toBeVisible()
   await expect(memberTabs).toBeVisible()
+  const chartContextWidths = await page
+    .getByRole('navigation', { name: 'Challenge contexts' })
+    .evaluate((navigation) => ({
+      link: navigation.querySelector('a')!.getBoundingClientRect().width,
+      row: navigation.querySelector(':scope > div')!.getBoundingClientRect()
+        .width,
+    }))
+  expect(chartContextWidths.link).toBeLessThan(chartContextWidths.row * 0.9)
   const [selectorBackground, memberTabsBackground] = await Promise.all([
     selector.evaluate((element) => getComputedStyle(element).backgroundColor),
     memberTabs.evaluate((element) => getComputedStyle(element).backgroundColor),
   ])
   expect(selectorBackground).toBe(memberTabsBackground)
 })
+
+for (const viewport of [
+  { label: 'desktop', width: 1280 },
+  { label: 'phone', width: 390 },
+]) {
+  for (const memberCount of [1, 2, 4]) {
+    test(`Records columns fill the container for ${memberCount} members on ${viewport.label}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: viewport.width, height: 900 })
+      await installGroupFixtures(page)
+      await page.route(
+        `${supabaseRestUrl}/rpc/get_group_chart_history`,
+        async (route) => {
+          const rows = Array.from({ length: memberCount }, (_, index) =>
+            ['2026-09-20', '2026-09-22'].map((recorded_date, dayIndex) => ({
+              member_key: `layout-member-${index + 1}`,
+              display_name: `Member ${index + 1}`,
+              recorded_date,
+              weight_kg:
+                index === 0
+                  ? 123.45 - dayIndex
+                  : memberCount > 1 && index === memberCount - 1
+                    ? 1000.5 - dayIndex
+                    : 90 - index - dayIndex,
+            })),
+          ).flat()
+          await route.fulfill({
+            contentType: 'application/json',
+            body: JSON.stringify(rows),
+          })
+        },
+      )
+      await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+      await page
+        .getByRole('navigation', { name: 'Group sections' })
+        .getByRole('link', { name: 'Records', exact: true })
+        .click()
+
+      const table = page.getByRole('table', {
+        name: 'Shared group weight history',
+      })
+      await expect(table.getByRole('columnheader')).toHaveCount(memberCount + 1)
+      await expect(
+        table.getByText('123.45 kg', { exact: true }).first(),
+      ).toBeVisible()
+      if (memberCount > 1)
+        await expect(
+          table.getByText('1000.50 kg', { exact: true }).first(),
+        ).toBeVisible()
+      const metrics = await table.evaluate((element) => {
+        const headers = Array.from(element.querySelectorAll('thead th'))
+        const bounds = element.getBoundingClientRect()
+        return {
+          tableWidth: bounds.width,
+          containerWidth: element.parentElement!.clientWidth,
+          scrollWidth: element.parentElement!.scrollWidth,
+          columnWidths: headers.map(
+            (header) => header.getBoundingClientRect().width,
+          ),
+        }
+      })
+      expect(metrics.tableWidth).toBeGreaterThanOrEqual(
+        metrics.containerWidth - 1,
+      )
+      expect(
+        Math.max(...metrics.columnWidths.slice(1)) -
+          Math.min(...metrics.columnWidths.slice(1)),
+      ).toBeLessThan(1)
+
+      const memberTabMetrics = await page
+        .getByRole('tablist', { name: 'Shared group members' })
+        .evaluate((element) => {
+          const tabs = Array.from(element.querySelectorAll('[role="tab"]'))
+          const widths = tabs.map((tab) => tab.getBoundingClientRect().width)
+          return {
+            clientWidth: element.clientWidth,
+            scrollWidth: element.scrollWidth,
+            tabCount: tabs.length,
+            widths,
+          }
+        })
+      expect(
+        Math.max(...memberTabMetrics.widths) -
+          Math.min(...memberTabMetrics.widths),
+      ).toBeLessThan(1)
+      const memberContentCenters = await page
+        .getByRole('tablist', { name: 'Shared group members' })
+        .evaluate((element) =>
+          Array.from(element.querySelectorAll('[role="tab"]')).map((tab) => {
+            const content = tab.querySelector<HTMLElement>(
+              '[data-member-tab-content]',
+            )!
+            const tabBounds = tab.getBoundingClientRect()
+            const contentBounds = content.getBoundingClientRect()
+            return {
+              horizontalOffset: Math.abs(
+                tabBounds.left +
+                  tabBounds.width / 2 -
+                  (contentBounds.left + contentBounds.width / 2),
+              ),
+              verticalOffset: Math.abs(
+                tabBounds.top +
+                  tabBounds.height / 2 -
+                  (contentBounds.top + contentBounds.height / 2),
+              ),
+            }
+          }),
+        )
+      expect(
+        Math.max(
+          ...memberContentCenters.map((center) => center.horizontalOffset),
+        ),
+      ).toBeLessThanOrEqual(2)
+      expect(
+        Math.max(
+          ...memberContentCenters.map((center) => center.verticalOffset),
+        ),
+      ).toBeLessThanOrEqual(2)
+      if (viewport.width === 390 && memberCount === 4) {
+        expect(memberTabMetrics.scrollWidth).toBeGreaterThan(
+          memberTabMetrics.clientWidth,
+        )
+        expect(Math.min(...memberTabMetrics.widths)).toBeGreaterThanOrEqual(104)
+      } else {
+        expect(memberTabMetrics.scrollWidth).toBeLessThanOrEqual(
+          memberTabMetrics.clientWidth,
+        )
+      }
+
+      const contextFilter = page.getByRole('navigation', {
+        name: 'Challenge contexts',
+      })
+      const filterGeometry = await contextFilter.evaluate((navigation) => {
+        const list = navigation.querySelector('ul')!
+        const listItem = list.querySelector('li')!
+        const link = listItem.querySelector('a')!
+        return {
+          listWidth: list.getBoundingClientRect().width,
+          itemWidth: listItem.getBoundingClientRect().width,
+          linkWidth: link.getBoundingClientRect().width,
+          linkCenter:
+            link.getBoundingClientRect().left +
+            link.getBoundingClientRect().width / 2,
+          textCenter: (() => {
+            const range = document.createRange()
+            range.selectNodeContents(link)
+            const bounds = range.getBoundingClientRect()
+            return bounds.left + bounds.width / 2
+          })(),
+          itemCount: list.children.length,
+          scrollWidth: list.parentElement!.scrollWidth,
+          clientWidth: list.parentElement!.clientWidth,
+        }
+      })
+      expect(filterGeometry.itemWidth).toBeGreaterThanOrEqual(
+        filterGeometry.listWidth / filterGeometry.itemCount - 1,
+      )
+      expect(filterGeometry.linkWidth).toBeCloseTo(filterGeometry.itemWidth, 0)
+      expect(
+        Math.abs(filterGeometry.linkCenter - filterGeometry.textCenter),
+      ).toBeLessThanOrEqual(2)
+      expect(filterGeometry.scrollWidth).toBeLessThanOrEqual(
+        filterGeometry.clientWidth,
+      )
+
+      const recordPairWidths = await table
+        .locator('tbody td')
+        .evaluateAll((cells) =>
+          cells.flatMap((cell) => {
+            const pair = cell.querySelector<HTMLElement>('[data-record-pair]')
+            return pair
+              ? [cell.clientWidth - pair.getBoundingClientRect().width]
+              : []
+          }),
+        )
+      expect(recordPairWidths.length).toBeGreaterThan(0)
+      expect(Math.max(...recordPairWidths)).toBeLessThanOrEqual(10)
+      expect(Math.min(...recordPairWidths)).toBeGreaterThanOrEqual(-1)
+      const recordBoxGeometry = await table
+        .locator('tbody td [data-record-pair]')
+        .evaluateAll((pairs) =>
+          pairs.map((pair) => {
+            const layout = pair.querySelector('[data-record-pair-layout]')!
+            const comparison = pair.querySelector('[data-record-comparison]')!
+            const card = pair.querySelector('[class~="record-weight-box"]')!
+            const comparisonBounds = comparison.getBoundingClientRect()
+            const cardBounds = card.getBoundingClientRect()
+            const pairBounds = pair.getBoundingClientRect()
+            const layoutBounds = layout.getBoundingClientRect()
+            const valueElement = card.querySelector('[data-record-value]')!
+            const valueBounds = valueElement.getBoundingClientRect()
+            const visibleValueRects = Array.from(valueElement.children)
+              .filter((child) => !child.classList.contains('sr-only'))
+              .map((part) => {
+                const range = document.createRange()
+                range.selectNodeContents(part)
+                return range.getBoundingClientRect()
+              })
+            const visibleValueLeft = Math.min(
+              ...visibleValueRects.map((rect) => rect.left),
+            )
+            const visibleValueRight = Math.max(
+              ...visibleValueRects.map((rect) => rect.right),
+            )
+            const comparisonText = comparison.querySelector('span')!
+            const textRange = document.createRange()
+            textRange.selectNodeContents(comparisonText)
+            const comparisonTextBounds = textRange.getBoundingClientRect()
+            return {
+              sideBySide: comparisonBounds.right <= cardBounds.left,
+              pairContainsBoth:
+                comparisonBounds.left >= pairBounds.left &&
+                cardBounds.right <= pairBounds.right,
+              outerContainerStyled:
+                getComputedStyle(pair).borderTopWidth !== '0px' &&
+                getComputedStyle(pair).borderTopLeftRadius !== '0px' &&
+                getComputedStyle(pair).paddingTop !== '0px' &&
+                getComputedStyle(pair).backgroundColor !== 'rgba(0, 0, 0, 0)',
+              innerLayoutWithinContainer:
+                layoutBounds.left >= pairBounds.left &&
+                layoutBounds.right <= pairBounds.right,
+              comparisonCenterOffset: Math.abs(
+                comparisonBounds.left +
+                  comparisonBounds.width / 2 -
+                  (comparisonTextBounds.left + comparisonTextBounds.width / 2),
+              ),
+              cardCenterOffset: Math.abs(
+                cardBounds.left +
+                  cardBounds.width / 2 -
+                  (valueBounds.left + valueBounds.width / 2),
+              ),
+              visibleTextCenterOffset: Math.abs(
+                cardBounds.left +
+                  cardBounds.width / 2 -
+                  (visibleValueLeft + visibleValueRight) / 2,
+              ),
+            }
+          }),
+        )
+      expect(recordBoxGeometry.every((geometry) => geometry.sideBySide)).toBe(
+        true,
+      )
+      expect(
+        recordBoxGeometry.every((geometry) => geometry.pairContainsBoth),
+      ).toBe(true)
+      expect(
+        recordBoxGeometry.every((geometry) => geometry.outerContainerStyled),
+      ).toBe(true)
+      expect(
+        recordBoxGeometry.every(
+          (geometry) => geometry.innerLayoutWithinContainer,
+        ),
+      ).toBe(true)
+      expect(
+        Math.max(
+          ...recordBoxGeometry.map(
+            (geometry) => geometry.comparisonCenterOffset,
+          ),
+        ),
+      ).toBeLessThanOrEqual(3)
+      expect(
+        Math.max(
+          ...recordBoxGeometry.map((geometry) => geometry.cardCenterOffset),
+        ),
+      ).toBeLessThanOrEqual(3)
+      expect(
+        Math.max(
+          ...recordBoxGeometry.map(
+            (geometry) => geometry.visibleTextCenterOffset,
+          ),
+        ),
+      ).toBeLessThanOrEqual(2)
+      const memberHeaderCenters = await table
+        .locator('thead th:not(:first-child)')
+        .evaluateAll((headers) =>
+          headers.map((header) => {
+            const range = document.createRange()
+            range.selectNodeContents(header)
+            const textBounds = range.getBoundingClientRect()
+            const headerBounds = header.getBoundingClientRect()
+            return Math.abs(
+              headerBounds.left +
+                headerBounds.width / 2 -
+                (textBounds.left + textBounds.width / 2),
+            )
+          }),
+        )
+      expect(Math.max(...memberHeaderCenters)).toBeLessThanOrEqual(2)
+      const headerFontSizes = await table
+        .locator('thead th button')
+        .evaluateAll((buttons) =>
+          buttons.map((button) => getComputedStyle(button).fontSize),
+        )
+      expect(new Set(headerFontSizes)).toEqual(new Set(['14px']))
+      const valueFontSizes = await table
+        .locator('tbody td .record-weight-box > span:not(.sr-only)')
+        .evaluateAll((values) =>
+          values.map((value) => getComputedStyle(value).fontSize),
+        )
+      const comparisonFontSizes = await table
+        .locator('tbody td [data-record-comparison] > span')
+        .evaluateAll((values) =>
+          values.map((value) => getComputedStyle(value).fontSize),
+        )
+      expect(new Set(valueFontSizes)).toEqual(new Set(['18px']))
+      expect(new Set(comparisonFontSizes)).toEqual(new Set(['11.5px']))
+      if (memberCount === 1 || memberCount === 4) {
+        await page.screenshot({
+          path: test
+            .info()
+            .outputPath(`records-${memberCount}-members-${viewport.width}.png`),
+          fullPage: true,
+        })
+      }
+      if (viewport.width === 1280) {
+        expect(metrics.tableWidth).toBeCloseTo(metrics.containerWidth, 0)
+      } else {
+        expect(metrics.scrollWidth).toBeGreaterThan(metrics.containerWidth)
+        expect(
+          Math.min(...metrics.columnWidths.slice(1)),
+        ).toBeGreaterThanOrEqual(236)
+      }
+      const initialUrl = page.url()
+      const memberTabs = page.getByRole('tablist', {
+        name: 'Shared group members',
+      })
+      const targetMemberNumber = memberCount === 4 ? 3 : 1
+      const heading = table.getByRole('button', {
+        name: `Show Records for Member ${targetMemberNumber}`,
+      })
+      await heading.click()
+      await expect(
+        memberTabs.getByRole('tab', {
+          name: `Member ${targetMemberNumber}`,
+        }),
+      ).toHaveAttribute('aria-selected', 'true')
+      await expect(table.getByRole('columnheader')).toHaveCount(2)
+      await expect(heading).toHaveAttribute('aria-pressed', 'true')
+      await expect(page).toHaveURL(initialUrl)
+      await memberTabs.getByRole('tab', { name: 'All members' }).click()
+      await expect(
+        memberTabs.getByRole('tab', { name: 'All members' }),
+      ).toHaveAttribute('aria-selected', 'true')
+      await expect(table.getByRole('columnheader')).toHaveCount(memberCount + 1)
+      if (memberCount === 4) {
+        await table
+          .getByRole('button', { name: 'Show Records for Member 4' })
+          .press('Enter')
+        await expect(
+          memberTabs.getByRole('tab', { name: 'Member 4' }),
+        ).toHaveAttribute('aria-selected', 'true')
+        await expect(
+          table.getByRole('button', { name: 'Show Records for Member 4' }),
+        ).toHaveAttribute('aria-pressed', 'true')
+        await memberTabs.getByRole('tab', { name: 'All members' }).click()
+        await expect(table.getByRole('columnheader')).toHaveCount(5)
+      }
+      await expect(page).toHaveURL(initialUrl)
+    })
+  }
+}
 
 test('shows the challenge owner badge only in Members and fits on mobile', async ({
   page,

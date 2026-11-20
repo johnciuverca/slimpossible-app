@@ -57,6 +57,22 @@ const signedIn: AuthState = {
 afterEach(() => cleanup())
 
 describe('AppLayout', () => {
+  it('restores Records from a direct group URL without dropping its selection', () => {
+    renderLayout(
+      '/group?challenge=private%2Fplan&source=invite&tab=records',
+      signedIn,
+    )
+
+    expect(screen.getByTestId('current-route')).toHaveTextContent(
+      '/group?challenge=private%2Fplan&source=invite&tab=records',
+    )
+    expect(
+      within(
+        screen.getByRole('navigation', { name: 'Group sections' }),
+      ).getByRole('link', { name: 'Records' }),
+    ).toHaveAttribute('aria-current', 'page')
+  })
+
   it('restores the selected section with Back/Forward and keeps group query state', async () => {
     const router = createMemoryRouter(
       [
@@ -87,6 +103,21 @@ describe('AppLayout', () => {
       'aria-current',
       'page',
     )
+    fireEvent.click(sections.getByRole('link', { name: 'Records' }))
+    expect(screen.getByTestId('current-route')).toHaveTextContent(
+      '/group?challenge=private%2Fplan&source=invite&tab=records',
+    )
+    expect(sections.getByRole('link', { name: 'Records' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    await act(async () => {
+      await router.navigate(-1)
+    })
+    expect(sections.getByRole('link', { name: 'Charts' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
     await act(async () => {
       await router.navigate(-1)
     })
@@ -98,6 +129,13 @@ describe('AppLayout', () => {
       await router.navigate(1)
     })
     expect(sections.getByRole('link', { name: 'Charts' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    await act(async () => {
+      await router.navigate(1)
+    })
+    expect(sections.getByRole('link', { name: 'Records' })).toHaveAttribute(
       'aria-current',
       'page',
     )

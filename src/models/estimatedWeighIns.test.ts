@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { interpolateMissingWeights } from './estimatedWeighIns'
+import {
+  estimatedHistoryDatePage,
+  estimatedHistoryDatePageForSeries,
+  interpolateMissingWeights,
+  interpolateMissingWeightsForDates,
+} from './estimatedWeighIns'
 
 describe('interpolateMissingWeights', () => {
   it('fills each missing calendar date with linearly interpolated values', () => {
@@ -81,5 +86,89 @@ describe('interpolateMissingWeights', () => {
       { date: '2026-03-29', weightKg: 79 },
       { date: '2026-03-30', weightKg: 78 },
     ])
+  })
+
+  it('computes only requested page dates while preserving chart interpolation values', () => {
+    const entries = [
+      { date: '2026-01-01', weightKg: 90 },
+      { date: '2026-01-07', weightKg: 89 },
+    ]
+    const all = interpolateMissingWeights(entries)
+    expect(
+      interpolateMissingWeightsForDates(entries, [
+        '2026-01-05',
+        '2026-01-02',
+        '2026-01-07',
+      ]),
+    ).toEqual([all[0], all[3]])
+  })
+
+  it('pages the union of actual and bracketed estimate dates newest first', () => {
+    const page1 = estimatedHistoryDatePage(
+      [
+        { date: '2026-01-01', weightKg: 90 },
+        { date: '2026-01-04', weightKg: 89 },
+        { date: '2026-01-03', weightKg: 70 },
+        { date: '2026-01-05', weightKg: 69 },
+      ],
+      0,
+      3,
+    )
+    expect(page1).toMatchObject({
+      dates: ['2026-01-05', '2026-01-04', '2026-01-03'],
+      pageIndex: 0,
+      pageCount: 2,
+      totalDates: 5,
+      firstPosition: 1,
+      lastPosition: 3,
+    })
+    expect(
+      estimatedHistoryDatePage(
+        [
+          { date: '2026-01-01', weightKg: 90 },
+          { date: '2026-01-04', weightKg: 89 },
+          { date: '2026-01-03', weightKg: 70 },
+          { date: '2026-01-05', weightKg: 69 },
+        ],
+        1,
+        3,
+      ).dates,
+    ).toEqual(['2026-01-02', '2026-01-01'])
+  })
+
+  it('does not interpolate across members when paging their union', () => {
+    expect(
+      estimatedHistoryDatePageForSeries(
+        [
+          [
+            { date: '2026-01-01', weightKg: 90 },
+            { date: '2026-01-02', weightKg: 89 },
+          ],
+          [
+            { date: '2026-01-10', weightKg: 70 },
+            { date: '2026-01-11', weightKg: 69 },
+          ],
+        ],
+        0,
+        30,
+      ),
+    ).toMatchObject({
+      dates: ['2026-01-11', '2026-01-10', '2026-01-02', '2026-01-01'],
+      totalDates: 4,
+    })
+  })
+
+  it('bounds a long history page without materializing every missing day', () => {
+    const page = estimatedHistoryDatePage(
+      [
+        { date: '1900-01-01', weightKg: 90 },
+        { date: '2200-01-01', weightKg: 80 },
+      ],
+      0,
+    )
+    expect(page.dates).toHaveLength(30)
+    expect(page.dates[0]).toBe('2200-01-01')
+    expect(page.totalDates).toBeGreaterThan(100_000)
+    expect(page.pageCount).toBeGreaterThan(3_000)
   })
 })

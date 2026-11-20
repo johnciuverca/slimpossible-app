@@ -389,7 +389,7 @@ describe('ChallengeManagementPage', () => {
         ),
       )
       expect(feedback).toHaveAttribute('aria-atomic', 'true')
-      expect(feedback).toHaveFocus()
+      await waitFor(() => expect(feedback).toHaveFocus())
       expect(archive).toBeEnabled()
       expect(screen.getByText('Retry group')).toBeInTheDocument()
     },

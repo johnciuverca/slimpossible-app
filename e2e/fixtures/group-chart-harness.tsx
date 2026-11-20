@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { GroupChartHistory } from '../../src/components/GroupChartHistory'
 import type { Persistence } from '../../src/data/persistence'
 import '../../src/index.css'
+const view = new URLSearchParams(window.location.search).get('view')
 const persistence = {
   mode: 'remote',
   repositories: {
@@ -52,15 +53,18 @@ const persistence = {
   },
 } as unknown as Persistence
 createRoot(document.getElementById('root')!).render(
-  <main className="mx-auto max-w-6xl p-4 sm:p-8">
+  <main className="shared-layout signed-in-shell mx-auto min-h-screen max-w-6xl bg-page p-4 text-ink sm:p-8">
     <p className="mb-4 font-semibold">
       Synthetic local-only chart fixture — not connected acceptance
     </p>
-    <GroupChartHistory
-      challengeId="synthetic-group"
-      viewerId="synthetic-viewer"
-      persistence={persistence}
-      refreshVersion={0}
-    />
+    <section className="group-workspace">
+      <GroupChartHistory
+        challengeId="synthetic-group"
+        viewerId="synthetic-viewer"
+        persistence={persistence}
+        refreshVersion={0}
+        view={view === 'records' ? 'records' : 'combined'}
+      />
+    </section>
   </main>,
 )

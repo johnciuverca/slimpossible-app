@@ -39,6 +39,7 @@ export function ChallengeTabs({
   error = '',
   showPersonalTracking = true,
   compact = false,
+  stretchItems = false,
   managementOwnerId,
 }: {
   challenges: Challenge[]
@@ -47,6 +48,7 @@ export function ChallengeTabs({
   error?: string
   showPersonalTracking?: boolean
   compact?: boolean
+  stretchItems?: boolean
   managementOwnerId?: string
 }) {
   const { pathname, search, hash } = useLocation()
@@ -104,7 +106,9 @@ export function ChallengeTabs({
           ref={row}
           className={`app-nav-scroll min-w-0 overflow-x-auto ${compact ? 'flex-1 py-1' : 'max-w-full py-2'}`}
         >
-          <ul className="flex w-max min-w-full gap-2">
+          <ul
+            className={`flex min-w-full gap-2 ${stretchItems ? 'w-full' : 'w-max'}`}
+          >
             {[
               ...(showPersonalTracking
                 ? [
@@ -123,11 +127,14 @@ export function ChallengeTabs({
             ].map(({ id, label, to }) => {
               const active = id ? selected === id : personalPage && !selected
               return (
-                <li key={id}>
+                <li
+                  key={id}
+                  className={stretchItems ? 'min-w-0 flex-1' : undefined}
+                >
                   <Link
                     to={to}
                     aria-current={active ? 'page' : undefined}
-                    className={`relative inline-flex min-h-11 items-center whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700 ${active ? 'border-forest-800 bg-forest-800 text-white' : 'border-line bg-panel text-forest-800 hover:bg-forest-50'}`}
+                    className={`relative inline-flex min-h-11 items-center rounded-full border py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700 ${stretchItems ? 'w-full justify-center whitespace-normal break-words px-2 text-center' : 'whitespace-nowrap px-4'} ${active ? 'border-forest-800 bg-forest-800 text-white' : 'border-line bg-panel text-forest-800 hover:bg-forest-50'}`}
                   >
                     {label}
                     {active ? (

@@ -1,6 +1,6 @@
 export type WorkspaceArea = 'dashboard' | 'group'
 export type WorkspaceSection =
-  'overview' | 'weigh-ins' | 'members' | 'weekly-results' | 'charts'
+  'overview' | 'weigh-ins' | 'members' | 'weekly-results' | 'charts' | 'records'
 
 export const workspaceSections = {
   dashboard: [
@@ -12,6 +12,7 @@ export const workspaceSections = {
     { id: 'members', label: 'Members' },
     { id: 'weekly-results', label: 'Weekly results' },
     { id: 'charts', label: 'Charts' },
+    { id: 'records', label: 'Records' },
   ],
 } as const
 
@@ -40,8 +41,8 @@ export function workspaceSection(
     if (['#group-summary', '#group-progress-heading'].includes(hash))
       return 'overview'
     if (['#group-progress', '#members'].includes(hash)) return 'members'
-    if (['#group-history', '#group-chart', '#charts'].includes(hash))
-      return 'charts'
+    if (hash === '#group-history') return 'records'
+    if (['#group-chart', '#charts'].includes(hash)) return 'charts'
     if (
       [
         '#weekly-winners-heading',

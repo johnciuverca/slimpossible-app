@@ -1489,11 +1489,24 @@ describe('GroupDashboardPage', () => {
         }),
       )
 
+    const chartHistoryResponse = vi.fn(() =>
+      Promise.resolve(
+        response([
+          {
+            member_key: '11111111111111111111111111111111',
+            display_name: 'Ava',
+            recorded_date: '2026-09-30',
+            weight_kg: 91.2,
+          },
+        ]),
+      ),
+    )
+
     renderDashboard(
       <GroupDashboardPage />,
       vi.fn((url: RequestInfo | URL, init?: RequestInit) =>
         String(url).includes('/rpc/get_group_chart_history')
-          ? Promise.resolve(response([]))
+          ? chartHistoryResponse()
           : String(url).includes('/rpc/get_group_member_progress')
             ? Promise.resolve(
                 response([
@@ -1657,31 +1670,26 @@ describe('GroupDashboardPage', () => {
       screen.getByRole('navigation', { name: 'Group sections' }),
     ).toBeInTheDocument()
     fireEvent.click(screen.getByRole('link', { name: 'Charts' }))
-    await waitFor(() =>
-      expect(
-        screen.getByRole('region', {
-          name: 'Group chart and weigh-in history',
-        }),
-      ).toBeInTheDocument(),
-    )
-    const unavailableHistory = screen.getByRole('region', {
-      name: 'Group chart and weigh-in history',
-    })
-    expect(unavailableHistory).not.toHaveAttribute('aria-disabled')
     expect(
-      within(unavailableHistory).getByText(
-        /Explicitly shared dates and weights only/,
-      ),
-    ).toHaveClass('sr-only')
+      await screen.findByRole('region', { name: 'Group charts' }),
+    ).toBeInTheDocument()
     expect(
-      within(unavailableHistory).queryByRole('img'),
+      await screen.findByRole('region', { name: 'Group comparison chart' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('table', { name: 'Shared group weight history' }),
+    ).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('link', { name: 'Records' }))
+    expect(
+      await screen.findByRole('table', { name: 'Shared group weight history' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('region', { name: 'Group comparison chart' }),
     ).not.toBeInTheDocument()
     expect(
-      within(unavailableHistory).queryByRole('table'),
-    ).not.toBeInTheDocument()
-    expect(
-      within(unavailableHistory).queryByRole('button'),
-    ).not.toBeInTheDocument()
+      screen.getByRole('link', { name: /Group · Autumn challenge/ }),
+    ).toHaveAttribute('aria-current', 'page')
+    expect(chartHistoryResponse).toHaveBeenCalledTimes(2)
     fireEvent.click(screen.getByRole('link', { name: 'Weekly results' }))
     expect(
       screen.queryByText('do not render private notes'),
