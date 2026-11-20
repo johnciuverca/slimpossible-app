@@ -21,7 +21,8 @@ export function WeightEntryCard({
   const label = weightKg.toFixed(2)
   return (
     <div
-      className={`group/weight rounded-lg border border-line bg-page ${centerValue ? 'flex min-h-[72px] w-full flex-col items-stretch gap-1 px-1 py-1 pointer-coarse:min-h-[80px]' : 'inline-flex h-10 shrink-0 flex-nowrap items-center gap-0 px-1 py-0 has-[button]:w-[124px] pointer-coarse:h-12 pointer-coarse:has-[button]:w-[148px]'} ${className}`}
+      data-center-value={centerValue ? '' : undefined}
+      className={`group/weight rounded-lg border border-line bg-page ${centerValue ? 'relative flex min-h-12 w-full flex-col items-stretch gap-1 px-1 py-1 pointer-coarse:min-h-[52px]' : 'inline-flex h-10 shrink-0 flex-nowrap items-center gap-0 px-1 py-0 has-[button]:w-[124px] pointer-coarse:h-12 pointer-coarse:has-[button]:w-[148px]'} ${className}`}
     >
       <span
         data-record-value=""
@@ -42,7 +43,10 @@ export function WeightEntryCard({
         <span className={centerValue ? 'text-xs font-medium' : ''}>kg</span>
       </span>
       {centerValue ? (
-        <div className="flex min-h-8 w-full items-center justify-end pointer-coarse:min-h-11">
+        <div
+          data-record-actions=""
+          className="flex min-h-8 w-full items-center justify-end pointer-coarse:min-h-11"
+        >
           {children}
         </div>
       ) : (

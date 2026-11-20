@@ -772,6 +772,7 @@ for (const layout of [
               const icon = button.querySelector('svg')!.getBoundingClientRect()
               return {
                 offset: box.x - bounds.x,
+                left: box.left,
                 width: box.width,
                 height: box.height,
                 center: box.y + box.height / 2,
@@ -798,8 +799,13 @@ for (const layout of [
             fits: value.scrollWidth <= value.clientWidth,
             center: valueBounds.y + valueBounds.height / 2,
             valueWidth: valueBounds.width,
+            valueLeft: valueBounds.left,
+            valueRight: valueBounds.right,
             centerX: valueBounds.left + valueBounds.width / 2,
             containerCenterX: bounds.left + bounds.width / 2,
+            inlineControls:
+              getComputedStyle(card.querySelector('[data-record-actions]')!)
+                .position === 'absolute',
             valueBottom: valueBounds.bottom,
             leftPadding: valueBounds.left - bounds.left,
             rightPadding: bounds.right - valueBounds.right,
@@ -840,16 +846,23 @@ for (const layout of [
         if (!box.buttons.length) {
           expect(box.childCount).toBe(2)
         }
-        expect(box.height).toBeGreaterThanOrEqual(layout.hasTouch ? 80 : 72)
+        expect(box.height).toBeGreaterThanOrEqual(layout.hasTouch ? 52 : 48)
         if (box.buttons.length) {
           expect(box.centerX).toBeCloseTo(box.containerCenterX, 1)
           expect(box.numberWidth).toBeGreaterThan(35)
           expect(box.valueWidth).toBeGreaterThan(box.numberWidth)
-          expect(box.buttons[0].center).toBeGreaterThan(box.valueBottom)
           expect(
             box.buttons[1].offset + box.buttons[1].width,
           ).toBeLessThanOrEqual(box.width)
           expect(box.buttons[0].center).toBeCloseTo(box.buttons[1].center, 1)
+          if (box.inlineControls) {
+            expect(box.height).toBeLessThanOrEqual(layout.hasTouch ? 56 : 52)
+            expect(box.buttons[0].center).toBeCloseTo(box.center, 1)
+            expect(box.valueRight).toBeLessThanOrEqual(box.buttons[0].left + 1)
+          } else {
+            expect(box.height).toBeGreaterThanOrEqual(layout.hasTouch ? 80 : 68)
+            expect(box.buttons[0].center).toBeGreaterThan(box.valueBottom)
+          }
         }
         expect(box.numberFits).toBe(true)
         expect(box.numberAlign).toBe('center')
@@ -2129,18 +2142,31 @@ for (const viewport of [
     const editBox = (await edit.boundingBox())!
     const deleteBox = (await remove.boundingBox())!
     const cardBox = (await card.boundingBox())!
+    const actionsInline =
+      (await card
+        .locator('[data-record-actions]')
+        .evaluate((element) => getComputedStyle(element).position)) ===
+      'absolute'
     expect(valueBox.x + valueBox.width / 2).toBeCloseTo(
       cardBox.x + cardBox.width / 2,
       1,
     )
     expect(deleteBox.x).toBeGreaterThanOrEqual(editBox.x + editBox.width)
-    expect(editBox.y).toBeGreaterThanOrEqual(valueBox.y + valueBox.height)
+    if (actionsInline) {
+      expect(valueBox.y + valueBox.height / 2).toBeCloseTo(
+        editBox.y + editBox.height / 2,
+        1,
+      )
+      expect(valueBox.x + valueBox.width).toBeLessThanOrEqual(editBox.x)
+    } else {
+      expect(editBox.y).toBeGreaterThanOrEqual(valueBox.y + valueBox.height)
+    }
     expect(
       Math.abs(
         editBox.y + editBox.height / 2 - deleteBox.y - deleteBox.height / 2,
       ),
     ).toBeLessThan(1)
-    expect(cardBox.height).toBeGreaterThanOrEqual(72)
+    expect(cardBox.height).toBeGreaterThanOrEqual(actionsInline ? 48 : 72)
     expect(editBox.width).toBeGreaterThanOrEqual(32)
     expect(deleteBox.width).toBeGreaterThanOrEqual(32)
     await edit.focus()
@@ -4566,18 +4592,13 @@ for (const viewport of [
             const cardBounds = card.getBoundingClientRect()
             const pairBounds = pair.getBoundingClientRect()
             const layoutBounds = layout.getBoundingClientRect()
+            const valueBounds = card
+              .querySelector('[data-record-value]')!
+              .getBoundingClientRect()
             const comparisonText = comparison.querySelector('span')!
             const textRange = document.createRange()
             textRange.selectNodeContents(comparisonText)
             const comparisonTextBounds = textRange.getBoundingClientRect()
-            const visibleChildren = Array.from(card.children).filter(
-              (child) => !child.classList.contains('sr-only'),
-            )
-            const bounds = visibleChildren.map((child) =>
-              child.getBoundingClientRect(),
-            )
-            const left = Math.min(...bounds.map((box) => box.left))
-            const right = Math.max(...bounds.map((box) => box.right))
             return {
               sideBySide: comparisonBounds.right <= cardBounds.left,
               pairContainsBoth:
@@ -4597,7 +4618,9 @@ for (const viewport of [
                   (comparisonTextBounds.left + comparisonTextBounds.width / 2),
               ),
               cardCenterOffset: Math.abs(
-                cardBounds.left + cardBounds.width / 2 - (left + right) / 2,
+                cardBounds.left +
+                  cardBounds.width / 2 -
+                  (valueBounds.left + valueBounds.width / 2),
               ),
             }
           }),

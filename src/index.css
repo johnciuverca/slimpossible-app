@@ -682,6 +682,52 @@ body {
 .group-history-table tbody tr:nth-child(even) th {
   background-color: #162330;
 }
+.record-weight-box[data-center-value] {
+  container-name: record-weight;
+  container-type: inline-size;
+}
+@media (pointer: fine) {
+  @container record-weight (min-width: 224px) {
+    .record-weight-box[data-center-value] > [data-record-value] {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: max-content;
+      max-width: calc(100% - 136px);
+      flex: none;
+      transform: translate(-50%, -50%);
+    }
+    .record-weight-box[data-center-value] > [data-record-actions] {
+      position: absolute;
+      top: 50%;
+      right: 4px;
+      width: max-content;
+      min-height: 32px;
+      transform: translateY(-50%);
+    }
+  }
+}
+@media (pointer: coarse) {
+  @container record-weight (min-width: 280px) {
+    .record-weight-box[data-center-value] > [data-record-value] {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: max-content;
+      max-width: calc(100% - 184px);
+      flex: none;
+      transform: translate(-50%, -50%);
+    }
+    .record-weight-box[data-center-value] > [data-record-actions] {
+      position: absolute;
+      top: 50%;
+      right: 4px;
+      width: max-content;
+      min-height: 44px;
+      transform: translateY(-50%);
+    }
+  }
+}
 /* Shared approved navy/teal shell for personal, group and authentication pages. */
 .shared-layout {
   color-scheme: dark;

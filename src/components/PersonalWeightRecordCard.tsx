@@ -19,17 +19,24 @@ export function PersonalWeightRecordCard({
 }) {
   return (
     <li className="min-w-0 rounded-xl border border-solid border-slate-700 bg-slate-800 p-3 text-slate-100">
-      <div className="min-w-0">
-        <p className="text-center text-3xl font-bold tracking-tight text-slate-50">
+      <div
+        data-personal-weight-row=""
+        className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2"
+      >
+        <time
+          data-record-date=""
+          className="min-w-0 text-sm text-slate-300"
+          dateTime={entry.date}
+        >
+          {formatChartDate(entry.date)}
+        </time>
+        <p
+          data-personal-record-value=""
+          className="whitespace-nowrap text-center text-3xl font-bold tracking-tight text-slate-50"
+        >
           {formatPersonalWeight(entry.weightKg)}
         </p>
-        <div className="mt-1 flex items-center justify-between gap-3">
-          <time
-            className="min-w-0 text-sm text-slate-300"
-            dateTime={entry.date}
-          >
-            {formatChartDate(entry.date)}
-          </time>
+        <div data-record-actions="" className="justify-self-end">
           <PersonalWeightRecordActions
             entry={entry}
             onEdit={onEdit}
