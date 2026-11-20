@@ -77,10 +77,11 @@ describe('PersonalWeighInsPage', () => {
       'border-slate-700',
       'bg-slate-800',
     )
-    expect(estimatedCard?.querySelector('p.text-lg')).toHaveClass(
-      'font-normal',
-      'text-slate-100',
-    )
+    expect(
+      estimatedCard?.querySelector(
+        '[data-personal-estimated-value] > span.text-lg',
+      ),
+    ).toHaveClass('font-normal', 'text-slate-100')
     const actualCard = screen.getByText('80 kg').closest('li')
     expect(actualCard).toHaveClass(
       'bg-slate-800',

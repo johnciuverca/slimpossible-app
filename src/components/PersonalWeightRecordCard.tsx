@@ -77,28 +77,40 @@ export function EstimatedPersonalWeightRecordCard({
   return (
     <li
       data-estimated-weigh-in=""
-      className="min-w-0 rounded-xl border border-dashed border-slate-700 bg-slate-800 p-3 text-slate-100"
+      className="flex min-h-16 min-w-0 items-center rounded-xl border border-dashed border-slate-700 bg-slate-800 p-1.5 text-slate-100 max-[600px]:min-h-[74px]"
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <span className="mb-1 inline-flex text-[10px] font-semibold tracking-wide text-slate-400">
+      <div
+        data-personal-weight-row=""
+        className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2"
+      >
+        <time
+          data-record-date=""
+          className="min-w-0 text-sm text-slate-300"
+          dateTime={date}
+        >
+          {formatChartDate(date)}
+        </time>
+        <p
+          data-personal-estimated-value=""
+          className="inline-flex min-w-0 items-baseline justify-center gap-2 whitespace-nowrap text-center"
+        >
+          <span className="text-lg font-normal tracking-tight text-slate-100">
+            {formatPersonalWeight(weightKg)}
+          </span>
+          <span className="text-[10px] font-semibold tracking-wide text-slate-400">
             Estimated
           </span>
-          <p className="text-lg font-normal tracking-tight text-slate-100">
-            {formatPersonalWeight(weightKg)}
-          </p>
-          <time className="mt-1 block text-sm text-slate-400" dateTime={date}>
-            {formatChartDate(date)}
-          </time>
+        </p>
+        <div data-record-actions="" className="flex min-w-0 justify-center">
+          <button
+            type="button"
+            aria-label={`Record estimated weight ${formatPersonalWeight(weightKg)} on ${date}`}
+            onClick={onRecord}
+            className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-600 bg-slate-900/60 px-3 text-sm font-semibold text-forest-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700"
+          >
+            Record weight
+          </button>
         </div>
-        <button
-          type="button"
-          aria-label={`Record estimated weight ${formatPersonalWeight(weightKg)} on ${date}`}
-          onClick={onRecord}
-          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-600 bg-slate-900/60 px-3 text-sm font-semibold text-forest-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700"
-        >
-          Record weight
-        </button>
       </div>
     </li>
   )

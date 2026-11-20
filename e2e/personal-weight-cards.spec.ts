@@ -174,3 +174,103 @@ for (const width of [1280, 390]) {
       .toBeLessThanOrEqual(width)
   })
 }
+
+for (const width of [1280, 390]) {
+  test(`estimated weigh-in is a one-line row matching recorded height at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 700 })
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'slimpossible.local.personal-weigh-ins',
+        JSON.stringify([
+          {
+            id: 'estimate-start',
+            userId: 'user-alex',
+            date: '2026-11-17',
+            weightKg: 90,
+            note: '',
+            sharedChallengeIds: [],
+          },
+          {
+            id: 'estimate-end',
+            userId: 'user-alex',
+            date: '2026-11-19',
+            weightKg: 88,
+            note: '',
+            sharedChallengeIds: [],
+          },
+        ]),
+      )
+    })
+    await page.goto(
+      `/e2e/fixtures/personal-dashboard-harness.html?${new URLSearchParams({ scenario: 'accounts', path: '/weigh-ins' })}`,
+    )
+
+    const history = page.getByRole('list', {
+      name: 'Personal weigh-in history',
+    })
+    const estimate = history.locator('[data-estimated-weigh-in]')
+    const estimateRow = estimate.locator('[data-personal-weight-row]')
+    const actual = history.getByRole('listitem').filter({ hasText: '90 kg' })
+    const actualRow = actual.locator('[data-personal-weight-row]')
+    const date = estimateRow.locator('[data-record-date]')
+    const value = estimateRow.locator('[data-personal-estimated-value]')
+    const action = estimateRow.locator('[data-record-actions]')
+    const button = action.getByRole('button', {
+      name: /Record estimated weight/,
+    })
+    const [
+      estimateCardBox,
+      estimateRowBox,
+      actualCardBox,
+      actualRowBox,
+      dateBox,
+      valueBox,
+      actionBox,
+      buttonBox,
+    ] = await Promise.all([
+      estimate.boundingBox(),
+      estimateRow.boundingBox(),
+      actual.boundingBox(),
+      actualRow.boundingBox(),
+      date.boundingBox(),
+      value.boundingBox(),
+      action.boundingBox(),
+      button.boundingBox(),
+    ])
+    expect(estimateCardBox).not.toBeNull()
+    expect(estimateRowBox).not.toBeNull()
+    expect(actualCardBox).not.toBeNull()
+    expect(actualRowBox).not.toBeNull()
+    expect(dateBox).not.toBeNull()
+    expect(valueBox).not.toBeNull()
+    expect(actionBox).not.toBeNull()
+    expect(buttonBox).not.toBeNull()
+    expect(
+      Math.abs(estimateCardBox!.height - actualCardBox!.height),
+    ).toBeLessThanOrEqual(1)
+    expect(
+      Math.abs(estimateRowBox!.height - actualRowBox!.height),
+    ).toBeLessThanOrEqual(1)
+    expect(dateBox!.x + dateBox!.width).toBeLessThanOrEqual(valueBox!.x)
+    expect(valueBox!.x + valueBox!.width).toBeLessThanOrEqual(actionBox!.x)
+    expect(valueBox!.x + valueBox!.width / 2).toBeCloseTo(
+      estimateRowBox!.x + estimateRowBox!.width / 2,
+      1,
+    )
+    expect(buttonBox!.x + buttonBox!.width / 2).toBeCloseTo(
+      actionBox!.x + actionBox!.width / 2,
+      1,
+    )
+    expect(buttonBox!.height).toBeGreaterThanOrEqual(width <= 600 ? 44 : 32)
+    expect(valueBox!.y + valueBox!.height).toBeLessThanOrEqual(
+      estimateRowBox!.y + estimateRowBox!.height,
+    )
+    await expect(value).toContainText('Estimated')
+    await estimate.scrollIntoViewIfNeeded()
+    await page.screenshot({
+      path: test.info().outputPath('personal-estimated-row.png'),
+    })
+  })
+}

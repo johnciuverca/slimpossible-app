@@ -820,10 +820,11 @@ export function GroupChartHistory({
                               {row.cells.map((point, index) => (
                                 <td
                                   key={series[index].memberKey}
+                                  data-record-cell={
+                                    view === 'records' ? '' : undefined
+                                  }
                                   className={`relative z-0 px-1 ${
-                                    view === 'records' &&
-                                    point &&
-                                    !point.estimated
+                                    view === 'records' && point
                                       ? 'py-0.5'
                                       : 'py-1'
                                   }`}
@@ -833,18 +834,24 @@ export function GroupChartHistory({
                                       <div
                                         data-record-estimate=""
                                         data-estimate-date={point.date}
-                                        className="flex min-w-0 flex-col items-center gap-1 rounded-xl border border-dashed border-slate-700 bg-slate-800 p-2 text-center"
+                                        className="record-estimate grid min-h-[46px] min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 rounded-xl border border-dashed border-slate-700 bg-slate-800 p-0.5 text-center"
                                       >
-                                        <span className="text-[10px] font-semibold tracking-wide text-slate-400">
-                                          Estimated
-                                        </span>
-                                        <WeightEntryCard
-                                          weightKg={point.weightKg}
-                                          className="!h-10 !w-full !justify-center !border-dashed !border-slate-700 min-w-[124px] bg-slate-900 pointer-coarse:min-w-[148px]"
-                                          valueClassName="font-normal text-slate-100"
-                                          valueSizeClassName="text-[11px]"
-                                          valueFontScale={68}
-                                        />
+                                        <span aria-hidden="true" />
+                                        <div
+                                          data-record-estimate-value=""
+                                          className="inline-flex min-w-0 items-center justify-center gap-1 whitespace-nowrap"
+                                        >
+                                          <span className="text-[10px] font-semibold tracking-wide text-slate-400">
+                                            Estimated
+                                          </span>
+                                          <WeightEntryCard
+                                            weightKg={point.weightKg}
+                                            className="record-estimate-weight !h-10 !w-auto !justify-center !border-dashed !border-slate-700 min-w-[124px] bg-slate-900 pointer-coarse:min-w-[148px]"
+                                            valueClassName="font-normal text-slate-100"
+                                            valueSizeClassName="text-[11px]"
+                                            valueFontScale={68}
+                                          />
+                                        </div>
                                         {point.memberKey === ownMemberKey &&
                                         personalWorkspace.userId ===
                                           viewerId.toLowerCase() &&
@@ -854,22 +861,29 @@ export function GroupChartHistory({
                                           'ready' &&
                                         personalWorkspace.contexts.state ===
                                           'ready' ? (
-                                          <button
-                                            type="button"
-                                            aria-label={`Record estimated weight ${point.weightKg} kg on ${point.date} for ${series[index].label}`}
-                                            className="min-h-11 w-full rounded-lg px-2 text-xs font-semibold text-forest-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
-                                            onClick={() =>
-                                              setChartAction({
-                                                context,
-                                                date: point.date,
-                                                value: point.weightKg,
-                                                estimated: true,
-                                              })
-                                            }
+                                          <div
+                                            data-record-actions=""
+                                            className="flex min-w-0 justify-center"
                                           >
-                                            Record weight
-                                          </button>
-                                        ) : null}
+                                            <button
+                                              type="button"
+                                              aria-label={`Record estimated weight ${point.weightKg} kg on ${point.date} for ${series[index].label}`}
+                                              className="min-h-8 whitespace-nowrap rounded-lg px-2 text-xs font-semibold text-forest-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 pointer-coarse:min-h-11"
+                                              onClick={() =>
+                                                setChartAction({
+                                                  context,
+                                                  date: point.date,
+                                                  value: point.weightKg,
+                                                  estimated: true,
+                                                })
+                                              }
+                                            >
+                                              Record weight
+                                            </button>
+                                          </div>
+                                        ) : (
+                                          <span aria-hidden="true" />
+                                        )}
                                       </div>
                                     ) : (
                                       <div

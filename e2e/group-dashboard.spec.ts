@@ -888,6 +888,84 @@ for (const layout of [
       expect(
         Math.max(...own.map((box) => box.recordRowHeight)),
       ).toBeLessThanOrEqual(layout.width >= 500 ? 75 : 86)
+      const estimated = matrix
+        .locator('[data-record-estimate]:has([data-record-actions] button)')
+        .first()
+      const estimateGeometry = await estimated.evaluate((element) => {
+        const card = element.getBoundingClientRect()
+        const value = element
+          .querySelector('[data-record-estimate-value]')!
+          .getBoundingClientRect()
+        const label = element
+          .querySelector('[data-record-estimate-value] span')!
+          .getBoundingClientRect()
+        const weight = element
+          .querySelector(
+            '[data-record-estimate-value] .record-estimate-weight',
+          )!
+          .getBoundingClientRect()
+        const actions = element
+          .querySelector('[data-record-actions]')!
+          .getBoundingClientRect()
+        const button = element.querySelector('button')!.getBoundingClientRect()
+        const row = element.closest('tr')!.getBoundingClientRect()
+        return {
+          cardHeight: card.height,
+          rowHeight: row.height,
+          cardCenterX: card.left + card.width / 2,
+          valueCenterX: value.left + value.width / 2,
+          valueTop: value.top,
+          valueBottom: value.bottom,
+          actionsCenterX: actions.left + actions.width / 2,
+          buttonCenterX: button.left + button.width / 2,
+          buttonHeight: button.height,
+          labelCenterY: label.top + label.height / 2,
+          weightCenterY: weight.top + weight.height / 2,
+          labelRight: label.right,
+          weightLeft: weight.left,
+          rowTop: row.top,
+          rowBottom: row.bottom,
+          actualRowHeights: Array.from(
+            document.querySelectorAll(
+              '.group-history-table .record-weight-box',
+            ),
+          )
+            .filter((card) => card.querySelectorAll('button').length > 0)
+            .map((card) => card.closest('tr')!.getBoundingClientRect().height),
+        }
+      })
+      expect(estimateGeometry.valueCenterX).toBeCloseTo(
+        estimateGeometry.cardCenterX,
+        1,
+      )
+      expect(estimateGeometry.buttonCenterX).toBeCloseTo(
+        estimateGeometry.actionsCenterX,
+        1,
+      )
+      expect(estimateGeometry.valueTop).toBeGreaterThanOrEqual(
+        estimateGeometry.rowTop,
+      )
+      expect(estimateGeometry.valueBottom).toBeLessThanOrEqual(
+        estimateGeometry.rowBottom,
+      )
+      expect(estimateGeometry.buttonHeight).toBeGreaterThanOrEqual(
+        layout.hasTouch ? 44 : 32,
+      )
+      expect(estimateGeometry.actualRowHeights.length).toBeGreaterThan(0)
+      expect(
+        Math.min(
+          ...estimateGeometry.actualRowHeights.map((height) =>
+            Math.abs(height - estimateGeometry.rowHeight),
+          ),
+        ),
+      ).toBeLessThanOrEqual(1)
+      expect(estimateGeometry.labelCenterY).toBeCloseTo(
+        estimateGeometry.weightCenterY,
+        1,
+      )
+      expect(estimateGeometry.labelRight).toBeLessThanOrEqual(
+        estimateGeometry.weightLeft,
+      )
       for (const box of own)
         expect(
           box.buttons[1].offset - box.buttons[0].offset - box.buttons[0].width,

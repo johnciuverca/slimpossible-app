@@ -686,6 +686,23 @@ body {
   container-name: record-weight;
   container-type: inline-size;
 }
+.group-history-table td[data-record-cell] {
+  container-name: group-record-cell;
+  container-type: inline-size;
+}
+.record-estimate {
+  min-height: 69px;
+}
+@media (max-width: 600px) {
+  .record-estimate {
+    min-height: 80px;
+  }
+}
+@media (pointer: coarse) {
+  .record-estimate {
+    min-height: 80px;
+  }
+}
 @media (pointer: fine) {
   @container record-weight (min-width: 224px) {
     .record-weight-box[data-center-value] > [data-record-value] {
@@ -704,6 +721,11 @@ body {
       width: max-content;
       min-height: 32px;
       transform: translateY(-50%);
+    }
+  }
+  @container group-record-cell (min-width: 320px) {
+    .record-estimate {
+      min-height: 46px;
     }
   }
 }
@@ -725,6 +747,11 @@ body {
       width: max-content;
       min-height: 44px;
       transform: translateY(-50%);
+    }
+  }
+  @container group-record-cell (min-width: 360px) {
+    .record-estimate {
+      min-height: 50px;
     }
   }
 }
