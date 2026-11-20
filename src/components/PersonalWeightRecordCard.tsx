@@ -20,19 +20,31 @@ export function PersonalWeightRecordCard({
   return (
     <li
       data-personal-weight-container=""
-      className="min-h-16 min-w-0 rounded-xl border border-solid border-slate-700 bg-slate-800 p-1.5 text-slate-100 max-[600px]:min-h-[74px]"
+      className="relative min-h-16 min-w-0 rounded-xl border border-solid border-slate-700 bg-slate-800 p-1.5 text-slate-100 max-[600px]:min-h-[74px]"
     >
-      <div
-        data-personal-weight-row=""
-        className="relative min-h-8 max-[600px]:min-h-11"
-      >
+      <div data-record-info="" className="max-w-[calc(50%-52px)]">
         <time
           data-record-date=""
-          className="absolute left-0 top-1/2 min-w-0 -translate-y-1/2 text-sm text-slate-300"
+          className="min-w-0 text-sm text-slate-300"
           dateTime={entry.date}
         >
           {formatChartDate(entry.date)}
         </time>
+        <p className="mt-1 break-words text-xs text-slate-300">
+          {entry.sharedChallengeIds.length
+            ? `Shared with ${entry.sharedChallengeIds.map(groupName).join(', ')}`
+            : 'Private'}
+        </p>
+        {entry.note ? (
+          <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-300">
+            {entry.note}
+          </p>
+        ) : null}
+      </div>
+      <div
+        data-personal-weight-row=""
+        className="pointer-events-none absolute inset-0"
+      >
         <p
           data-personal-record-value=""
           className="absolute left-1/2 top-1/2 w-max -translate-x-1/2 -translate-y-1/2 whitespace-nowrap text-center text-3xl font-bold tracking-tight text-slate-50"
@@ -41,7 +53,7 @@ export function PersonalWeightRecordCard({
         </p>
         <div
           data-record-actions=""
-          className="absolute right-0 top-1/2 -translate-y-1/2"
+          className="pointer-events-auto absolute right-1.5 top-1/2 -translate-y-1/2"
         >
           <PersonalWeightRecordActions
             entry={entry}
@@ -52,16 +64,6 @@ export function PersonalWeightRecordCard({
           />
         </div>
       </div>
-      {entry.note ? (
-        <p className="mt-3 whitespace-pre-wrap break-words text-sm text-slate-300">
-          {entry.note}
-        </p>
-      ) : null}
-      <p className="mt-1 break-words text-xs text-slate-300">
-        {entry.sharedChallengeIds.length
-          ? `Shared with ${entry.sharedChallengeIds.map(groupName).join(', ')}`
-          : 'Private'}
-      </p>
       {deleting ? (
         <p role="status" className="mt-3 text-sm text-slate-300">
           Deleting entry and group shares…

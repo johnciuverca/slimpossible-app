@@ -797,6 +797,14 @@ for (const layout of [
               }
             },
           )
+          const primaryTop = Math.min(
+            ...visibleValueRects.map((rect) => rect.top),
+            ...buttons.map((button) => button.center - button.height / 2),
+          )
+          const primaryBottom = Math.max(
+            ...visibleValueRects.map((rect) => rect.bottom),
+            ...buttons.map((button) => button.center + button.height / 2),
+          )
           return {
             width: bounds.width,
             layoutWidth: card.parentElement!.getBoundingClientRect().width,
@@ -818,6 +826,8 @@ for (const layout of [
             centerX: valueBounds.left + valueBounds.width / 2,
             visibleValueCenterX: (visibleValueLeft + visibleValueRight) / 2,
             containerCenterX: bounds.left + bounds.width / 2,
+            primaryCenterY: (primaryTop + primaryBottom) / 2,
+            containerCenterY: bounds.top + bounds.height / 2,
             inlineControls: (() => {
               const actions = card.querySelector('[data-record-actions]')
               return actions
@@ -867,6 +877,9 @@ for (const layout of [
           expect(box.height).toBeLessThanOrEqual(layout.hasTouch ? 46 : 42)
         }
         expect(box.height).toBeGreaterThanOrEqual(layout.hasTouch ? 44 : 40)
+        expect(
+          Math.abs(box.primaryCenterY - box.containerCenterY),
+        ).toBeLessThanOrEqual(2)
         if (box.buttons.length) {
           expect(box.centerX).toBeCloseTo(box.containerCenterX, 1)
           expect(
