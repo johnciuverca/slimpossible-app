@@ -18,25 +18,31 @@ export function PersonalWeightRecordCard({
   disabled?: boolean
 }) {
   return (
-    <li className="min-w-0 rounded-xl border border-solid border-slate-700 bg-slate-800 p-1.5 text-slate-100">
+    <li
+      data-personal-weight-container=""
+      className="min-h-16 min-w-0 rounded-xl border border-solid border-slate-700 bg-slate-800 p-1.5 text-slate-100 max-[600px]:min-h-[74px]"
+    >
       <div
         data-personal-weight-row=""
-        className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2"
+        className="relative min-h-8 max-[600px]:min-h-11"
       >
         <time
           data-record-date=""
-          className="min-w-0 text-sm text-slate-300"
+          className="absolute left-0 top-1/2 min-w-0 -translate-y-1/2 text-sm text-slate-300"
           dateTime={entry.date}
         >
           {formatChartDate(entry.date)}
         </time>
         <p
           data-personal-record-value=""
-          className="whitespace-nowrap text-center text-3xl font-bold tracking-tight text-slate-50"
+          className="absolute left-1/2 top-1/2 w-max -translate-x-1/2 -translate-y-1/2 whitespace-nowrap text-center text-3xl font-bold tracking-tight text-slate-50"
         >
           {formatPersonalWeight(entry.weightKg)}
         </p>
-        <div data-record-actions="" className="justify-self-end">
+        <div
+          data-record-actions=""
+          className="absolute right-0 top-1/2 -translate-y-1/2"
+        >
           <PersonalWeightRecordActions
             entry={entry}
             onEdit={onEdit}
@@ -101,12 +107,12 @@ export function EstimatedPersonalWeightRecordCard({
             Estimated
           </span>
         </p>
-        <div data-record-actions="" className="flex min-w-0 justify-center">
+        <div data-record-actions="" className="flex min-w-0 justify-end">
           <button
             type="button"
             aria-label={`Record estimated weight ${formatPersonalWeight(weightKg)} on ${date}`}
             onClick={onRecord}
-            className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-600 bg-slate-900/60 px-3 text-sm font-semibold text-forest-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700"
+            className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-600 bg-slate-900/60 px-2 text-sm font-semibold text-forest-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700"
           >
             Record weight
           </button>

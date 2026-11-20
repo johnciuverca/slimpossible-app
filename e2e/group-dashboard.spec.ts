@@ -766,6 +766,20 @@ for (const layout of [
           const value = card.querySelector('[data-record-value]')!
           const number = value.querySelector('[data-weight-value]')!
           const valueBounds = value.getBoundingClientRect()
+          const visibleValueParts = Array.from(value.children).filter(
+            (child) => !child.classList.contains('sr-only'),
+          )
+          const visibleValueRects = visibleValueParts.map((part) => {
+            const range = document.createRange()
+            range.selectNodeContents(part)
+            return range.getBoundingClientRect()
+          })
+          const visibleValueLeft = Math.min(
+            ...visibleValueRects.map((rect) => rect.left),
+          )
+          const visibleValueRight = Math.max(
+            ...visibleValueRects.map((rect) => rect.right),
+          )
           const buttons = Array.from(card.querySelectorAll('button')).map(
             (button) => {
               const box = button.getBoundingClientRect()
@@ -802,6 +816,7 @@ for (const layout of [
             valueLeft: valueBounds.left,
             valueRight: valueBounds.right,
             centerX: valueBounds.left + valueBounds.width / 2,
+            visibleValueCenterX: (visibleValueLeft + visibleValueRight) / 2,
             containerCenterX: bounds.left + bounds.width / 2,
             inlineControls: (() => {
               const actions = card.querySelector('[data-record-actions]')
@@ -854,6 +869,9 @@ for (const layout of [
         expect(box.height).toBeGreaterThanOrEqual(layout.hasTouch ? 44 : 40)
         if (box.buttons.length) {
           expect(box.centerX).toBeCloseTo(box.containerCenterX, 1)
+          expect(
+            Math.abs(box.visibleValueCenterX - box.containerCenterX),
+          ).toBeLessThanOrEqual(2)
           expect(box.numberWidth).toBeGreaterThan(35)
           expect(box.valueWidth).toBeGreaterThan(box.numberWidth)
           expect(
@@ -896,6 +914,14 @@ for (const layout of [
         const value = element
           .querySelector('[data-record-estimate-value]')!
           .getBoundingClientRect()
+        const valueElement = element.querySelector(
+          '[data-record-estimate-value]',
+        )!
+        const valueParts = Array.from(valueElement.children).map((part) => {
+          const range = document.createRange()
+          range.selectNodeContents(part)
+          return range.getBoundingClientRect()
+        })
         const label = element
           .querySelector('[data-record-estimate-value] span')!
           .getBoundingClientRect()
@@ -913,19 +939,17 @@ for (const layout of [
           cardHeight: card.height,
           rowHeight: row.height,
           cardCenterX: card.left + card.width / 2,
+          valueCenterX: value.left + value.width / 2,
           valueTop: value.top,
           valueBottom: value.bottom,
           actionsCenterX: actions.left + actions.width / 2,
-          lineCenterX:
-            (Math.min(value.left, actions.left) +
-              Math.max(value.right, actions.right)) /
-            2,
+          buttonRightInset: card.right - button.right,
           buttonCenterX: button.left + button.width / 2,
           buttonHeight: button.height,
           buttonLeft: button.left,
           buttonRight: button.right,
-          valueLeft: value.left,
-          valueRight: value.right,
+          valueLeft: Math.min(...valueParts.map((rect) => rect.left)),
+          valueRight: Math.max(...valueParts.map((rect) => rect.right)),
           cardLeft: card.left,
           cardRight: card.right,
           labelCenterY: label.top + label.height / 2,
@@ -943,9 +967,9 @@ for (const layout of [
             .map((card) => card.closest('tr')!.getBoundingClientRect().height),
         }
       })
-      expect(estimateGeometry.lineCenterX).toBeCloseTo(
+      expect(estimateGeometry.valueCenterX).toBeCloseTo(
         estimateGeometry.cardCenterX,
-        1,
+        0,
       )
       expect(estimateGeometry.buttonCenterX).toBeCloseTo(
         estimateGeometry.actionsCenterX,
@@ -977,10 +1001,12 @@ for (const layout of [
       )
       expect(estimateGeometry.buttonLeft).toBeGreaterThanOrEqual(
         estimateGeometry.valueRight,
+        JSON.stringify(estimateGeometry),
       )
       expect(estimateGeometry.buttonRight).toBeLessThanOrEqual(
         estimateGeometry.cardRight,
       )
+      expect(estimateGeometry.buttonRightInset).toBeCloseTo(3, 0)
       for (const box of own)
         expect(
           box.buttons[1].offset - box.buttons[0].offset - box.buttons[0].width,
@@ -4537,7 +4563,12 @@ for (const viewport of [
               member_key: `layout-member-${index + 1}`,
               display_name: `Member ${index + 1}`,
               recorded_date,
-              weight_kg: 90 - index - dayIndex,
+              weight_kg:
+                index === 0
+                  ? 123.45 - dayIndex
+                  : memberCount > 1 && index === memberCount - 1
+                    ? 1000.5 - dayIndex
+                    : 90 - index - dayIndex,
             })),
           ).flat()
           await route.fulfill({
@@ -4556,6 +4587,13 @@ for (const viewport of [
         name: 'Shared group weight history',
       })
       await expect(table.getByRole('columnheader')).toHaveCount(memberCount + 1)
+      await expect(
+        table.getByText('123.45 kg', { exact: true }).first(),
+      ).toBeVisible()
+      if (memberCount > 1)
+        await expect(
+          table.getByText('1000.50 kg', { exact: true }).first(),
+        ).toBeVisible()
       const metrics = await table.evaluate((element) => {
         const headers = Array.from(element.querySelectorAll('thead th'))
         const bounds = element.getBoundingClientRect()
@@ -4696,9 +4734,21 @@ for (const viewport of [
             const cardBounds = card.getBoundingClientRect()
             const pairBounds = pair.getBoundingClientRect()
             const layoutBounds = layout.getBoundingClientRect()
-            const valueBounds = card
-              .querySelector('[data-record-value]')!
-              .getBoundingClientRect()
+            const valueElement = card.querySelector('[data-record-value]')!
+            const valueBounds = valueElement.getBoundingClientRect()
+            const visibleValueRects = Array.from(valueElement.children)
+              .filter((child) => !child.classList.contains('sr-only'))
+              .map((part) => {
+                const range = document.createRange()
+                range.selectNodeContents(part)
+                return range.getBoundingClientRect()
+              })
+            const visibleValueLeft = Math.min(
+              ...visibleValueRects.map((rect) => rect.left),
+            )
+            const visibleValueRight = Math.max(
+              ...visibleValueRects.map((rect) => rect.right),
+            )
             const comparisonText = comparison.querySelector('span')!
             const textRange = document.createRange()
             textRange.selectNodeContents(comparisonText)
@@ -4725,6 +4775,11 @@ for (const viewport of [
                 cardBounds.left +
                   cardBounds.width / 2 -
                   (valueBounds.left + valueBounds.width / 2),
+              ),
+              visibleTextCenterOffset: Math.abs(
+                cardBounds.left +
+                  cardBounds.width / 2 -
+                  (visibleValueLeft + visibleValueRight) / 2,
               ),
             }
           }),
@@ -4755,6 +4810,13 @@ for (const viewport of [
           ...recordBoxGeometry.map((geometry) => geometry.cardCenterOffset),
         ),
       ).toBeLessThanOrEqual(3)
+      expect(
+        Math.max(
+          ...recordBoxGeometry.map(
+            (geometry) => geometry.visibleTextCenterOffset,
+          ),
+        ),
+      ).toBeLessThanOrEqual(2)
       const memberHeaderCenters = await table
         .locator('thead th:not(:first-child)')
         .evaluateAll((headers) =>

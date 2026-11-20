@@ -691,7 +691,25 @@ body {
   container-type: inline-size;
 }
 .record-estimate {
+  width: 100%;
   min-height: 69px;
+}
+.record-estimate > [data-record-estimate-value] {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+.record-estimate > [data-record-actions] {
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  transform: translateY(-50%);
+}
+.record-estimate [data-record-actions] > button {
+  padding-inline: 0 !important;
+  font-size: 10px !important;
+  letter-spacing: -0.03em !important;
 }
 @media (max-width: 600px) {
   .record-estimate {

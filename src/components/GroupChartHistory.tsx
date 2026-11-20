@@ -757,7 +757,7 @@ export function GroupChartHistory({
                         className="group-history-table table-fixed border-collapse text-left text-xs"
                         style={{
                           width: '100%',
-                          minWidth: `max(100%, ${120 + series.length * 236}px)`,
+                          minWidth: `max(100%, ${120 + series.length * (view === 'records' ? 259 : 236)}px)`,
                         }}
                       >
                         <colgroup>
@@ -834,7 +834,7 @@ export function GroupChartHistory({
                                       <div
                                         data-record-estimate=""
                                         data-estimate-date={point.date}
-                                        className="record-estimate flex min-h-[46px] min-w-0 items-center justify-center gap-1 whitespace-nowrap rounded-xl border border-dashed border-slate-700 bg-slate-800 p-0.5 text-center"
+                                        className="record-estimate relative flex min-h-[46px] min-w-0 items-center justify-center gap-1 whitespace-nowrap rounded-xl border border-dashed border-slate-700 bg-slate-800 p-0.5 text-center"
                                       >
                                         <div
                                           data-record-estimate-value=""
@@ -867,7 +867,7 @@ export function GroupChartHistory({
                                             <button
                                               type="button"
                                               aria-label={`Record estimated weight ${point.weightKg} kg on ${point.date} for ${series[index].label}`}
-                                              className="min-h-8 whitespace-nowrap rounded-lg px-2 text-xs font-semibold text-forest-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 pointer-coarse:min-h-11"
+                                              className="min-h-8 whitespace-nowrap rounded-lg px-1 text-[10px] font-semibold text-forest-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 pointer-coarse:min-h-11"
                                               onClick={() =>
                                                 setChartAction({
                                                   context,

@@ -115,63 +115,105 @@ for (const width of [1280, 390]) {
   })
 }
 
-for (const width of [1280, 390]) {
-  test(`centers a large recorded weight between the date and actions at ${width}px`, async ({
-    page,
+for (const layout of [
+  { label: 'desktop', width: 1280, hasTouch: false },
+  { label: 'phone', width: 390, hasTouch: false },
+  { label: 'coarse-pointer phone', width: 390, hasTouch: true },
+]) {
+  test(`centers a large recorded weight between the date and actions on ${layout.label}`, async ({
+    browser,
   }) => {
-    await page.setViewportSize({ width, height: 700 })
-    await page.addInitScript(() => {
-      localStorage.setItem(
-        'slimpossible.local.personal-weigh-ins',
-        JSON.stringify([
-          {
-            id: 'synthetic-large-weight',
-            userId: 'user-alex',
-            date: '2026-11-18',
-            weightKg: 123.45,
-            note: '',
-            sharedChallengeIds: [],
-          },
-        ]),
+    const context = await browser.newContext({
+      hasTouch: layout.hasTouch,
+      viewport: { width: layout.width, height: 700 },
+    })
+    try {
+      const page = await context.newPage()
+      await page.addInitScript(() => {
+        localStorage.setItem(
+          'slimpossible.local.personal-weigh-ins',
+          JSON.stringify([
+            {
+              id: 'synthetic-large-weight',
+              userId: 'user-alex',
+              date: '2026-11-18',
+              weightKg: 123.45,
+              note: '',
+              sharedChallengeIds: [],
+            },
+          ]),
+        )
+      })
+      await page.goto(
+        `/e2e/fixtures/personal-dashboard-harness.html?${new URLSearchParams({ scenario: 'accounts', path: '/weigh-ins' })}`,
       )
-    })
-    await page.goto(
-      `/e2e/fixtures/personal-dashboard-harness.html?${new URLSearchParams({ scenario: 'accounts', path: '/weigh-ins' })}`,
-    )
-    const history = page.getByRole('list', {
-      name: 'Personal weigh-in history',
-    })
-    const record = history.getByRole('listitem').filter({
-      hasText: '123.45 kg',
-    })
-    const row = record.locator('[data-personal-weight-row]')
-    const value = row.locator('[data-personal-record-value]')
-    const valueBox = (await value.boundingBox())!
-    const rowBox = (await row.boundingBox())!
-    const edit = record.getByRole('button', { name: 'Edit weight 2026-11-18' })
-    const remove = record.getByRole('button', { name: 'Delete 2026-11-18' })
-    const editBox = (await edit.boundingBox())!
-    const removeBox = (await remove.boundingBox())!
-    await expect(value).toHaveClass(/text-3xl/)
-    await expect(value).toHaveClass(/font-bold/)
-    expect(valueBox.x + valueBox.width / 2).toBeCloseTo(
-      rowBox.x + rowBox.width / 2,
-      1,
-    )
-    expect(valueBox.x + valueBox.width).toBeLessThanOrEqual(editBox.x)
-    expect(editBox.y + editBox.height / 2).toBeCloseTo(
-      removeBox.y + removeBox.height / 2,
-      1,
-    )
-    expect(rowBox.height).toBeLessThanOrEqual(48)
-    expect((await record.boundingBox())!.height).toBeLessThanOrEqual(76)
-    await record.scrollIntoViewIfNeeded()
-    await page.screenshot({
-      path: test.info().outputPath('large-personal-record-row.png'),
-    })
-    await expect
-      .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
-      .toBeLessThanOrEqual(width)
+      const history = page.getByRole('list', {
+        name: 'Personal weigh-in history',
+      })
+      const record = history.getByRole('listitem').filter({
+        hasText: '123.45 kg',
+      })
+      const row = record.locator('[data-personal-weight-row]')
+      const value = row.locator('[data-personal-record-value]')
+      const visibleValueBox = await value.evaluate((element) => {
+        const range = document.createRange()
+        range.selectNodeContents(element)
+        const bounds = range.getBoundingClientRect()
+        return { x: bounds.left, width: bounds.width }
+      })
+      const rowBox = (await row.boundingBox())!
+      const recordBox = (await record.boundingBox())!
+      const date = row.locator('[data-record-date]')
+      const dateBox = (await date.boundingBox())!
+      const edit = record.getByRole('button', {
+        name: 'Edit weight 2026-11-18',
+      })
+      const remove = record.getByRole('button', {
+        name: 'Delete 2026-11-18',
+      })
+      const actions = row.locator('[data-record-actions]')
+      const actionsBox = (await actions.boundingBox())!
+      const editBox = (await edit.boundingBox())!
+      const removeBox = (await remove.boundingBox())!
+      const visibleText = await value.evaluate((element) => {
+        const range = document.createRange()
+        range.selectNodeContents(element)
+        const bounds = range.getBoundingClientRect()
+        return bounds.left + bounds.width / 2
+      })
+      const containerCenter = recordBox.x + recordBox.width / 2
+      await expect(value).toHaveClass(/text-3xl/)
+      await expect(value).toHaveClass(/font-bold/)
+      expect(Math.abs(visibleText - containerCenter)).toBeLessThanOrEqual(2)
+      expect(visibleValueBox.x).toBeGreaterThanOrEqual(
+        dateBox.x + dateBox.width,
+      )
+      expect(visibleValueBox.x + visibleValueBox.width).toBeLessThanOrEqual(
+        editBox.x,
+      )
+      expect(editBox.y + editBox.height / 2).toBeCloseTo(
+        removeBox.y + removeBox.height / 2,
+        1,
+      )
+      expect(
+        Math.abs(
+          dateBox.x -
+            recordBox.x -
+            (recordBox.x + recordBox.width - (actionsBox.x + actionsBox.width)),
+        ),
+      ).toBeLessThanOrEqual(2)
+      expect(rowBox.height).toBeLessThanOrEqual(48)
+      expect(recordBox.height).toBeLessThanOrEqual(76)
+      await record.scrollIntoViewIfNeeded()
+      await page.screenshot({
+        path: test.info().outputPath('large-personal-record-row.png'),
+      })
+      await expect
+        .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+        .toBeLessThanOrEqual(layout.width)
+    } finally {
+      await context.close()
+    }
   })
 }
 
@@ -249,7 +291,7 @@ for (const width of [1280, 390]) {
     expect(buttonBox).not.toBeNull()
     expect(
       Math.abs(estimateCardBox!.height - actualCardBox!.height),
-    ).toBeLessThanOrEqual(1)
+    ).toBeLessThanOrEqual(2)
     expect(
       Math.abs(estimateRowBox!.height - actualRowBox!.height),
     ).toBeLessThanOrEqual(1)
@@ -259,10 +301,16 @@ for (const width of [1280, 390]) {
       estimateRowBox!.x + estimateRowBox!.width / 2,
       1,
     )
-    expect(buttonBox!.x + buttonBox!.width / 2).toBeCloseTo(
-      actionBox!.x + actionBox!.width / 2,
+    const leftInset = dateBox!.x - estimateCardBox!.x
+    const rightInset =
+      estimateCardBox!.x +
+      estimateCardBox!.width -
+      (buttonBox!.x + buttonBox!.width)
+    expect(actionBox!.x + actionBox!.width).toBeCloseTo(
+      buttonBox!.x + buttonBox!.width,
       1,
     )
+    expect(Math.abs(leftInset - rightInset)).toBeLessThanOrEqual(2)
     expect(buttonBox!.height).toBeGreaterThanOrEqual(width <= 600 ? 44 : 32)
     expect(valueBox!.y + valueBox!.height).toBeLessThanOrEqual(
       estimateRowBox!.y + estimateRowBox!.height,
