@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { Children, isValidElement, type ReactNode } from 'react'
 
 /** Shared compact weight label; actual rendered controls determine editable sizing. */
 export function WeightEntryCard({
@@ -19,10 +19,13 @@ export function WeightEntryCard({
   valueFontScale?: number
 }) {
   const label = weightKg.toFixed(2)
+  const hasActions = Children.toArray(children).some(
+    (child) => isValidElement(child) && typeof child.type === 'function',
+  )
   return (
     <div
       data-center-value={centerValue ? '' : undefined}
-      className={`group/weight rounded-lg border border-line bg-page ${centerValue ? 'relative flex min-h-12 w-full flex-col items-stretch gap-1 px-1 py-1 pointer-coarse:min-h-[52px]' : 'inline-flex h-10 shrink-0 flex-nowrap items-center gap-0 px-1 py-0 has-[button]:w-[124px] pointer-coarse:h-12 pointer-coarse:has-[button]:w-[148px]'} ${className}`}
+      className={`group/weight rounded-lg border border-line bg-page ${centerValue ? 'relative flex min-h-10 w-full flex-col items-stretch gap-0 px-1 py-0.5 pointer-coarse:min-h-11' : 'inline-flex h-10 shrink-0 flex-nowrap items-center gap-0 px-1 py-0 has-[button]:w-[124px] pointer-coarse:h-12 pointer-coarse:has-[button]:w-[148px]'} ${className}`}
     >
       <span
         data-record-value=""
@@ -42,7 +45,7 @@ export function WeightEntryCard({
         </span>{' '}
         <span className={centerValue ? 'text-xs font-medium' : ''}>kg</span>
       </span>
-      {centerValue ? (
+      {centerValue && hasActions ? (
         <div
           data-record-actions=""
           className="flex min-h-8 w-full items-center justify-end pointer-coarse:min-h-11"

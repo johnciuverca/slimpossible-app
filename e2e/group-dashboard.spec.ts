@@ -803,10 +803,14 @@ for (const layout of [
             valueRight: valueBounds.right,
             centerX: valueBounds.left + valueBounds.width / 2,
             containerCenterX: bounds.left + bounds.width / 2,
-            inlineControls:
-              getComputedStyle(card.querySelector('[data-record-actions]')!)
-                .position === 'absolute',
+            inlineControls: (() => {
+              const actions = card.querySelector('[data-record-actions]')
+              return actions
+                ? getComputedStyle(actions).position === 'absolute'
+                : false
+            })(),
             valueBottom: valueBounds.bottom,
+            recordRowHeight: card.closest('tr')!.getBoundingClientRect().height,
             leftPadding: valueBounds.left - bounds.left,
             rightPadding: bounds.right - valueBounds.right,
             unitRight: value.lastElementChild!.getBoundingClientRect().right,
@@ -845,8 +849,9 @@ for (const layout of [
         }
         if (!box.buttons.length) {
           expect(box.childCount).toBe(2)
+          expect(box.height).toBeLessThanOrEqual(layout.hasTouch ? 46 : 42)
         }
-        expect(box.height).toBeGreaterThanOrEqual(layout.hasTouch ? 52 : 48)
+        expect(box.height).toBeGreaterThanOrEqual(layout.hasTouch ? 44 : 40)
         if (box.buttons.length) {
           expect(box.centerX).toBeCloseTo(box.containerCenterX, 1)
           expect(box.numberWidth).toBeGreaterThan(35)
@@ -856,11 +861,14 @@ for (const layout of [
           ).toBeLessThanOrEqual(box.width)
           expect(box.buttons[0].center).toBeCloseTo(box.buttons[1].center, 1)
           if (box.inlineControls) {
-            expect(box.height).toBeLessThanOrEqual(layout.hasTouch ? 56 : 52)
+            expect(box.height).toBeLessThanOrEqual(layout.hasTouch ? 48 : 44)
             expect(box.buttons[0].center).toBeCloseTo(box.center, 1)
             expect(box.valueRight).toBeLessThanOrEqual(box.buttons[0].left + 1)
           } else {
-            expect(box.height).toBeGreaterThanOrEqual(layout.hasTouch ? 80 : 68)
+            expect(box.height).toBeGreaterThanOrEqual(layout.hasTouch ? 72 : 60)
+            expect(box.height).toBeLessThanOrEqual(
+              layout.width >= 500 ? 66 : 76,
+            )
             expect(box.buttons[0].center).toBeGreaterThan(box.valueBottom)
           }
         }
@@ -877,6 +885,9 @@ for (const layout of [
       }
       const own = boxes.filter((box) => box.buttons.length > 0)
       expect(own).toHaveLength(2)
+      expect(
+        Math.max(...own.map((box) => box.recordRowHeight)),
+      ).toBeLessThanOrEqual(layout.width >= 500 ? 75 : 86)
       for (const box of own)
         expect(
           box.buttons[1].offset - box.buttons[0].offset - box.buttons[0].width,

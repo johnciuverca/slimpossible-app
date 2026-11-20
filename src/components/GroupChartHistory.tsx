@@ -820,7 +820,13 @@ export function GroupChartHistory({
                               {row.cells.map((point, index) => (
                                 <td
                                   key={series[index].memberKey}
-                                  className="relative z-0 px-1 py-1"
+                                  className={`relative z-0 px-1 ${
+                                    view === 'records' &&
+                                    point &&
+                                    !point.estimated
+                                      ? 'py-0.5'
+                                      : 'py-1'
+                                  }`}
                                 >
                                   {point ? (
                                     point.estimated ? (
@@ -872,7 +878,7 @@ export function GroupChartHistory({
                                         }
                                         className={
                                           view === 'records'
-                                            ? 'w-full rounded-xl border border-slate-700 bg-slate-800 p-1'
+                                            ? 'w-full rounded-xl border border-slate-700 bg-slate-800 p-0.5'
                                             : 'contents'
                                         }
                                       >
@@ -889,7 +895,7 @@ export function GroupChartHistory({
                                           {view === 'records' ? (
                                             <div
                                               data-record-comparison
-                                              className="flex min-h-10 min-w-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-900 px-1 text-center text-[11.5px] pointer-coarse:min-h-12"
+                                              className="flex min-h-10 min-w-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-900 px-1 text-center text-[11.5px] pointer-coarse:min-h-11"
                                             >
                                               <span
                                                 className={`whitespace-nowrap ${sharedChangeColor(point.previousSharedChangeKg, true)}`}

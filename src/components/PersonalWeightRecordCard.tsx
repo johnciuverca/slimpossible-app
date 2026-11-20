@@ -18,7 +18,7 @@ export function PersonalWeightRecordCard({
   disabled?: boolean
 }) {
   return (
-    <li className="min-w-0 rounded-xl border border-solid border-slate-700 bg-slate-800 p-3 text-slate-100">
+    <li className="min-w-0 rounded-xl border border-solid border-slate-700 bg-slate-800 p-1.5 text-slate-100">
       <div
         data-personal-weight-row=""
         className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2"
@@ -47,11 +47,11 @@ export function PersonalWeightRecordCard({
         </div>
       </div>
       {entry.note ? (
-        <p className="mt-4 whitespace-pre-wrap break-words text-sm text-slate-300">
+        <p className="mt-3 whitespace-pre-wrap break-words text-sm text-slate-300">
           {entry.note}
         </p>
       ) : null}
-      <p className="mt-3 break-words text-xs text-slate-300">
+      <p className="mt-1 break-words text-xs text-slate-300">
         {entry.sharedChallengeIds.length
           ? `Shared with ${entry.sharedChallengeIds.map(groupName).join(', ')}`
           : 'Private'}

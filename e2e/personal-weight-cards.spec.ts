@@ -164,6 +164,7 @@ for (const width of [1280, 390]) {
       1,
     )
     expect(rowBox.height).toBeLessThanOrEqual(48)
+    expect((await record.boundingBox())!.height).toBeLessThanOrEqual(76)
     await record.scrollIntoViewIfNeeded()
     await page.screenshot({
       path: test.info().outputPath('large-personal-record-row.png'),
