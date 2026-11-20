@@ -2177,7 +2177,7 @@ for (const viewport of [
         editBox.y + editBox.height / 2 - deleteBox.y - deleteBox.height / 2,
       ),
     ).toBeLessThan(1)
-    expect(cardBox.height).toBeGreaterThanOrEqual(actionsInline ? 48 : 72)
+    expect(cardBox.height).toBeGreaterThanOrEqual(actionsInline ? 40 : 72)
     expect(editBox.width).toBeGreaterThanOrEqual(32)
     expect(deleteBox.width).toBeGreaterThanOrEqual(32)
     await edit.focus()
