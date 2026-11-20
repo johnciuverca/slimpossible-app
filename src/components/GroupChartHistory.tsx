@@ -834,9 +834,8 @@ export function GroupChartHistory({
                                       <div
                                         data-record-estimate=""
                                         data-estimate-date={point.date}
-                                        className="record-estimate grid min-h-[46px] min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 rounded-xl border border-dashed border-slate-700 bg-slate-800 p-0.5 text-center"
+                                        className="record-estimate flex min-h-[46px] min-w-0 items-center justify-center gap-1 whitespace-nowrap rounded-xl border border-dashed border-slate-700 bg-slate-800 p-0.5 text-center"
                                       >
-                                        <span aria-hidden="true" />
                                         <div
                                           data-record-estimate-value=""
                                           className="inline-flex min-w-0 items-center justify-center gap-1 whitespace-nowrap"
@@ -846,7 +845,7 @@ export function GroupChartHistory({
                                           </span>
                                           <WeightEntryCard
                                             weightKg={point.weightKg}
-                                            className="record-estimate-weight !h-10 !w-auto !justify-center !border-dashed !border-slate-700 min-w-[124px] bg-slate-900 pointer-coarse:min-w-[148px]"
+                                            className="record-estimate-weight !h-10 !min-w-0 !w-auto !justify-center !border-dashed !border-slate-700 !px-1 bg-slate-900"
                                             valueClassName="font-normal text-slate-100"
                                             valueSizeClassName="text-[11px]"
                                             valueFontScale={68}
@@ -863,7 +862,7 @@ export function GroupChartHistory({
                                           'ready' ? (
                                           <div
                                             data-record-actions=""
-                                            className="flex min-w-0 justify-center"
+                                            className="flex shrink-0 justify-center"
                                           >
                                             <button
                                               type="button"
@@ -881,9 +880,7 @@ export function GroupChartHistory({
                                               Record weight
                                             </button>
                                           </div>
-                                        ) : (
-                                          <span aria-hidden="true" />
-                                        )}
+                                        ) : null}
                                       </div>
                                     ) : (
                                       <div

@@ -913,12 +913,21 @@ for (const layout of [
           cardHeight: card.height,
           rowHeight: row.height,
           cardCenterX: card.left + card.width / 2,
-          valueCenterX: value.left + value.width / 2,
           valueTop: value.top,
           valueBottom: value.bottom,
           actionsCenterX: actions.left + actions.width / 2,
+          lineCenterX:
+            (Math.min(value.left, actions.left) +
+              Math.max(value.right, actions.right)) /
+            2,
           buttonCenterX: button.left + button.width / 2,
           buttonHeight: button.height,
+          buttonLeft: button.left,
+          buttonRight: button.right,
+          valueLeft: value.left,
+          valueRight: value.right,
+          cardLeft: card.left,
+          cardRight: card.right,
           labelCenterY: label.top + label.height / 2,
           weightCenterY: weight.top + weight.height / 2,
           labelRight: label.right,
@@ -934,7 +943,7 @@ for (const layout of [
             .map((card) => card.closest('tr')!.getBoundingClientRect().height),
         }
       })
-      expect(estimateGeometry.valueCenterX).toBeCloseTo(
+      expect(estimateGeometry.lineCenterX).toBeCloseTo(
         estimateGeometry.cardCenterX,
         1,
       )
@@ -965,6 +974,12 @@ for (const layout of [
       )
       expect(estimateGeometry.labelRight).toBeLessThanOrEqual(
         estimateGeometry.weightLeft,
+      )
+      expect(estimateGeometry.buttonLeft).toBeGreaterThanOrEqual(
+        estimateGeometry.valueRight,
+      )
+      expect(estimateGeometry.buttonRight).toBeLessThanOrEqual(
+        estimateGeometry.cardRight,
       )
       for (const box of own)
         expect(
