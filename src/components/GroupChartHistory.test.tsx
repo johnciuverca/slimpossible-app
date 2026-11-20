@@ -38,6 +38,47 @@ const legendName = (item: Element) => {
   return copy.textContent?.trim()
 }
 describe('Group chart history', () => {
+  it('shows a muted estimate row between explicitly shared actual records', async () => {
+    render(
+      <GroupChartHistory
+        challengeId="group"
+        viewerId="viewer"
+        persistence={persistence(
+          vi.fn().mockResolvedValue({ state: 'success', data: rows }),
+        )}
+        refreshVersion={0}
+        view="records"
+      />,
+    )
+
+    const estimate = await screen.findByText('Estimated')
+    const estimateCard = estimate.closest('[data-record-estimate]')
+    expect(estimateCard).toHaveAttribute('data-estimate-date', '2026-09-02')
+    expect(estimateCard).toHaveClass(
+      'border',
+      'border-dashed',
+      'border-slate-700',
+      'bg-slate-800',
+    )
+    expect(estimateCard).toHaveTextContent('89.25 kg')
+    expect(estimateCard?.querySelector('[title="89.25 kg"]')).toHaveClass(
+      'font-normal',
+      'text-slate-100',
+    )
+    expect(estimateCard).not.toHaveTextContent('Record weight')
+    const table = screen.getByRole('table', {
+      name: 'Shared group weight history',
+    })
+    const actualWeight = table.querySelector('[title="88.5 kg"]')
+    expect(actualWeight).toHaveClass('font-bold', 'text-[18px]', 'text-center')
+    expect(actualWeight).toHaveAttribute('data-record-value', '')
+    expect(actualWeight?.closest('.record-weight-box')).toHaveClass(
+      '!border-solid',
+      '!border-slate-700',
+    )
+    expect(within(table).getAllByRole('row')).toHaveLength(4)
+  })
+
   it('centers shared-record comparisons and colors only prior actual shared changes', async () => {
     const load = vi.fn().mockResolvedValue({
       state: 'success',
@@ -99,8 +140,14 @@ describe('Group chart history', () => {
     expect(first.pair.parentElement).toBe(first.cell)
     expect(first.card.parentElement).toBe(first.layout)
     expect(first.changeContainer.parentElement).toBe(first.layout)
-    expect(first.pair).toHaveClass('rounded-xl', 'border', 'bg-panel')
+    expect(first.pair).toHaveClass(
+      'rounded-xl',
+      'border',
+      'border-slate-700',
+      'bg-slate-800',
+    )
     expect(first.layout).toHaveClass('grid')
+    expect(first.card).toHaveClass('bg-slate-900', '!border-slate-700')
     expect(first.change).toHaveClass('text-ink')
     expect(first.changeContainer).toHaveClass('text-center')
 
@@ -763,9 +810,9 @@ describe('Group chart history', () => {
     const dateRow = within(table)
       .getByRole('rowheader', { name: '2026-09-02' })
       .closest('tr')!
-    expect(within(dateRow).getByLabelText('No shared entry')).toHaveTextContent(
-      '—',
-    )
+    expect(
+      within(dateRow).getByText('Estimated').closest('[data-record-estimate]'),
+    ).toHaveTextContent('89.25 kg')
     expect(dateRow).toHaveTextContent('70.25 kg')
     const all = screen.getByRole('tab', { name: 'All members' })
     fireEvent.keyDown(all, { key: 'End' })

@@ -682,6 +682,97 @@ body {
 .group-history-table tbody tr:nth-child(even) th {
   background-color: #162330;
 }
+.record-weight-box[data-center-value] {
+  container-name: record-weight;
+  container-type: inline-size;
+}
+.group-history-table td[data-record-cell] {
+  container-name: group-record-cell;
+  container-type: inline-size;
+}
+.record-estimate {
+  width: 100%;
+  min-height: 69px;
+}
+.record-estimate > [data-record-estimate-value] {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+.record-estimate > [data-record-actions] {
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  transform: translateY(-50%);
+}
+.record-estimate [data-record-actions] > button {
+  padding-inline: 0 !important;
+  font-size: 10px !important;
+  letter-spacing: -0.03em !important;
+}
+@media (max-width: 600px) {
+  .record-estimate {
+    min-height: 80px;
+  }
+}
+@media (pointer: coarse) {
+  .record-estimate {
+    min-height: 80px;
+  }
+}
+@media (pointer: fine) {
+  @container record-weight (min-width: 224px) {
+    .record-weight-box[data-center-value] > [data-record-value] {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: max-content;
+      max-width: calc(100% - 136px);
+      flex: none;
+      transform: translate(-50%, -50%);
+    }
+    .record-weight-box[data-center-value] > [data-record-actions] {
+      position: absolute;
+      top: 50%;
+      right: 4px;
+      width: max-content;
+      min-height: 32px;
+      transform: translateY(-50%);
+    }
+  }
+  @container group-record-cell (min-width: 320px) {
+    .record-estimate {
+      min-height: 46px;
+    }
+  }
+}
+@media (pointer: coarse) {
+  @container record-weight (min-width: 280px) {
+    .record-weight-box[data-center-value] > [data-record-value] {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: max-content;
+      max-width: calc(100% - 184px);
+      flex: none;
+      transform: translate(-50%, -50%);
+    }
+    .record-weight-box[data-center-value] > [data-record-actions] {
+      position: absolute;
+      top: 50%;
+      right: 4px;
+      width: max-content;
+      min-height: 44px;
+      transform: translateY(-50%);
+    }
+  }
+  @container group-record-cell (min-width: 360px) {
+    .record-estimate {
+      min-height: 50px;
+    }
+  }
+}
 /* Shared approved navy/teal shell for personal, group and authentication pages. */
 .shared-layout {
   color-scheme: dark;
