@@ -1,6 +1,6 @@
 export const WEEKLY_RESULTS_TIME_ZONE = 'Europe/Bucharest'
 
-export function mostRecentWeeklySunday(now = new Date()) {
+export function weeklyCurrentDate(now = new Date()) {
   const formatter = new Intl.DateTimeFormat('en-CA', {
     timeZone: WEEKLY_RESULTS_TIME_ZONE,
     year: 'numeric',
@@ -13,7 +13,11 @@ export function mostRecentWeeklySunday(now = new Date()) {
       .filter((part) => part.type !== 'literal')
       .map((part) => [part.type, Number(part.value)]),
   )
-  const date = new Date(Date.UTC(parts.year, parts.month - 1, parts.day))
+  return `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`
+}
+
+export function mostRecentWeeklySunday(now = new Date()) {
+  const date = new Date(`${weeklyCurrentDate(now)}T00:00:00.000Z`)
   date.setUTCDate(date.getUTCDate() - date.getUTCDay())
   return date.toISOString().slice(0, 10)
 }

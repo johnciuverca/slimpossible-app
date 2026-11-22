@@ -70,12 +70,14 @@ import {
 } from '../models/groupProgress'
 import {
   localDateOnly,
+  provisionalWeekDates,
   type ProvisionalGroupLeaderSummary,
 } from '../models/provisionalGroupLeader'
 import { createSavedWeeklyWinCelebration } from '../models/weeklyCelebrations'
 import {
   mostRecentWeeklySunday,
   previousWeeklySunday,
+  weeklyCurrentDate,
 } from '../models/weeklyFinalization'
 import { calculateDailyWeightChange } from '../models/weightChange'
 import { calculatePersonalWeeklyChange } from '../models/personalWeeklyChange'
@@ -1490,10 +1492,11 @@ export function GroupDashboardPage() {
   )
   const challengeParam = searchParams.get('challenge')
   const persistence = useMemo(() => createPersistence(authState), [authState])
+  const [localToday, setLocalToday] = useState(() => weeklyCurrentDate())
   const [savedData, setData] = useState<GroupDashboardData | null>(null)
   const [savedChallenges, setChallenges] = useState<Challenge[]>([])
   const weightRevision = usePersonalWeightRevision(ownerId ?? '')
-  const requestKey = `${authState.status}:${ownerId ?? ''}:${challengeParam ?? ''}:${persistence.mode}:${weightRevision}`
+  const requestKey = `${authState.status}:${ownerId ?? ''}:${challengeParam ?? ''}:${persistence.mode}:${weightRevision}:${localToday}`
   const [loadedKey, setLoadedKey] = useState('')
   const data = loadedKey === requestKey ? savedData : null
   const challenges = loadedKey === requestKey ? savedChallenges : []
@@ -1511,6 +1514,21 @@ export function GroupDashboardPage() {
         ownGroupMemberKey(data?.challenge.id ?? '', ownerId) !== null),
     ),
   })
+
+  useEffect(() => {
+    const refreshLocalDate = () => {
+      const today = weeklyCurrentDate()
+      setLocalToday((current) => (current === today ? current : today))
+    }
+    const interval = window.setInterval(refreshLocalDate, 60_000)
+    window.addEventListener('focus', refreshLocalDate)
+    document.addEventListener('visibilitychange', refreshLocalDate)
+    return () => {
+      window.clearInterval(interval)
+      window.removeEventListener('focus', refreshLocalDate)
+      document.removeEventListener('visibilitychange', refreshLocalDate)
+    }
+  }, [])
   const [memberProgressSnapshot, setMemberProgressSnapshot] = useState<{
     key: string
     rows: GroupMemberProgress[]
@@ -1628,6 +1646,7 @@ export function GroupDashboardPage() {
 
   useEffect(() => {
     let current = true
+    let latestRequest = 0
     const challengeId = data?.challenge.id
     const currentSunday = data?.summary.currentSunday
     const loadDisplay =
@@ -1657,16 +1676,22 @@ export function GroupDashboardPage() {
     )
     const refreshDisplay = () => {
       const resultSunday = mostRecentWeeklySunday()
+      const requestId = ++latestRequest
       setData((currentData) =>
         currentData?.challenge.id === challengeId
           ? currentData.weeklyResultSunday === resultSunday
             ? currentData
-            : { ...currentData, weeklyResultSunday: resultSunday }
+            : {
+                ...currentData,
+                weeklyResultSunday: resultSunday,
+                weeklyResultDisplay: null,
+                weeklyResultDisplayState: 'loading',
+              }
           : currentData,
       )
       void loadDisplay(challengeId, resultSunday)
         .then((result) => {
-          if (!current) return
+          if (!current || requestId !== latestRequest) return
           setData((currentData) =>
             currentData?.challenge.id === challengeId
               ? {
@@ -1682,7 +1707,7 @@ export function GroupDashboardPage() {
           )
         })
         .catch(() => {
-          if (!current) return
+          if (!current || requestId !== latestRequest) return
           setData((currentData) =>
             currentData?.challenge.id === challengeId
               ? {
@@ -1920,7 +1945,7 @@ export function GroupDashboardPage() {
           const provisionalResult =
             await persistence.repositories.groupProgress.getProvisionalLeader(
               challenge.id,
-              localDateOnly(),
+              localToday,
             )
           if (!isCurrent) return
 
@@ -1967,6 +1992,7 @@ export function GroupDashboardPage() {
     persistence,
     reloadKey,
     requestKey,
+    localToday,
   ])
 
   const summary = data?.summary
@@ -2053,6 +2079,17 @@ export function GroupDashboardPage() {
   const displayedPreviousSunday = displayedCurrentSunday
     ? previousWeeklySunday(displayedCurrentSunday)
     : summary?.previousSunday
+  const finalizedThisProvisionalWeek = Boolean(
+    hasManagedWeeklyResult &&
+    weeklyResultDisplayState === 'ready' &&
+    weeklyResultDisplay?.state === 'finalized' &&
+    displayedCurrentSunday === provisionalWeekDates(localToday).currentWeekEnd,
+  )
+  const showProvisionalLeader =
+    (!hasManagedWeeklyResult ||
+      (weeklyResultDisplayState === 'ready' && Boolean(weeklyResultDisplay)) ||
+      data?.provisionalLeaderState === 'error') &&
+    !finalizedThisProvisionalWeek
   const selectedChallengeId =
     challengeParam ||
     data?.challenge.id ||
@@ -2214,115 +2251,121 @@ export function GroupDashboardPage() {
                 }
               >
                 {section === 'weekly-results' ? (
-                  <div className="grid gap-5 lg:grid-cols-2">
-                    <section
-                      aria-labelledby="provisional-leader-heading"
-                      className="group-overview-leader min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 sm:p-7"
-                    >
-                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-800">
-                        This week
-                      </p>
-                      <h2
-                        className="mt-2 text-xl font-bold text-slate-950"
-                        id="provisional-leader-heading"
+                  <div
+                    className={`grid gap-5 ${showProvisionalLeader ? 'lg:grid-cols-2' : ''}`}
+                  >
+                    {showProvisionalLeader ? (
+                      <section
+                        aria-labelledby="provisional-leader-heading"
+                        className="group-overview-leader min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 sm:p-7"
                       >
-                        Provisional leader
-                      </h2>
-                      {data.provisionalLeaderState === 'loading' ? (
-                        <p
-                          className="mt-4 text-sm text-slate-700"
-                          role="status"
-                        >
-                          Loading this week’s group update…
+                        <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-800">
+                          This week
                         </p>
-                      ) : data.provisionalLeaderState === 'error' ? (
-                        <p
-                          className="mt-4 text-sm text-slate-700"
-                          role="status"
+                        <h2
+                          className="mt-2 text-xl font-bold text-slate-950"
+                          id="provisional-leader-heading"
                         >
-                          Provisional group progress is unavailable right now.
-                        </p>
-                      ) : provisionalLeader?.state === 'leaders' ? (
-                        <>
-                          <p className="mt-3 text-sm text-slate-700">
-                            Comparing check-ins since Sunday{' '}
+                          Provisional leader
+                        </h2>
+                        {data.provisionalLeaderState === 'loading' ? (
+                          <p
+                            className="mt-4 text-sm text-slate-700"
+                            role="status"
+                          >
+                            Loading this week’s group update…
+                          </p>
+                        ) : data.provisionalLeaderState === 'error' ? (
+                          <p
+                            className="mt-4 text-sm text-slate-700"
+                            role="status"
+                          >
+                            Provisional group progress is unavailable right now.
+                          </p>
+                        ) : provisionalLeader?.state === 'leaders' ? (
+                          <>
+                            <p className="mt-3 text-sm text-slate-700">
+                              Comparing check-ins since Sunday{' '}
+                              <time dateTime={provisionalLeader.previousSunday}>
+                                {formatDate(provisionalLeader.previousSunday)}
+                              </time>
+                              ; this week runs{' '}
+                              <time
+                                dateTime={provisionalLeader.currentWeekStart}
+                              >
+                                {formatDate(provisionalLeader.currentWeekStart)}
+                              </time>{' '}
+                              to{' '}
+                              <time dateTime={provisionalLeader.currentWeekEnd}>
+                                {formatDate(provisionalLeader.currentWeekEnd)}
+                              </time>
+                              .
+                            </p>
+                            <p className="mt-4 text-lg font-bold text-slate-950">
+                              {provisionalLeader.leaderCount > 1
+                                ? 'Shared provisional leaders'
+                                : 'Current provisional leader'}
+                            </p>
+                            <ul
+                              aria-label="Provisional leaders"
+                              className="mt-2 space-y-2"
+                            >
+                              {provisionalLeader.leaderNames.map(
+                                (name, index) => (
+                                  <li
+                                    className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-xl bg-white/80 px-4 py-3"
+                                    key={`${name}-${index}`}
+                                  >
+                                    <span className="font-semibold text-slate-950">
+                                      {name}
+                                    </span>
+                                    <span className="text-sm text-slate-600">
+                                      Latest check-in{' '}
+                                      <time
+                                        dateTime={
+                                          provisionalLeader.leaderLatestDates[
+                                            index
+                                          ]
+                                        }
+                                      >
+                                        {formatDate(
+                                          provisionalLeader.leaderLatestDates[
+                                            index
+                                          ],
+                                        )}
+                                      </time>
+                                    </span>
+                                  </li>
+                                ),
+                              )}
+                            </ul>
+                            <p className="mt-3 text-sm leading-6 text-slate-700">
+                              {provisionalLeader.eligibleParticipantCount} of{' '}
+                              {provisionalLeader.activeParticipantCount} active
+                              members have both comparison check-ins. Ties are
+                              shared; this result is provisional until Sunday.
+                            </p>
+                          </>
+                        ) : provisionalLeader?.state ===
+                          'no-eligible-candidates' ? (
+                          <p className="mt-4 text-sm leading-6 text-slate-700">
+                            No provisional leader is available yet. A member
+                            needs a saved check-in on Sunday{' '}
                             <time dateTime={provisionalLeader.previousSunday}>
                               {formatDate(provisionalLeader.previousSunday)}
-                            </time>
-                            ; this week runs{' '}
-                            <time dateTime={provisionalLeader.currentWeekStart}>
-                              {formatDate(provisionalLeader.currentWeekStart)}
                             </time>{' '}
-                            to{' '}
-                            <time dateTime={provisionalLeader.currentWeekEnd}>
-                              {formatDate(provisionalLeader.currentWeekEnd)}
-                            </time>
-                            .
+                            and one during this week. The result updates as
+                            saved check-ins change.
                           </p>
-                          <p className="mt-4 text-lg font-bold text-slate-950">
-                            {provisionalLeader.leaderCount > 1
-                              ? 'Shared provisional leaders'
-                              : 'Current provisional leader'}
+                        ) : (
+                          <p className="mt-4 text-sm leading-6 text-slate-700">
+                            {provisionalLeader?.activeParticipantCount === 0
+                              ? 'No active members are available for a provisional result.'
+                              : 'At least two active members are needed for a provisional group result.'}
                           </p>
-                          <ul
-                            aria-label="Provisional leaders"
-                            className="mt-2 space-y-2"
-                          >
-                            {provisionalLeader.leaderNames.map(
-                              (name, index) => (
-                                <li
-                                  className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-xl bg-white/80 px-4 py-3"
-                                  key={`${name}-${index}`}
-                                >
-                                  <span className="font-semibold text-slate-950">
-                                    {name}
-                                  </span>
-                                  <span className="text-sm text-slate-600">
-                                    Latest check-in{' '}
-                                    <time
-                                      dateTime={
-                                        provisionalLeader.leaderLatestDates[
-                                          index
-                                        ]
-                                      }
-                                    >
-                                      {formatDate(
-                                        provisionalLeader.leaderLatestDates[
-                                          index
-                                        ],
-                                      )}
-                                    </time>
-                                  </span>
-                                </li>
-                              ),
-                            )}
-                          </ul>
-                          <p className="mt-3 text-sm leading-6 text-slate-700">
-                            {provisionalLeader.eligibleParticipantCount} of{' '}
-                            {provisionalLeader.activeParticipantCount} active
-                            members have both comparison check-ins. Ties are
-                            shared; this result is provisional until Sunday.
-                          </p>
-                        </>
-                      ) : provisionalLeader?.state ===
-                        'no-eligible-candidates' ? (
-                        <p className="mt-4 text-sm leading-6 text-slate-700">
-                          No provisional leader is available yet. A member needs
-                          a saved check-in on Sunday{' '}
-                          <time dateTime={provisionalLeader.previousSunday}>
-                            {formatDate(provisionalLeader.previousSunday)}
-                          </time>{' '}
-                          and one during this week. The result updates as saved
-                          check-ins change.
-                        </p>
-                      ) : (
-                        <p className="mt-4 text-sm leading-6 text-slate-700">
-                          {provisionalLeader?.activeParticipantCount === 0
-                            ? 'No active members are available for a provisional result.'
-                            : 'At least two active members are needed for a provisional group result.'}
-                        </p>
-                      )}
-                    </section>
+                        )}
+                      </section>
+                    ) : null}
 
                     <section
                       aria-labelledby="weekly-winners-heading"
