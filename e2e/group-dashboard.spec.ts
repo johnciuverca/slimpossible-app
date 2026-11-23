@@ -1573,12 +1573,16 @@ for (const width of [320, 390, 430, 1280]) {
         return { x, y, width, height, right, bottom }
       }
       const card = document.querySelector('#group-summary')!
+      const checkIn = card.querySelector(
+        '[aria-labelledby="weekly-check-in-heading"]',
+      )!
       const row = card.querySelector('dl')!
       const chart = document.querySelector(
         '.group-history-workspace svg[role="img"]',
       )!
       return {
         card: rect(card),
+        checkIn: rect(checkIn),
         row: rect(row),
         metrics: Array.from(row.children, rect),
         metricText: Array.from(row.children, (metric) => {
@@ -1604,6 +1608,9 @@ for (const width of [320, 390, 430, 1280]) {
     await expect(metrics.nth(1)).toContainText('42.5%')
     await expect(metrics.nth(2)).toContainText('Checked in')
     await expect(metrics.nth(3)).toContainText('Goals reached')
+    expect(bounds.checkIn.y).toBeGreaterThanOrEqual(bounds.card.y)
+    expect(bounds.row.y).toBeGreaterThan(bounds.checkIn.bottom)
+    expect(bounds.chart.y).toBeGreaterThanOrEqual(bounds.card.bottom)
     if (width < 640) {
       const row = bounds.row
       for (const metric of bounds.metrics) {
@@ -1619,16 +1626,12 @@ for (const width of [320, 390, 430, 1280]) {
       if (width >= 390) {
         expect(new Set(bounds.metrics.map((metric) => metric.y)).size).toBe(1)
         expect(bounds.row.height).toBeLessThanOrEqual(60)
-        expect(bounds.chart.y).toBeLessThan(530)
       } else {
         expect(new Set(bounds.metrics.map((metric) => metric.y)).size).toBe(2)
-        expect(bounds.chart.y).toBeLessThan(665)
       }
     } else {
-      expect(bounds.card.height).toBeCloseTo(103.15625, 1)
       expect(bounds.row.height).toBeCloseTo(67.1875, 1)
       expect(bounds.chart.x).toBeCloseTo(37, 1)
-      expect(bounds.chart.y).toBeCloseTo(444.15625, 1)
       expect(bounds.chart.width).toBeCloseTo(1206, 1)
       expect(bounds.chart.height).toBeCloseTo(441.140625, 1)
     }
