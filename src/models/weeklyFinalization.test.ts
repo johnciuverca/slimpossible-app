@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   mostRecentWeeklySunday,
   weeklyProvisionalCutoff,
+  weeklyCurrentDate,
 } from './weeklyFinalization'
 
 describe('weekly Sunday cutoff', () => {
@@ -20,6 +21,15 @@ describe('weekly Sunday cutoff', () => {
     )
     expect(mostRecentWeeklySunday(new Date('2026-10-24T21:00:00.000Z'))).toBe(
       '2026-10-25',
+    )
+  })
+
+  it('uses Bucharest calendar dates for the provisional week rollover', () => {
+    expect(weeklyCurrentDate(new Date('2026-11-22T21:59:00.000Z'))).toBe(
+      '2026-11-22',
+    )
+    expect(weeklyCurrentDate(new Date('2026-11-22T22:00:00.000Z'))).toBe(
+      '2026-11-23',
     )
   })
 })

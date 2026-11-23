@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -19,6 +20,7 @@ import {
   TodayPage,
 } from './AppPages'
 import { mostRecentSunday } from '../models/groupProgress'
+import { weeklyCurrentDate } from '../models/weeklyFinalization'
 import { PersonalWeighInsPage } from './PersonalWeighInsPage'
 import { ContextualSubnav } from '../components/ContextualSubnav'
 // These legacy challenge-view tests use ordered HTTP responses. Exercise the
@@ -178,7 +180,8 @@ function provisionalLeaderResponse({
   leaderNames?: string[]
   state?: 'leaders' | 'no-eligible-candidates' | 'solo-challenge'
 } = {}) {
-  const week = provisionalWeekDates(localDateOnly())
+  const currentDate = weeklyCurrentDate()
+  const week = provisionalWeekDates(currentDate)
   return response([
     {
       active_participant_count: activeParticipantCount,
@@ -187,7 +190,7 @@ function provisionalLeaderResponse({
       current_week_start: week.currentWeekStart,
       eligible_participant_count: eligibleParticipantCount,
       leader_count: leaderNames.length,
-      leader_latest_dates: leaderNames.map(() => localDateOnly()),
+      leader_latest_dates: leaderNames.map(() => currentDate),
       leader_names: leaderNames,
       previous_sunday: week.previousSunday,
       state,
@@ -245,6 +248,7 @@ function authContextValue(userId: string): AuthContextValue {
 
 afterEach(() => {
   cleanup()
+  vi.useRealTimers()
   vi.unstubAllEnvs()
   vi.unstubAllGlobals()
 })
@@ -1382,6 +1386,8 @@ describe('HomePage', () => {
 
 describe('GroupDashboardPage', () => {
   it('renders only aggregate progress and weekly winners returned by the RPC', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-11-22T18:30:00.000Z'))
     const currentSunday = mostRecentSunday()
     const previousSundayDate = new Date(`${currentSunday}T00:00:00.000Z`)
     previousSundayDate.setUTCDate(previousSundayDate.getUTCDate() - 7)
@@ -1564,7 +1570,7 @@ describe('GroupDashboardPage', () => {
                     response([
                       {
                         result_state: 'finalized',
-                        finalized_at: '2026-11-09T18:00:00.000Z',
+                        finalized_at: `${currentSunday}T18:00:00.000Z`,
                         active_participant_count: 3,
                         recorded_participant_count: 2,
                         eligible_participant_count: 2,
@@ -1656,16 +1662,14 @@ describe('GroupDashboardPage', () => {
     expect(
       screen.getByRole('list', { name: 'Challenge weeks won' }),
     ).toHaveTextContent('Ava2 weeksBen2 weeksCasey0 weeks')
-    expect(screen.getAllByText('Ava')).toHaveLength(4)
-    expect(screen.getAllByText('Ben')).toHaveLength(2)
+    expect(screen.getAllByText('Ava')).toHaveLength(3)
+    expect(screen.getAllByText('Ben')).toHaveLength(1)
     expect(
-      screen.getByRole('heading', { name: 'Provisional leader' }),
-    ).toBeInTheDocument()
-    expect(screen.getByText('Shared provisional leaders')).toBeInTheDocument()
-    const provisionalLeaderRegion = screen.getByRole('region', {
-      name: 'Provisional leader',
-    })
-    expect(provisionalLeaderRegion).toHaveTextContent('Ties are shared')
+      screen.queryByRole('heading', { name: 'Provisional leader' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('Shared provisional leaders'),
+    ).not.toBeInTheDocument()
     expect(
       screen.getByRole('navigation', { name: 'Group sections' }),
     ).toBeInTheDocument()
@@ -1714,7 +1718,7 @@ describe('GroupDashboardPage', () => {
     )
     expect(JSON.parse(String(provisionalRequest?.[1]?.body))).toEqual({
       target_challenge_id: 'challenge-1',
-      target_current_date: localDateOnly(),
+      target_current_date: weeklyCurrentDate(),
     })
 
     fireEvent.click(
@@ -1729,11 +1733,9 @@ describe('GroupDashboardPage', () => {
     )
     expect(within(finalizedWeeklyResult).getAllByText('Ava')).toHaveLength(2)
     expect(finalizedWeeklyResult).not.toHaveTextContent('Casey')
-    await waitFor(() =>
-      expect(
-        screen.getByRole('region', { name: 'Provisional leader' }),
-      ).toHaveTextContent('No provisional leader is available yet'),
-    )
+    expect(
+      screen.queryByRole('region', { name: 'Provisional leader' }),
+    ).not.toBeInTheDocument()
     expect(screen.queryByText('Weekly result updated: Casey.')).toBeNull()
 
     fireEvent.click(
@@ -1744,6 +1746,146 @@ describe('GroupDashboardPage', () => {
         screen.queryByText('Weekly result updated: Casey.'),
       ).not.toBeInTheDocument(),
     )
+  })
+
+  it('shows the next week provisional leader after the previous week locks', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-11-22T18:30:00.000Z'))
+    const requestedProvisionalDates: string[] = []
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.includes('/challenges?')) {
+        return response([
+          {
+            created_at: '2026-09-17T10:00:00.000Z',
+            created_by: 'member-1',
+            description: null,
+            end_date: '2026-12-31',
+            id: 'challenge-1',
+            name: 'Autumn challenge',
+            owner_id: 'member-1',
+            start_date: '2026-09-17',
+            status: 'active',
+            target_weight_kg: null,
+            updated_at: '2026-09-17T10:00:00.000Z',
+          },
+        ])
+      }
+      if (url.includes('/rpc/get_group_progress_summary')) {
+        return groupProgressResponse()
+      }
+      if (url.includes('/rpc/get_provisional_group_leader_summary')) {
+        requestedProvisionalDates.push(
+          JSON.parse(String(init?.body)).target_current_date,
+        )
+        return provisionalLeaderResponse()
+      }
+      if (url.includes('/rpc/get_group_weekly_result_display')) {
+        return response([
+          {
+            result_state: 'finalized',
+            finalized_at: '2026-11-22T18:00:00.000Z',
+            active_participant_count: 3,
+            recorded_participant_count: 3,
+            eligible_participant_count: 2,
+            result_outcome: 'shared_winners',
+            sole_participant_name: null,
+            winner_count: 1,
+            winner_names: ['Ava'],
+            winner_details: [
+              {
+                member_key: '11111111111111111111111111111111',
+                display_name: 'Ava',
+              },
+            ],
+          },
+        ])
+      }
+      return response([])
+    })
+
+    renderDashboard(
+      <GroupDashboardPage />,
+      fetchMock,
+      '/group?challenge=challenge-1&tab=weekly-results',
+    )
+
+    expect(await screen.findByText('Final weekly winner')).toBeInTheDocument()
+    await waitFor(() =>
+      expect(
+        screen.queryByText('Shared provisional leaders'),
+      ).not.toBeInTheDocument(),
+    )
+
+    vi.setSystemTime(new Date('2026-11-23T12:00:00.000Z'))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000)
+    })
+
+    expect(
+      await screen.findByText('Shared provisional leaders'),
+    ).toBeInTheDocument()
+    expect(requestedProvisionalDates).toEqual(['2026-11-22', '2026-11-23'])
+    expect(
+      screen.getByRole('region', { name: 'Weekly result' }),
+    ).toHaveTextContent('Finalized')
+  })
+
+  it('hides provisional leaders when authoritative weekly status fails', async () => {
+    let finishStatusRequest: (result: Response) => void = () => undefined
+    const pendingStatusRequest = new Promise<Response>((resolve) => {
+      finishStatusRequest = resolve
+    })
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes('/challenges?')) {
+        return response([
+          {
+            created_at: '2026-09-17T10:00:00.000Z',
+            created_by: 'member-1',
+            description: null,
+            end_date: '2026-12-31',
+            id: 'challenge-1',
+            name: 'Autumn challenge',
+            owner_id: 'member-1',
+            start_date: '2026-09-17',
+            status: 'active',
+            target_weight_kg: null,
+            updated_at: '2026-09-17T10:00:00.000Z',
+          },
+        ])
+      }
+      if (url.includes('/rpc/get_group_progress_summary')) {
+        return groupProgressResponse()
+      }
+      if (url.includes('/rpc/get_provisional_group_leader_summary')) {
+        return provisionalLeaderResponse()
+      }
+      if (url.includes('/rpc/get_group_weekly_result_display')) {
+        return pendingStatusRequest
+      }
+      return response([])
+    })
+
+    renderDashboard(
+      <GroupDashboardPage />,
+      fetchMock,
+      '/group?challenge=challenge-1&tab=weekly-results',
+    )
+
+    expect(
+      await screen.findByText('Checking the weekly result.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText('Shared provisional leaders'),
+    ).not.toBeInTheDocument()
+    finishStatusRequest(response({ message: 'Weekly status unavailable' }, 500))
+    expect(
+      await screen.findByText('Weekly result status unavailable'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('region', { name: 'Weekly result' }),
+    ).toHaveTextContent('status is unavailable')
   })
 
   it('loads selected-group summaries for an owner who is not enrolled', async () => {
@@ -2082,7 +2224,17 @@ describe('GroupDashboardPage', () => {
     ).toHaveAttribute('aria-current', 'page')
     expect(screen.queryByText('45.1%')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('link', { name: 'Weekly results' }))
-    expect(await screen.findByText('Jamie')).toBeInTheDocument()
+    expect(screen.queryByText('Jamie')).not.toBeInTheDocument()
+    expect(
+      fetchMock.mock.calls
+        .filter(([url]) =>
+          String(url).includes('/rpc/get_provisional_group_leader_summary'),
+        )
+        .map(
+          ([, requestInit]) =>
+            JSON.parse(String(requestInit?.body)).target_challenge_id,
+        ),
+    ).toEqual(['challenge-1', 'challenge-2'])
     fireEvent.click(screen.getByRole('link', { name: 'Overview' }))
 
     fireEvent.click(
@@ -2091,7 +2243,7 @@ describe('GroupDashboardPage', () => {
     expect(await screen.findByText('64.3%')).toBeInTheDocument()
     expect(screen.queryByText('61.2%')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('link', { name: 'Weekly results' }))
-    expect(await screen.findByText('Jo')).toBeInTheDocument()
+    expect(screen.queryByText('Jo')).not.toBeInTheDocument()
 
     const groupRequests = fetchMock.mock.calls.filter(([url]) =>
       String(url).includes('/rpc/get_group_progress_summary'),
@@ -2101,6 +2253,16 @@ describe('GroupDashboardPage', () => {
         ([, requestInit]) =>
           JSON.parse(String(requestInit?.body)).target_challenge_id,
       ),
+    ).toEqual(['challenge-1', 'challenge-2', 'challenge-2'])
+    expect(
+      fetchMock.mock.calls
+        .filter(([url]) =>
+          String(url).includes('/rpc/get_provisional_group_leader_summary'),
+        )
+        .map(
+          ([, requestInit]) =>
+            JSON.parse(String(requestInit?.body)).target_challenge_id,
+        ),
     ).toEqual(['challenge-1', 'challenge-2', 'challenge-2'])
   })
 
