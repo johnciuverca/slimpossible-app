@@ -34,6 +34,7 @@ async function installGroupFixtures(
     holdPersonalContexts?: boolean
     participantAvatars?: boolean
     finalizedWeeklyResultForPrimaryGroup?: boolean
+    weeklyResultMode?: 'finalized' | 'unfinished' | 'error' | 'pending'
   } = {},
 ) {
   const challengeId = ownEntries ? ownGroupId : 'e2e-challenge'
@@ -50,6 +51,7 @@ async function installGroupFixtures(
   let privateEntrySharedChallengeIds: string[] =
     options.privateEntrySharedWithOtherGroup ? [secondId] : []
   const releasePersonalContexts: (() => void)[] = []
+  const releaseWeeklyResultStatus: (() => void)[] = []
   let personalContextsHeld = false
   let ownTarget = 80
   let ownStartingWeight = 100
@@ -509,8 +511,25 @@ async function installGroupFixtures(
       expect([challengeId, ...(multiple ? [secondId] : [])]).toContain(
         body.target_challenge_id,
       )
+      if (options.weeklyResultMode === 'pending') {
+        await new Promise<void>((resolve) => {
+          releaseWeeklyResultStatus.push(resolve)
+        })
+      }
+      if (options.weeklyResultMode === 'error') {
+        await route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            message: 'Fixture weekly status unavailable',
+          }),
+        })
+        return
+      }
       const hasFinalizedResult =
-        options.finalizedWeeklyResultForPrimaryGroup === true &&
+        (options.weeklyResultMode === 'finalized' ||
+          (options.weeklyResultMode !== 'unfinished' &&
+            options.finalizedWeeklyResultForPrimaryGroup === true)) &&
         body.target_challenge_id === challengeId
       const winnerNames =
         body.target_challenge_id === challengeId
@@ -524,7 +543,7 @@ async function installGroupFixtures(
             recorded_participant_count: hasFinalizedResult ? 2 : 0,
             eligible_participant_count: hasFinalizedResult ? 2 : 0,
             finalized_at: hasFinalizedResult
-              ? '2026-09-21T17:00:00.000Z'
+              ? `${body.target_sunday}T18:00:00.000Z`
               : null,
             result_outcome: hasFinalizedResult
               ? 'shared_winners'
@@ -708,6 +727,8 @@ async function installGroupFixtures(
     personalContextsHeld: () => personalContextsHeld,
     releasePersonalContexts: () =>
       releasePersonalContexts.splice(0).forEach((release) => release()),
+    releaseWeeklyResultStatus: () =>
+      releaseWeeklyResultStatus.splice(0).forEach((release) => release()),
   })
 }
 
@@ -3095,6 +3116,111 @@ for (const viewport of [
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
       .toBeLessThanOrEqual(viewport.width)
   })
+
+  test(`locked weekly result replaces provisional leaders and survives week rollover on ${viewport.label}`, async ({
+    page,
+  }) => {
+    await page.clock.install({
+      time: new Date('2026-11-22T21:59:30.000Z'),
+    })
+    await page.setViewportSize({ height: 900, width: viewport.width })
+    await installGroupFixtures(
+      page,
+      false,
+      false,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        weeklyResultMode: 'finalized',
+      },
+    )
+    await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    const sections = page.getByRole('navigation', {
+      name: 'Group sections',
+    })
+    await sections.getByRole('link', { name: 'Weekly results' }).click()
+
+    const winnerList = page.getByRole('list', { name: 'Weekly winners' })
+    await expect(
+      page.getByText('Final shared weekly winners — 2 of 3 members recorded'),
+    ).toBeVisible()
+    await expect(winnerList).toContainText('Ava')
+    await expect(winnerList).toContainText('Ben')
+    await expect(
+      page.getByRole('heading', { name: 'Provisional leader' }),
+    ).toHaveCount(0)
+    await page
+      .locator('.group-overview-result')
+      .first()
+      .locator('..')
+      .screenshot({
+        path: test.info().outputPath(`weekly-finalized-${viewport.width}.png`),
+      })
+
+    await page.clock.fastForward(60_000)
+    await expect(
+      page.getByText('Shared provisional leaders', { exact: true }),
+    ).toBeVisible()
+    await expect(winnerList).toContainText('Ava')
+    await expect(winnerList).toContainText('Ben')
+    await page
+      .locator('.group-overview-result')
+      .first()
+      .locator('..')
+      .screenshot({
+        path: test.info().outputPath(`weekly-rollover-${viewport.width}.png`),
+      })
+  })
+
+  for (const weeklyResultMode of ['pending', 'error'] as const) {
+    test(`authoritative ${weeklyResultMode} status does not expose provisional leaders on ${viewport.label}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ height: 900, width: viewport.width })
+      const fixtures = await installGroupFixtures(
+        page,
+        false,
+        false,
+        false,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        { weeklyResultMode },
+      )
+      await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+      await page
+        .getByRole('navigation', { name: 'Group sections' })
+        .getByRole('link', { name: 'Weekly results' })
+        .click()
+
+      if (weeklyResultMode === 'pending') {
+        await expect(
+          page.getByText('Checking the weekly result.'),
+        ).toBeVisible()
+      } else {
+        await expect(
+          page.getByText('Weekly result status unavailable'),
+        ).toBeVisible()
+      }
+      await expect(
+        page.getByRole('heading', { name: 'Provisional leader' }),
+      ).toHaveCount(0)
+
+      if (weeklyResultMode === 'pending') {
+        fixtures.releaseWeeklyResultStatus()
+        await expect(
+          page.getByText('Shared provisional leaders', { exact: true }),
+        ).toBeVisible()
+      }
+    })
+  }
+
   test(`renders only authorized Group data accessibly on ${viewport.label}`, async ({
     page,
   }) => {
