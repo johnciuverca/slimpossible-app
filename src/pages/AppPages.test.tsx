@@ -1386,6 +1386,8 @@ describe('HomePage', () => {
 
 describe('GroupDashboardPage', () => {
   it('renders only aggregate progress and weekly winners returned by the RPC', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-11-22T18:30:00.000Z'))
     const currentSunday = mostRecentSunday()
     const previousSundayDate = new Date(`${currentSunday}T00:00:00.000Z`)
     previousSundayDate.setUTCDate(previousSundayDate.getUTCDate() - 7)
@@ -1568,7 +1570,7 @@ describe('GroupDashboardPage', () => {
                     response([
                       {
                         result_state: 'finalized',
-                        finalized_at: '2026-11-09T18:00:00.000Z',
+                        finalized_at: `${currentSunday}T18:00:00.000Z`,
                         active_participant_count: 3,
                         recorded_participant_count: 2,
                         eligible_participant_count: 2,
