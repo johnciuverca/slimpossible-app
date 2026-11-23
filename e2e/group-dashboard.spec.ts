@@ -34,7 +34,9 @@ async function installGroupFixtures(
     holdPersonalContexts?: boolean
     participantAvatars?: boolean
     finalizedWeeklyResultForPrimaryGroup?: boolean
+    finalizedSunday?: string
     weeklyResultMode?: 'finalized' | 'unfinished' | 'error' | 'pending'
+    ownSundayRecorded?: boolean
   } = {},
 ) {
   const challengeId = ownEntries ? ownGroupId : 'e2e-challenge'
@@ -526,11 +528,17 @@ async function installGroupFixtures(
         })
         return
       }
-      const hasFinalizedResult =
+      const hasWeeklyResult =
         (options.weeklyResultMode === 'finalized' ||
+          options.weeklyResultMode === 'unfinished' ||
           (options.weeklyResultMode !== 'unfinished' &&
             options.finalizedWeeklyResultForPrimaryGroup === true)) &&
         body.target_challenge_id === challengeId
+      const isFinalized =
+        hasWeeklyResult &&
+        options.weeklyResultMode !== 'unfinished' &&
+        (!options.finalizedSunday ||
+          body.target_sunday === options.finalizedSunday)
       const winnerNames =
         body.target_challenge_id === challengeId
           ? ['Ava', 'Ben']
@@ -539,19 +547,27 @@ async function installGroupFixtures(
         contentType: 'application/json',
         body: JSON.stringify([
           {
-            active_participant_count: hasFinalizedResult ? 3 : 0,
-            recorded_participant_count: hasFinalizedResult ? 2 : 0,
-            eligible_participant_count: hasFinalizedResult ? 2 : 0,
-            finalized_at: hasFinalizedResult
+            active_participant_count: hasWeeklyResult ? 3 : 0,
+            recorded_participant_count: hasWeeklyResult
+              ? isFinalized
+                ? 2
+                : 1
+              : 0,
+            eligible_participant_count: hasWeeklyResult ? 2 : 0,
+            finalized_at: isFinalized
               ? `${body.target_sunday}T18:00:00.000Z`
               : null,
-            result_outcome: hasFinalizedResult
+            result_outcome: hasWeeklyResult
               ? 'shared_winners'
               : 'no_eligible_candidates',
-            result_state: hasFinalizedResult ? 'finalized' : 'disabled',
+            result_state: isFinalized
+              ? 'finalized'
+              : hasWeeklyResult
+                ? 'provisional'
+                : 'disabled',
             sole_participant_name: null,
-            winner_count: hasFinalizedResult ? 2 : 0,
-            winner_details: hasFinalizedResult
+            winner_count: hasWeeklyResult ? 2 : 0,
+            winner_details: hasWeeklyResult
               ? [
                   {
                     member_key: memberKey(body.target_challenge_id, viewerId),
@@ -566,7 +582,7 @@ async function installGroupFixtures(
                   },
                 ]
               : [],
-            winner_names: hasFinalizedResult ? winnerNames : [],
+            winner_names: hasWeeklyResult ? winnerNames : [],
           },
         ]),
       })
@@ -613,7 +629,9 @@ async function installGroupFixtures(
                 ? ownStartingWeight
                 : 100,
             target_weight_kg: ownTarget,
-            latest_recorded_date: '2026-09-22',
+            latest_recorded_date: options.ownSundayRecorded
+              ? '2026-11-22'
+              : '2026-09-22',
             completion_percentage:
               body.target_challenge_id === challengeId
                 ? Math.round(
@@ -3136,9 +3154,15 @@ for (const viewport of [
       undefined,
       {
         weeklyResultMode: 'finalized',
+        finalizedSunday: '2026-11-22',
       },
     )
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    const overviewCard = page.getByRole('region', {
+      name: 'This week’s check-in',
+    })
+    await expect(overviewCard).toContainText('2 of 3 active members checked in')
+    await expect(overviewCard).toContainText('finalized and locked')
     const sections = page.getByRole('navigation', {
       name: 'Group sections',
     })
@@ -3167,6 +3191,20 @@ for (const viewport of [
     ).toBeVisible()
     await expect(winnerList).toContainText('Ava')
     await expect(winnerList).toContainText('Ben')
+    await sections.getByRole('link', { name: 'Overview' }).click()
+    await expect(overviewCard).toContainText('Sunday Nov 29, 2026')
+    await expect(overviewCard).toContainText(
+      'Sunday check-ins open on this date',
+    )
+    await expect(overviewCard).not.toContainText(
+      'of 3 active members checked in',
+    )
+    await expect(
+      overviewCard.getByRole('button', { name: 'Record weight' }),
+    ).toHaveCount(0)
+    await sections.getByRole('link', { name: 'Weekly results' }).click()
+    await expect(winnerList).toContainText('Ava')
+    await expect(winnerList).toContainText('Ben')
     await page
       .locator('.group-overview-result')
       .first()
@@ -3174,6 +3212,119 @@ for (const viewport of [
       .screenshot({
         path: test.info().outputPath(`weekly-rollover-${viewport.width}.png`),
       })
+  })
+
+  test(`weekly check-in card shows authoritative count and own Sunday status on ${viewport.label}`, async ({
+    page,
+  }) => {
+    await page.clock.install({ time: new Date('2026-11-22T10:00:00.000Z') })
+    await page.setViewportSize({ height: 900, width: viewport.width })
+    await installGroupFixtures(
+      page,
+      false,
+      true,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { weeklyResultMode: 'unfinished', ownSundayRecorded: true },
+    )
+    await page.goto(
+      `/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
+    )
+
+    const card = page.getByRole('region', { name: 'This week’s check-in' })
+    await expect(card).toContainText('1 of 3 active members checked in')
+    await expect(card).toContainText('Your Sunday weigh-in is shared')
+    await expect(card).not.toContainText('2 have a usable baseline')
+    await expect(
+      card.getByRole('button', { name: 'Record weight' }),
+    ).toHaveCount(0)
+    await card.screenshot({
+      path: test
+        .info()
+        .outputPath(`weekly-check-in-recorded-${viewport.width}.png`),
+    })
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+      .toBeLessThanOrEqual(viewport.width)
+  })
+
+  test(`weekly check-in card offers one action when the viewer has not shared Sunday weight on ${viewport.label}`, async ({
+    page,
+  }) => {
+    await page.clock.install({ time: new Date('2026-11-22T10:00:00.000Z') })
+    await page.setViewportSize({ height: 900, width: viewport.width })
+    await installGroupFixtures(
+      page,
+      false,
+      true,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { weeklyResultMode: 'unfinished' },
+    )
+    await page.goto(
+      `/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
+    )
+
+    const card = page.getByRole('region', { name: 'This week’s check-in' })
+    await expect(card).toContainText('1 of 3 active members checked in')
+    await expect(card).toContainText(
+      'Your Sunday weigh-in has not been shared yet',
+    )
+    await expect(
+      card.getByRole('button', { name: 'Record weight' }),
+    ).toHaveCount(1)
+    await expect(
+      page.getByRole('button', { name: 'Record weight' }),
+    ).toHaveCount(1)
+    const buttonBounds = await card
+      .getByRole('button', { name: 'Record weight' })
+      .boundingBox()
+    expect(buttonBounds?.height).toBeGreaterThanOrEqual(44)
+    await card.screenshot({
+      path: test
+        .info()
+        .outputPath(`weekly-check-in-needed-${viewport.width}.png`),
+    })
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+      .toBeLessThanOrEqual(viewport.width)
+  })
+
+  test(`weekly check-in error never presents a false count or action on ${viewport.label}`, async ({
+    page,
+  }) => {
+    await page.clock.install({ time: new Date('2026-11-22T10:00:00.000Z') })
+    await page.setViewportSize({ height: 900, width: viewport.width })
+    await installGroupFixtures(
+      page,
+      false,
+      true,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { weeklyResultMode: 'error' },
+    )
+    await page.goto(
+      `/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
+    )
+
+    const card = page.getByRole('region', { name: 'This week’s check-in' })
+    await expect(card).toContainText('check-in status is unavailable')
+    await expect(card).not.toContainText('active members checked in')
+    await expect(
+      card.getByRole('button', { name: 'Record weight' }),
+    ).toHaveCount(0)
   })
 
   for (const weeklyResultMode of ['pending', 'error'] as const) {
