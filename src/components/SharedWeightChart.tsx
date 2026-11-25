@@ -1066,7 +1066,13 @@ export function SharedWeightChart({
             onClick={() => choosePreset('1w', oneWeekStart)}
             className={presetClass(selectedPreset === '1w')}
           >
-            1W
+            <span
+              className={
+                compactOverview ? 'group-overview-range-label' : undefined
+              }
+            >
+              1W
+            </span>
           </button>
           <button
             type="button"
@@ -1076,7 +1082,13 @@ export function SharedWeightChart({
             onClick={() => choosePreset('2w', twoWeekStart)}
             className={presetClass(selectedPreset === '2w')}
           >
-            2W
+            <span
+              className={
+                compactOverview ? 'group-overview-range-label' : undefined
+              }
+            >
+              2W
+            </span>
           </button>
           <button
             type="button"
@@ -1086,7 +1098,13 @@ export function SharedWeightChart({
             onClick={() => choosePreset('1m', oneMonthStart)}
             className={presetClass(selectedPreset === '1m')}
           >
-            1M
+            <span
+              className={
+                compactOverview ? 'group-overview-range-label' : undefined
+              }
+            >
+              1M
+            </span>
           </button>
           <button
             type="button"
@@ -1096,7 +1114,13 @@ export function SharedWeightChart({
             onClick={() => choosePreset('3m', threeMonthStart)}
             className={presetClass(selectedPreset === '3m')}
           >
-            3M
+            <span
+              className={
+                compactOverview ? 'group-overview-range-label' : undefined
+              }
+            >
+              3M
+            </span>
           </button>
           <button
             type="button"
@@ -1106,7 +1130,13 @@ export function SharedWeightChart({
             onClick={() => choosePreset('all', firstDay)}
             className={presetClass(selectedPreset === 'all')}
           >
-            All
+            <span
+              className={
+                compactOverview ? 'group-overview-range-label' : undefined
+              }
+            >
+              All
+            </span>
           </button>
         </div>
         {compactOlderHistory && expandedWeeks.size > 0 ? (

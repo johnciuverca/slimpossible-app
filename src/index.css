@@ -1796,15 +1796,53 @@ body {
     .group-overview-chart-controls
     [aria-label='Quick date ranges'] {
     flex-wrap: nowrap;
+    gap: 0;
+    overflow: visible;
+    border: 0;
+    background: transparent;
   }
   .group-workspace
     .group-history-workspace
     .group-overview-chart-controls
     [aria-label='Quick date ranges']
     button {
+    display: grid;
+    width: 44px;
     min-height: 44px;
     min-width: 44px;
-    padding-inline: 8px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+  .group-workspace
+    .group-history-workspace
+    .group-overview-chart-controls
+    [aria-label='Quick date ranges']
+    .group-overview-range-label {
+    display: grid;
+    width: max-content;
+    min-width: 32px;
+    max-width: 44px;
+    height: 32px;
+    place-items: center;
+    border: 1px solid #354353;
+    border-radius: 6px;
+    background: #111c28;
+    color: #e4edf4;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    padding-inline: 3px;
+  }
+  .group-workspace
+    .group-history-workspace
+    .group-overview-chart-controls
+    [aria-label='Quick date ranges']
+    button[aria-pressed='true']
+    .group-overview-range-label {
+    border-color: #31dbb0;
+    background: #145447;
+    color: #f1fffb;
   }
   .group-workspace
     .group-history-workspace

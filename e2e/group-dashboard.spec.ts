@@ -1643,6 +1643,14 @@ for (const width of [320, 390, 430, 1280, 1366, 1440, 1920]) {
         chartHeading: rect(chartHeading),
         quickRanges: rect(quickRanges),
         rangeButtons: Array.from(quickRanges.querySelectorAll('button'), rect),
+        rangeLabels: Array.from(
+          quickRanges.querySelectorAll('.group-overview-range-label'),
+          rect,
+        ),
+        rangeLabelFontSizes: Array.from(
+          quickRanges.querySelectorAll('.group-overview-range-label'),
+          (label) => Number.parseFloat(getComputedStyle(label).fontSize),
+        ),
         axisTitle: rect(chart.querySelector('.group-overview-axis-title')!),
         yTickLabels: Array.from(
           chart.querySelectorAll(
@@ -1695,8 +1703,18 @@ for (const width of [320, 390, 430, 1280, 1366, 1440, 1920]) {
       bounds.chartControls.right,
     )
     expect(bounds.rangeButtons).toHaveLength(5)
-    for (const button of bounds.rangeButtons)
+    for (const button of bounds.rangeButtons) {
       expect(button.height).toBeGreaterThanOrEqual(width < 640 ? 44 : 32)
+      if (width < 640) expect(button.width).toBeGreaterThanOrEqual(44)
+    }
+    if (width < 640) {
+      expect(bounds.rangeLabels).toHaveLength(5)
+      expect(bounds.rangeLabelFontSizes).toEqual([12, 12, 12, 12, 12])
+      for (const label of bounds.rangeLabels) {
+        expect(label.width).toBeLessThanOrEqual(44)
+        expect(label.height).toBe(32)
+      }
+    }
     expect(bounds.chart.y).toBeGreaterThan(bounds.checkIn.bottom)
     expect(bounds.row.y).toBeGreaterThan(bounds.chart.bottom)
     expect(bounds.legend.bottom).toBeLessThanOrEqual(bounds.row.y)
@@ -1766,7 +1784,7 @@ for (const width of [320, 390, 430, 1280, 1366, 1440, 1920]) {
       path: testInfo.outputPath(`group-overview-${width}-after.png`),
       fullPage: true,
     })
-    if (width === 390) {
+    if (width < 640) {
       const oneWeek = rangeControls.getByRole('button', {
         name: 'Show last 1 week',
       })
@@ -1775,6 +1793,29 @@ for (const width of [320, 390, 430, 1280, 1366, 1440, 1920]) {
       await expect(
         page.getByRole('status', { name: 'Visible date range' }),
       ).toContainText('Last 7 days')
+      const rangeLabels = page.locator('.group-overview-range-label')
+      await rangeLabels.evaluateAll((labels) => {
+        for (const label of labels)
+          (label as HTMLElement).style.fontSize = '20px'
+      })
+      const enlargedLabels = await rangeLabels.evaluateAll((labels) =>
+        labels.map((label) => {
+          const range = document.createRange()
+          range.selectNodeContents(label)
+          const text = range.getBoundingClientRect()
+          const box = label.getBoundingClientRect()
+          return {
+            textLeft: text.left,
+            textRight: text.right,
+            boxLeft: box.left,
+            boxRight: box.right,
+          }
+        }),
+      )
+      for (const label of enlargedLabels) {
+        expect(label.textLeft).toBeGreaterThanOrEqual(label.boxLeft)
+        expect(label.textRight).toBeLessThanOrEqual(label.boxRight)
+      }
     }
     if (width < 640) {
       await page.locator('#group-summary').evaluate((card) => {
