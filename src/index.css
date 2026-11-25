@@ -1538,6 +1538,12 @@ body {
 .group-shell .app-shell-header-inner {
   padding-inline: 16px;
 }
+.group-shell .app-shell-main {
+  max-width: none;
+}
+.group-shell .contextual-subnav-scroll {
+  max-width: none;
+}
 .group-shell .account-control summary {
   padding-right: 0;
   border-right-width: 0;
@@ -1548,9 +1554,85 @@ body {
   justify-content: space-between;
   gap: 16px;
   width: 100%;
-  max-width: 1280px;
+  max-width: none;
   margin-inline: auto;
   padding-inline: 16px;
+}
+
+/* Wide Group Overview hierarchy follows the owner-provided reference. */
+.group-workspace .group-weekly-checkin-strip {
+  border-color: #354353;
+  background: #111c28;
+  color: #f1f6fa;
+  box-shadow: 0 12px 32px -26px #000;
+}
+.group-workspace .group-weekly-checkin-strip .text-slate-950,
+.group-workspace .group-weekly-checkin-strip .text-slate-700,
+.group-workspace .group-weekly-checkin-strip .text-slate-600 {
+  color: #d6e0e9;
+}
+.group-weekly-checkin-members li {
+  border-color: #354353;
+  background: #172431;
+  color: #f1f6fa;
+}
+.group-weekly-checkin-check {
+  color: #31dbb0;
+  font-weight: 800;
+}
+.group-workspace .group-history-workspace > [id$='-panel'] > section {
+  border-color: #354353;
+  background: #111c28;
+}
+.group-workspace .group-history-workspace [aria-label='Quick date ranges'] {
+  gap: 6px;
+}
+.group-workspace
+  .group-history-workspace
+  [aria-label='Quick date ranges']
+  > span {
+  color: #b5c1d0;
+  font-size: 0.75rem;
+}
+.group-workspace
+  .group-history-workspace
+  [aria-label='Quick date ranges']
+  button {
+  min-height: 44px;
+  min-width: 40px;
+  border-radius: 999px;
+  border-color: #354353;
+  padding-inline: 12px;
+}
+.group-workspace
+  .group-history-workspace
+  [aria-label='Quick date ranges']
+  button[aria-pressed='true'] {
+  border-color: #31dbb0;
+  background: #145447;
+  color: #f1fffb;
+}
+.group-workspace .group-history-workspace [aria-label='Group chart legend'] {
+  justify-content: flex-start;
+  border-top: 1px solid #354353;
+  padding-top: 10px;
+}
+@media (max-width: 639px) {
+  .group-workspace .group-weekly-checkin-strip {
+    padding: 12px;
+  }
+  .group-workspace .group-history-workspace [aria-label='Group chart legend'] {
+    gap: 4px 8px;
+  }
+  .group-workspace
+    .group-history-workspace
+    [aria-label='Group chart legend']
+    button {
+    max-width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    overflow-wrap: anywhere;
+  }
 }
 .group-context-subnav .contextual-subnav-scroll {
   min-width: 0;

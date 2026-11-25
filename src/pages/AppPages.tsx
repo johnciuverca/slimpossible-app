@@ -2231,7 +2231,7 @@ export function GroupDashboardPage() {
 
   return (
     <section
-      className="group-workspace mx-auto w-full max-w-7xl space-y-4"
+      className="group-workspace mx-auto w-full space-y-4"
       aria-labelledby="group-title"
     >
       <div className="space-y-2">
@@ -2538,7 +2538,7 @@ export function GroupDashboardPage() {
                   <div className="space-y-3">
                     <section
                       aria-labelledby="weekly-check-in-heading"
-                      className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 sm:flex sm:items-center sm:justify-between sm:gap-4"
+                      className="group-weekly-checkin-strip rounded-xl border px-4 py-3 sm:flex sm:items-center sm:justify-between sm:gap-4"
                     >
                       <div className="min-w-0">
                         <h2
@@ -2552,6 +2552,7 @@ export function GroupDashboardPage() {
                           <time dateTime={checkInSunday}>
                             {formatDate(checkInSunday)}
                           </time>
+                          {!checkInSundayIsToday ? ' · Opens Sunday' : null}
                           {checkInResultAvailable && checkInSundayIsToday ? (
                             <>
                               {' · '}
@@ -2569,6 +2570,39 @@ export function GroupDashboardPage() {
                             Checking this week’s shared weigh-ins…
                           </p>
                         ) : null}
+                        {checkInResultAvailable &&
+                        checkInSundayIsToday &&
+                        memberProgressState === 'ready' ? (
+                          <ul
+                            aria-label="Members checked in this Sunday"
+                            className="group-weekly-checkin-members mt-2 flex flex-wrap gap-2"
+                          >
+                            {memberProgress
+                              .filter(
+                                (member) =>
+                                  member.latestRecordedDate === checkInSunday,
+                              )
+                              .map((member) => (
+                                <li
+                                  key={member.memberKey}
+                                  className="inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-medium"
+                                >
+                                  <GroupParticipantAvatar
+                                    avatarPresetId={member.avatarPresetId}
+                                    displayName={member.displayName}
+                                    className="h-6! w-6! text-xs!"
+                                  />
+                                  <span>{member.displayName}</span>
+                                  <span
+                                    aria-hidden="true"
+                                    className="group-weekly-checkin-check"
+                                  >
+                                    ✓
+                                  </span>
+                                </li>
+                              ))}
+                          </ul>
+                        ) : null}
                         {visibleCheckInSnapshot.state === 'error' ||
                         (checkInResult &&
                           !['provisional', 'finalized'].includes(
@@ -2582,10 +2616,11 @@ export function GroupDashboardPage() {
                             before relying on the count.
                           </p>
                         ) : null}
-                        {checkInResultAvailable && !checkInSundayIsToday ? (
+                        {!checkInSundayIsToday ? (
                           <p className="mt-1 text-xs text-slate-600">
                             Sunday check-ins open on this date; the count
-                            appears on Sunday.
+                            appears on Sunday. The weekly result locks at 20:00
+                            Europe/Bucharest.
                           </p>
                         ) : null}
                         {checkInResultAvailable && checkInSundayIsToday ? (
@@ -2674,7 +2709,7 @@ export function GroupDashboardPage() {
                         </div>
                         <div className="group-overview-metric min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2">
                           <dt className="text-xs font-semibold text-slate-600">
-                            Checked in
+                            Shared weights
                           </dt>
                           <dd className="mt-1 text-xl font-bold tracking-tight text-slate-950">
                             {summary.participantsWithRecordedWeightCount}

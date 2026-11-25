@@ -1191,7 +1191,7 @@ test('selected Group sections retain readable contrast in both color schemes', a
   }
 })
 
-for (const width of [320, 390, 430, 1280]) {
+for (const width of [320, 390, 430, 1280, 1920]) {
   test(`weekly Group history expands and collapses at ${width}px`, async ({
     page,
   }, testInfo) => {
@@ -1550,7 +1550,7 @@ for (const width of [320, 390, 430, 1280]) {
   })
 }
 
-for (const width of [320, 390, 430, 1280]) {
+for (const width of [320, 390, 430, 1280, 1920]) {
   test(`Group overview summary row geometry at ${width}px`, async ({
     page,
   }, testInfo) => {
@@ -1573,6 +1573,7 @@ for (const width of [320, 390, 430, 1280]) {
         return { x, y, width, height, right, bottom }
       }
       const card = document.querySelector('#group-summary')!
+      const main = document.querySelector('.app-shell-main')!
       const checkIn = card.querySelector(
         '[aria-labelledby="weekly-check-in-heading"]',
       )!
@@ -1582,6 +1583,7 @@ for (const width of [320, 390, 430, 1280]) {
       )!
       return {
         card: rect(card),
+        main: rect(main),
         checkIn: rect(checkIn),
         row: rect(row),
         metrics: Array.from(row.children, rect),
@@ -1606,7 +1608,7 @@ for (const width of [320, 390, 430, 1280]) {
     await expect(metrics.nth(0)).toContainText('Members')
     await expect(metrics.nth(0)).toContainText('3')
     await expect(metrics.nth(1)).toContainText('42.5%')
-    await expect(metrics.nth(2)).toContainText('Checked in')
+    await expect(metrics.nth(2)).toContainText('Shared weights')
     await expect(metrics.nth(3)).toContainText('Goals reached')
     expect(bounds.checkIn.y).toBeGreaterThanOrEqual(bounds.card.y)
     expect(bounds.row.y).toBeGreaterThan(bounds.checkIn.bottom)
@@ -1630,13 +1632,12 @@ for (const width of [320, 390, 430, 1280]) {
         expect(new Set(bounds.metrics.map((metric) => metric.y)).size).toBe(2)
       }
     } else {
-      expect(bounds.row.height).toBeCloseTo(67.1875, 1)
-      expect(bounds.chart.x).toBeCloseTo(37, 1)
-      expect(bounds.chart.width).toBeCloseTo(1206, 1)
-      expect(bounds.chart.height).toBeCloseTo(441.140625, 1)
+      expect(bounds.card.width).toBeGreaterThan(bounds.main.width * 0.9)
+      expect(bounds.chart.width).toBeGreaterThan(bounds.card.width * 0.85)
     }
     await page.screenshot({
       path: testInfo.outputPath(`group-overview-${width}-after.png`),
+      fullPage: true,
     })
     if (width < 640) {
       await page.locator('#group-summary').evaluate((card) => {
@@ -3051,7 +3052,7 @@ for (const viewport of [
       .click()
     await expect(
       page.getByRole('table', { name: 'Shared group weight history' }),
-    ).toContainText('Ava')
+    ).toContainText('Jo')
     const contexts = page.getByRole('navigation', {
       name: 'Challenge contexts',
     })
@@ -3232,7 +3233,11 @@ for (const viewport of [
       undefined,
       undefined,
       undefined,
-      { weeklyResultMode: 'unfinished', ownSundayRecorded: true },
+      {
+        weeklyResultMode: 'unfinished',
+        ownSundayRecorded: true,
+        participantAvatars: true,
+      },
     )
     await page.goto(
       `/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
@@ -3241,6 +3246,14 @@ for (const viewport of [
     const card = page.getByRole('region', { name: 'This week’s check-in' })
     await expect(card).toContainText('1 of 3 active members checked in')
     await expect(card).toContainText('Your Sunday weigh-in is shared')
+    await expect(
+      card.getByRole('list', { name: 'Members checked in this Sunday' }),
+    ).toContainText('Ava')
+    await expect(
+      card
+        .getByRole('list', { name: 'Members checked in this Sunday' })
+        .locator('[data-avatar-preset="female-03"]'),
+    ).toBeVisible()
     await expect(card).not.toContainText('2 have a usable baseline')
     await expect(
       card.getByRole('button', { name: 'Record weight' }),
