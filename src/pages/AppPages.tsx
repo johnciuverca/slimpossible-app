@@ -2538,96 +2538,49 @@ export function GroupDashboardPage() {
                   <div className="space-y-3">
                     <section
                       aria-labelledby="weekly-check-in-heading"
-                      className="group-weekly-checkin-strip rounded-xl border px-4 py-3 sm:flex sm:items-center sm:justify-between sm:gap-4"
+                      className="group-weekly-checkin-strip rounded-xl border px-4 py-3"
                     >
-                      <div className="min-w-0">
+                      <div className="group-checkin-summary min-w-0">
+                        <span className="group-checkin-kicker">This week</span>
                         <h2
                           className="font-semibold text-slate-950"
                           id="weekly-check-in-heading"
                         >
                           This week’s check-in
                         </h2>
-                        <p className="mt-1 text-sm text-slate-700">
-                          Sunday{' '}
-                          <time dateTime={checkInSunday}>
-                            {formatDate(checkInSunday)}
-                          </time>
-                          {!checkInSundayIsToday ? ' · Opens Sunday' : null}
-                          {checkInResultAvailable && checkInSundayIsToday ? (
+                        <p className="group-checkin-status text-sm text-slate-700">
+                          {!checkInSundayIsToday ? (
                             <>
-                              {' · '}
-                              {checkInResult?.recordedParticipantCount} of{' '}
-                              {checkInResult?.activeParticipantCount} active
-                              members checked in
+                              Opens{' '}
+                              <time dateTime={checkInSunday}>
+                                {formatDate(checkInSunday)}
+                              </time>
                             </>
-                          ) : null}
+                          ) : visibleCheckInSnapshot.state === 'loading' ? (
+                            'Checking status…'
+                          ) : visibleCheckInSnapshot.state === 'error' ||
+                            (checkInResult &&
+                              !['provisional', 'finalized'].includes(
+                                checkInResult.state,
+                              )) ? (
+                            'Status unavailable'
+                          ) : checkInResultAvailable &&
+                            checkInResult?.state === 'finalized' ? (
+                            'Finalized and locked'
+                          ) : checkInResultAvailable ? (
+                            'Check-in open'
+                          ) : (
+                            'Status unavailable'
+                          )}
                         </p>
-                        {visibleCheckInSnapshot.state === 'loading' ? (
-                          <p
-                            className="mt-1 text-sm text-slate-600"
-                            role="status"
-                          >
-                            Checking this week’s shared weigh-ins…
-                          </p>
-                        ) : null}
-                        {checkInResultAvailable &&
-                        checkInSundayIsToday &&
-                        memberProgressState === 'ready' ? (
-                          <ul
-                            aria-label="Members checked in this Sunday"
-                            className="group-weekly-checkin-members mt-2 flex flex-wrap gap-2"
-                          >
-                            {memberProgress
-                              .filter(
-                                (member) =>
-                                  member.latestRecordedDate === checkInSunday,
-                              )
-                              .map((member) => (
-                                <li
-                                  key={member.memberKey}
-                                  className="inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-medium"
-                                >
-                                  <GroupParticipantAvatar
-                                    avatarPresetId={member.avatarPresetId}
-                                    displayName={member.displayName}
-                                    className="h-6! w-6! text-xs!"
-                                  />
-                                  <span>{member.displayName}</span>
-                                  <span
-                                    aria-hidden="true"
-                                    className="group-weekly-checkin-check"
-                                  >
-                                    ✓
-                                  </span>
-                                </li>
-                              ))}
-                          </ul>
-                        ) : null}
-                        {visibleCheckInSnapshot.state === 'error' ||
-                        (checkInResult &&
-                          !['provisional', 'finalized'].includes(
-                            checkInResult.state,
-                          )) ? (
-                          <p
-                            className="mt-1 text-sm text-slate-700"
-                            role="status"
-                          >
-                            This week’s check-in status is unavailable. Refresh
-                            before relying on the count.
-                          </p>
-                        ) : null}
-                        {!checkInSundayIsToday ? (
-                          <p className="mt-1 text-xs text-slate-600">
-                            Sunday check-ins open on this date; the count
-                            appears on Sunday. The weekly result locks at 20:00
-                            Europe/Bucharest.
-                          </p>
-                        ) : null}
                         {checkInResultAvailable && checkInSundayIsToday ? (
-                          <p className="mt-1 text-xs text-slate-600">
-                            {checkInResult?.state === 'finalized'
-                              ? 'This week is finalized and locked.'
-                              : 'The weekly result locks Sunday at 20:00 Europe/Bucharest.'}
+                          <p
+                            className="mt-0.5 text-sm text-slate-700"
+                            role="status"
+                          >
+                            {checkInResult?.recordedParticipantCount} of{' '}
+                            {checkInResult?.activeParticipantCount} active
+                            members checked in
                           </p>
                         ) : null}
                         {checkInResultAvailable &&
@@ -2635,35 +2588,35 @@ export function GroupDashboardPage() {
                         ownMemberKey ? (
                           memberProgressState === 'loading' ? (
                             <p
-                              className="mt-1 text-sm text-slate-600"
+                              className="mt-0.5 text-xs text-slate-600"
                               role="status"
                             >
                               Checking your shared weigh-in…
                             </p>
                           ) : memberProgressState === 'error' ? (
                             <p
-                              className="mt-1 text-sm text-slate-700"
+                              className="mt-0.5 text-xs text-slate-700"
                               role="status"
                             >
                               Your check-in status is unavailable.
                             </p>
                           ) : ownSharedSundayRecorded ? (
                             <p
-                              className="mt-1 text-sm font-medium text-ink"
+                              className="mt-0.5 text-xs font-medium text-ink"
                               role="status"
                             >
                               Your Sunday weigh-in is shared with this group.
                             </p>
                           ) : ownProgressRow ? (
                             <p
-                              className="mt-1 text-sm text-slate-700"
+                              className="mt-0.5 text-xs text-slate-700"
                               role="status"
                             >
                               Your Sunday weigh-in has not been shared yet.
                             </p>
                           ) : (
                             <p
-                              className="mt-1 text-sm text-slate-700"
+                              className="mt-0.5 text-xs text-slate-700"
                               role="status"
                             >
                               Your group membership status is unavailable.
@@ -2671,8 +2624,74 @@ export function GroupDashboardPage() {
                           )
                         ) : null}
                       </div>
+                      <div className="group-checkin-deadline">
+                        <svg
+                          aria-hidden="true"
+                          className="group-checkin-calendar"
+                          viewBox="0 0 24 24"
+                        >
+                          <rect x="3.5" y="5" width="17" height="15" rx="2" />
+                          <path d="M7.5 3.5v3M16.5 3.5v3M3.5 9h17" />
+                        </svg>
+                        <span>
+                          <strong>
+                            {checkInResultAvailable &&
+                            checkInSundayIsToday &&
+                            checkInResult?.state === 'finalized'
+                              ? 'Locked Sunday at 20:00'
+                              : 'Locks Sunday at 20:00'}
+                          </strong>
+                          <span className="group-checkin-muted">
+                            Romanian time
+                          </span>
+                        </span>
+                      </div>
+                      {checkInSundayIsToday &&
+                      memberProgressState === 'ready' ? (
+                        <div className="group-checkin-members">
+                          {memberProgress.filter(
+                            (member) =>
+                              member.latestRecordedDate === checkInSunday,
+                          ).length > 0 ? (
+                            <ul
+                              aria-label="Members checked in this Sunday"
+                              className="group-weekly-checkin-members flex flex-wrap gap-2"
+                            >
+                              {memberProgress
+                                .filter(
+                                  (member) =>
+                                    member.latestRecordedDate === checkInSunday,
+                                )
+                                .map((member) => (
+                                  <li
+                                    key={member.memberKey}
+                                    className="inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-medium"
+                                  >
+                                    <GroupParticipantAvatar
+                                      avatarPresetId={member.avatarPresetId}
+                                      displayName={member.displayName}
+                                      className="h-6! w-6! text-xs!"
+                                    />
+                                    <span>{member.displayName}</span>
+                                    <span
+                                      aria-hidden="true"
+                                      className="group-weekly-checkin-check"
+                                    >
+                                      ✓
+                                    </span>
+                                  </li>
+                                ))}
+                            </ul>
+                          ) : checkInResultAvailable &&
+                            checkInResult?.recordedParticipantCount === 0 ? (
+                            <span className="group-checkin-muted">
+                              No Sunday check-ins yet
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
                       {showOverviewRecordAction ? (
-                        <div className="mt-3 shrink-0 [&_button]:min-h-11 sm:mt-0">
+                        <div className="group-checkin-action shrink-0 [&_button]:min-h-11">
                           <StandaloneRecordWeightAction
                             onRecorded={() =>
                               setReloadKey((value) => value + 1)

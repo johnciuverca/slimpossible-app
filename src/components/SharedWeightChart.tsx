@@ -190,6 +190,18 @@ export function SharedWeightChart({
     }
   }, [compactOverview, fitContainer])
   const compactLayout = fitContainer && compactFitLayout
+  const valueLabelFontSize = compactOverview
+    ? compactLayout
+      ? 11
+      : 12.5
+    : compactLayout
+      ? 9
+      : 6.6
+  const valueLabelCharacterWidth = compactOverview
+    ? valueLabelFontSize * 0.58
+    : compactLayout && labelExtremesOnly
+      ? 5.4
+      : 4.2
   const chartLeft = compactLayout ? sharedChartTheme.plot.compactLeft : left
   let chartRight = compactLayout ? 312 : right
   const chartTop = top
@@ -429,7 +441,7 @@ export function SharedWeightChart({
   const pointLabelX = (point: SharedChartPoint) => {
     const pointX = x(point.date)
     if (!labelExtremesOnly || !compactLayout || !point.label) return pointX
-    const halfLabelWidth = (point.label.length * 5.4) / 2
+    const halfLabelWidth = (point.label.length * valueLabelCharacterWidth) / 2
     return Math.max(
       chartLeft + halfLabelWidth + 2,
       Math.min(pointX, chartRight - halfLabelWidth - 2),
@@ -438,8 +450,7 @@ export function SharedWeightChart({
   const seriesLabelX = (point: SharedChartPoint) => {
     const pointX = x(point.date)
     if (!labelSeriesExtremesOnly || !point.label) return pointX
-    const halfLabelWidth =
-      (point.label.length * (compactLayout ? 5.4 : 4.2)) / 2
+    const halfLabelWidth = (point.label.length * valueLabelCharacterWidth) / 2
     return Math.max(
       chartLeft + halfLabelWidth + 2,
       Math.min(pointX, chartRight - halfLabelWidth - 2),
@@ -696,7 +707,8 @@ export function SharedWeightChart({
       ],
       viewBoxWidth,
       viewBoxHeight,
-      labelExtremesOnly && compactLayout ? 5.4 : undefined,
+      valueLabelCharacterWidth,
+      valueLabelFontSize,
     ).map(({ id, x: labelX, y: labelY }) => [id, { x: labelX, y: labelY }]),
   )
   const valueLabelPosition = (
@@ -1118,7 +1130,7 @@ export function SharedWeightChart({
           <desc>{description}</desc>
           <text
             x={chartLeft}
-            y="17"
+            y={compactOverview ? '12' : '17'}
             className="chart-axis-title"
             style={{ fontSize: `${sharedChartTheme.axisTitlePx}px` }}
           >
@@ -1365,7 +1377,7 @@ export function SharedWeightChart({
                           y={labelPosition.y}
                           textAnchor="middle"
                           className="chart-value"
-                          fontSize={compactLayout ? '9' : '6.6'}
+                          fontSize={valueLabelFontSize}
                           fontWeight="700"
                           data-chart-series-id={item.id}
                           data-date={point.date}
@@ -1476,7 +1488,7 @@ export function SharedWeightChart({
                       y={labelPosition.y}
                       textAnchor="middle"
                       className="chart-value"
-                      fontSize={compactLayout ? '9' : '6.6'}
+                      fontSize={valueLabelFontSize}
                       fontWeight="700"
                       data-date={point.date}
                       data-weight-kg={point.value}

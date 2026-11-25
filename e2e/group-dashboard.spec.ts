@@ -1585,6 +1585,14 @@ for (const width of [320, 390, 430, 1280, 1366, 1440, 1920]) {
       const chart = document.querySelector(
         '.group-history-workspace svg[role="img"]',
       )!
+      const renderedTextBounds = (selector: string) =>
+        Array.from(chart.querySelectorAll(selector), (element) => {
+          const { height } = element.getBoundingClientRect()
+          return {
+            fontSize: Number.parseFloat(getComputedStyle(element).fontSize),
+            glyphHeight: height,
+          }
+        })
       return {
         card: rect(card),
         main: rect(main),
@@ -1605,6 +1613,8 @@ for (const width of [320, 390, 430, 1280, 1366, 1440, 1920]) {
         }),
         chart: rect(chart),
         legend: rect(legend),
+        valueLabels: renderedTextBounds('.chart-value'),
+        axisLabels: renderedTextBounds('.chart-axis-tick'),
         pageWidth: document.documentElement.scrollWidth,
         viewportWidth: window.innerWidth,
         viewportHeight: window.innerHeight,
@@ -1623,6 +1633,19 @@ for (const width of [320, 390, 430, 1280, 1366, 1440, 1920]) {
     if (width >= 1280) {
       expect(bounds.chart.height).toBeLessThanOrEqual(310)
       expect(bounds.legend.bottom).toBeLessThanOrEqual(bounds.viewportHeight)
+      expect(bounds.valueLabels.length).toBeGreaterThan(0)
+      expect(
+        Math.min(...bounds.valueLabels.map((label) => label.fontSize)),
+      ).toBeGreaterThanOrEqual(12)
+      expect(
+        Math.min(...bounds.valueLabels.map((label) => label.glyphHeight)),
+      ).toBeGreaterThanOrEqual(11)
+      expect(
+        Math.min(...bounds.axisLabels.map((label) => label.fontSize)),
+      ).toBeGreaterThanOrEqual(11)
+      expect(
+        Math.min(...bounds.axisLabels.map((label) => label.glyphHeight)),
+      ).toBeGreaterThanOrEqual(9)
     }
     if (width < 640) {
       const row = bounds.row
@@ -3203,9 +3226,7 @@ for (const viewport of [
     await expect(winnerList).toContainText('Ben')
     await sections.getByRole('link', { name: 'Overview' }).click()
     await expect(overviewCard).toContainText('Sunday Nov 29, 2026')
-    await expect(overviewCard).toContainText(
-      'Sunday check-ins open on this date',
-    )
+    await expect(overviewCard).toContainText('Opens Sunday Nov 29, 2026')
     await expect(overviewCard).not.toContainText(
       'of 3 active members checked in',
     )
@@ -3342,7 +3363,7 @@ for (const viewport of [
     )
 
     const card = page.getByRole('region', { name: 'This week’s check-in' })
-    await expect(card).toContainText('check-in status is unavailable')
+    await expect(card).toContainText('Status unavailable')
     await expect(card).not.toContainText('active members checked in')
     await expect(
       card.getByRole('button', { name: 'Record weight' }),
