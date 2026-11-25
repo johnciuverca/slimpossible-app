@@ -1550,11 +1550,12 @@ for (const width of [320, 390, 430, 1280, 1920]) {
   })
 }
 
-for (const width of [320, 390, 430, 1280, 1920]) {
+for (const width of [320, 390, 430, 1280, 1366, 1440, 1920]) {
   test(`Group overview summary row geometry at ${width}px`, async ({
     page,
   }, testInfo) => {
-    await page.setViewportSize({ width, height: 900 })
+    const height = width === 1366 ? 768 : 900
+    await page.setViewportSize({ width, height })
     await installGroupFixtures(page, true)
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
     await expect(
@@ -1577,7 +1578,10 @@ for (const width of [320, 390, 430, 1280, 1920]) {
       const checkIn = card.querySelector(
         '[aria-labelledby="weekly-check-in-heading"]',
       )!
-      const row = card.querySelector('dl')!
+      const row = document.querySelector('.group-overview-stats dl')!
+      const legend = document.querySelector(
+        '.group-history-workspace [aria-label="Group chart legend"]',
+      )!
       const chart = document.querySelector(
         '.group-history-workspace svg[role="img"]',
       )!
@@ -1600,8 +1604,10 @@ for (const width of [320, 390, 430, 1280, 1920]) {
           return { label: rangeRect(label), value: rangeRect(value) }
         }),
         chart: rect(chart),
+        legend: rect(legend),
         pageWidth: document.documentElement.scrollWidth,
         viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
       }
     })
     console.log('group-overview-summary-bounds', width, bounds)
@@ -1611,8 +1617,13 @@ for (const width of [320, 390, 430, 1280, 1920]) {
     await expect(metrics.nth(2)).toContainText('Shared weights')
     await expect(metrics.nth(3)).toContainText('Goals reached')
     expect(bounds.checkIn.y).toBeGreaterThanOrEqual(bounds.card.y)
-    expect(bounds.row.y).toBeGreaterThan(bounds.checkIn.bottom)
-    expect(bounds.chart.y).toBeGreaterThanOrEqual(bounds.card.bottom)
+    expect(bounds.chart.y).toBeGreaterThan(bounds.checkIn.bottom)
+    expect(bounds.row.y).toBeGreaterThan(bounds.chart.bottom)
+    expect(bounds.legend.bottom).toBeLessThanOrEqual(bounds.row.y)
+    if (width >= 1280) {
+      expect(bounds.chart.height).toBeLessThanOrEqual(310)
+      expect(bounds.legend.bottom).toBeLessThanOrEqual(bounds.viewportHeight)
+    }
     if (width < 640) {
       const row = bounds.row
       for (const metric of bounds.metrics) {
@@ -1625,12 +1636,7 @@ for (const width of [320, 390, 430, 1280, 1920]) {
           expect(box.right).toBeLessThanOrEqual(row.right)
         }
       }
-      if (width >= 390) {
-        expect(new Set(bounds.metrics.map((metric) => metric.y)).size).toBe(1)
-        expect(bounds.row.height).toBeLessThanOrEqual(60)
-      } else {
-        expect(new Set(bounds.metrics.map((metric) => metric.y)).size).toBe(2)
-      }
+      expect(new Set(bounds.metrics.map((metric) => metric.y)).size).toBe(2)
     } else {
       expect(bounds.card.width).toBeGreaterThan(bounds.main.width * 0.9)
       expect(bounds.chart.width).toBeGreaterThan(bounds.card.width * 0.85)

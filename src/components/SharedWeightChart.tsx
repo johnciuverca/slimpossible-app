@@ -93,6 +93,7 @@ export function SharedWeightChart({
   labelExtremesOnly = false,
   labelSeriesExtremesOnly = false,
   compactOlderHistory = false,
+  compactOverview = false,
   className = 'block h-auto w-full min-w-[600px]',
   viewBox = '0 0 760 266',
 }: {
@@ -117,6 +118,7 @@ export function SharedWeightChart({
   labelExtremesOnly?: boolean
   labelSeriesExtremesOnly?: boolean
   compactOlderHistory?: boolean
+  compactOverview?: boolean
   className?: string
   viewBox?: string
 }) {
@@ -141,6 +143,10 @@ export function SharedWeightChart({
     () =>
       fitContainer && typeof window !== 'undefined' && window.innerWidth <= 600,
   )
+  const [overviewViewBox, setOverviewViewBox] = useState({
+    width: 760,
+    height: 300,
+  })
   useEffect(() => {
     if (!fitContainer) {
       setCompactFitLayout(false)
@@ -157,11 +163,41 @@ export function SharedWeightChart({
     window.addEventListener('resize', update)
     return () => window.removeEventListener('resize', update)
   }, [fitContainer])
+  useEffect(() => {
+    if (!compactOverview || !fitContainer) return
+    const plot = plotRef.current
+    if (!plot) return
+    const update = () => {
+      const width = Math.round(plot.getBoundingClientRect().width)
+      const height = Math.round(
+        Math.max(180, Math.min(300, 180 + window.innerHeight - 768)),
+      )
+      if (width > 0)
+        setOverviewViewBox((current) =>
+          current.width === width && current.height === height
+            ? current
+            : { width, height },
+        )
+    }
+    update()
+    const observer =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update)
+    observer?.observe(plot)
+    window.addEventListener('resize', update)
+    return () => {
+      observer?.disconnect()
+      window.removeEventListener('resize', update)
+    }
+  }, [compactOverview, fitContainer])
   const compactLayout = fitContainer && compactFitLayout
   const chartLeft = compactLayout ? sharedChartTheme.plot.compactLeft : left
   let chartRight = compactLayout ? 312 : right
   const chartTop = top
-  const chartViewBox = compactLayout ? '0 0 320 266' : viewBox
+  const chartViewBox = compactLayout
+    ? '0 0 320 266'
+    : compactOverview
+      ? `0 0 ${overviewViewBox.width} ${overviewViewBox.height}`
+      : viewBox
   const chartClassName = fitContainer
     ? className.replace('min-w-[600px]', 'min-w-0')
     : className
@@ -615,6 +651,8 @@ export function SharedWeightChart({
   const viewBoxHeight = viewBoxParts[3] || 266
   if (compactLayout) {
     chartRight = viewBoxWidth - sharedChartTheme.plot.compactRightInset
+  } else if (compactOverview) {
+    chartRight = viewBoxWidth - (760 - sharedChartTheme.plot.right)
   }
   const plotBottom = viewBoxHeight - sharedChartTheme.plot.bottomInset
   const y = (value: number) =>

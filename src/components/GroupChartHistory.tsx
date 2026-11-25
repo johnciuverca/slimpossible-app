@@ -412,7 +412,7 @@ export function GroupChartHistory({
                         yLabel="Weight (kg)"
                         min={min}
                         max={max}
-                        maxTicks={8}
+                        maxTicks={compactOverview ? 6 : 8}
                         paddingRatio={0.05}
                         paddingMinimum={0.5}
                         floorAtZero
@@ -420,6 +420,7 @@ export function GroupChartHistory({
                         className="w-full min-w-0"
                         viewBox={`0 0 760 ${chartViewBoxHeight}`}
                         fitContainer
+                        compactOverview={compactOverview}
                         labelSeriesExtremesOnly
                         hiddenSeriesIds={
                           selectedKey ? noHiddenMembers : hiddenMemberKeys

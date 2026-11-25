@@ -2681,70 +2681,6 @@ export function GroupDashboardPage() {
                         </div>
                       ) : null}
                     </section>
-                    <section aria-labelledby="group-progress-heading">
-                      <h2
-                        className="text-sm font-semibold text-slate-700"
-                        id="group-progress-heading"
-                      >
-                        Group progress
-                      </h2>
-                      <dl className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-                        <div className="group-overview-metric min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2">
-                          <dt className="text-xs font-semibold text-slate-600">
-                            Members
-                          </dt>
-                          <dd className="mt-1 text-xl font-bold tracking-tight text-slate-950">
-                            {summary.activeParticipantCount}
-                          </dd>
-                        </div>
-                        <div className="group-overview-metric min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2">
-                          <dt className="text-xs font-semibold text-slate-600">
-                            Avg. goal progress
-                          </dt>
-                          <dd className="mt-1 text-xl font-bold tracking-tight text-slate-950">
-                            {summary.averageCompletionPercentage === null
-                              ? '—'
-                              : `${summary.averageCompletionPercentage}%`}
-                          </dd>
-                        </div>
-                        <div className="group-overview-metric min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2">
-                          <dt className="text-xs font-semibold text-slate-600">
-                            Shared weights
-                          </dt>
-                          <dd className="mt-1 text-xl font-bold tracking-tight text-slate-950">
-                            {summary.participantsWithRecordedWeightCount}
-                          </dd>
-                        </div>
-                        <div className="group-overview-metric min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2">
-                          <dt className="text-xs font-semibold text-slate-600">
-                            Goals reached
-                          </dt>
-                          <dd className="mt-1 text-xl font-bold tracking-tight text-slate-950">
-                            {summary.reachedTargetCount}
-                          </dd>
-                        </div>
-                      </dl>
-                      <div
-                        role="group"
-                        className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-sm"
-                        aria-label="This week’s winners"
-                      >
-                        <span className="font-semibold">
-                          This week’s winners
-                        </span>
-                        <span className="text-ink-muted">
-                          {hasManagedWeeklyResult
-                            ? weeklyResultDisplay?.winnerCount === 0
-                              ? 'No result yet'
-                              : weeklyWinnerNames.join(', ')
-                            : weeklyCelebration?.state ===
-                                'no-eligible-candidates'
-                              ? 'No result yet'
-                              : weeklyCelebration?.winnerNames.join(', ') ||
-                                'No result yet'}
-                        </span>
-                      </div>
-                    </section>
                   </div>
                 ) : null}
                 {section === 'weekly-results' ? (
@@ -2817,6 +2753,70 @@ export function GroupDashboardPage() {
           compactOverview
           memberProgress={memberProgressState === 'ready' ? memberProgress : []}
         />
+      ) : null}
+      {summary && section === 'overview' ? (
+        <section
+          aria-labelledby="group-progress-heading"
+          className="group-overview-stats space-y-2"
+        >
+          <h2
+            className="text-sm font-semibold text-slate-700"
+            id="group-progress-heading"
+          >
+            Group progress
+          </h2>
+          <dl className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+            <div className="group-overview-metric min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2">
+              <dt className="text-xs font-semibold text-slate-600">Members</dt>
+              <dd className="mt-1 text-xl font-bold tracking-tight text-slate-950">
+                {summary.activeParticipantCount}
+              </dd>
+            </div>
+            <div className="group-overview-metric min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2">
+              <dt className="text-xs font-semibold text-slate-600">
+                Avg. goal progress
+              </dt>
+              <dd className="mt-1 text-xl font-bold tracking-tight text-slate-950">
+                {summary.averageCompletionPercentage === null
+                  ? '—'
+                  : `${summary.averageCompletionPercentage}%`}
+              </dd>
+            </div>
+            <div className="group-overview-metric min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2">
+              <dt className="text-xs font-semibold text-slate-600">
+                Shared weights
+              </dt>
+              <dd className="mt-1 text-xl font-bold tracking-tight text-slate-950">
+                {summary.participantsWithRecordedWeightCount}
+              </dd>
+            </div>
+            <div className="group-overview-metric min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2">
+              <dt className="text-xs font-semibold text-slate-600">
+                Goals reached
+              </dt>
+              <dd className="mt-1 text-xl font-bold tracking-tight text-slate-950">
+                {summary.reachedTargetCount}
+              </dd>
+            </div>
+          </dl>
+          <div
+            role="group"
+            className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-sm"
+            aria-label="This week’s winners"
+          >
+            <span className="font-semibold">This week’s winners</span>
+            <span className="text-ink-muted">
+              {hasManagedWeeklyResult
+                ? weeklyResultDisplay?.winnerCount === 0
+                  ? 'No result yet'
+                  : weeklyWinnerNames.join(', ')
+                : weeklyCelebration?.state === 'no-eligible-candidates'
+                  ? 'No result yet'
+                  : weeklyCelebration?.winnerNames.join(', ') ||
+                    'No result yet'}
+            </span>
+          </div>
+        </section>
       ) : null}
       {summary && section === 'members' ? (
         <Card id="group-progress" className="space-y-5 p-5 sm:p-8">
