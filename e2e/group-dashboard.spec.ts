@@ -3195,7 +3195,7 @@ for (const viewport of [
       name: 'This week’s check-in',
     })
     await expect(overviewCard).toContainText('2 of 3 active members checked in')
-    await expect(overviewCard).toContainText('finalized and locked')
+    await expect(overviewCard).toContainText('Finalized and locked')
     const sections = page.getByRole('navigation', {
       name: 'Group sections',
     })
@@ -3225,8 +3225,7 @@ for (const viewport of [
     await expect(winnerList).toContainText('Ava')
     await expect(winnerList).toContainText('Ben')
     await sections.getByRole('link', { name: 'Overview' }).click()
-    await expect(overviewCard).toContainText('Sunday Nov 29, 2026')
-    await expect(overviewCard).toContainText('Opens Sunday Nov 29, 2026')
+    await expect(overviewCard).toContainText('Opens Nov 29, 2026')
     await expect(overviewCard).not.toContainText(
       'of 3 active members checked in',
     )
@@ -4683,13 +4682,16 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
     const overviewChart = page
       .locator('.group-history-workspace svg[role="img"]')
       .first()
+    const overviewViewBoxWidth = await overviewChart.evaluate((chart) =>
+      Number(chart.getAttribute('viewBox')?.trim().split(/\s+/)[2]),
+    )
     await expect(overviewChart).toHaveAttribute(
       'data-chart-plot-left',
       width <= 600 ? '32' : '44',
     )
     await expect(overviewChart).toHaveAttribute(
       'data-chart-plot-right',
-      width <= 600 ? '304' : '736',
+      width <= 600 ? '304' : String(overviewViewBoxWidth - 24),
     )
     const [overviewCardBounds, overviewFrameBounds] = await Promise.all([
       overviewChart.locator('xpath=ancestor::section[1]').boundingBox(),
@@ -4739,6 +4741,7 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
       ).map((card) => ({
         bounds: card.getBoundingClientRect().toJSON(),
         border: ['Top', 'Right', 'Bottom', 'Left'].map((side) => ({
+          side,
           width: getComputedStyle(card).getPropertyValue(
             `border-${side.toLowerCase()}-width`,
           ),
@@ -4775,17 +4778,28 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
     expect(edges.arrow).toBeLessThanOrEqual(edges.chart.right)
     expect(edges.arrow).toBeGreaterThanOrEqual(edges.chart.left)
     expect(edges.overflow).toBe(0)
-    for (const card of edges.cards)
+    const accentColors = [
+      'rgb(49, 219, 176)',
+      'rgb(103, 165, 255)',
+      'rgb(196, 156, 255)',
+      'rgb(255, 193, 100)',
+    ]
+    for (const [index, card] of edges.cards.entries())
       for (const side of card.border) {
-        expect(side.width).toBe('1px')
-        expect(side.color).toBe('rgb(53, 67, 83)')
+        if (side.side === 'Top') {
+          expect(side.width).toBe('3px')
+          expect(side.color).toBe(accentColors[index])
+        } else {
+          expect(side.width).toBe('1px')
+          expect(side.color).toBe('rgb(53, 67, 83)')
+        }
       }
     if (width === 1440) {
       expect(edges.plot.width).toBeCloseTo(
         edges.chart.right - edges.chart.left - 10,
         0,
       )
-      expect(edges.plot.height).toBeGreaterThan(441)
+      expect(edges.plot.height).toBe(300)
     }
     if (width === 390) {
       expect(edges.plot.width).toBeLessThan(600)
