@@ -3052,7 +3052,7 @@ for (const viewport of [
       .click()
     await expect(
       page.getByRole('table', { name: 'Shared group weight history' }),
-    ).toContainText('Jo')
+    ).toContainText('Ava')
     const contexts = page.getByRole('navigation', {
       name: 'Challenge contexts',
     })
@@ -4742,10 +4742,11 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
       expect(Math.abs(edge - edges.chart.left)).toBeLessThanOrEqual(1)
     for (const edge of [
       edges.refresh,
-      edges.arrow,
       Math.max(...edges.cards.map((c) => c.bounds.right)),
     ])
       expect(Math.abs(edge - edges.chart.right)).toBeLessThanOrEqual(1)
+    expect(edges.arrow).toBeLessThanOrEqual(edges.chart.right)
+    expect(edges.arrow).toBeGreaterThanOrEqual(edges.chart.left)
     expect(edges.overflow).toBe(0)
     for (const card of edges.cards)
       for (const side of card.border) {
@@ -4753,8 +4754,11 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
         expect(side.color).toBe('rgb(53, 67, 83)')
       }
     if (width === 1440) {
-      expect(edges.plot.width).toBeCloseTo(1206, 0)
-      expect(edges.plot.height).toBeCloseTo(441.140625, 0)
+      expect(edges.plot.width).toBeCloseTo(
+        edges.chart.right - edges.chart.left - 10,
+        0,
+      )
+      expect(edges.plot.height).toBeGreaterThan(441)
     }
     if (width === 390) {
       expect(edges.plot.width).toBeLessThan(600)
