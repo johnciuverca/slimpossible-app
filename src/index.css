@@ -1656,14 +1656,16 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 8px;
-  padding-inline: 4px;
+  margin: 0 12px 4px;
 }
 .group-workspace .group-overview-chart-heading {
   flex: 0 0 auto;
   color: #f4f7fb;
   font-size: 1.1rem;
   font-weight: 700;
+}
+.group-workspace .group-overview-axis-title {
+  fill: #d6e0e9;
 }
 .group-workspace .group-overview-history-collapse {
   flex: 0 0 auto;
@@ -1759,6 +1761,7 @@ body {
 @media (max-width: 639px) {
   .group-workspace .group-overview-chart-controls {
     gap: 4px;
+    margin-inline: 16px;
   }
   .group-workspace .group-overview-chart-heading {
     font-size: 1rem;

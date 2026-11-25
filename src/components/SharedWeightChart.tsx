@@ -205,7 +205,13 @@ export function SharedWeightChart({
     : compactLayout && labelExtremesOnly
       ? 5.4
       : 4.2
-  const chartLeft = compactLayout ? sharedChartTheme.plot.compactLeft : left
+  const chartLeft = compactLayout
+    ? compactOverview
+      ? 40
+      : sharedChartTheme.plot.compactLeft
+    : compactOverview
+      ? left + 2
+      : left
   let chartRight = compactLayout ? 312 : right
   const chartTop = top
   const chartViewBox = compactLayout
@@ -669,6 +675,8 @@ export function SharedWeightChart({
     chartRight = viewBoxWidth - (760 - sharedChartTheme.plot.right)
   }
   const plotBottom = viewBoxHeight - sharedChartTheme.plot.bottomInset
+  const axisTitleX = compactOverview ? (compactLayout ? 8 : 15) : chartLeft
+  const axisTitleY = compactOverview ? (chartTop + plotBottom) / 2 : 17
   const y = (value: number) =>
     plotBottom -
     ((value - yMinimum) / (yMaximum - yMinimum)) * (plotBottom - chartTop)
@@ -1139,9 +1147,14 @@ export function SharedWeightChart({
           <title>{title}</title>
           <desc>{description}</desc>
           <text
-            x={chartLeft}
-            y={compactOverview ? '12' : '17'}
-            className="chart-axis-title"
+            x={axisTitleX}
+            y={axisTitleY}
+            transform={
+              compactOverview
+                ? `rotate(-90 ${axisTitleX} ${axisTitleY})`
+                : undefined
+            }
+            className={`chart-axis-title ${compactOverview ? 'group-overview-axis-title' : ''}`}
             style={{ fontSize: `${sharedChartTheme.axisTitlePx}px` }}
           >
             {yLabel}

@@ -1599,6 +1599,9 @@ for (const width of [320, 390, 430, 1280, 1366, 1440, 1920]) {
       const chart = document.querySelector(
         '.group-history-workspace svg[role="img"]',
       )!
+      const chartSection = document.querySelector(
+        '.group-history-workspace section[aria-labelledby$="-history-heading"]',
+      )!
       const chartControls = document.querySelector(
         '.group-overview-chart-controls',
       )!
@@ -1635,10 +1638,18 @@ for (const width of [320, 390, 430, 1280, 1366, 1440, 1920]) {
           return { label: rangeRect(label), value: rangeRect(value) }
         }),
         chart: rect(chart),
+        chartSection: rect(chartSection),
         chartControls: rect(chartControls),
         chartHeading: rect(chartHeading),
         quickRanges: rect(quickRanges),
         rangeButtons: Array.from(quickRanges.querySelectorAll('button'), rect),
+        axisTitle: rect(chart.querySelector('.group-overview-axis-title')!),
+        yTickLabels: Array.from(
+          chart.querySelectorAll(
+            '.chart-axis-tick:not([data-chart-date-tick])',
+          ),
+          rect,
+        ),
         legend: rect(legend),
         valueLabels: renderedTextBounds('.chart-value'),
         axisLabels: renderedTextBounds('.chart-axis-tick'),
@@ -1647,7 +1658,23 @@ for (const width of [320, 390, 430, 1280, 1366, 1440, 1920]) {
         viewportHeight: window.innerHeight,
       }
     })
-    console.log('group-overview-summary-bounds', width, bounds)
+    console.log('Group overview visual geometry', width, {
+      headerInsets: {
+        left: bounds.chartControls.x - bounds.chartSection.x,
+        right: bounds.chartSection.right - bounds.chartControls.right,
+        top: bounds.chartControls.y - bounds.chartSection.y,
+      },
+      chartHeading: bounds.chartHeading,
+      quickRanges: bounds.quickRanges,
+      axisTitle: bounds.axisTitle,
+      firstYAxisTickX: Math.min(...bounds.yTickLabels.map((tick) => tick.x)),
+      plotHeight: bounds.chart.height,
+      legendBottom: bounds.legend.bottom,
+      viewportHeight: bounds.viewportHeight,
+      pageWidth: bounds.pageWidth,
+      viewportWidth: bounds.viewportWidth,
+      rangeButtonHeights: bounds.rangeButtons.map((button) => button.height),
+    })
     await expect(metrics.nth(0)).toContainText('Members')
     await expect(metrics.nth(0)).toContainText('3')
     await expect(metrics.nth(1)).toContainText('42.5%')
@@ -1655,6 +1682,14 @@ for (const width of [320, 390, 430, 1280, 1366, 1440, 1920]) {
     await expect(metrics.nth(3)).toContainText('Goals reached')
     expect(bounds.checkIn.y).toBeGreaterThanOrEqual(bounds.card.y)
     expect(bounds.chartControls.bottom).toBeLessThan(bounds.chart.y)
+    const chartHeaderInset = bounds.chartControls.x - bounds.chartSection.x
+    const chartHeaderRightInset =
+      bounds.chartSection.right - bounds.chartControls.right
+    const expectedHeaderInset = width < 640 ? 21 : 17
+    expect(chartHeaderInset).toBeCloseTo(expectedHeaderInset, 0)
+    expect(chartHeaderRightInset).toBeCloseTo(expectedHeaderInset, 0)
+    expect(chartHeaderInset).toBeCloseTo(chartHeaderRightInset, 0)
+    expect(bounds.chartControls.y - bounds.chartSection.y).toBeCloseTo(13, 0)
     expect(bounds.chartHeading.x).toBeGreaterThanOrEqual(bounds.chartControls.x)
     expect(bounds.quickRanges.right).toBeLessThanOrEqual(
       bounds.chartControls.right,
@@ -1665,6 +1700,14 @@ for (const width of [320, 390, 430, 1280, 1366, 1440, 1920]) {
     expect(bounds.chart.y).toBeGreaterThan(bounds.checkIn.bottom)
     expect(bounds.row.y).toBeGreaterThan(bounds.chart.bottom)
     expect(bounds.legend.bottom).toBeLessThanOrEqual(bounds.row.y)
+    expect(bounds.axisTitle.height).toBeGreaterThan(bounds.axisTitle.width)
+    expect(bounds.axisTitle.x).toBeGreaterThanOrEqual(bounds.chartSection.x)
+    expect(bounds.axisTitle.y).toBeGreaterThanOrEqual(bounds.chart.y)
+    expect(bounds.axisTitle.bottom).toBeLessThanOrEqual(bounds.chart.bottom)
+    expect(
+      Math.min(...bounds.yTickLabels.map((tick) => tick.x)) -
+        bounds.axisTitle.right,
+    ).toBeGreaterThanOrEqual(2)
     if (width >= 1280) {
       expect(bounds.chart.height).toBeLessThanOrEqual(330)
       expect(bounds.legend.bottom).toBeLessThanOrEqual(bounds.viewportHeight)
@@ -4752,7 +4795,7 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
     )
     await expect(overviewChart).toHaveAttribute(
       'data-chart-plot-left',
-      width <= 600 ? '32' : '44',
+      width <= 600 ? '40' : '46',
     )
     await expect(overviewChart).toHaveAttribute(
       'data-chart-plot-right',

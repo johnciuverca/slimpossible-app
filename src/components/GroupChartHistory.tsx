@@ -347,7 +347,7 @@ export function GroupChartHistory({
         >
           <section
             aria-labelledby={`${id}-history-heading`}
-            className={`min-w-0 rounded-2xl border border-stone-200 bg-white ${compactOverview ? 'p-3 sm:p-5' : 'p-5 sm:p-7'}`}
+            className={`min-w-0 rounded-2xl border border-stone-200 bg-white ${compactOverview ? 'p-3 sm:px-5 sm:pt-3 sm:pb-5' : 'p-5 sm:p-7'}`}
           >
             <h2
               id={`${id}-history-heading`}
@@ -403,7 +403,7 @@ export function GroupChartHistory({
                       role="region"
                       aria-label="Group comparison chart"
                       tabIndex={0}
-                      className="mt-4 min-w-0 focus-visible:outline-2 focus-visible:outline-emerald-700"
+                      className={`${compactOverview ? 'mt-0' : 'mt-4'} min-w-0 focus-visible:outline-2 focus-visible:outline-emerald-700`}
                     >
                       <SharedWeightChart
                         compactOlderHistory={!selectedKey}
