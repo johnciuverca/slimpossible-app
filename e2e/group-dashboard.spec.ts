@@ -1566,7 +1566,21 @@ for (const width of [320, 390, 430, 1280, 1366, 1440, 1920]) {
     const chart = page
       .locator('.group-history-workspace svg[role="img"]')
       .first()
+    const rangeControls = page.getByRole('group', {
+      name: 'Chart date range controls',
+    })
     await expect(chart).toBeVisible()
+    await expect(
+      rangeControls.getByText('Group progress', { exact: true }),
+    ).toBeVisible()
+    await expect(
+      rangeControls.getByText('Date range', { exact: true }),
+    ).toHaveCount(0)
+    await expect(
+      rangeControls
+        .getByRole('group', { name: 'Quick date ranges' })
+        .getByRole('button'),
+    ).toHaveCount(5)
     const bounds = await page.evaluate(() => {
       const rect = (element: Element) => {
         const { x, y, width, height, right, bottom } =
@@ -1584,6 +1598,15 @@ for (const width of [320, 390, 430, 1280, 1366, 1440, 1920]) {
       )!
       const chart = document.querySelector(
         '.group-history-workspace svg[role="img"]',
+      )!
+      const chartControls = document.querySelector(
+        '.group-overview-chart-controls',
+      )!
+      const chartHeading = chartControls.querySelector(
+        '.group-overview-chart-heading',
+      )!
+      const quickRanges = chartControls.querySelector(
+        '[aria-label="Quick date ranges"]',
       )!
       const renderedTextBounds = (selector: string) =>
         Array.from(chart.querySelectorAll(selector), (element) => {
@@ -1612,6 +1635,10 @@ for (const width of [320, 390, 430, 1280, 1366, 1440, 1920]) {
           return { label: rangeRect(label), value: rangeRect(value) }
         }),
         chart: rect(chart),
+        chartControls: rect(chartControls),
+        chartHeading: rect(chartHeading),
+        quickRanges: rect(quickRanges),
+        rangeButtons: Array.from(quickRanges.querySelectorAll('button'), rect),
         legend: rect(legend),
         valueLabels: renderedTextBounds('.chart-value'),
         axisLabels: renderedTextBounds('.chart-axis-tick'),
@@ -1627,11 +1654,19 @@ for (const width of [320, 390, 430, 1280, 1366, 1440, 1920]) {
     await expect(metrics.nth(2)).toContainText('Shared weights')
     await expect(metrics.nth(3)).toContainText('Goals reached')
     expect(bounds.checkIn.y).toBeGreaterThanOrEqual(bounds.card.y)
+    expect(bounds.chartControls.bottom).toBeLessThan(bounds.chart.y)
+    expect(bounds.chartHeading.x).toBeGreaterThanOrEqual(bounds.chartControls.x)
+    expect(bounds.quickRanges.right).toBeLessThanOrEqual(
+      bounds.chartControls.right,
+    )
+    expect(bounds.rangeButtons).toHaveLength(5)
+    for (const button of bounds.rangeButtons)
+      expect(button.height).toBeGreaterThanOrEqual(width < 640 ? 44 : 32)
     expect(bounds.chart.y).toBeGreaterThan(bounds.checkIn.bottom)
     expect(bounds.row.y).toBeGreaterThan(bounds.chart.bottom)
     expect(bounds.legend.bottom).toBeLessThanOrEqual(bounds.row.y)
     if (width >= 1280) {
-      expect(bounds.chart.height).toBeLessThanOrEqual(310)
+      expect(bounds.chart.height).toBeLessThanOrEqual(330)
       expect(bounds.legend.bottom).toBeLessThanOrEqual(bounds.viewportHeight)
       expect(bounds.valueLabels.length).toBeGreaterThan(0)
       expect(
@@ -1660,14 +1695,44 @@ for (const width of [320, 390, 430, 1280, 1366, 1440, 1920]) {
         }
       }
       expect(new Set(bounds.metrics.map((metric) => metric.y)).size).toBe(2)
+      if (width >= 420) {
+        expect(
+          Math.abs(
+            bounds.chartHeading.y +
+              bounds.chartHeading.height / 2 -
+              bounds.quickRanges.y -
+              bounds.quickRanges.height / 2,
+          ),
+        ).toBeLessThan(1)
+        expect(bounds.chartHeading.right).toBeLessThan(bounds.quickRanges.x)
+      }
     } else {
       expect(bounds.card.width).toBeGreaterThan(bounds.main.width * 0.9)
       expect(bounds.chart.width).toBeGreaterThan(bounds.card.width * 0.85)
+      expect(
+        Math.abs(
+          bounds.chartHeading.y +
+            bounds.chartHeading.height / 2 -
+            bounds.quickRanges.y -
+            bounds.quickRanges.height / 2,
+        ),
+      ).toBeLessThan(1)
+      expect(bounds.chartHeading.right).toBeLessThan(bounds.quickRanges.x)
     }
     await page.screenshot({
       path: testInfo.outputPath(`group-overview-${width}-after.png`),
       fullPage: true,
     })
+    if (width === 390) {
+      const oneWeek = rangeControls.getByRole('button', {
+        name: 'Show last 1 week',
+      })
+      await oneWeek.click()
+      await expect(oneWeek).toHaveAttribute('aria-pressed', 'true')
+      await expect(
+        page.getByRole('status', { name: 'Visible date range' }),
+      ).toContainText('Last 7 days')
+    }
     if (width < 640) {
       await page.locator('#group-summary').evaluate((card) => {
         ;(card as HTMLElement).style.fontSize = '20px'
@@ -4799,7 +4864,7 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
         edges.chart.right - edges.chart.left - 10,
         0,
       )
-      expect(edges.plot.height).toBe(300)
+      expect(edges.plot.height).toBe(320)
     }
     if (width === 390) {
       expect(edges.plot.width).toBeLessThan(600)

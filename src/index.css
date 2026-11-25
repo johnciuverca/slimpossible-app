@@ -1650,6 +1650,43 @@ body {
 .group-workspace .group-history-workspace [aria-label='Quick date ranges'] {
   gap: 6px;
 }
+.group-workspace .group-overview-chart-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-inline: 4px;
+}
+.group-workspace .group-overview-chart-heading {
+  flex: 0 0 auto;
+  color: #f4f7fb;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.group-workspace .group-overview-history-collapse {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding-inline: 12px;
+}
+.group-workspace
+  .group-history-workspace
+  .group-overview-chart-controls
+  [aria-label='Quick date ranges'] {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: 0;
+  width: auto;
+  margin: 0 0 0 auto;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #354353;
+  border-radius: 8px;
+  background: #111c28;
+}
 .group-workspace
   .group-history-workspace
   [aria-label='Quick date ranges']
@@ -1666,6 +1703,25 @@ body {
   border-radius: 999px;
   border-color: #354353;
   padding-inline: 12px;
+}
+.group-workspace
+  .group-history-workspace
+  .group-overview-chart-controls
+  [aria-label='Quick date ranges']
+  button {
+  min-height: 32px;
+  min-width: 36px;
+  padding-inline: 8px;
+  border: 0;
+  border-right: 1px solid #354353;
+  border-radius: 0;
+}
+.group-workspace
+  .group-history-workspace
+  .group-overview-chart-controls
+  [aria-label='Quick date ranges']
+  button:last-child {
+  border-right: 0;
 }
 .group-workspace
   .group-history-workspace
@@ -1701,6 +1757,16 @@ body {
   }
 }
 @media (max-width: 639px) {
+  .group-workspace .group-overview-chart-controls {
+    gap: 4px;
+  }
+  .group-workspace .group-overview-chart-heading {
+    font-size: 1rem;
+  }
+  .group-workspace .group-overview-history-collapse {
+    flex-basis: 100%;
+    min-height: 44px;
+  }
   .group-workspace .group-weekly-checkin-strip {
     padding: 12px;
   }
@@ -1721,6 +1787,21 @@ body {
   }
   .group-workspace .group-history-workspace [aria-label='Group chart legend'] {
     gap: 4px 8px;
+  }
+  .group-workspace
+    .group-history-workspace
+    .group-overview-chart-controls
+    [aria-label='Quick date ranges'] {
+    flex-wrap: nowrap;
+  }
+  .group-workspace
+    .group-history-workspace
+    .group-overview-chart-controls
+    [aria-label='Quick date ranges']
+    button {
+    min-height: 44px;
+    min-width: 44px;
+    padding-inline: 8px;
   }
   .group-workspace
     .group-history-workspace

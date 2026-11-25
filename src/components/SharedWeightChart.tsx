@@ -170,7 +170,7 @@ export function SharedWeightChart({
     const update = () => {
       const width = Math.round(plot.getBoundingClientRect().width)
       const height = Math.round(
-        Math.max(180, Math.min(300, 180 + window.innerHeight - 768)),
+        Math.max(200, Math.min(320, 200 + window.innerHeight - 768)),
       )
       if (width > 0)
         setOverviewViewBox((current) =>
@@ -1028,21 +1028,28 @@ export function SharedWeightChart({
             ? { top: 'calc(var(--group-navigation-height, 0px) + 8px)' }
             : undefined
         }
-        className={`w-full text-sm ${compactOlderHistory && expandedWeeks.size > 0 ? 'sticky z-20 rounded-lg bg-panel py-2 shadow-panel' : ''}`}
+        className={`${compactOverview ? 'group-overview-chart-controls' : 'w-full text-sm'} ${compactOlderHistory && expandedWeeks.size > 0 ? 'sticky z-20 rounded-lg bg-panel py-2 shadow-panel' : ''}`}
       >
+        {compactOverview ? (
+          <h2 className="group-overview-chart-heading">Group progress</h2>
+        ) : null}
         <div
           role="group"
-          className={`${sharedChartTheme.spacing.quickRangesBottomClass} flex w-full flex-wrap items-center ${sharedChartTheme.spacing.quickRangesGapClass} ${compactLayout ? 'justify-center' : ''}`}
+          className={`${compactOverview ? '' : sharedChartTheme.spacing.quickRangesBottomClass} flex flex-wrap items-center ${compactOverview ? 'group-overview-quick-ranges' : `w-full ${sharedChartTheme.spacing.quickRangesGapClass} ${compactLayout ? 'justify-center' : ''}`}`}
           aria-label="Quick date ranges"
           style={
-            compactLayout ? undefined : { paddingLeft: `${plotStartPercent}%` }
+            compactOverview || compactLayout
+              ? undefined
+              : { paddingLeft: `${plotStartPercent}%` }
           }
         >
-          <span
-            className={`${compactLayout ? 'w-full text-center' : 'mr-1'} font-semibold text-ink`}
-          >
-            Date range
-          </span>
+          {!compactOverview ? (
+            <span
+              className={`${compactLayout ? 'w-full text-center' : 'mr-1'} font-semibold text-ink`}
+            >
+              Date range
+            </span>
+          ) : null}
           <button
             type="button"
             aria-label="Show last 1 week"
@@ -1093,21 +1100,21 @@ export function SharedWeightChart({
           >
             All
           </button>
-          {compactOlderHistory && expandedWeeks.size > 0 ? (
-            <button
-              type="button"
-              className={`${presetClass(true)} min-h-11 w-full px-3 sm:w-auto`}
-              onClick={() => {
-                setExpandedWeeks(new Set())
-                setSelectedPoint(null)
-                setHoveredPointId(null)
-                setRestoreWeeklyFocus(true)
-              }}
-            >
-              Back to weekly averages
-            </button>
-          ) : null}
         </div>
+        {compactOlderHistory && expandedWeeks.size > 0 ? (
+          <button
+            type="button"
+            className={`${presetClass(true)} ${compactOverview ? 'group-overview-history-collapse' : 'min-h-11 w-full px-3 sm:w-auto'}`}
+            onClick={() => {
+              setExpandedWeeks(new Set())
+              setSelectedPoint(null)
+              setHoveredPointId(null)
+              setRestoreWeeklyFocus(true)
+            }}
+          >
+            Back to weekly averages
+          </button>
+        ) : null}
       </div>
       <div
         className="relative"

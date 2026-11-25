@@ -2782,7 +2782,7 @@ export function GroupDashboardPage() {
             className="text-sm font-semibold text-slate-700"
             id="group-progress-heading"
           >
-            Group progress
+            Progress metrics
           </h2>
           <dl className="grid grid-cols-2 gap-2 lg:grid-cols-4">
             <div className="group-overview-metric min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2">
