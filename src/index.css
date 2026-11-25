@@ -1795,12 +1795,24 @@ body {
     .group-history-workspace
     .group-overview-chart-controls
     [aria-label='Quick date ranges'] {
+    position: relative;
     flex-wrap: nowrap;
     gap: 0;
-    overflow: hidden;
+    overflow: visible;
+    border: 0;
+    background: transparent;
+  }
+  .group-workspace
+    .group-history-workspace
+    .group-overview-chart-controls
+    [aria-label='Quick date ranges']::before {
+    position: absolute;
+    z-index: 2;
+    inset: 8px 0;
     border: 1px solid #354353;
     border-radius: 7px;
-    background: #111c28;
+    content: '';
+    pointer-events: none;
   }
   .group-workspace
     .group-history-workspace
@@ -1808,6 +1820,8 @@ body {
     [aria-label='Quick date ranges']
     button {
     display: grid;
+    position: relative;
+    z-index: 1;
     width: 44px;
     min-height: 44px;
     min-width: 44px;
@@ -1826,6 +1840,7 @@ body {
     min-width: 44px;
     max-width: 44px;
     height: 28px;
+    align-self: center;
     place-items: center;
     border-right: 1px solid #354353;
     background: transparent;
@@ -1839,9 +1854,20 @@ body {
     .group-history-workspace
     .group-overview-chart-controls
     [aria-label='Quick date ranges']
+    button:first-child
+    .group-overview-range-label {
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+  }
+  .group-workspace
+    .group-history-workspace
+    .group-overview-chart-controls
+    [aria-label='Quick date ranges']
     button:last-child
     .group-overview-range-label {
     border-right: 0;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
   }
   .group-workspace
     .group-history-workspace

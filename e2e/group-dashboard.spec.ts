@@ -1651,6 +1651,17 @@ for (const width of [320, 390, 430, 1280, 1366, 1440, 1920]) {
           quickRanges.querySelectorAll('.group-overview-range-label'),
           (label) => Number.parseFloat(getComputedStyle(label).fontSize),
         ),
+        rangeFrame: (() => {
+          const frame = getComputedStyle(quickRanges, '::before')
+          return {
+            top: Number.parseFloat(frame.top),
+            bottom: Number.parseFloat(frame.bottom),
+            left: Number.parseFloat(frame.left),
+            right: Number.parseFloat(frame.right),
+            borderWidth: Number.parseFloat(frame.borderTopWidth),
+            radius: Number.parseFloat(frame.borderTopLeftRadius),
+          }
+        })(),
         axisTitle: rect(chart.querySelector('.group-overview-axis-title')!),
         yTickLabels: Array.from(
           chart.querySelectorAll(
@@ -1710,9 +1721,19 @@ for (const width of [320, 390, 430, 1280, 1366, 1440, 1920]) {
     if (width < 640) {
       expect(bounds.rangeLabels).toHaveLength(5)
       expect(bounds.rangeLabelFontSizes).toEqual([11, 11, 11, 11, 11])
+      expect(bounds.quickRanges.height).toBe(44)
+      expect(bounds.rangeFrame).toEqual({
+        top: 8,
+        bottom: 8,
+        left: 0,
+        right: 0,
+        borderWidth: 1,
+        radius: 7,
+      })
       for (const [index, label] of bounds.rangeLabels.entries()) {
         expect(label.width).toBe(44)
         expect(label.height).toBe(28)
+        expect(label.y).toBeCloseTo(bounds.quickRanges.y + 8, 0)
         if (index > 0) {
           expect(label.x).toBeCloseTo(
             bounds.rangeLabels[index - 1].x +
