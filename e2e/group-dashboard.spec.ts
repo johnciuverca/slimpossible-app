@@ -1709,10 +1709,17 @@ for (const width of [320, 390, 430, 1280, 1366, 1440, 1920]) {
     }
     if (width < 640) {
       expect(bounds.rangeLabels).toHaveLength(5)
-      expect(bounds.rangeLabelFontSizes).toEqual([12, 12, 12, 12, 12])
-      for (const label of bounds.rangeLabels) {
-        expect(label.width).toBeLessThanOrEqual(44)
-        expect(label.height).toBe(32)
+      expect(bounds.rangeLabelFontSizes).toEqual([11, 11, 11, 11, 11])
+      for (const [index, label] of bounds.rangeLabels.entries()) {
+        expect(label.width).toBe(44)
+        expect(label.height).toBe(28)
+        if (index > 0) {
+          expect(label.x).toBeCloseTo(
+            bounds.rangeLabels[index - 1].x +
+              bounds.rangeLabels[index - 1].width,
+            0,
+          )
+        }
       }
     }
     expect(bounds.chart.y).toBeGreaterThan(bounds.checkIn.bottom)

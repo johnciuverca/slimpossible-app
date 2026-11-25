@@ -1797,9 +1797,10 @@ body {
     [aria-label='Quick date ranges'] {
     flex-wrap: nowrap;
     gap: 0;
-    overflow: visible;
-    border: 0;
-    background: transparent;
+    overflow: hidden;
+    border: 1px solid #354353;
+    border-radius: 7px;
+    background: #111c28;
   }
   .group-workspace
     .group-history-workspace
@@ -1820,19 +1821,27 @@ body {
     [aria-label='Quick date ranges']
     .group-overview-range-label {
     display: grid;
-    width: max-content;
-    min-width: 32px;
+    box-sizing: border-box;
+    width: 44px;
+    min-width: 44px;
     max-width: 44px;
-    height: 32px;
+    height: 28px;
     place-items: center;
-    border: 1px solid #354353;
-    border-radius: 6px;
-    background: #111c28;
+    border-right: 1px solid #354353;
+    background: transparent;
     color: #e4edf4;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     line-height: 1;
-    padding-inline: 3px;
+    padding: 0;
+  }
+  .group-workspace
+    .group-history-workspace
+    .group-overview-chart-controls
+    [aria-label='Quick date ranges']
+    button:last-child
+    .group-overview-range-label {
+    border-right: 0;
   }
   .group-workspace
     .group-history-workspace
