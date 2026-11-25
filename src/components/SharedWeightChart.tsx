@@ -190,6 +190,9 @@ export function SharedWeightChart({
     }
   }, [compactOverview, fitContainer])
   const compactLayout = fitContainer && compactFitLayout
+  const chartAxisTickPx = compactOverview
+    ? 14 * sharedChartTheme.axisTickScale
+    : sharedChartAxisTickPx
   const valueLabelFontSize = compactOverview
     ? compactLayout
       ? 11
@@ -830,7 +833,7 @@ export function SharedWeightChart({
       span
     : Infinity
   const minimumDateLabelGap =
-    sharedChartAxisTickPx *
+    chartAxisTickPx *
       sharedChartTheme.dates.averageGlyphWidthEm *
       sharedChartTheme.dates.labelCharacters *
       sharedChartTheme.dates.edgeLabelWidthMultiplier +
@@ -1164,7 +1167,7 @@ export function SharedWeightChart({
                 y={y(value) + 4}
                 textAnchor="end"
                 className="chart-axis-tick"
-                style={{ fontSize: `${sharedChartAxisTickPx}px` }}
+                style={{ fontSize: `${chartAxisTickPx}px` }}
               >
                 {format(value)}
               </text>
@@ -1519,7 +1522,7 @@ export function SharedWeightChart({
                       : 'middle'
               }
               className="chart-axis-tick"
-              style={{ fontSize: `${sharedChartAxisTickPx}px` }}
+              style={{ fontSize: `${chartAxisTickPx}px` }}
               data-chart-date-tick={dateAtDay(date)}
             >
               {formatChartDate(dateAtDay(date))}

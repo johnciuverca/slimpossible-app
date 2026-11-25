@@ -4,7 +4,7 @@
  * in the matching .chart-axis-* and .date-range-handle rules in index.css.
  */
 export const sharedChartTheme = {
-  axisBaselinePx: 14,
+  axisBaselinePx: 12,
   axisTickScale: 0.85,
   axisTitlePx: 12,
   trendOpacity: 0.32,
