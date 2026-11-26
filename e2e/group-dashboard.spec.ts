@@ -5486,6 +5486,29 @@ for (const width of [320, 390, 430, 1440]) {
       name: 'Choose group',
       exact: true,
     })
+    const alignment = await dashboardTrigger.evaluate((button) => {
+      const span = button.querySelector('span')!
+      const range = document.createRange()
+      range.selectNodeContents(span)
+      const glyph = range.getBoundingClientRect()
+      const box = button.getBoundingClientRect()
+      const frame = getComputedStyle(button, '::before')
+      return {
+        horizontalOffset: glyph.x + glyph.width / 2 - box.x - box.width / 2,
+        verticalOffset: glyph.y + glyph.height / 2 - box.y - box.height / 2,
+        width: box.width,
+        height: box.height,
+        frameTop: parseFloat(frame.top),
+        frameBottom: parseFloat(frame.bottom),
+      }
+    })
+    console.log('navbar trigger text bounds', width, alignment)
+    expect(Math.abs(alignment.horizontalOffset)).toBeLessThanOrEqual(1)
+    expect(Math.abs(alignment.verticalOffset)).toBeLessThanOrEqual(1)
+    expect(alignment.width).toBeLessThanOrEqual(width < 640 ? 110 : 180)
+    expect(alignment.height).toBe(44)
+    expect(alignment.frameTop).toBe(6)
+    expect(alignment.frameBottom).toBe(6)
     await dashboardTrigger.click()
     await page
       .locator('.group-switcher-panel')

@@ -30,7 +30,11 @@ for (const width of [320, 390, 768, 1280, 1920]) {
     )
     await expect(group).toHaveAttribute('aria-current', 'page')
     await expect(dashboard).not.toHaveAttribute('aria-current')
-    await expect(group).toHaveCSS('background-color', 'rgb(37, 59, 45)')
+    expect(
+      await group.evaluate(
+        (el) => getComputedStyle(el, '::before').backgroundColor,
+      ),
+    ).toBe('rgb(37, 59, 45)')
     await expect(dashboard).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
     await expect(account).toBeVisible()
     if (width > 640) {
