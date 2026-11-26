@@ -145,32 +145,25 @@ export function PersonalWeighInEditor({
             No eligible groups. You can still save this private weigh-in.
           </p>
         ) : (
-          <>
-            <p className="mb-3 text-xs leading-5 text-ink-muted">
-              {values.sharedChallengeIds.length
-                ? 'Selected groups receive the date and weight only. Change the selection before saving if needed; your note stays private.'
-                : 'No groups selected. This entry will stay private; your note is always private.'}
-            </p>
-            <div className="space-y-3">
-              {groups.map((group) => (
-                <label
-                  className="flex items-center gap-3 text-sm text-ink"
-                  key={group.id}
-                >
-                  <input
-                    disabled={isSaving}
-                    checked={values.sharedChallengeIds.includes(group.id)}
-                    className="size-4 shrink-0 accent-forest-800"
-                    onChange={(event) =>
-                      toggleGroup(group.id, event.target.checked)
-                    }
-                    type="checkbox"
-                  />
-                  <span className="min-w-0 break-words">{group.name}</span>
-                </label>
-              ))}
-            </div>
-          </>
+          <div className="space-y-3">
+            {groups.map((group) => (
+              <label
+                className="flex items-center gap-3 text-sm text-ink"
+                key={group.id}
+              >
+                <input
+                  disabled={isSaving}
+                  checked={values.sharedChallengeIds.includes(group.id)}
+                  className="size-4 shrink-0 accent-forest-800"
+                  onChange={(event) =>
+                    toggleGroup(group.id, event.target.checked)
+                  }
+                  type="checkbox"
+                />
+                <span className="min-w-0 break-words">{group.name}</span>
+              </label>
+            ))}
+          </div>
         )}
         {errors.sharedChallengeIds ? (
           <p className="mt-2 text-sm text-red-700">
