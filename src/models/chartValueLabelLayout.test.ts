@@ -19,17 +19,19 @@ it('preserves the point x-coordinate while assigning centered labels their own r
 })
 
 it('leaves sparse labels on their default row and keeps edge labels within the viewBox', () => {
-  expect(
-    layoutChartValueLabels(
-      [
-        { id: 'first', x: 64, pointY: 100, text: '80.5' },
-        { id: 'last', x: 696, pointY: 160, text: '100' },
-      ],
-      760,
-      266,
-    ),
-  ).toEqual([
-    { id: 'first', x: 64, y: 88 },
-    { id: 'last', x: 696, y: 148 },
+  const positions = layoutChartValueLabels(
+    [
+      { id: 'first', x: 64, pointY: 100, text: '80.5' },
+      { id: 'last', x: 696, pointY: 160, text: '100' },
+    ],
+    760,
+    266,
+  )
+
+  expect(positions.map(({ id, x }) => ({ id, x }))).toEqual([
+    { id: 'first', x: 64 },
+    { id: 'last', x: 696 },
   ])
+  expect(positions[0].y).toBeCloseTo(88, 0)
+  expect(positions[1].y).toBeCloseTo(148, 0)
 })

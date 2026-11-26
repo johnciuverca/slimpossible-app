@@ -5,6 +5,7 @@ export type GroupMemberProgress = {
   completionPercentage: number | null
   displayName: string
   memberKey: string
+  latestRecordedDate?: string | null
   negativeProgressCapped: boolean
   progressState: 'unavailable' | 'in_progress' | 'reached'
   reachedTargetMilestones: Array<{

@@ -34,7 +34,9 @@ async function installGroupFixtures(
     holdPersonalContexts?: boolean
     participantAvatars?: boolean
     finalizedWeeklyResultForPrimaryGroup?: boolean
+    finalizedSunday?: string
     weeklyResultMode?: 'finalized' | 'unfinished' | 'error' | 'pending'
+    ownSundayRecorded?: boolean
   } = {},
 ) {
   const challengeId = ownEntries ? ownGroupId : 'e2e-challenge'
@@ -526,11 +528,17 @@ async function installGroupFixtures(
         })
         return
       }
-      const hasFinalizedResult =
+      const hasWeeklyResult =
         (options.weeklyResultMode === 'finalized' ||
+          options.weeklyResultMode === 'unfinished' ||
           (options.weeklyResultMode !== 'unfinished' &&
             options.finalizedWeeklyResultForPrimaryGroup === true)) &&
         body.target_challenge_id === challengeId
+      const isFinalized =
+        hasWeeklyResult &&
+        options.weeklyResultMode !== 'unfinished' &&
+        (!options.finalizedSunday ||
+          body.target_sunday === options.finalizedSunday)
       const winnerNames =
         body.target_challenge_id === challengeId
           ? ['Ava', 'Ben']
@@ -539,19 +547,27 @@ async function installGroupFixtures(
         contentType: 'application/json',
         body: JSON.stringify([
           {
-            active_participant_count: hasFinalizedResult ? 3 : 0,
-            recorded_participant_count: hasFinalizedResult ? 2 : 0,
-            eligible_participant_count: hasFinalizedResult ? 2 : 0,
-            finalized_at: hasFinalizedResult
+            active_participant_count: hasWeeklyResult ? 3 : 0,
+            recorded_participant_count: hasWeeklyResult
+              ? isFinalized
+                ? 2
+                : 1
+              : 0,
+            eligible_participant_count: hasWeeklyResult ? 2 : 0,
+            finalized_at: isFinalized
               ? `${body.target_sunday}T18:00:00.000Z`
               : null,
-            result_outcome: hasFinalizedResult
+            result_outcome: hasWeeklyResult
               ? 'shared_winners'
               : 'no_eligible_candidates',
-            result_state: hasFinalizedResult ? 'finalized' : 'disabled',
+            result_state: isFinalized
+              ? 'finalized'
+              : hasWeeklyResult
+                ? 'provisional'
+                : 'disabled',
             sole_participant_name: null,
-            winner_count: hasFinalizedResult ? 2 : 0,
-            winner_details: hasFinalizedResult
+            winner_count: hasWeeklyResult ? 2 : 0,
+            winner_details: hasWeeklyResult
               ? [
                   {
                     member_key: memberKey(body.target_challenge_id, viewerId),
@@ -566,7 +582,7 @@ async function installGroupFixtures(
                   },
                 ]
               : [],
-            winner_names: hasFinalizedResult ? winnerNames : [],
+            winner_names: hasWeeklyResult ? winnerNames : [],
           },
         ]),
       })
@@ -613,7 +629,9 @@ async function installGroupFixtures(
                 ? ownStartingWeight
                 : 100,
             target_weight_kg: ownTarget,
-            latest_recorded_date: '2026-09-22',
+            latest_recorded_date: options.ownSundayRecorded
+              ? '2026-11-22'
+              : '2026-09-22',
             completion_percentage:
               body.target_challenge_id === challengeId
                 ? Math.round(
@@ -1173,7 +1191,7 @@ test('selected Group sections retain readable contrast in both color schemes', a
   }
 })
 
-for (const width of [320, 390, 430, 1280]) {
+for (const width of [320, 390, 430, 1280, 1920]) {
   test(`weekly Group history expands and collapses at ${width}px`, async ({
     page,
   }, testInfo) => {
@@ -1532,11 +1550,12 @@ for (const width of [320, 390, 430, 1280]) {
   })
 }
 
-for (const width of [320, 390, 430, 1280]) {
+for (const width of [320, 390, 430, 1280, 1366, 1440, 1920]) {
   test(`Group overview summary row geometry at ${width}px`, async ({
     page,
   }, testInfo) => {
-    await page.setViewportSize({ width, height: 900 })
+    const height = width === 1366 ? 768 : 900
+    await page.setViewportSize({ width, height })
     await installGroupFixtures(page, true)
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
     await expect(
@@ -1547,7 +1566,21 @@ for (const width of [320, 390, 430, 1280]) {
     const chart = page
       .locator('.group-history-workspace svg[role="img"]')
       .first()
+    const rangeControls = page.getByRole('group', {
+      name: 'Chart date range controls',
+    })
     await expect(chart).toBeVisible()
+    await expect(
+      rangeControls.getByText('Group progress', { exact: true }),
+    ).toBeVisible()
+    await expect(
+      rangeControls.getByText('Date range', { exact: true }),
+    ).toHaveCount(0)
+    await expect(
+      rangeControls
+        .getByRole('group', { name: 'Quick date ranges' })
+        .getByRole('button'),
+    ).toHaveCount(5)
     const bounds = await page.evaluate(() => {
       const rect = (element: Element) => {
         const { x, y, width, height, right, bottom } =
@@ -1555,12 +1588,41 @@ for (const width of [320, 390, 430, 1280]) {
         return { x, y, width, height, right, bottom }
       }
       const card = document.querySelector('#group-summary')!
-      const row = card.querySelector('dl')!
+      const main = document.querySelector('.app-shell-main')!
+      const checkIn = card.querySelector(
+        '[aria-labelledby="weekly-check-in-heading"]',
+      )!
+      const row = document.querySelector('.group-overview-stats dl')!
+      const legend = document.querySelector(
+        '.group-history-workspace [aria-label="Group chart legend"]',
+      )!
       const chart = document.querySelector(
         '.group-history-workspace svg[role="img"]',
       )!
+      const chartSection = document.querySelector(
+        '.group-history-workspace section[aria-labelledby$="-history-heading"]',
+      )!
+      const chartControls = document.querySelector(
+        '.group-overview-chart-controls',
+      )!
+      const chartHeading = chartControls.querySelector(
+        '.group-overview-chart-heading',
+      )!
+      const quickRanges = chartControls.querySelector(
+        '[aria-label="Quick date ranges"]',
+      )!
+      const renderedTextBounds = (selector: string) =>
+        Array.from(chart.querySelectorAll(selector), (element) => {
+          const { height } = element.getBoundingClientRect()
+          return {
+            fontSize: Number.parseFloat(getComputedStyle(element).fontSize),
+            glyphHeight: height,
+          }
+        })
       return {
         card: rect(card),
+        main: rect(main),
+        checkIn: rect(checkIn),
         row: rect(row),
         metrics: Array.from(row.children, rect),
         metricText: Array.from(row.children, (metric) => {
@@ -1576,16 +1638,139 @@ for (const width of [320, 390, 430, 1280]) {
           return { label: rangeRect(label), value: rangeRect(value) }
         }),
         chart: rect(chart),
+        chartSection: rect(chartSection),
+        chartControls: rect(chartControls),
+        chartHeading: rect(chartHeading),
+        quickRanges: rect(quickRanges),
+        rangeButtons: Array.from(quickRanges.querySelectorAll('button'), rect),
+        rangeLabels: Array.from(
+          quickRanges.querySelectorAll('.group-overview-range-label'),
+          rect,
+        ),
+        rangeLabelFontSizes: Array.from(
+          quickRanges.querySelectorAll('.group-overview-range-label'),
+          (label) => Number.parseFloat(getComputedStyle(label).fontSize),
+        ),
+        rangeFrame: (() => {
+          const frame = getComputedStyle(quickRanges, '::before')
+          return {
+            top: Number.parseFloat(frame.top),
+            bottom: Number.parseFloat(frame.bottom),
+            left: Number.parseFloat(frame.left),
+            right: Number.parseFloat(frame.right),
+            borderWidth: Number.parseFloat(frame.borderTopWidth),
+            radius: Number.parseFloat(frame.borderTopLeftRadius),
+          }
+        })(),
+        axisTitle: rect(chart.querySelector('.group-overview-axis-title')!),
+        yTickLabels: Array.from(
+          chart.querySelectorAll(
+            '.chart-axis-tick:not([data-chart-date-tick])',
+          ),
+          rect,
+        ),
+        legend: rect(legend),
+        valueLabels: renderedTextBounds('.chart-value'),
+        axisLabels: renderedTextBounds('.chart-axis-tick'),
         pageWidth: document.documentElement.scrollWidth,
         viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
       }
     })
-    console.log('group-overview-summary-bounds', width, bounds)
+    console.log('Group overview visual geometry', width, {
+      headerInsets: {
+        left: bounds.chartControls.x - bounds.chartSection.x,
+        right: bounds.chartSection.right - bounds.chartControls.right,
+        top: bounds.chartControls.y - bounds.chartSection.y,
+      },
+      chartHeading: bounds.chartHeading,
+      quickRanges: bounds.quickRanges,
+      axisTitle: bounds.axisTitle,
+      firstYAxisTickX: Math.min(...bounds.yTickLabels.map((tick) => tick.x)),
+      plotHeight: bounds.chart.height,
+      legendBottom: bounds.legend.bottom,
+      viewportHeight: bounds.viewportHeight,
+      pageWidth: bounds.pageWidth,
+      viewportWidth: bounds.viewportWidth,
+      rangeButtonHeights: bounds.rangeButtons.map((button) => button.height),
+    })
     await expect(metrics.nth(0)).toContainText('Members')
     await expect(metrics.nth(0)).toContainText('3')
     await expect(metrics.nth(1)).toContainText('42.5%')
-    await expect(metrics.nth(2)).toContainText('Checked in')
+    await expect(metrics.nth(2)).toContainText('Shared weights')
     await expect(metrics.nth(3)).toContainText('Goals reached')
+    expect(bounds.checkIn.y).toBeGreaterThanOrEqual(bounds.card.y)
+    expect(bounds.chartControls.bottom).toBeLessThan(bounds.chart.y)
+    const chartHeaderInset = bounds.chartControls.x - bounds.chartSection.x
+    const chartHeaderRightInset =
+      bounds.chartSection.right - bounds.chartControls.right
+    const expectedHeaderInset = width < 640 ? 21 : 17
+    expect(chartHeaderInset).toBeCloseTo(expectedHeaderInset, 0)
+    expect(chartHeaderRightInset).toBeCloseTo(expectedHeaderInset, 0)
+    expect(chartHeaderInset).toBeCloseTo(chartHeaderRightInset, 0)
+    expect(bounds.chartControls.y - bounds.chartSection.y).toBeCloseTo(13, 0)
+    expect(bounds.chartHeading.x).toBeGreaterThanOrEqual(bounds.chartControls.x)
+    expect(bounds.quickRanges.right).toBeLessThanOrEqual(
+      bounds.chartControls.right,
+    )
+    expect(bounds.rangeButtons).toHaveLength(5)
+    for (const button of bounds.rangeButtons) {
+      expect(button.height).toBeGreaterThanOrEqual(width < 640 ? 44 : 32)
+      if (width < 640) expect(button.width).toBeGreaterThanOrEqual(44)
+    }
+    if (width < 640) {
+      expect(bounds.rangeLabels).toHaveLength(5)
+      expect(bounds.rangeLabelFontSizes).toEqual([11, 11, 11, 11, 11])
+      expect(bounds.quickRanges.height).toBe(44)
+      expect(bounds.rangeFrame).toEqual({
+        top: 8,
+        bottom: 8,
+        left: 0,
+        right: 0,
+        borderWidth: 1,
+        radius: 7,
+      })
+      for (const [index, label] of bounds.rangeLabels.entries()) {
+        expect(label.width).toBe(44)
+        expect(label.height).toBe(28)
+        expect(label.y).toBeCloseTo(bounds.quickRanges.y + 8, 0)
+        if (index > 0) {
+          expect(label.x).toBeCloseTo(
+            bounds.rangeLabels[index - 1].x +
+              bounds.rangeLabels[index - 1].width,
+            0,
+          )
+        }
+      }
+    }
+    expect(bounds.chart.y).toBeGreaterThan(bounds.checkIn.bottom)
+    expect(bounds.row.y).toBeGreaterThan(bounds.chart.bottom)
+    expect(bounds.legend.bottom).toBeLessThanOrEqual(bounds.row.y)
+    expect(bounds.axisTitle.height).toBeGreaterThan(bounds.axisTitle.width)
+    expect(bounds.axisTitle.x).toBeGreaterThanOrEqual(bounds.chartSection.x)
+    expect(bounds.axisTitle.y).toBeGreaterThanOrEqual(bounds.chart.y)
+    expect(bounds.axisTitle.bottom).toBeLessThanOrEqual(bounds.chart.bottom)
+    expect(
+      Math.min(...bounds.yTickLabels.map((tick) => tick.x)) -
+        bounds.axisTitle.right,
+    ).toBeGreaterThanOrEqual(2)
+    if (width >= 1280) {
+      expect(bounds.chart.height).toBeLessThanOrEqual(330)
+      expect(bounds.legend.bottom).toBeLessThanOrEqual(bounds.viewportHeight)
+      expect(bounds.valueLabels.length).toBeGreaterThan(0)
+      expect(
+        Math.min(...bounds.valueLabels.map((label) => label.fontSize)),
+      ).toBeGreaterThanOrEqual(12)
+      expect(
+        Math.min(...bounds.valueLabels.map((label) => label.glyphHeight)),
+      ).toBeGreaterThanOrEqual(11)
+      expect(
+        Math.min(...bounds.axisLabels.map((label) => label.fontSize)),
+      ).toBeGreaterThanOrEqual(11)
+      expect(
+        Math.min(...bounds.axisLabels.map((label) => label.glyphHeight)),
+      ).toBeGreaterThanOrEqual(9)
+    }
     if (width < 640) {
       const row = bounds.row
       for (const metric of bounds.metrics) {
@@ -1598,25 +1783,68 @@ for (const width of [320, 390, 430, 1280]) {
           expect(box.right).toBeLessThanOrEqual(row.right)
         }
       }
-      if (width >= 390) {
-        expect(new Set(bounds.metrics.map((metric) => metric.y)).size).toBe(1)
-        expect(bounds.row.height).toBeLessThanOrEqual(60)
-        expect(bounds.chart.y).toBeLessThan(530)
-      } else {
-        expect(new Set(bounds.metrics.map((metric) => metric.y)).size).toBe(2)
-        expect(bounds.chart.y).toBeLessThan(665)
+      expect(new Set(bounds.metrics.map((metric) => metric.y)).size).toBe(2)
+      if (width >= 420) {
+        expect(
+          Math.abs(
+            bounds.chartHeading.y +
+              bounds.chartHeading.height / 2 -
+              bounds.quickRanges.y -
+              bounds.quickRanges.height / 2,
+          ),
+        ).toBeLessThan(1)
+        expect(bounds.chartHeading.right).toBeLessThan(bounds.quickRanges.x)
       }
     } else {
-      expect(bounds.card.height).toBeCloseTo(103.15625, 1)
-      expect(bounds.row.height).toBeCloseTo(67.1875, 1)
-      expect(bounds.chart.x).toBeCloseTo(37, 1)
-      expect(bounds.chart.y).toBeCloseTo(444.15625, 1)
-      expect(bounds.chart.width).toBeCloseTo(1206, 1)
-      expect(bounds.chart.height).toBeCloseTo(441.140625, 1)
+      expect(bounds.card.width).toBeGreaterThan(bounds.main.width * 0.9)
+      expect(bounds.chart.width).toBeGreaterThan(bounds.card.width * 0.85)
+      expect(
+        Math.abs(
+          bounds.chartHeading.y +
+            bounds.chartHeading.height / 2 -
+            bounds.quickRanges.y -
+            bounds.quickRanges.height / 2,
+        ),
+      ).toBeLessThan(1)
+      expect(bounds.chartHeading.right).toBeLessThan(bounds.quickRanges.x)
     }
     await page.screenshot({
       path: testInfo.outputPath(`group-overview-${width}-after.png`),
+      fullPage: true,
     })
+    if (width < 640) {
+      const oneWeek = rangeControls.getByRole('button', {
+        name: 'Show last 1 week',
+      })
+      await oneWeek.click()
+      await expect(oneWeek).toHaveAttribute('aria-pressed', 'true')
+      await expect(
+        page.getByRole('status', { name: 'Visible date range' }),
+      ).toContainText('Last 7 days')
+      const rangeLabels = page.locator('.group-overview-range-label')
+      await rangeLabels.evaluateAll((labels) => {
+        for (const label of labels)
+          (label as HTMLElement).style.fontSize = '20px'
+      })
+      const enlargedLabels = await rangeLabels.evaluateAll((labels) =>
+        labels.map((label) => {
+          const range = document.createRange()
+          range.selectNodeContents(label)
+          const text = range.getBoundingClientRect()
+          const box = label.getBoundingClientRect()
+          return {
+            textLeft: text.left,
+            textRight: text.right,
+            boxLeft: box.left,
+            boxRight: box.right,
+          }
+        }),
+      )
+      for (const label of enlargedLabels) {
+        expect(label.textLeft).toBeGreaterThanOrEqual(label.boxLeft)
+        expect(label.textRight).toBeLessThanOrEqual(label.boxRight)
+      }
+    }
     if (width < 640) {
       await page.locator('#group-summary').evaluate((card) => {
         ;(card as HTMLElement).style.fontSize = '20px'
@@ -3136,9 +3364,15 @@ for (const viewport of [
       undefined,
       {
         weeklyResultMode: 'finalized',
+        finalizedSunday: '2026-11-22',
       },
     )
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    const overviewCard = page.getByRole('region', {
+      name: 'This week’s check-in',
+    })
+    await expect(overviewCard).toContainText('2 of 3 active members checked in')
+    await expect(overviewCard).toContainText('Finalized and locked')
     const sections = page.getByRole('navigation', {
       name: 'Group sections',
     })
@@ -3167,6 +3401,17 @@ for (const viewport of [
     ).toBeVisible()
     await expect(winnerList).toContainText('Ava')
     await expect(winnerList).toContainText('Ben')
+    await sections.getByRole('link', { name: 'Overview' }).click()
+    await expect(overviewCard).toContainText('Opens Nov 29, 2026')
+    await expect(overviewCard).not.toContainText(
+      'of 3 active members checked in',
+    )
+    await expect(
+      overviewCard.getByRole('button', { name: 'Record weight' }),
+    ).toHaveCount(0)
+    await sections.getByRole('link', { name: 'Weekly results' }).click()
+    await expect(winnerList).toContainText('Ava')
+    await expect(winnerList).toContainText('Ben')
     await page
       .locator('.group-overview-result')
       .first()
@@ -3174,6 +3419,131 @@ for (const viewport of [
       .screenshot({
         path: test.info().outputPath(`weekly-rollover-${viewport.width}.png`),
       })
+  })
+
+  test(`weekly check-in card shows authoritative count and own Sunday status on ${viewport.label}`, async ({
+    page,
+  }) => {
+    await page.clock.install({ time: new Date('2026-11-22T10:00:00.000Z') })
+    await page.setViewportSize({ height: 900, width: viewport.width })
+    await installGroupFixtures(
+      page,
+      false,
+      true,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        weeklyResultMode: 'unfinished',
+        ownSundayRecorded: true,
+        participantAvatars: true,
+      },
+    )
+    await page.goto(
+      `/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
+    )
+
+    const card = page.getByRole('region', { name: 'This week’s check-in' })
+    await expect(card).toContainText('1 of 3 active members checked in')
+    await expect(card).toContainText('Your Sunday weigh-in is shared')
+    await expect(
+      card.getByRole('list', { name: 'Members checked in this Sunday' }),
+    ).toContainText('Ava')
+    await expect(
+      card
+        .getByRole('list', { name: 'Members checked in this Sunday' })
+        .locator('[data-avatar-preset="female-03"]'),
+    ).toBeVisible()
+    await expect(card).not.toContainText('2 have a usable baseline')
+    await expect(
+      card.getByRole('button', { name: 'Record weight' }),
+    ).toHaveCount(0)
+    await card.screenshot({
+      path: test
+        .info()
+        .outputPath(`weekly-check-in-recorded-${viewport.width}.png`),
+    })
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+      .toBeLessThanOrEqual(viewport.width)
+  })
+
+  test(`weekly check-in card offers one action when the viewer has not shared Sunday weight on ${viewport.label}`, async ({
+    page,
+  }) => {
+    await page.clock.install({ time: new Date('2026-11-22T10:00:00.000Z') })
+    await page.setViewportSize({ height: 900, width: viewport.width })
+    await installGroupFixtures(
+      page,
+      false,
+      true,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { weeklyResultMode: 'unfinished' },
+    )
+    await page.goto(
+      `/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
+    )
+
+    const card = page.getByRole('region', { name: 'This week’s check-in' })
+    await expect(card).toContainText('1 of 3 active members checked in')
+    await expect(card).toContainText(
+      'Your Sunday weigh-in has not been shared yet',
+    )
+    await expect(
+      card.getByRole('button', { name: 'Record weight' }),
+    ).toHaveCount(1)
+    await expect(
+      page.getByRole('button', { name: 'Record weight' }),
+    ).toHaveCount(1)
+    const buttonBounds = await card
+      .getByRole('button', { name: 'Record weight' })
+      .boundingBox()
+    expect(buttonBounds?.height).toBeGreaterThanOrEqual(44)
+    await card.screenshot({
+      path: test
+        .info()
+        .outputPath(`weekly-check-in-needed-${viewport.width}.png`),
+    })
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+      .toBeLessThanOrEqual(viewport.width)
+  })
+
+  test(`weekly check-in error never presents a false count or action on ${viewport.label}`, async ({
+    page,
+  }) => {
+    await page.clock.install({ time: new Date('2026-11-22T10:00:00.000Z') })
+    await page.setViewportSize({ height: 900, width: viewport.width })
+    await installGroupFixtures(
+      page,
+      false,
+      true,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { weeklyResultMode: 'error' },
+    )
+    await page.goto(
+      `/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
+    )
+
+    const card = page.getByRole('region', { name: 'This week’s check-in' })
+    await expect(card).toContainText('Status unavailable')
+    await expect(card).not.toContainText('active members checked in')
+    await expect(
+      card.getByRole('button', { name: 'Record weight' }),
+    ).toHaveCount(0)
   })
 
   for (const weeklyResultMode of ['pending', 'error'] as const) {
@@ -4489,13 +4859,16 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
     const overviewChart = page
       .locator('.group-history-workspace svg[role="img"]')
       .first()
+    const overviewViewBoxWidth = await overviewChart.evaluate((chart) =>
+      Number(chart.getAttribute('viewBox')?.trim().split(/\s+/)[2]),
+    )
     await expect(overviewChart).toHaveAttribute(
       'data-chart-plot-left',
-      width <= 600 ? '32' : '44',
+      width <= 600 ? '40' : '46',
     )
     await expect(overviewChart).toHaveAttribute(
       'data-chart-plot-right',
-      width <= 600 ? '304' : '736',
+      width <= 600 ? '304' : String(overviewViewBoxWidth - 24),
     )
     const [overviewCardBounds, overviewFrameBounds] = await Promise.all([
       overviewChart.locator('xpath=ancestor::section[1]').boundingBox(),
@@ -4545,6 +4918,7 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
       ).map((card) => ({
         bounds: card.getBoundingClientRect().toJSON(),
         border: ['Top', 'Right', 'Bottom', 'Left'].map((side) => ({
+          side,
           width: getComputedStyle(card).getPropertyValue(
             `border-${side.toLowerCase()}-width`,
           ),
@@ -4575,19 +4949,34 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
       expect(Math.abs(edge - edges.chart.left)).toBeLessThanOrEqual(1)
     for (const edge of [
       edges.refresh,
-      edges.arrow,
       Math.max(...edges.cards.map((c) => c.bounds.right)),
     ])
       expect(Math.abs(edge - edges.chart.right)).toBeLessThanOrEqual(1)
+    expect(edges.arrow).toBeLessThanOrEqual(edges.chart.right)
+    expect(edges.arrow).toBeGreaterThanOrEqual(edges.chart.left)
     expect(edges.overflow).toBe(0)
-    for (const card of edges.cards)
+    const accentColors = [
+      'rgb(49, 219, 176)',
+      'rgb(103, 165, 255)',
+      'rgb(196, 156, 255)',
+      'rgb(255, 193, 100)',
+    ]
+    for (const [index, card] of edges.cards.entries())
       for (const side of card.border) {
-        expect(side.width).toBe('1px')
-        expect(side.color).toBe('rgb(53, 67, 83)')
+        if (side.side === 'Top') {
+          expect(side.width).toBe('3px')
+          expect(side.color).toBe(accentColors[index])
+        } else {
+          expect(side.width).toBe('1px')
+          expect(side.color).toBe('rgb(53, 67, 83)')
+        }
       }
     if (width === 1440) {
-      expect(edges.plot.width).toBeCloseTo(1206, 0)
-      expect(edges.plot.height).toBeCloseTo(441.140625, 0)
+      expect(edges.plot.width).toBeCloseTo(
+        edges.chart.right - edges.chart.left - 10,
+        0,
+      )
+      expect(edges.plot.height).toBe(320)
     }
     if (width === 390) {
       expect(edges.plot.width).toBeLessThan(600)

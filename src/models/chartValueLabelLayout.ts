@@ -11,17 +11,17 @@ export type ChartValueLabelPosition = {
   y: number
 }
 
-const rowHeight = 7
-const labelHeight = 6.6
-const horizontalPadding = 1
-
 /** Centers each label on its point and assigns nearby labels separate rows. */
 export const layoutChartValueLabels = (
   labels: readonly ChartValueLabel[],
   viewBoxWidth: number,
   viewBoxHeight: number,
   characterWidth = 4.2,
+  fontSize = 6.6,
 ): ChartValueLabelPosition[] => {
+  const rowHeight = Math.max(7, fontSize * 1.25)
+  const labelHeight = fontSize
+  const horizontalPadding = Math.max(1, fontSize * 0.15)
   const sorted = [...labels].sort(
     (first, second) =>
       first.x - second.x ||
@@ -39,7 +39,7 @@ export const layoutChartValueLabels = (
       candidates.push(-row * rowHeight, row * rowHeight)
     }
     const validCandidates = candidates
-      .map((offset) => ({ y: label.pointY - 12 + offset, offset }))
+      .map((offset) => ({ y: label.pointY - fontSize - 5 + offset, offset }))
       .filter(
         ({ y }) =>
           y >= minimumY &&
