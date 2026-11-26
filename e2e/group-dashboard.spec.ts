@@ -5437,6 +5437,45 @@ for (const width of [320, 390, 430, 1440]) {
       .getByRole('navigation', { name: 'Group sections' })
       .getByRole('link', { name: 'Records', exact: true })
       .click()
+    const chevrons = await page.evaluate(() => {
+      const measure = (pathSelector: string, controlSelector: string) => {
+        const path = document.querySelector<SVGGraphicsElement>(pathSelector)!
+        const control = document
+          .querySelector(controlSelector)!
+          .getBoundingClientRect()
+        const bounds = path.getBBox()
+        const center = new DOMPoint(
+          bounds.x + bounds.width / 2,
+          bounds.y + bounds.height / 2,
+        ).matrixTransform(path.getScreenCTM()!)
+        const svg = path.ownerSVGElement!.getBoundingClientRect()
+        return {
+          offset: center.y - control.y - control.height / 2,
+          width: svg.width,
+          height: svg.height,
+          stroke: path.getAttribute('stroke-width'),
+          shape: path.getAttribute('d'),
+        }
+      }
+      return {
+        group: measure(
+          '.group-switcher-trigger svg path',
+          '.group-switcher-trigger',
+        ),
+        profile: measure(
+          '.account-control .account-chevron svg path',
+          '.account-control summary',
+        ),
+      }
+    })
+    console.log('navbar chevron bounds', width, chevrons)
+    expect(chevrons.group.width).toBe(chevrons.profile.width)
+    expect(chevrons.group.height).toBe(chevrons.profile.height)
+    expect(chevrons.group.shape).toBe(chevrons.profile.shape)
+    expect(chevrons.group.stroke).toBe(chevrons.profile.stroke)
+    expect(
+      Math.abs(chevrons.group.offset - chevrons.profile.offset),
+    ).toBeLessThanOrEqual(0.5)
     await trigger.click()
     const second = page
       .locator('.group-switcher-panel')
