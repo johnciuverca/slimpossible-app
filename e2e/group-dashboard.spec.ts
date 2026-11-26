@@ -5652,11 +5652,9 @@ for (const width of [320, 390, 430, 1440]) {
     await page.screenshot({
       path: testInfo.outputPath(`navbar-dashboard-closed-${width}.png`),
     })
-    await page
-      .locator('.app-shell-header-inner')
-      .screenshot({
-        path: testInfo.outputPath(`dashboard-navbar-frame-${width}.png`),
-      })
+    await page.locator('.app-shell-header-inner').screenshot({
+      path: testInfo.outputPath(`dashboard-navbar-frame-${width}.png`),
+    })
     await dashboardTrigger.click()
     expect(await expectMatchingFrames()).toEqual(originalFrames)
     await page.screenshot({
@@ -5687,11 +5685,9 @@ for (const width of [320, 390, 430, 1440]) {
       path: testInfo.outputPath(`group-overview-navbar-${width}.png`),
       fullPage: true,
     })
-    await page
-      .locator('.app-shell-header-inner')
-      .screenshot({
-        path: testInfo.outputPath(`group-navbar-frame-${width}.png`),
-      })
+    await page.locator('.app-shell-header-inner').screenshot({
+      path: testInfo.outputPath(`group-navbar-frame-${width}.png`),
+    })
     await page.getByRole('button', { name: /^Choose group:/ }).click()
     expect(await expectMatchingFrames()).toEqual(originalFrames)
     await page.screenshot({
