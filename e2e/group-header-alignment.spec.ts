@@ -54,7 +54,8 @@ for (const viewport of [
         ).toBeVisible()
         continue
       }
-      if (await page.locator('.group-workspace').count()) {
+      if (path === '/group' || path.startsWith('/challenges')) {
+        await expect(page.locator('.group-workspace')).toBeVisible()
         await expect(contexts).toHaveCount(0)
         const trigger = page.getByRole('button', { name: /^Choose group/ })
         await expect(trigger).toBeVisible()
@@ -84,7 +85,8 @@ for (const viewport of [
         exact: true,
       })
       await expect(action).toBeEnabled()
-      if (await page.locator('.group-workspace').count()) {
+      if (path === '/group' || path.startsWith('/challenges')) {
+        await expect(page.locator('.group-workspace')).toBeVisible()
         const subnav = page.getByRole('navigation', { name: 'Group sections' })
         await expect(
           subnav.getByRole('button', { name: 'Record weight', exact: true }),
