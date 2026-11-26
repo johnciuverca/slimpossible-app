@@ -2493,7 +2493,8 @@ for (const viewport of [
     ).toHaveCount(0)
     await page.getByRole('button', { name: /^Choose group/ }).click()
     await page
-      .getByRole('link', { name: 'Group overview', exact: true })
+      .locator('.group-switcher-panel')
+      .getByRole('link', { name: 'E2E authorized group', exact: true })
       .click()
     await page
       .getByRole('navigation', { name: 'Group sections' })
@@ -5491,6 +5492,41 @@ for (const width of [320, 390, 430, 1440]) {
     })
     await expect(trigger).toBeVisible()
     await expect(
+      page.getByRole('heading', { name: 'Group progress', exact: true }),
+    ).toBeVisible()
+    const expectMatchingFrames = async () => {
+      const frames = await page.evaluate(() => {
+        const dashboard = document
+          .querySelector<HTMLAnchorElement>(
+            'nav[aria-label="Primary navigation"] a[href="/dashboard"]',
+          )!
+          .getBoundingClientRect()
+        const group = document.querySelector<HTMLElement>(
+          '.group-switcher-trigger',
+        )!
+        const bounds = group.getBoundingClientRect()
+        const frame = getComputedStyle(group, '::before')
+        const top = parseFloat(frame.top),
+          bottom = parseFloat(frame.bottom)
+        return {
+          dashboardHeight: dashboard.height,
+          groupHeight: bounds.height - top - bottom,
+          topOffset: bounds.y + top - dashboard.y,
+          width: bounds.width,
+          noOverflow: [dashboard, bounds].every(
+            (box) => box.left >= 0 && box.right <= innerWidth,
+          ),
+        }
+      })
+      expect(frames.dashboardHeight).toBe(44)
+      expect(frames.groupHeight).toBe(44)
+      expect(Math.abs(frames.topOffset)).toBeLessThanOrEqual(1)
+      expect(frames.noOverflow).toBe(true)
+      return frames
+    }
+    const originalFrames = await expectMatchingFrames()
+
+    await expect(
       page.getByRole('navigation', { name: 'Challenge contexts' }),
     ).toHaveCount(0)
     await page
@@ -5537,6 +5573,10 @@ for (const width of [320, 390, 430, 1440]) {
       Math.abs(chevrons.group.offset - chevrons.profile.offset),
     ).toBeLessThanOrEqual(0.5)
     await trigger.click()
+    expect(await expectMatchingFrames()).toEqual(originalFrames)
+    await expect(
+      page.locator('.group-switcher-panel').getByRole('link'),
+    ).toHaveText(['E2E authorized group', 'Second authorized group'])
     const second = page
       .locator('.group-switcher-panel')
       .getByRole('link', { name: 'Second authorized group', exact: true })
@@ -5606,9 +5646,20 @@ for (const width of [320, 390, 430, 1440]) {
     expect(Math.abs(alignment.verticalOffset)).toBeLessThanOrEqual(1)
     expect(alignment.width).toBeLessThanOrEqual(width < 640 ? 110 : 180)
     expect(alignment.height).toBe(44)
-    expect(alignment.frameTop).toBe(6)
-    expect(alignment.frameBottom).toBe(6)
+    expect(alignment.frameTop).toBe(0)
+    expect(alignment.frameBottom).toBe(0)
+    expect(await expectMatchingFrames()).toEqual(originalFrames)
+    await page.screenshot({
+      path: testInfo.outputPath(`navbar-dashboard-closed-${width}.png`),
+    })
+    await page.locator('.app-shell-header-inner').screenshot({
+      path: testInfo.outputPath(`dashboard-navbar-frame-${width}.png`),
+    })
     await dashboardTrigger.click()
+    expect(await expectMatchingFrames()).toEqual(originalFrames)
+    await page.screenshot({
+      path: testInfo.outputPath(`navbar-dashboard-open-${width}.png`),
+    })
     await page
       .locator('.group-switcher-panel')
       .getByRole('link', { name: 'E2E authorized group', exact: true })
@@ -5618,7 +5669,9 @@ for (const width of [320, 390, 430, 1440]) {
     )
     await trigger.press('ArrowDown')
     await expect(
-      page.getByRole('link', { name: 'Group overview', exact: true }),
+      page
+        .locator('.group-switcher-panel')
+        .getByRole('link', { name: 'E2E authorized group', exact: true }),
     ).toBeFocused()
     await page.keyboard.press('Escape')
     await expect(trigger).toBeFocused()
@@ -5627,11 +5680,16 @@ for (const width of [320, 390, 430, 1440]) {
     await expect(
       page.getByRole('heading', { name: 'Group progress', exact: true }),
     ).toBeVisible()
+    expect(await expectMatchingFrames()).toEqual(originalFrames)
     await page.screenshot({
       path: testInfo.outputPath(`group-overview-navbar-${width}.png`),
       fullPage: true,
     })
+    await page.locator('.app-shell-header-inner').screenshot({
+      path: testInfo.outputPath(`group-navbar-frame-${width}.png`),
+    })
     await page.getByRole('button', { name: /^Choose group:/ }).click()
+    expect(await expectMatchingFrames()).toEqual(originalFrames)
     await page.screenshot({
       path: testInfo.outputPath(`group-dropdown-overview-${width}.png`),
       fullPage: true,

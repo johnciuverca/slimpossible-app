@@ -132,9 +132,11 @@ export function GroupSwitcher({
         className="group-switcher-panel"
         aria-label="Authorized groups"
       >
-        <Link to="/group" onClick={() => setOpen(false)}>
-          Group overview
-        </Link>
+        {loading || error || groups.length === 0 ? (
+          <Link to="/group" onClick={() => setOpen(false)}>
+            Group overview
+          </Link>
+        ) : null}
         {loading ? (
           <p role="status">Loading authorized groups…</p>
         ) : error ? (

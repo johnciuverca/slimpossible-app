@@ -72,7 +72,8 @@ for (const width of [1280, 390]) {
     ).toBeVisible()
     await primary.getByRole('button', { name: /^Choose group/ }).click()
     await page
-      .getByRole('link', { name: 'Group overview', exact: true })
+      .locator('.group-switcher-panel')
+      .getByRole('link', { name: 'Synthetic draft group', exact: true })
       .click()
     await expect(
       page.getByRole('heading', { name: 'Synthetic draft group', exact: true }),

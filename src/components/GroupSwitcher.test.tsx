@@ -41,6 +41,11 @@ it('switches authorized groups while retaining the Group tab and safe URL state'
   fireEvent.click(
     screen.getByRole('button', { name: 'Choose group: First group' }),
   )
+  expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual([
+    'First group',
+    'Second group',
+  ])
+  expect(screen.queryByRole('link', { name: 'Group overview' })).toBeNull()
   expect(
     screen.queryByRole('link', { name: 'Personal' }),
   ).not.toBeInTheDocument()
@@ -113,4 +118,6 @@ it('keeps empty and single-group navigation usable without an unavailable select
     'aria-current',
     'page',
   )
+  expect(screen.getAllByRole('link')).toHaveLength(1)
+  expect(screen.queryByRole('link', { name: 'Group overview' })).toBeNull()
 })
