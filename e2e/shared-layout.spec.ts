@@ -309,7 +309,7 @@ for (const width of [1280, 390]) {
       .click()
     await page
       .locator('.group-switcher-panel')
-      .getByRole('link', { name: 'Group overview', exact: true })
+      .getByRole('link', { name: 'Synthetic first group', exact: true })
       .click()
     await expect(
       page.getByText('Authorized selected Group destination', { exact: true }),

@@ -2493,7 +2493,8 @@ for (const viewport of [
     ).toHaveCount(0)
     await page.getByRole('button', { name: /^Choose group/ }).click()
     await page
-      .getByRole('link', { name: 'Group overview', exact: true })
+      .locator('.group-switcher-panel')
+      .getByRole('link', { name: 'E2E authorized group', exact: true })
       .click()
     await page
       .getByRole('navigation', { name: 'Group sections' })
@@ -5537,6 +5538,9 @@ for (const width of [320, 390, 430, 1440]) {
       Math.abs(chevrons.group.offset - chevrons.profile.offset),
     ).toBeLessThanOrEqual(0.5)
     await trigger.click()
+    await expect(
+      page.locator('.group-switcher-panel').getByRole('link'),
+    ).toHaveText(['E2E authorized group', 'Second authorized group'])
     const second = page
       .locator('.group-switcher-panel')
       .getByRole('link', { name: 'Second authorized group', exact: true })
@@ -5618,7 +5622,9 @@ for (const width of [320, 390, 430, 1440]) {
     )
     await trigger.press('ArrowDown')
     await expect(
-      page.getByRole('link', { name: 'Group overview', exact: true }),
+      page
+        .locator('.group-switcher-panel')
+        .getByRole('link', { name: 'E2E authorized group', exact: true }),
     ).toBeFocused()
     await page.keyboard.press('Escape')
     await expect(trigger).toBeFocused()
