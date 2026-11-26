@@ -1273,34 +1273,39 @@ for (const width of [320, 390, 430, 1280, 1920]) {
       await expect(
         chart.locator('[data-series="target-reference"]'),
       ).toHaveCount(0)
-      const styles = await chart
-        .locator('[data-chart-trend]')
-        .evaluateAll((trends) =>
-          trends.map((trend) => {
-            const seriesId = trend.getAttribute('data-chart-series-id')
-            const seriesLine = Array.from(
-              trend
-                .closest('svg')!
-                .querySelectorAll('path[data-chart-series-id]'),
-            ).find(
-              (path) => path.getAttribute('data-chart-series-id') === seriesId,
-            )
-            return {
-              seriesId,
-              stroke: trend.getAttribute('stroke'),
-              seriesStroke: seriesLine?.getAttribute('stroke'),
-              opacity: trend.getAttribute('opacity'),
-              dash: trend.getAttribute('stroke-dasharray'),
-            }
-          }),
-        )
-      expect(styles.length).toBeGreaterThan(0)
-      for (const style of styles) {
-        expect(style.seriesId).toBeTruthy()
-        expect(style.stroke).toBe(style.seriesStroke)
-        expect(style.opacity).toBe('0.32')
-        expect(style.dash).toBeNull()
-      }
+      // Navigation can replace the Overview SVG between the count check and read.
+      // Retry the style snapshot as one assertion against the settled Charts SVG.
+      await expect(async () => {
+        const styles = await chart
+          .locator('[data-chart-trend]')
+          .evaluateAll((trends) =>
+            trends.map((trend) => {
+              const seriesId = trend.getAttribute('data-chart-series-id')
+              const seriesLine = Array.from(
+                trend
+                  .closest('svg')!
+                  .querySelectorAll('path[data-chart-series-id]'),
+              ).find(
+                (path) =>
+                  path.getAttribute('data-chart-series-id') === seriesId,
+              )
+              return {
+                seriesId,
+                stroke: trend.getAttribute('stroke'),
+                seriesStroke: seriesLine?.getAttribute('stroke'),
+                opacity: trend.getAttribute('opacity'),
+                dash: trend.getAttribute('stroke-dasharray'),
+              }
+            }),
+          )
+        expect(styles.length).toBeGreaterThan(0)
+        for (const style of styles) {
+          expect(style.seriesId).toBeTruthy()
+          expect(style.stroke).toBe(style.seriesStroke)
+          expect(style.opacity).toBe('0.32')
+          expect(style.dash).toBeNull()
+        }
+      }).toPass({ timeout: 5000 })
     }
     await expectTrendStyles()
     await chart.screenshot({
