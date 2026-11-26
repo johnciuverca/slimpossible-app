@@ -41,6 +41,9 @@ export function PersonalWeighInEditor({
   compactMobile = false,
 }: PersonalWeighInEditorProps) {
   const initial = useRef(JSON.stringify(values))
+  const sharingDestinations = groups
+    .filter(({ id }) => values.sharedChallengeIds.includes(id))
+    .map(({ name }) => name)
   const visualViewport = window.visualViewport
   const wideEnoughForColumns =
     window.matchMedia?.('(min-width: 768px) and (min-height: 501px)').matches ??
@@ -266,7 +269,11 @@ export function PersonalWeighInEditor({
             : 'flex flex-wrap gap-3'
         }
       >
-        <Button disabled={isSaving} type="submit">
+        <Button
+          aria-describedby="personal-weigh-in-sharing-destination"
+          disabled={isSaving}
+          type="submit"
+        >
           {isSaving ? 'Saving…' : submitLabel}
         </Button>
         {onCancel ? (
@@ -279,6 +286,21 @@ export function PersonalWeighInEditor({
             Cancel edit
           </Button>
         ) : null}
+        <p
+          className="min-w-[min(8rem,100%)] flex-1 self-center text-xs leading-5 break-words text-ink-muted"
+          role="status"
+          aria-label="Sharing destination"
+          aria-atomic="true"
+        >
+          <span id="personal-weigh-in-sharing-destination">
+            <span className="font-semibold text-ink">
+              {sharingDestinations.length
+                ? `Sharing with: ${sharingDestinations.join(', ')}`
+                : 'Private — only you'}
+            </span>
+            {sharingDestinations.length ? ' · Note stays private' : null}
+          </span>
+        </p>
       </div>
     </form>
   )

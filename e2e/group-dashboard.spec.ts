@@ -40,6 +40,7 @@ async function installGroupFixtures(
     privateEntryAtEstimatedDate?: boolean
     privateEntrySharedWithOtherGroup?: boolean
     duplicateEstimateOnSave?: boolean
+    estimateShareOptOut?: boolean
     holdPersonalContexts?: boolean
     participantAvatars?: boolean
     finalizedWeeklyResultForPrimaryGroup?: boolean
@@ -249,7 +250,9 @@ async function installGroupFixtures(
         expect(body.target_recorded_date).toBe('2026-09-21')
         expect(body.target_weight_kg).toBeCloseTo(estimatedOwnWeight())
         expect(body.target_note).toBeNull()
-        expect(body.target_shared_challenge_ids).toEqual([challengeId])
+        expect(body.target_shared_challenge_ids).toEqual(
+          options.estimateShareOptOut ? [] : [challengeId],
+        )
         if (options.duplicateEstimateOnSave && !privateEntryAtEstimatedDate) {
           privateEntryAtEstimatedDate = true
           await route.fulfill({
@@ -4424,6 +4427,63 @@ test('archived groups leave normal navigation and remain accessible as read-only
 test.describe('group chart weigh-in dots', () => {
   test.use({ hasTouch: true, viewport: { width: 1280, height: 900 } })
 
+  test('Group estimate sharing summary supports an explicit private save', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 900 })
+    const requests = await installGroupFixtures(
+      page,
+      true,
+      true,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'e2e-owner',
+      { estimateShareOptOut: true },
+    )
+    await page.goto(
+      `/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
+    )
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Charts', exact: true })
+      .click()
+    const chart = page.getByRole('img', {
+      name: 'Weight (kg) — shared group history',
+    })
+    const estimate = chart.locator(
+      `circle[data-series-id="${memberKey(ownGroupId, viewerId)}"][data-date="2026-09-21"][data-point-kind="estimated"]`,
+    )
+    await estimate.focus()
+    await page.keyboard.press('Enter')
+    await page
+      .getByRole('group', { name: /Chart point details/ })
+      .getByRole('button', { name: 'Record weight', exact: true })
+      .click()
+    const editor = page.getByRole('dialog', { name: 'Record weight' })
+    const summary = editor.getByRole('status', { name: 'Sharing destination' })
+    await expect(summary).toHaveText(
+      'Sharing with: E2E authorized group · Note stays private',
+    )
+    await expect(editor.getByLabel('E2E authorized group')).toBeChecked()
+    await expect(editor.getByLabel('Second authorized group')).not.toBeChecked()
+    await editor.getByLabel('E2E authorized group').uncheck()
+    await expect(summary).toHaveText('Private — only you')
+    const save = editor.getByRole('button', {
+      name: 'Save weight',
+      exact: true,
+    })
+    await expect(save).toHaveAccessibleDescription('Private — only you')
+    await save.click()
+    await expect(editor).toHaveCount(0)
+    expect(
+      requests.filter((url) => url.includes('/rpc/save_personal_weigh_in')),
+    ).toHaveLength(1)
+    await expect(estimate).toBeVisible()
+  })
+
   test('adds the current Group share to an estimate-resolved entry while preserving its other share', async ({
     page,
   }) => {
@@ -4505,6 +4565,11 @@ test.describe('group chart weigh-in dots', () => {
     )
     await expect(edit.getByLabel('E2E authorized group')).toBeChecked()
     await expect(edit.getByLabel('Second authorized group')).toBeChecked()
+    await expect(
+      edit.getByRole('status', { name: 'Sharing destination' }),
+    ).toHaveText(
+      'Sharing with: E2E authorized group, Second authorized group · Note stays private',
+    )
     await expect(edit.getByText(/matches a saved personal entry/)).toBeVisible()
 
     await edit.getByLabel('Weight in kg').fill('84.5')
@@ -4755,6 +4820,9 @@ test.describe('group chart weigh-in dots', () => {
     await expect(create.getByText(/display-only estimate/)).toBeVisible()
     const groupShare = create.getByLabel('E2E authorized group')
     await expect(groupShare).toBeChecked()
+    await expect(
+      create.getByRole('status', { name: 'Sharing destination' }),
+    ).toHaveText('Sharing with: E2E authorized group · Note stays private')
     const saveRequestsBeforeCancel = requests.filter((url) =>
       url.includes('/rpc/save_personal_weigh_in'),
     ).length
