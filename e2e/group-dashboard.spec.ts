@@ -17,6 +17,15 @@ function shiftDate(dateOnly: string, days: number) {
   return date.toISOString().slice(0, 10)
 }
 
+async function groupLink(page: Page, name: string) {
+  const trigger = page.getByRole('button', { name: /^Choose group/ })
+  if ((await trigger.getAttribute('aria-expanded')) !== 'true')
+    await trigger.click()
+  return page
+    .locator('.group-switcher-panel')
+    .getByRole('link', { name: name.replace(/^Group · /, ''), exact: true })
+}
+
 async function installGroupFixtures(
   page: Page,
   multiple = false,
@@ -37,6 +46,7 @@ async function installGroupFixtures(
     finalizedSunday?: string
     weeklyResultMode?: 'finalized' | 'unfinished' | 'error' | 'pending'
     ownSundayRecorded?: boolean
+    groupName?: string
   } = {},
 ) {
   const challengeId = ownEntries ? ownGroupId : 'e2e-challenge'
@@ -412,7 +422,7 @@ async function installGroupFixtures(
             description: null,
             end_date: '2026-12-01',
             id: challengeId,
-            name: 'E2E authorized group',
+            name: options.groupName ?? 'E2E authorized group',
             owner_id: challengeOwnerId,
             start_date: '2026-09-17',
             status: 'active',
@@ -2473,9 +2483,9 @@ for (const viewport of [
     await expect(
       page.getByRole('list', { name: 'Your own personal entry actions' }),
     ).toHaveCount(0)
+    await page.getByRole('button', { name: /^Choose group/ }).click()
     await page
-      .getByRole('navigation', { name: 'Primary navigation' })
-      .getByRole('link', { name: 'Group', exact: true })
+      .getByRole('link', { name: 'Group overview', exact: true })
       .click()
     await page
       .getByRole('navigation', { name: 'Group sections' })
@@ -2621,13 +2631,7 @@ for (const viewport of [
     const countBefore = requests.filter((url) =>
       url.includes('get_group_chart_history'),
     ).length
-    await page
-      .getByRole('navigation', { name: 'Challenge contexts' })
-      .getByRole('link', {
-        name: 'Group · Second authorized group',
-        exact: true,
-      })
-      .click()
+    await (await groupLink(page, 'Group · Second authorized group')).click()
     await expect(matrix.getByText('87.00 kg', { exact: true })).toBeVisible()
     await expect(
       matrix.getByRole('button', { name: /^(Edit weight|Delete)\b/ }),
@@ -2637,10 +2641,7 @@ for (const viewport of [
       .click()
     await expect(editor.getByLabel('Weight in kg')).toHaveValue('87')
     await page.keyboard.press('Escape')
-    await page
-      .getByRole('navigation', { name: 'Challenge contexts' })
-      .getByRole('link', { name: 'Group · E2E authorized group', exact: true })
-      .click()
+    await (await groupLink(page, 'Group · E2E authorized group')).click()
     await remove.click()
     const deletion = page.getByRole('dialog', { name: 'Delete weight?' })
     await expect(deletion).toContainText('87 kg recorded 2026-09-22')
@@ -2663,13 +2664,7 @@ for (const viewport of [
     expect(
       requests.filter((url) => url.includes('get_group_chart_history')).length,
     ).toBeGreaterThan(countBefore)
-    await page
-      .getByRole('navigation', { name: 'Challenge contexts' })
-      .getByRole('link', {
-        name: 'Group · Second authorized group',
-        exact: true,
-      })
-      .click()
+    await (await groupLink(page, 'Group · Second authorized group')).click()
     await page
       .getByRole('navigation', { name: 'Group sections' })
       .getByRole('link', { name: 'Overview', exact: true })
@@ -3114,15 +3109,9 @@ for (const viewport of [
         /\/(personal_weigh_ins|weigh_ins)(?:\?|$)/.test(url),
       ),
     ).toBe(false)
-    const contexts = page.getByRole('navigation', {
-      name: 'Challenge contexts',
-    })
-    await contexts
-      .getByRole('link', {
-        name: 'Group · Second authorized group',
-        exact: true,
-      })
-      .press('Enter')
+    await (
+      await groupLink(page, 'Group · Second authorized group')
+    ).press('Enter')
     await expect(
       tabs.getByRole('tab', { name: 'All members' }),
     ).toHaveAttribute('aria-selected', 'true')
@@ -3259,15 +3248,13 @@ for (const viewport of [
     await expect(
       page.getByRole('table', { name: 'Shared group weight history' }),
     ).toContainText('Ava')
-    const contexts = page.getByRole('navigation', {
-      name: 'Challenge contexts',
-    })
-    await expect(contexts).toHaveCount(1)
-    const row = (await contexts.boundingBox())!
+    const row = (await page
+      .getByRole('button', { name: /Choose group:/ })
+      .boundingBox())!
     const chart = (await page
       .locator('.group-history-workspace')
       .boundingBox())!
-    expect(row.x).toBeCloseTo(chart.x, 0)
+    expect(row.x).toBeGreaterThanOrEqual(chart.x)
     expect(row.y + row.height).toBeLessThanOrEqual(chart.y)
     await expect(
       page
@@ -3296,10 +3283,7 @@ for (const viewport of [
       .getByRole('navigation', { name: 'Group sections' })
       .getByRole('link', { name: 'Charts', exact: true })
       .click()
-    const second = contexts.getByRole('link', {
-      name: 'Group · Second authorized group',
-      exact: true,
-    })
+    const second = await groupLink(page, 'Group · Second authorized group')
     await second.focus()
     await page.keyboard.press('Enter')
     await page
@@ -3319,7 +3303,9 @@ for (const viewport of [
     ).not.toContainText('Ava')
     await expect(page.getByText('42.5%', { exact: true })).toHaveCount(0)
     await expect(
-      contexts.getByRole('link', { name: /Second authorized group/ }),
+      page.getByRole('button', {
+        name: 'Choose group: Second authorized group',
+      }),
     ).toHaveAttribute('aria-current', 'page')
     await page
       .getByRole('navigation', { name: 'Group sections' })
@@ -3336,7 +3322,9 @@ for (const viewport of [
     )
     await page.reload()
     await expect(page.getByText('73.2%', { exact: true })).toBeVisible()
-    await expect(contexts.getByRole('combobox')).toHaveCount(0)
+    await expect(
+      page.getByRole('navigation', { name: 'Challenge contexts' }),
+    ).toHaveCount(0)
     await expect(
       page.getByText('fixture private note must never render'),
     ).toHaveCount(0)
@@ -3785,9 +3773,7 @@ for (const viewport of [
       .getByRole('navigation', { name: 'Group sections' })
       .getByRole('link', { name: 'Members', exact: true })
       .click()
-    await page
-      .getByRole('link', { name: 'Group · E2E authorized group' })
-      .click()
+    await (await groupLink(page, 'Group · E2E authorized group')).click()
 
     await expect(
       page.getByRole('heading', { name: 'Member progress' }),
@@ -3849,9 +3835,7 @@ for (const viewport of [
       .getByRole('navigation', { name: 'Group sections' })
       .getByRole('link', { name: 'Members', exact: true })
       .click()
-    await page
-      .getByRole('link', { name: 'Group · E2E authorized group' })
-      .click()
+    await (await groupLink(page, 'Group · E2E authorized group')).click()
 
     const editButton = page.getByRole('button', {
       name: 'Edit starting weight',
@@ -3942,9 +3926,7 @@ for (const viewport of [
       .getByRole('navigation', { name: 'Group sections' })
       .getByRole('link', { name: 'Members', exact: true })
       .click()
-    await page
-      .getByRole('link', { name: 'Group · E2E authorized group' })
-      .click()
+    await (await groupLink(page, 'Group · E2E authorized group')).click()
     await expect(
       page.getByRole('button', { name: 'Change target' }),
     ).toBeVisible()
@@ -3991,18 +3973,13 @@ for (const viewport of [
       .getByRole('navigation', { name: 'Group sections' })
       .getByRole('link', { name: 'Members', exact: true })
       .click()
-    await page
-      .getByRole('link', { name: 'Group · E2E authorized group' })
-      .click()
+    await (await groupLink(page, 'Group · E2E authorized group')).click()
     const oldMember = page.getByRole('heading', {
       name: 'Same display name',
     })
     await expect(oldMember).toHaveCount(2)
 
-    await page
-      .getByRole('navigation', { name: 'Challenge contexts' })
-      .getByRole('link', { name: 'Group · Second authorized group' })
-      .click()
+    await (await groupLink(page, 'Group · Second authorized group')).click()
     await expect(oldMember).toHaveCount(0)
     await expect(page.getByText('Loading member progress…')).toBeVisible()
     releaseProjection()
@@ -4033,24 +4010,19 @@ for (const viewport of [
       .getByRole('navigation', { name: 'Group sections' })
       .getByRole('link', { name: 'Members', exact: true })
       .click()
-    await page
-      .getByRole('link', { name: 'Group · E2E authorized group' })
-      .click()
-    const contexts = page.getByRole('navigation', {
-      name: 'Challenge contexts',
-    })
-    const firstGroup = contexts.getByRole('link', {
-      name: 'Group · E2E authorized group',
-    })
-    const secondGroup = contexts.getByRole('link', {
-      name: 'Group · Second authorized group',
-    })
+    await (await groupLink(page, 'Group · E2E authorized group')).click()
+    const firstGroup = page
+      .locator('.group-switcher-panel a')
+      .filter({ hasText: 'E2E authorized group' })
+    const secondGroup = page
+      .locator('.group-switcher-panel a')
+      .filter({ hasText: 'Second authorized group' })
 
     await page.getByRole('button', { name: 'Change target' }).click()
     await secondGroup.evaluate((link: HTMLAnchorElement) => link.click())
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await expect(secondGroup).toHaveAttribute('aria-current', 'page')
-    await firstGroup.click()
+    await (await groupLink(page, 'E2E authorized group')).click()
 
     await page.getByRole('button', { name: 'Change target' }).click()
     await page.getByLabel('New target (kg)').fill('85')
@@ -4064,7 +4036,7 @@ for (const viewport of [
       .click()
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await expect(secondGroup).toHaveAttribute('aria-current', 'page')
-    await firstGroup.click()
+    await (await groupLink(page, 'E2E authorized group')).click()
 
     await page.getByRole('button', { name: 'Change target' }).click()
     await page.getByLabel('New target (kg)').fill('85')
@@ -4100,9 +4072,7 @@ for (const viewport of [
       .getByRole('navigation', { name: 'Group sections' })
       .getByRole('link', { name: 'Members', exact: true })
       .click()
-    await page
-      .getByRole('link', { name: 'Group · E2E authorized group' })
-      .click()
+    await (await groupLink(page, 'Group · E2E authorized group')).click()
 
     const negativeCard = page.locator('article').filter({ hasText: '-25%' })
     await expect(negativeCard).toHaveCount(1)
@@ -4394,7 +4364,9 @@ test('archived groups leave normal navigation and remain accessible as read-only
     page.getByRole('link', { name: /Group · Archived navigation group/ }),
   ).toHaveCount(0)
   await expect(
-    page.getByRole('link', { name: /Group · Current navigation group/ }),
+    page.getByRole('button', {
+      name: 'Choose group: Current navigation group',
+    }),
   ).toHaveAttribute('aria-current', 'page')
   // A direct old bookmark remains explicit read-only history after a reload.
   await page.goto(
@@ -4902,7 +4874,7 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
         .querySelector('.group-history-workspace')!
         .getBoundingClientRect()
       const selector = document
-        .querySelector('[aria-label="Challenge contexts"] > div')!
+        .querySelector('.app-shell-brand')!
         .getBoundingClientRect()
       const tabs = document
         .querySelector('.group-context-subnav .contextual-subnav-scroll')!
@@ -4992,11 +4964,6 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
     await expect(manage).toHaveAttribute('title', 'Manage challenges')
     expect(
       await manage.evaluate((element) =>
-        Boolean(element.parentElement?.querySelector('a[aria-current="page"]')),
-      ),
-    ).toBe(true)
-    expect(
-      await manage.evaluate((element) =>
         Boolean(element.parentElement?.closest('a,button')),
       ),
     ).toBe(false)
@@ -5004,8 +4971,7 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
     expect(manageBox.width).toBeGreaterThanOrEqual(44)
     expect(manageBox.height).toBeGreaterThanOrEqual(44)
     await expect(manage).toHaveCSS('font-size', '12.6px')
-    await page.getByRole('link', { name: /Group · testtest/ }).focus()
-    await page.keyboard.press('Tab')
+    await manage.focus()
     await expect(manage).toBeFocused()
     await page.keyboard.press('Enter')
     await expect(
@@ -5032,7 +4998,7 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
       owner = false
       await page.goto(url)
       await expect(
-        page.getByRole('link', { name: /Group · testtest/ }),
+        page.getByRole('button', { name: 'Choose group: testtest' }),
       ).toBeVisible()
       await expect(
         page.getByRole('link', { name: 'Manage', exact: true }),
@@ -5041,10 +5007,9 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
   })
 }
 
-test('group selector matches the member tabs container surface on Charts', async ({
+test('navbar selector replaces the duplicate Group context strip on Charts', async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 390, height: 900 })
   await installGroupFixtures(page, false, true)
   await page.goto(
     `/e2e/fixtures/today-harness.html?scenario=group&user=${viewerId}&route=${encodeURIComponent(`/group?challenge=${ownGroupId}`)}`,
@@ -5053,24 +5018,13 @@ test('group selector matches the member tabs container surface on Charts', async
     .getByRole('navigation', { name: 'Group sections' })
     .getByRole('link', { name: 'Charts', exact: true })
     .click()
-
-  const selector = page.locator('[aria-label="Challenge contexts"] > div')
-  const memberTabs = page.locator('.group-history-workspace > .sticky')
-  await expect(selector).toBeVisible()
-  await expect(memberTabs).toBeVisible()
-  const chartContextWidths = await page
-    .getByRole('navigation', { name: 'Challenge contexts' })
-    .evaluate((navigation) => ({
-      link: navigation.querySelector('a')!.getBoundingClientRect().width,
-      row: navigation.querySelector(':scope > div')!.getBoundingClientRect()
-        .width,
-    }))
-  expect(chartContextWidths.link).toBeLessThan(chartContextWidths.row * 0.9)
-  const [selectorBackground, memberTabsBackground] = await Promise.all([
-    selector.evaluate((element) => getComputedStyle(element).backgroundColor),
-    memberTabs.evaluate((element) => getComputedStyle(element).backgroundColor),
-  ])
-  expect(selectorBackground).toBe(memberTabsBackground)
+  await expect(
+    page.getByRole('button', { name: /Choose group:/ }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('navigation', { name: 'Challenge contexts' }),
+  ).toHaveCount(0)
+  await expect(page.locator('.group-history-workspace > .sticky')).toBeVisible()
 })
 
 for (const viewport of [
@@ -5202,41 +5156,12 @@ for (const viewport of [
         )
       }
 
-      const contextFilter = page.getByRole('navigation', {
-        name: 'Challenge contexts',
-      })
-      const filterGeometry = await contextFilter.evaluate((navigation) => {
-        const list = navigation.querySelector('ul')!
-        const listItem = list.querySelector('li')!
-        const link = listItem.querySelector('a')!
-        return {
-          listWidth: list.getBoundingClientRect().width,
-          itemWidth: listItem.getBoundingClientRect().width,
-          linkWidth: link.getBoundingClientRect().width,
-          linkCenter:
-            link.getBoundingClientRect().left +
-            link.getBoundingClientRect().width / 2,
-          textCenter: (() => {
-            const range = document.createRange()
-            range.selectNodeContents(link)
-            const bounds = range.getBoundingClientRect()
-            return bounds.left + bounds.width / 2
-          })(),
-          itemCount: list.children.length,
-          scrollWidth: list.parentElement!.scrollWidth,
-          clientWidth: list.parentElement!.clientWidth,
-        }
-      })
-      expect(filterGeometry.itemWidth).toBeGreaterThanOrEqual(
-        filterGeometry.listWidth / filterGeometry.itemCount - 1,
-      )
-      expect(filterGeometry.linkWidth).toBeCloseTo(filterGeometry.itemWidth, 0)
-      expect(
-        Math.abs(filterGeometry.linkCenter - filterGeometry.textCenter),
-      ).toBeLessThanOrEqual(2)
-      expect(filterGeometry.scrollWidth).toBeLessThanOrEqual(
-        filterGeometry.clientWidth,
-      )
+      await expect(
+        page.getByRole('navigation', { name: 'Challenge contexts' }),
+      ).toHaveCount(0)
+      await expect(
+        page.getByRole('button', { name: /Choose group:/ }),
+      ).toBeVisible()
 
       const recordPairWidths = await table
         .locator('tbody td')
@@ -5490,4 +5415,209 @@ test('shows the challenge owner badge only in Members and fits on mobile', async
   await expect(
     page.getByRole('list', { name: 'Group chart legend' }),
   ).not.toContainText('Owner')
+})
+
+for (const width of [320, 390, 430, 1440]) {
+  test(`navbar group dropdown routes and fits at ${width}px`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 })
+    await installGroupFixtures(page, true)
+    await page.goto(
+      '/e2e/fixtures/today-harness.html?scenario=group&navigationTest',
+    )
+    const trigger = page.getByRole('button', {
+      name: 'Choose group: E2E authorized group',
+    })
+    await expect(trigger).toBeVisible()
+    await expect(
+      page.getByRole('navigation', { name: 'Challenge contexts' }),
+    ).toHaveCount(0)
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Records', exact: true })
+      .click()
+    const chevrons = await page.evaluate(() => {
+      const measure = (pathSelector: string, controlSelector: string) => {
+        const path = document.querySelector<SVGGraphicsElement>(pathSelector)!
+        const control = document
+          .querySelector(controlSelector)!
+          .getBoundingClientRect()
+        const bounds = path.getBBox()
+        const center = new DOMPoint(
+          bounds.x + bounds.width / 2,
+          bounds.y + bounds.height / 2,
+        ).matrixTransform(path.getScreenCTM()!)
+        const svg = path.ownerSVGElement!.getBoundingClientRect()
+        return {
+          offset: center.y - control.y - control.height / 2,
+          width: svg.width,
+          height: svg.height,
+          stroke: path.getAttribute('stroke-width'),
+          shape: path.getAttribute('d'),
+        }
+      }
+      return {
+        group: measure(
+          '.group-switcher-trigger svg path',
+          '.group-switcher-trigger',
+        ),
+        profile: measure(
+          '.account-control .account-chevron svg path',
+          '.account-control summary',
+        ),
+      }
+    })
+    console.log('navbar chevron bounds', width, chevrons)
+    expect(chevrons.group.width).toBe(chevrons.profile.width)
+    expect(chevrons.group.height).toBe(chevrons.profile.height)
+    expect(chevrons.group.shape).toBe(chevrons.profile.shape)
+    expect(chevrons.group.stroke).toBe(chevrons.profile.stroke)
+    expect(
+      Math.abs(chevrons.group.offset - chevrons.profile.offset),
+    ).toBeLessThanOrEqual(0.5)
+    await trigger.click()
+    const second = page
+      .locator('.group-switcher-panel')
+      .getByRole('link', { name: 'Second authorized group', exact: true })
+    await expect(second).toHaveAttribute('href', /tab=records/)
+    await page.screenshot({
+      path: testInfo.outputPath(`group-dropdown-${width}.png`),
+      fullPage: true,
+    })
+    const panel = (await page.locator('.group-switcher-panel').boundingBox())!
+    expect(panel.x).toBeGreaterThanOrEqual(0)
+    expect(panel.x + panel.width).toBeLessThanOrEqual(width)
+    const box = (await trigger.boundingBox())!
+    expect(box.height).toBeGreaterThanOrEqual(44)
+    await second.click()
+    await expect(page.getByTestId('fixture-route')).toHaveText(
+      /challenge=e2e-second-group.*tab=records/,
+    )
+    await expect(
+      page.getByRole('button', {
+        name: 'Choose group: Second authorized group',
+      }),
+    ).toHaveAttribute('aria-expanded', 'false')
+    await page
+      .getByRole('button', { name: 'Fixture Back', exact: true })
+      .click()
+    await expect(trigger).toBeVisible()
+    await page
+      .getByRole('button', { name: 'Fixture Forward', exact: true })
+      .click()
+    await expect(
+      page.getByRole('button', {
+        name: 'Choose group: Second authorized group',
+      }),
+    ).toBeVisible()
+    await page.goto(
+      '/e2e/fixtures/today-harness.html?scenario=group&navigationTest&route=' +
+        encodeURIComponent('/group?challenge=e2e-second-group&tab=records'),
+    )
+    await expect(
+      page.getByRole('button', {
+        name: 'Choose group: Second authorized group',
+      }),
+    ).toBeVisible()
+    await page.getByRole('link', { name: 'Dashboard', exact: true }).click()
+    const dashboardTrigger = page.getByRole('button', {
+      name: 'Choose group',
+      exact: true,
+    })
+    const alignment = await dashboardTrigger.evaluate((button) => {
+      const span = button.querySelector('span')!
+      const range = document.createRange()
+      range.selectNodeContents(span)
+      const glyph = range.getBoundingClientRect()
+      const box = button.getBoundingClientRect()
+      const frame = getComputedStyle(button, '::before')
+      return {
+        horizontalOffset: glyph.x + glyph.width / 2 - box.x - box.width / 2,
+        verticalOffset: glyph.y + glyph.height / 2 - box.y - box.height / 2,
+        width: box.width,
+        height: box.height,
+        frameTop: parseFloat(frame.top),
+        frameBottom: parseFloat(frame.bottom),
+      }
+    })
+    console.log('navbar trigger text bounds', width, alignment)
+    expect(Math.abs(alignment.horizontalOffset)).toBeLessThanOrEqual(1)
+    expect(Math.abs(alignment.verticalOffset)).toBeLessThanOrEqual(1)
+    expect(alignment.width).toBeLessThanOrEqual(width < 640 ? 110 : 180)
+    expect(alignment.height).toBe(44)
+    expect(alignment.frameTop).toBe(6)
+    expect(alignment.frameBottom).toBe(6)
+    await dashboardTrigger.click()
+    await page
+      .locator('.group-switcher-panel')
+      .getByRole('link', { name: 'E2E authorized group', exact: true })
+      .click()
+    await expect(page.getByTestId('fixture-route')).toHaveText(
+      /challenge=e2e-challenge&tab=overview/,
+    )
+    await trigger.press('ArrowDown')
+    await expect(
+      page.getByRole('link', { name: 'Group overview', exact: true }),
+    ).toBeFocused()
+    await page.keyboard.press('Escape')
+    await expect(trigger).toBeFocused()
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    await expect(
+      page.getByRole('heading', { name: 'Group progress', exact: true }),
+    ).toBeVisible()
+    await page.screenshot({
+      path: testInfo.outputPath(`group-overview-navbar-${width}.png`),
+      fullPage: true,
+    })
+    await page.getByRole('button', { name: /^Choose group:/ }).click()
+    await page.screenshot({
+      path: testInfo.outputPath(`group-dropdown-overview-${width}.png`),
+      fullPage: true,
+    })
+  })
+}
+
+test('long group names wrap in the dropdown and fit enlarged phone text', async ({
+  page,
+}) => {
+  const name =
+    'A very long authorized family group name that must remain readable on a narrow phone'
+  await page.setViewportSize({ width: 320, height: 900 })
+  await installGroupFixtures(
+    page,
+    false,
+    false,
+    false,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    'e2e-owner',
+    { groupName: name },
+  )
+  await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+  const trigger = page.getByRole('button', { name: `Choose group: ${name}` })
+  await expect(trigger).toBeVisible()
+  await trigger.click()
+  await page.locator('.group-switcher').evaluate((el) => {
+    for (const target of el.querySelectorAll<HTMLElement>('button,a'))
+      target.style.fontSize = '20px'
+  })
+  const link = page
+    .locator('.group-switcher-panel')
+    .getByRole('link', { name, exact: true })
+  await expect(link).toBeVisible()
+  const bounds = await link.evaluate((el) => ({
+    client: el.clientWidth,
+    scroll: el.scrollWidth,
+    height: el.getBoundingClientRect().height,
+  }))
+  expect(bounds.scroll).toBeLessThanOrEqual(bounds.client)
+  expect(bounds.height).toBeGreaterThanOrEqual(44)
+  await page
+    .getByRole('heading', { name: 'Group progress', exact: true })
+    .click()
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false')
 })

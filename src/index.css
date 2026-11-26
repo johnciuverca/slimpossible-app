@@ -2018,3 +2018,114 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Shared small gutters keep the primary shell aligned with workspace edges. */
+.signed-in-shell .app-shell-header-inner {
+  max-width: none;
+  padding-inline: 16px;
+}
+.group-switcher {
+  position: relative;
+  min-width: 0;
+}
+.group-switcher-trigger {
+  position: relative;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) 16px;
+  align-items: center;
+  min-height: 44px;
+  width: 180px;
+  max-width: 28vw;
+  padding: 0 6px;
+  border: 0;
+  color: var(--color-ink);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1;
+}
+.group-switcher-trigger::before {
+  position: absolute;
+  inset: 6px 0;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: var(--color-panel);
+  content: '';
+  pointer-events: none;
+}
+.group-switcher-trigger > span {
+  position: relative;
+  min-width: 0;
+  text-align: center;
+}
+.group-switcher-trigger > span:first-child {
+  grid-column: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.group-switcher-trigger > span:last-child {
+  grid-column: 3;
+}
+.group-switcher-trigger:focus-visible {
+  outline: 2px solid var(--color-forest-800);
+  outline-offset: 2px;
+}
+.group-switcher-panel {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 300px;
+  max-width: calc(100vw - 32px);
+  max-height: 60vh;
+  overflow-y: auto;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  padding: 6px;
+  background: var(--color-panel);
+  box-shadow: 0 12px 30px #0008;
+}
+.app-shell.signed-in-shell .group-switcher-panel a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  padding: 8px 10px;
+}
+.group-switcher-panel p {
+  padding: 10px;
+  font-size: 13px;
+}
+@media (max-width: 640px) {
+  .group-switcher-trigger {
+    width: 110px;
+    max-width: 28vw;
+    font-size: 12px;
+    grid-template-columns: 12px minmax(0, 1fr) 12px;
+    padding-inline: 4px;
+  }
+}
+
+.group-switcher-trigger[aria-current='page']::before {
+  background: #253b2d;
+  border-color: #527b5e;
+}
+.signed-in-shell .contextual-subnav-scroll {
+  max-width: none;
+}
+
+.signed-in-shell .app-shell-main .group-workspace a.group-manage-link {
+  min-height: 44px;
+  min-width: 44px;
+  font-size: 12.6px;
+}
+@media (min-width: 640px) {
+  .signed-in-shell.group-shell .app-shell-header-inner {
+    padding-inline: 24px;
+  }
+}
+.signed-in-shell .app-shell-brand {
+  padding-inline: 0;
+}

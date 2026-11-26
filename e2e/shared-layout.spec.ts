@@ -10,23 +10,31 @@ for (const width of [320, 390, 768, 1280, 1920]) {
     )
     const nav = page.getByRole('navigation', { name: 'Primary navigation' })
     const dashboard = nav.getByRole('link', { name: 'Dashboard', exact: true })
-    const group = nav.getByRole('link', { name: 'Group', exact: true })
+    const group = nav.getByRole('button', { name: /^Choose group/ })
     const account = page.getByLabel('Profile and account for Synthetic Alex', {
       exact: true,
     })
     await expect(dashboard).toHaveAttribute('aria-current', 'page')
     await expect(dashboard).toHaveAttribute('href', '/dashboard')
-    await expect(group).toHaveAttribute(
-      'href',
-      '/group?challenge=dashboard-active',
-    )
     await group.click()
+    const destination = page.locator(
+      '.group-switcher-panel a[href*="challenge=dashboard-active"]',
+    )
+    await expect(destination).toHaveAttribute(
+      'href',
+      '/group?challenge=dashboard-active&tab=overview',
+    )
+    await destination.click()
     await expect(page.getByTestId('fixture-route')).toHaveText(
-      '/group?challenge=dashboard-active',
+      '/group?challenge=dashboard-active&tab=overview',
     )
     await expect(group).toHaveAttribute('aria-current', 'page')
     await expect(dashboard).not.toHaveAttribute('aria-current')
-    await expect(group).toHaveCSS('background-color', 'rgb(37, 59, 45)')
+    expect(
+      await group.evaluate(
+        (el) => getComputedStyle(el, '::before').backgroundColor,
+      ),
+    ).toBe('rgb(37, 59, 45)')
     await expect(dashboard).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
     await expect(account).toBeVisible()
     if (width > 640) {
@@ -297,7 +305,11 @@ for (const width of [1280, 390]) {
     const before = await header.boundingBox()
     await page
       .getByRole('navigation', { name: 'Primary navigation' })
-      .getByRole('link', { name: 'Group', exact: true })
+      .getByRole('button', { name: /^Choose group/ })
+      .click()
+    await page
+      .locator('.group-switcher-panel')
+      .getByRole('link', { name: 'Group overview', exact: true })
       .click()
     await expect(
       page.getByText('Authorized selected Group destination', { exact: true }),
