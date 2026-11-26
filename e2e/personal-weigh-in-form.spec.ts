@@ -171,13 +171,15 @@ for (const viewport of [
     await page.getByLabel('Weight in kg').fill('90')
     const note = page.getByLabel('Private note (optional)')
     await note.fill('Synthetic note never included in group sharing.')
-    await note.focus()
+    await page.getByLabel('Weight in kg').focus()
     await page.keyboard.press('Tab')
     await expect(draft).toBeFocused()
     await page.keyboard.press('Space')
     await page.keyboard.press('Tab')
     await expect(active).toBeFocused()
     await page.keyboard.press('Space')
+    await page.keyboard.press('Tab')
+    await expect(note).toBeFocused()
     await page.keyboard.press('Tab')
     await expect(
       page.getByRole('button', { name: 'Save weight', exact: true }),
