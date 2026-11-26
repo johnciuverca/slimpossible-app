@@ -1,5 +1,11 @@
 import { createRoot } from 'react-dom/client'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from 'react-router-dom'
 
 import { AuthContext, type AuthContextValue } from '../../src/auth/context'
 import { ProtectedRoute } from '../../src/auth/ProtectedRoute'
@@ -217,6 +223,23 @@ const authValue: AuthContextValue = {
   },
 }
 
+// Test-only routing controls for the MemoryRouter fixture.
+// eslint-disable-next-line react-refresh/only-export-components
+function FixtureNavigation() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  return (
+    <aside aria-label="Fixture navigation">
+      <output data-testid="fixture-route">
+        {location.pathname}
+        {location.search}
+      </output>
+      <button onClick={() => navigate(-1)}>Fixture Back</button>
+      <button onClick={() => navigate(1)}>Fixture Forward</button>
+    </aside>
+  )
+}
+
 createRoot(document.getElementById('root')!).render(
   <AuthContext.Provider value={authValue}>
     <MemoryRouter
@@ -239,6 +262,9 @@ createRoot(document.getElementById('root')!).render(
                 : [isMember ? `/today?challenge=${challengeId}` : '/today']
       }
     >
+      {new URLSearchParams(window.location.search).has('navigationTest') ? (
+        <FixtureNavigation />
+      ) : null}
       <AppLayout>
         <Routes>
           <Route path="/" element={<HomePage />} />

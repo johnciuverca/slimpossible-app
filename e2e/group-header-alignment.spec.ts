@@ -54,6 +54,24 @@ for (const viewport of [
         ).toBeVisible()
         continue
       }
+      if (await page.locator('.group-workspace').count()) {
+        await expect(contexts).toHaveCount(0)
+        const trigger = page.getByRole('button', { name: /^Choose group/ })
+        await expect(trigger).toBeVisible()
+        await expect(
+          page.getByRole('button', { name: 'Record weight', exact: true }),
+        ).toBeEnabled()
+        const header = await page
+          .locator('.app-shell-header-inner')
+          .boundingBox()
+        expect(header!.width).toBe(viewport.width)
+        await trigger.click()
+        const panel = await page.locator('.group-switcher-panel').boundingBox()
+        expect(panel!.x).toBeGreaterThanOrEqual(16)
+        expect(panel!.x + panel!.width).toBeLessThanOrEqual(viewport.width - 16)
+        await page.keyboard.press('Escape')
+        continue
+      }
       await expect(contexts).toHaveCount(1)
       await expect(
         contexts.getByRole('link', {
@@ -181,23 +199,28 @@ for (const viewport of [
         await page.evaluate(() => document.documentElement.scrollWidth),
       ).toBe(viewport.width)
     }
-    const draft = contexts.getByRole('link', {
-      name: /^Group · Synthetic draft group(?: \(selected\))?$/,
-      exact: true,
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Charts', exact: true })
+      .click()
+    const trigger = page.getByRole('button', {
+      name: 'Choose group: Synthetic draft group',
     })
-    await expect(draft).toHaveAttribute('aria-current', 'page')
-    const active = contexts.getByRole('link', {
-      name: /^Group · Synthetic active group(?: \(selected\))?$/,
-      exact: true,
-    })
+    await expect(trigger).toHaveAttribute('aria-current', 'page')
+    await trigger.click()
+    const active = page
+      .locator('.group-switcher-panel')
+      .getByRole('link', { name: 'Synthetic active group', exact: true })
     await active.focus()
-    await expect(active).toBeFocused()
     await page.keyboard.press('Enter')
     await expect(page.getByTestId('fixture-route')).toHaveText(
       '/group?tab=charts&challenge=dashboard-active',
     )
-    await expect(active).toHaveAttribute('aria-current', 'page')
-    await expect(draft).not.toHaveAttribute('aria-current', 'page')
+    await expect(
+      page.getByRole('button', {
+        name: 'Choose group: Synthetic active group',
+      }),
+    ).toHaveAttribute('aria-current', 'page')
     await page.goto(fixture('/progress?challenge=dashboard-active'))
     const ownGoals = page.getByRole('navigation', {
       name: 'Your goal challenges',
@@ -219,14 +242,9 @@ for (const viewport of [
     )
     await page.goto(fixture('/group?challenge=missing'))
     await expect(
-      contexts.getByText(
-        'That group challenge is unavailable for this account.',
-      ),
+      page.getByRole('button', { name: 'Choose group', exact: true }),
     ).toBeVisible()
-    await expect(contexts.locator('[aria-current="page"]')).toHaveCount(0)
-    await expect(contexts.getByRole('link', { name: /Personal/ })).toHaveCount(
-      0,
-    )
+    await expect(contexts).toHaveCount(0)
     await page.goto(fixture('/progress'))
     await page.getByRole('button', { name: 'Switch synthetic account' }).click()
     await expect(

@@ -11,7 +11,6 @@ import {
 } from '../components/ui'
 import { MilestoneProgress } from '../components/MilestoneProgress'
 import { PersonalProgressChart } from '../components/PersonalProgressChart'
-import { ChallengeTabs } from '../components/ChallengeContextTabs'
 import { GroupSubnavActions } from '../components/GroupSubnavActions'
 import { ChallengeSettingsLink } from '../components/ChallengeSettingsLink'
 import {
@@ -2189,9 +2188,6 @@ export function GroupDashboardPage() {
     ownProgressRow &&
     !ownSharedSundayRecorded,
   )
-  const currentChallenges = challenges.filter(
-    ({ status }) => status !== 'archived',
-  )
 
   const scrolledNavigation = useRef('')
   useEffect(() => {
@@ -2303,17 +2299,15 @@ export function GroupDashboardPage() {
               View current groups
             </Link>
           </div>
-        ) : (
-          <ChallengeTabs
-            challenges={currentChallenges}
-            selectedId={selectedChallengeId}
-            loading={isLoading}
-            showPersonalTracking={false}
-            compact
-            stretchItems={section === 'records'}
-            managementOwnerId={ownerId}
-          />
-        )}
+        ) : selectedChallenge?.ownerId === ownerId ? (
+          <Link
+            to="/challenge/manage"
+            title="Manage challenges"
+            className="group-manage-link inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-line bg-panel px-4 py-2 font-semibold text-forest-800"
+          >
+            Manage
+          </Link>
+        ) : null}
       </div>
       {!selectedChallenge && !isLoading ? (
         <Link

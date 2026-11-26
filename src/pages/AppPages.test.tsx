@@ -7,7 +7,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { Link, MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { AuthProvider } from '../auth/AuthContext'
@@ -1607,8 +1607,8 @@ describe('GroupDashboardPage', () => {
     expect(manage).toHaveAttribute('href', '/challenge/manage')
     expect(manage).toHaveAttribute('title', 'Manage challenges')
     expect(
-      manage.parentElement?.querySelector('a[aria-current="page"]'),
-    ).toBeInTheDocument()
+      screen.queryByRole('navigation', { name: 'Challenge contexts' }),
+    ).not.toBeInTheDocument()
     expect(
       screen.queryByRole('link', { name: 'Manage challenges' }),
     ).not.toBeInTheDocument()
@@ -1616,9 +1616,9 @@ describe('GroupDashboardPage', () => {
     expect(
       await screen.findByRole('heading', { name: 'Weekly result' }),
     ).toBeInTheDocument()
-    expect(
-      screen.getByRole('link', { name: /Group · Autumn challenge/ }),
-    ).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      'Autumn challenge',
+    )
     expect(
       screen.queryByRole('link', { name: /Personal tracking/ }),
     ).not.toBeInTheDocument()
@@ -1690,9 +1690,9 @@ describe('GroupDashboardPage', () => {
     expect(
       screen.queryByRole('region', { name: 'Group comparison chart' }),
     ).not.toBeInTheDocument()
-    expect(
-      screen.getByRole('link', { name: /Group · Autumn challenge/ }),
-    ).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      'Autumn challenge',
+    )
     expect(chartHistoryResponse).toHaveBeenCalledTimes(2)
     fireEvent.click(screen.getByRole('link', { name: 'Weekly results' }))
     expect(
@@ -2208,20 +2208,23 @@ describe('GroupDashboardPage', () => {
     })
 
     renderDashboard(
-      <GroupDashboardPage />,
+      <>
+        <Link to="/group?challenge=challenge-2">Switch group fixture</Link>
+        <GroupDashboardPage />
+      </>,
       fetchMock,
       '/group?challenge=challenge-1',
     )
 
     expect(await screen.findByText('45.1%')).toBeInTheDocument()
     const challengeSelector = screen.getByRole('link', {
-      name: 'Group · Winter challenge',
+      name: 'Switch group fixture',
     })
     fireEvent.click(challengeSelector)
     expect(await screen.findByText('61.2%')).toBeInTheDocument()
-    expect(
-      screen.getByRole('link', { name: /Group · Winter challenge/ }),
-    ).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      'Winter challenge',
+    )
     expect(screen.queryByText('45.1%')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('link', { name: 'Weekly results' }))
     expect(screen.queryByText('Jamie')).not.toBeInTheDocument()
