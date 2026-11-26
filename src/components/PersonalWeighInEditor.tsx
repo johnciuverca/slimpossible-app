@@ -41,9 +41,6 @@ export function PersonalWeighInEditor({
   compactMobile = false,
 }: PersonalWeighInEditorProps) {
   const initial = useRef(JSON.stringify(values))
-  const sharingDestinations = groups
-    .filter(({ id }) => values.sharedChallengeIds.includes(id))
-    .map(({ name }) => name)
   const visualViewport = window.visualViewport
   const wideEnoughForColumns =
     window.matchMedia?.('(min-width: 768px) and (min-height: 501px)').matches ??
@@ -139,6 +136,48 @@ export function PersonalWeighInEditor({
           />
         </>
       )}
+      <fieldset className="rounded-xl border border-line p-4">
+        <legend className="px-1 text-sm font-semibold text-ink">
+          Share date and weight with groups (optional)
+        </legend>
+        {groups.length === 0 ? (
+          <p className="text-sm leading-6 text-ink-muted">
+            No eligible groups. You can still save this private weigh-in.
+          </p>
+        ) : (
+          <>
+            <p className="mb-3 text-xs leading-5 text-ink-muted">
+              {values.sharedChallengeIds.length
+                ? 'Selected groups receive the date and weight only. Change the selection before saving if needed; your note stays private.'
+                : 'No groups selected. This entry will stay private; your note is always private.'}
+            </p>
+            <div className="space-y-3">
+              {groups.map((group) => (
+                <label
+                  className="flex items-center gap-3 text-sm text-ink"
+                  key={group.id}
+                >
+                  <input
+                    disabled={isSaving}
+                    checked={values.sharedChallengeIds.includes(group.id)}
+                    className="size-4 shrink-0 accent-forest-800"
+                    onChange={(event) =>
+                      toggleGroup(group.id, event.target.checked)
+                    }
+                    type="checkbox"
+                  />
+                  <span className="min-w-0 break-words">{group.name}</span>
+                </label>
+              ))}
+            </div>
+          </>
+        )}
+        {errors.sharedChallengeIds ? (
+          <p className="mt-2 text-sm text-red-700">
+            {errors.sharedChallengeIds}
+          </p>
+        ) : null}
+      </fieldset>
       <div>
         {compactMobile ? (
           <button
@@ -219,49 +258,6 @@ export function PersonalWeighInEditor({
         </div>
       </div>
 
-      <fieldset className="rounded-xl border border-line p-4">
-        <legend className="px-1 text-sm font-semibold text-ink">
-          Share date and weight with groups (optional)
-        </legend>
-        {groups.length === 0 ? (
-          <p className="text-sm leading-6 text-ink-muted">
-            No eligible groups. You can still save this private weigh-in.
-          </p>
-        ) : (
-          <>
-            <p className="mb-3 text-xs leading-5 text-ink-muted">
-              {values.sharedChallengeIds.length
-                ? 'Selected groups receive the date and weight only. Change the selection before saving if needed; your note stays private.'
-                : 'Nothing is selected by default. Choose each group separately; your note stays private.'}
-            </p>
-            <div className="space-y-3">
-              {groups.map((group) => (
-                <label
-                  className="flex items-center gap-3 text-sm text-ink"
-                  key={group.id}
-                >
-                  <input
-                    disabled={isSaving}
-                    checked={values.sharedChallengeIds.includes(group.id)}
-                    className="size-4 shrink-0 accent-forest-800"
-                    onChange={(event) =>
-                      toggleGroup(group.id, event.target.checked)
-                    }
-                    type="checkbox"
-                  />
-                  <span className="min-w-0 break-words">{group.name}</span>
-                </label>
-              ))}
-            </div>
-          </>
-        )}
-        {errors.sharedChallengeIds ? (
-          <p className="mt-2 text-sm text-red-700">
-            {errors.sharedChallengeIds}
-          </p>
-        ) : null}
-      </fieldset>
-
       <div
         className={
           compactMobile
@@ -269,11 +265,7 @@ export function PersonalWeighInEditor({
             : 'flex flex-wrap gap-3'
         }
       >
-        <Button
-          aria-describedby="personal-weigh-in-sharing-destination"
-          disabled={isSaving}
-          type="submit"
-        >
+        <Button disabled={isSaving} type="submit">
           {isSaving ? 'Saving…' : submitLabel}
         </Button>
         {onCancel ? (
@@ -286,21 +278,6 @@ export function PersonalWeighInEditor({
             Cancel edit
           </Button>
         ) : null}
-        <p
-          className="min-w-[min(8rem,100%)] flex-1 self-center text-xs leading-5 break-words text-ink-muted"
-          role="status"
-          aria-label="Sharing destination"
-          aria-atomic="true"
-        >
-          <span id="personal-weigh-in-sharing-destination">
-            <span className="font-semibold text-ink">
-              {sharingDestinations.length
-                ? `Sharing with: ${sharingDestinations.join(', ')}`
-                : 'Private — only you'}
-            </span>
-            {sharingDestinations.length ? ' · Note stays private' : null}
-          </span>
-        </p>
       </div>
     </form>
   )

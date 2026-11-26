@@ -1,6 +1,11 @@
 import type { Challenge } from './challenge'
 import type { Participant } from './participant'
 
+// Call only when initializing a new draft, with already-authorized groups.
+export function defaultNewWeighInShares(eligibleGroups: Challenge[]) {
+  return eligibleGroups.length === 1 ? [eligibleGroups[0].id] : []
+}
+
 // Setup-created groups remain draft until a challenge lifecycle is introduced.
 // Membership activity and challenge lifecycle are separate authorization checks.
 export function isEligibleSharingGroup(

@@ -230,6 +230,11 @@ test('mobile note stays expanded and focused through keyboard resize, and the sh
   }))
   expect(scrollState.htmlOverflow).toBe('hidden')
   expect(scrollState.bodyPosition).toBe('fixed')
+  // Focusing the note below sharing may already scroll to the sheet's bottom.
+  // Start this scroll-containment check at the top so the wheel can move it.
+  await dialog.evaluate((element) => {
+    element.scrollTop = 0
+  })
   const initialDialogScroll = await dialog.evaluate(
     (element) => element.scrollTop,
   )
