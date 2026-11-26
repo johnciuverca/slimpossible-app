@@ -40,6 +40,7 @@ async function installGroupFixtures(
     privateEntryAtEstimatedDate?: boolean
     privateEntrySharedWithOtherGroup?: boolean
     duplicateEstimateOnSave?: boolean
+    estimateShareOptOut?: boolean
     holdPersonalContexts?: boolean
     participantAvatars?: boolean
     finalizedWeeklyResultForPrimaryGroup?: boolean
@@ -249,7 +250,9 @@ async function installGroupFixtures(
         expect(body.target_recorded_date).toBe('2026-09-21')
         expect(body.target_weight_kg).toBeCloseTo(estimatedOwnWeight())
         expect(body.target_note).toBeNull()
-        expect(body.target_shared_challenge_ids).toEqual([challengeId])
+        expect(body.target_shared_challenge_ids).toEqual(
+          options.estimateShareOptOut ? [] : [challengeId],
+        )
         if (options.duplicateEstimateOnSave && !privateEntryAtEstimatedDate) {
           privateEntryAtEstimatedDate = true
           await route.fulfill({
@@ -1270,34 +1273,39 @@ for (const width of [320, 390, 430, 1280, 1920]) {
       await expect(
         chart.locator('[data-series="target-reference"]'),
       ).toHaveCount(0)
-      const styles = await chart
-        .locator('[data-chart-trend]')
-        .evaluateAll((trends) =>
-          trends.map((trend) => {
-            const seriesId = trend.getAttribute('data-chart-series-id')
-            const seriesLine = Array.from(
-              trend
-                .closest('svg')!
-                .querySelectorAll('path[data-chart-series-id]'),
-            ).find(
-              (path) => path.getAttribute('data-chart-series-id') === seriesId,
-            )
-            return {
-              seriesId,
-              stroke: trend.getAttribute('stroke'),
-              seriesStroke: seriesLine?.getAttribute('stroke'),
-              opacity: trend.getAttribute('opacity'),
-              dash: trend.getAttribute('stroke-dasharray'),
-            }
-          }),
-        )
-      expect(styles.length).toBeGreaterThan(0)
-      for (const style of styles) {
-        expect(style.seriesId).toBeTruthy()
-        expect(style.stroke).toBe(style.seriesStroke)
-        expect(style.opacity).toBe('0.32')
-        expect(style.dash).toBeNull()
-      }
+      // Navigation can replace the Overview SVG between the count check and read.
+      // Retry the style snapshot as one assertion against the settled Charts SVG.
+      await expect(async () => {
+        const styles = await chart
+          .locator('[data-chart-trend]')
+          .evaluateAll((trends) =>
+            trends.map((trend) => {
+              const seriesId = trend.getAttribute('data-chart-series-id')
+              const seriesLine = Array.from(
+                trend
+                  .closest('svg')!
+                  .querySelectorAll('path[data-chart-series-id]'),
+              ).find(
+                (path) =>
+                  path.getAttribute('data-chart-series-id') === seriesId,
+              )
+              return {
+                seriesId,
+                stroke: trend.getAttribute('stroke'),
+                seriesStroke: seriesLine?.getAttribute('stroke'),
+                opacity: trend.getAttribute('opacity'),
+                dash: trend.getAttribute('stroke-dasharray'),
+              }
+            }),
+          )
+        expect(styles.length).toBeGreaterThan(0)
+        for (const style of styles) {
+          expect(style.seriesId).toBeTruthy()
+          expect(style.stroke).toBe(style.seriesStroke)
+          expect(style.opacity).toBe('0.32')
+          expect(style.dash).toBeNull()
+        }
+      }).toPass({ timeout: 5000 })
     }
     await expectTrendStyles()
     await chart.screenshot({
@@ -4424,6 +4432,57 @@ test('archived groups leave normal navigation and remain accessible as read-only
 test.describe('group chart weigh-in dots', () => {
   test.use({ hasTouch: true, viewport: { width: 1280, height: 900 } })
 
+  test('Group estimate context supports an explicit private save', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 900 })
+    const requests = await installGroupFixtures(
+      page,
+      true,
+      true,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'e2e-owner',
+      { estimateShareOptOut: true },
+    )
+    await page.goto(
+      `/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
+    )
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Charts', exact: true })
+      .click()
+    const chart = page.getByRole('img', {
+      name: 'Weight (kg) — shared group history',
+    })
+    const estimate = chart.locator(
+      `circle[data-series-id="${memberKey(ownGroupId, viewerId)}"][data-date="2026-09-21"][data-point-kind="estimated"]`,
+    )
+    await estimate.focus()
+    await page.keyboard.press('Enter')
+    await page
+      .getByRole('group', { name: /Chart point details/ })
+      .getByRole('button', { name: 'Record weight', exact: true })
+      .click()
+    const editor = page.getByRole('dialog', { name: 'Record weight' })
+    await expect(editor.getByLabel('E2E authorized group')).toBeChecked()
+    await expect(editor.getByLabel('Second authorized group')).not.toBeChecked()
+    await editor.getByLabel('E2E authorized group').uncheck()
+    const save = editor.getByRole('button', {
+      name: 'Save weight',
+      exact: true,
+    })
+    await save.click()
+    await expect(editor).toHaveCount(0)
+    expect(
+      requests.filter((url) => url.includes('/rpc/save_personal_weigh_in')),
+    ).toHaveLength(1)
+    await expect(estimate).toBeVisible()
+  })
+
   test('adds the current Group share to an estimate-resolved entry while preserving its other share', async ({
     page,
   }) => {
@@ -4505,6 +4564,7 @@ test.describe('group chart weigh-in dots', () => {
     )
     await expect(edit.getByLabel('E2E authorized group')).toBeChecked()
     await expect(edit.getByLabel('Second authorized group')).toBeChecked()
+
     await expect(edit.getByText(/matches a saved personal entry/)).toBeVisible()
 
     await edit.getByLabel('Weight in kg').fill('84.5')

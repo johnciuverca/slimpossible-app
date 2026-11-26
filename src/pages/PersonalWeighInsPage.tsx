@@ -17,7 +17,10 @@ import {
 import { useOptionalAuth } from '../auth/useAuth'
 import { createPersistence } from '../data/persistence'
 import type { Challenge } from '../models/challenge'
-import { isEligibleSharingGroup } from '../models/groupSharingEligibility'
+import {
+  defaultNewWeighInShares,
+  isEligibleSharingGroup,
+} from '../models/groupSharingEligibility'
 import { participantFixture } from '../models/fixtures'
 import type { PersonalWeighIn } from '../models/personalWeighIn'
 import {
@@ -147,11 +150,14 @@ export function PersonalWeighInsPage() {
           'Group choices could not be loaded. You can still save privately.',
         )
       } else if (groupsResult.state === 'success') {
-        setGroups(
-          groupsResult.data.filter((challenge) =>
-            isEligibleSharingGroup(challenge, userId, participantsResult.data),
-          ),
+        const eligibleGroups = groupsResult.data.filter((challenge) =>
+          isEligibleSharingGroup(challenge, userId, participantsResult.data),
         )
+        setGroups(eligibleGroups)
+        setValues({
+          ...emptyForm,
+          sharedChallengeIds: defaultNewWeighInShares(eligibleGroups),
+        })
       }
       setIsLoading(false)
     }
@@ -221,7 +227,10 @@ export function PersonalWeighInsPage() {
     draftChanged.current = false
     setEditingId(null)
     setEstimateNotice('')
-    setValues(emptyForm)
+    setValues({
+      ...emptyForm,
+      sharedChallengeIds: defaultNewWeighInShares(groups),
+    })
     setErrors({})
     setSubmitError('')
     setSharesWarning('')
@@ -234,7 +243,7 @@ export function PersonalWeighInsPage() {
     setValues({
       date: estimate.date,
       note: '',
-      sharedChallengeIds: [],
+      sharedChallengeIds: defaultNewWeighInShares(groups),
       weightKg: String(estimate.weightKg),
     })
     setErrors({})
@@ -242,7 +251,7 @@ export function PersonalWeighInsPage() {
     setSharesWarning('')
     setSuccess('')
     setEstimateNotice(
-      'Estimated from your surrounding saved weigh-ins. Saving adds a real weigh-in; no groups are selected.',
+      'Estimated from your surrounding saved weigh-ins. Saving adds a real weigh-in; review the optional group checkboxes before saving.',
     )
     setFocusRevision((value) => value + 1)
   }
@@ -346,7 +355,10 @@ export function PersonalWeighInsPage() {
     setEditingId(null)
     draftChanged.current = false
     setSharesWarning('')
-    setValues(emptyForm)
+    setValues({
+      ...emptyForm,
+      sharedChallengeIds: defaultNewWeighInShares(groups),
+    })
     setErrors({})
     notifyPersonalWeightChange(userId)
     setSuccess(

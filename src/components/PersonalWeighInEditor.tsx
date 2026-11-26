@@ -136,6 +136,41 @@ export function PersonalWeighInEditor({
           />
         </>
       )}
+      <fieldset className="rounded-xl border border-line p-4">
+        <legend className="px-1 text-sm font-semibold text-ink">
+          Share date and weight with groups (optional)
+        </legend>
+        {groups.length === 0 ? (
+          <p className="text-sm leading-6 text-ink-muted">
+            No eligible groups. You can still save this private weigh-in.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {groups.map((group) => (
+              <label
+                className="flex items-center gap-3 text-sm text-ink"
+                key={group.id}
+              >
+                <input
+                  disabled={isSaving}
+                  checked={values.sharedChallengeIds.includes(group.id)}
+                  className="size-4 shrink-0 accent-forest-800"
+                  onChange={(event) =>
+                    toggleGroup(group.id, event.target.checked)
+                  }
+                  type="checkbox"
+                />
+                <span className="min-w-0 break-words">{group.name}</span>
+              </label>
+            ))}
+          </div>
+        )}
+        {errors.sharedChallengeIds ? (
+          <p className="mt-2 text-sm text-red-700">
+            {errors.sharedChallengeIds}
+          </p>
+        ) : null}
+      </fieldset>
       <div>
         {compactMobile ? (
           <button
@@ -215,49 +250,6 @@ export function PersonalWeighInEditor({
           ) : null}
         </div>
       </div>
-
-      <fieldset className="rounded-xl border border-line p-4">
-        <legend className="px-1 text-sm font-semibold text-ink">
-          Share date and weight with groups (optional)
-        </legend>
-        {groups.length === 0 ? (
-          <p className="text-sm leading-6 text-ink-muted">
-            No eligible groups. You can still save this private weigh-in.
-          </p>
-        ) : (
-          <>
-            <p className="mb-3 text-xs leading-5 text-ink-muted">
-              {values.sharedChallengeIds.length
-                ? 'Selected groups receive the date and weight only. Change the selection before saving if needed; your note stays private.'
-                : 'Nothing is selected by default. Choose each group separately; your note stays private.'}
-            </p>
-            <div className="space-y-3">
-              {groups.map((group) => (
-                <label
-                  className="flex items-center gap-3 text-sm text-ink"
-                  key={group.id}
-                >
-                  <input
-                    disabled={isSaving}
-                    checked={values.sharedChallengeIds.includes(group.id)}
-                    className="size-4 shrink-0 accent-forest-800"
-                    onChange={(event) =>
-                      toggleGroup(group.id, event.target.checked)
-                    }
-                    type="checkbox"
-                  />
-                  <span className="min-w-0 break-words">{group.name}</span>
-                </label>
-              ))}
-            </div>
-          </>
-        )}
-        {errors.sharedChallengeIds ? (
-          <p className="mt-2 text-sm text-red-700">
-            {errors.sharedChallengeIds}
-          </p>
-        ) : null}
-      </fieldset>
 
       <div
         className={
