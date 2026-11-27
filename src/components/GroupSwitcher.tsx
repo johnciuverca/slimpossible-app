@@ -180,16 +180,17 @@ export function GroupSwitcher({
             >
               <svg
                 aria-hidden="true"
-                width="16"
-                height="16"
+                width="19"
+                height="19"
                 viewBox="0 0 28 28"
-                fill="currentColor"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               >
-                <path
-                  d="M11.2 2h5.6l.8 3.1 2.5 1.4 3-.9 2.8 4.8-2.2 2.3v2.8l2.2 2.3-2.8 4.8-3-.9-2.5 1.4-.8 3.1h-5.6l-.8-3.1-2.5-1.4-3 .9-2.8-4.8 2.2-2.3v-2.8L2.1 10.4l2.8-4.8 3 .9 2.5-1.4L11.2 2Zm2.8 7.2a4.8 4.8 0 1 0 0 9.6 4.8 4.8 0 0 0 0-9.6Z"
-                  fillRule="evenodd"
-                  clipRule="evenodd"
-                />
+                <path d="M12.3 2.5h3.4l.6 2.2a9.7 9.7 0 0 1 1.8.8l2.1-1.1 2.4 2.4-1.1 2.1c.4.6.7 1.2.8 1.8l2.2.6v3.4l-2.2.6a9.7 9.7 0 0 1-.8 1.8l1.1 2.1-2.4 2.4-2.1-1.1c-.6.4-1.2.7-1.8.8l-.6 2.2h-3.4l-.6-2.2a9.7 9.7 0 0 1-1.8-.8l-2.1 1.1-2.4-2.4 1.1-2.1a9.7 9.7 0 0 1-.8-1.8l-2.2-.6v-3.4l2.2-.6a9.7 9.7 0 0 1 .8-1.8L5.4 6.8l2.4-2.4 2.1 1.1a9.7 9.7 0 0 1 1.8-.8l.6-2.2Z" />
+                <circle cx="14" cy="13" r="3.4" />
               </svg>
               Manage groups
             </Link>
