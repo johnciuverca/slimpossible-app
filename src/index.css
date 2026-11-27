@@ -1360,6 +1360,19 @@ body {
   background: var(--color-page);
   color: var(--color-ink);
 }
+.app-shell.signed-in-shell
+  .app-shell-header
+  nav
+  .group-switcher-trigger
+  .group-switcher-name:hover,
+.app-shell.signed-in-shell
+  .app-shell-header
+  nav
+  .group-switcher-trigger
+  .group-switcher-name:focus-visible {
+  border-color: transparent;
+  background: transparent;
+}
 .signed-in-shell .account-control summary {
   gap: 10px;
   max-width: 220px;

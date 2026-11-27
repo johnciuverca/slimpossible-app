@@ -46,6 +46,7 @@ export function GroupSwitcher({
     }
   }, [routeSelected?.id])
   useEffect(() => {
+    if (loading || error) return
     if (rememberedId && !groups.some((group) => group.id === rememberedId)) {
       setRememberedId(null)
       try {
@@ -54,7 +55,7 @@ export function GroupSwitcher({
         // Ignore unavailable storage; the ID is never used without authorization.
       }
     }
-  }, [groups, rememberedId])
+  }, [error, groups, loading, rememberedId])
   const root = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false)
