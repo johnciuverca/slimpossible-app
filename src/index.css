@@ -961,6 +961,13 @@ body {
 
 @media (max-width: 639px) {
   .dashboard-shell .app-shell-main:has(.dashboard-workspace) {
+    max-width: none;
+    padding-inline: 16px;
+  }
+  .dashboard-shell .dashboard-workspace {
+    max-width: none;
+  }
+  .dashboard-shell .app-shell-main:has(.dashboard-workspace) {
     padding-block-start: 0.5rem;
   }
   .dashboard-shell #dashboard-overview-panel > :not(:first-child),
@@ -2310,9 +2317,12 @@ body {
 }
 .signed-in-shell .app-shell-brand {
   padding-inline: 0;
-  margin-left: 8px;
+  margin-left: clamp(16px, 15vw, 200px);
 }
 @media (max-width: 639px) {
+  .signed-in-shell .app-shell-brand {
+    margin-left: clamp(12px, 4vw, 16px);
+  }
   .dashboard-personal-chart-card .group-overview-chart-controls {
     gap: 4px;
     margin-inline: 16px;
@@ -2400,5 +2410,14 @@ body {
     border-color: #31dbb0;
     background: #145447;
     color: #f1fffb;
+  }
+}
+@media (min-width: 640px) {
+  .dashboard-shell .app-shell-main:has(.dashboard-workspace) {
+    max-width: none;
+    padding-inline: 24px;
+  }
+  .dashboard-shell .dashboard-workspace {
+    max-width: none;
   }
 }

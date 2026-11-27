@@ -4957,9 +4957,19 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
       const chart = document
         .querySelector('.group-history-workspace')!
         .getBoundingClientRect()
+      const main = document
+        .querySelector('.app-shell-main')!
+        .getBoundingClientRect()
+      const mainStyle = getComputedStyle(
+        document.querySelector('.app-shell-main')!,
+      )
       const selector = document
         .querySelector('.app-shell-brand')!
         .getBoundingClientRect()
+      const brandMarginLeft = Number.parseFloat(
+        getComputedStyle(document.querySelector('.app-shell-brand')!)
+          .marginLeft,
+      )
       const tabs = document
         .querySelector('.group-context-subnav .contextual-subnav-scroll')!
         .getBoundingClientRect()
@@ -4988,7 +4998,11 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
         .getBoundingClientRect()
       return {
         chart: { left: chart.left, right: chart.right },
+        mainContentLeft: main.left + Number.parseFloat(mainStyle.paddingLeft),
+        mainContentRight:
+          main.right - Number.parseFloat(mainStyle.paddingRight),
         selector: selector.left,
+        brandMarginLeft,
         tabs: tabs.left,
         refresh: refresh.right,
         arrow: arrow.right,
@@ -5002,7 +5016,9 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
       Math.min(...edges.cards.map((c) => c.bounds.x)),
     ])
       expect(Math.abs(edge - edges.chart.left)).toBeLessThanOrEqual(1)
-    expect(edges.selector - edges.chart.left).toBe(8)
+    expect(
+      Math.abs(edges.selector - edges.chart.left - edges.brandMarginLeft),
+    ).toBeLessThanOrEqual(1)
     for (const edge of [
       edges.refresh,
       Math.max(...edges.cards.map((c) => c.bounds.right)),
@@ -5011,6 +5027,8 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
     expect(edges.arrow).toBeLessThanOrEqual(edges.chart.right)
     expect(edges.arrow).toBeGreaterThanOrEqual(edges.chart.left)
     expect(edges.overflow).toBe(0)
+    expect(edges.chart.left).toBeCloseTo(edges.mainContentLeft, 0)
+    expect(edges.chart.right).toBeCloseTo(edges.mainContentRight, 0)
     const accentColors = [
       'rgb(49, 219, 176)',
       'rgb(103, 165, 255)',

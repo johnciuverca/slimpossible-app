@@ -7,6 +7,8 @@ const viewports = [
   { width: 390, height: 700 },
   { width: 430, height: 932 },
   { width: 1280, height: 900 },
+  { width: 1440, height: 900 },
+  { width: 1920, height: 1080 },
 ]
 
 test('Dashboard compactness bounds and screenshots', async ({ page }) => {
@@ -56,6 +58,12 @@ test('Dashboard compactness bounds and screenshots', async ({ page }) => {
       )!
       const chart = rect('[role="img"][viewBox]')
       const chartCard = rect('.dashboard-personal-chart-card')
+      const mainElement = document.querySelector('.app-shell-main')!
+      const main = mainElement.getBoundingClientRect()
+      const mainStyle = getComputedStyle(mainElement)
+      const contentLeft = main.left + Number.parseFloat(mainStyle.paddingLeft)
+      const contentRight =
+        main.right - Number.parseFloat(mainStyle.paddingRight)
       const viewBoxHeight = Number(
         chartElement.getAttribute('viewBox')?.trim().split(/\s+/)[3],
       )
@@ -80,6 +88,8 @@ test('Dashboard compactness bounds and screenshots', async ({ page }) => {
         compactCardStackHeight: actions.bottom - latest.y,
         chart,
         chartCard,
+        contentLeft,
+        contentRight,
         plotTopY,
         plotBottomY,
         plotHeight: plotBottomY - plotTopY,
@@ -107,6 +117,8 @@ test('Dashboard compactness bounds and screenshots', async ({ page }) => {
             ? 150
             : metrics.plotHeight - 1,
       )
+      expect(metrics.chartCard.x).toBeCloseTo(metrics.contentLeft, 0)
+      expect(metrics.chartCard.right).toBeCloseTo(metrics.contentRight, 0)
       const controls = await actions
         .locator(
           '.dashboard-action-grid-compact > a, .dashboard-action-grid-compact > button',
@@ -142,6 +154,8 @@ test('Dashboard compactness bounds and screenshots', async ({ page }) => {
       expect(metrics.actions.height).toBeGreaterThanOrEqual(64)
       expect(metrics.chart.x).toBeGreaterThanOrEqual(metrics.chartCard.x)
       expect(metrics.chart.right).toBeLessThanOrEqual(metrics.chartCard.right)
+      expect(metrics.chartCard.x).toBeCloseTo(metrics.contentLeft, 0)
+      expect(metrics.chartCard.right).toBeCloseTo(metrics.contentRight, 0)
       expect(metrics.chart.height).toBeCloseTo(320, 0)
       expect(metrics.chart.y).toBeLessThan(400)
     }
