@@ -3,6 +3,7 @@ import type { InputHTMLAttributes } from 'react'
 type TextInputProps = InputHTMLAttributes<HTMLInputElement> & {
   error?: string
   label: string
+  labelClassName?: string
   shellClassName?: string
 }
 
@@ -11,6 +12,7 @@ export function TextInput({
   error,
   id,
   label,
+  labelClassName = 'text-sm font-semibold text-ink',
   shellClassName,
   ...props
 }: TextInputProps) {
@@ -27,7 +29,7 @@ export function TextInput({
 
   return (
     <div>
-      <label className="text-sm font-semibold text-ink" htmlFor={id}>
+      <label className={labelClassName} htmlFor={id}>
         {label}
       </label>
       {shellClassName ? <div className={shellClassName}>{input}</div> : input}

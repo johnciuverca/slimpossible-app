@@ -208,8 +208,8 @@ export function RecordWeightDialog({
       }
       element.setAttribute('data-compact-viewport', '')
       const stackFields =
-        window.innerWidth < 400 ||
-        (!!viewport && (viewport.width < 400 || viewport.scale > 1.05))
+        window.innerWidth < 360 ||
+        (!!viewport && (viewport.width < 360 || viewport.scale > 1.05))
       if (stackFields) element.setAttribute('data-narrow-fields', '')
       else element.removeAttribute('data-narrow-fields')
       const visibleBottom = viewport.offsetTop + viewport.height
