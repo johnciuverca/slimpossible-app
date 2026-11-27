@@ -79,7 +79,7 @@ describe('PersonalWeighInEditor', () => {
       name: 'Private note (optional)Needs attention',
     })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    expect(toggle.querySelector('svg')).not.toHaveClass('rotate-180')
+    expect(toggle.querySelector('svg')).toBeNull()
     expect(screen.getByLabelText('Weight in kg')).toBeVisible()
     const note = screen.getByRole('textbox', {
       name: 'Private note (optional)',
@@ -97,7 +97,7 @@ describe('PersonalWeighInEditor', () => {
     expect(toggle).toHaveAccessibleName(
       'Private note (optional)Needs attention',
     )
-    expect(toggle.querySelector('svg')).toHaveClass('rotate-180')
+    expect(toggle.querySelector('svg')).toBeNull()
     expect(note.parentElement).not.toHaveClass('is-collapsed')
     expect(note).toHaveValue('Existing private note')
     expect(screen.getByText('Note must be text when provided.')).toBeVisible()
