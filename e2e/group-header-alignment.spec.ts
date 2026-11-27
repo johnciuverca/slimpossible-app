@@ -208,7 +208,10 @@ for (const viewport of [
     const trigger = page.getByRole('button', {
       name: 'Choose group: Synthetic draft group',
     })
-    await expect(trigger).toHaveAttribute('aria-current', 'page')
+    const groupName = page.getByRole('link', {
+      name: 'Open group: Synthetic draft group',
+    })
+    await expect(groupName).toHaveAttribute('aria-current', 'page')
     await trigger.click()
     const active = page
       .locator('.group-switcher-panel')
@@ -219,8 +222,8 @@ for (const viewport of [
       '/group?tab=charts&challenge=dashboard-active',
     )
     await expect(
-      page.getByRole('button', {
-        name: 'Choose group: Synthetic active group',
+      page.getByRole('link', {
+        name: 'Open group: Synthetic active group',
       }),
     ).toHaveAttribute('aria-current', 'page')
     await page.goto(fixture('/progress?challenge=dashboard-active'))
@@ -241,6 +244,9 @@ for (const viewport of [
       .click()
     await expect(page.getByTestId('fixture-route')).toHaveText(
       '/dashboard?tab=overview&challenge=dashboard-personal#goals',
+    )
+    await page.evaluate(() =>
+      localStorage.removeItem('slimpossible:last-authorized-group'),
     )
     await page.goto(fixture('/group?challenge=missing'))
     await expect(

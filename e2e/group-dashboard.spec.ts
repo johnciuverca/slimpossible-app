@@ -48,6 +48,7 @@ async function installGroupFixtures(
     weeklyResultMode?: 'finalized' | 'unfinished' | 'error' | 'pending'
     ownSundayRecorded?: boolean
     groupName?: string
+    holdChallengeList?: boolean
   } = {},
 ) {
   const challengeId = ownEntries ? ownGroupId : 'e2e-challenge'
@@ -66,6 +67,8 @@ async function installGroupFixtures(
   const releasePersonalContexts: (() => void)[] = []
   const releaseWeeklyResultStatus: (() => void)[] = []
   let personalContextsHeld = false
+  let challengeListHeld = false
+  const releaseChallengeLists: (() => void)[] = []
   let ownTarget = 80
   let ownStartingWeight = 100
   const estimatedOwnWeight = () => {
@@ -416,6 +419,12 @@ async function installGroupFixtures(
     }
 
     if (url.pathname === '/rest/v1/challenges') {
+      if (options.holdChallengeList) {
+        challengeListHeld = true
+        await new Promise<void>((resolve) => {
+          releaseChallengeLists.push(resolve)
+        })
+      }
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify([
@@ -756,6 +765,9 @@ async function installGroupFixtures(
   })
   return Object.assign(requests, {
     personalContextsHeld: () => personalContextsHeld,
+    challengeListHeld: () => challengeListHeld,
+    releaseChallengeLists: () =>
+      releaseChallengeLists.splice(0).forEach((release) => release()),
     releasePersonalContexts: () =>
       releasePersonalContexts.splice(0).forEach((release) => release()),
     releaseWeeklyResultStatus: () =>
@@ -2983,7 +2995,7 @@ for (const viewport of [
     await expect(table.getByRole('columnheader')).toHaveCount(2)
     await expect(table).toContainText('88.50 kg')
     await expect(table).not.toContainText('70.00 kg')
-    await expect(page.getByRole('img')).toHaveCount(0)
+    await expect(table.getByRole('img')).toHaveCount(0)
     await page.keyboard.press('End')
     await expect(
       tabs.getByRole('tab', { name: 'Ava (member 2)' }),
@@ -3312,8 +3324,9 @@ for (const viewport of [
     ).not.toContainText('Ava')
     await expect(page.getByText('42.5%', { exact: true })).toHaveCount(0)
     await expect(
-      page.getByRole('button', {
-        name: 'Choose group: Second authorized group',
+      page.getByRole('link', {
+        name: 'Open group: Second authorized group',
+        exact: true,
       }),
     ).toHaveAttribute('aria-current', 'page')
     await page
@@ -4373,8 +4386,9 @@ test('archived groups leave normal navigation and remain accessible as read-only
     page.getByRole('link', { name: /Group · Archived navigation group/ }),
   ).toHaveCount(0)
   await expect(
-    page.getByRole('button', {
-      name: 'Choose group: Current navigation group',
+    page.getByRole('link', {
+      name: 'Open group: Current navigation group',
+      exact: true,
     }),
   ).toHaveAttribute('aria-current', 'page')
   // A direct old bookmark remains explicit read-only history after a reload.
@@ -5494,13 +5508,58 @@ test('shows the challenge owner badge only in Members and fits on mobile', async
 })
 
 for (const width of [320, 390, 430, 1440]) {
+  test(`keeps the verified group label visible during delayed Dashboard context loading at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 })
+    const fixtureOptions = { holdChallengeList: false }
+    const fixtureRequests = await installGroupFixtures(
+      page,
+      true,
+      true,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'e2e-owner',
+      fixtureOptions,
+    )
+    await page.goto(
+      '/e2e/fixtures/today-harness.html?scenario=group&route=' +
+        encodeURIComponent(`/group?challenge=${ownGroupId}`),
+    )
+    const selectedGroupName = page.getByRole('link', {
+      name: 'Open group: E2E authorized group',
+    })
+    await expect(selectedGroupName).toBeVisible()
+
+    fixtureOptions.holdChallengeList = true
+    await page.getByRole('link', { name: 'Dashboard', exact: true }).click()
+    await expect.poll(() => fixtureRequests.challengeListHeld()).toBe(true)
+    await expect(selectedGroupName).toBeVisible()
+    await expect(
+      page.getByRole('link', { name: 'Group', exact: true }),
+    ).toHaveCount(0)
+    await expect(selectedGroupName).toHaveAttribute(
+      'href',
+      `/group?challenge=${ownGroupId}&tab=overview`,
+    )
+
+    fixtureRequests.releaseChallengeLists()
+    await expect(selectedGroupName).toBeVisible()
+  })
+}
+
+for (const width of [320, 390, 430, 1440]) {
   test(`navbar group dropdown routes and fits at ${width}px`, async ({
     page,
   }, testInfo) => {
     await page.setViewportSize({ width, height: 900 })
-    await installGroupFixtures(page, true)
+    await installGroupFixtures(page, true, true)
     await page.goto(
-      '/e2e/fixtures/today-harness.html?scenario=group&navigationTest',
+      '/e2e/fixtures/today-harness.html?scenario=group&navigationTest&route=' +
+        encodeURIComponent(`/group?challenge=${ownGroupId}`),
     )
     const trigger = page.getByRole('button', {
       name: 'Choose group: E2E authorized group',
@@ -5607,7 +5666,7 @@ for (const width of [320, 390, 430, 1440]) {
     expect(box.height).toBeGreaterThanOrEqual(44)
     await second.click()
     await expect(page.getByTestId('fixture-route')).toHaveText(
-      /challenge=e2e-second-group.*tab=records/,
+      new RegExp(`challenge=${secondGroupId}.*tab=records`),
     )
     await expect(
       page.getByRole('button', {
@@ -5628,7 +5687,7 @@ for (const width of [320, 390, 430, 1440]) {
     ).toBeVisible()
     await page.goto(
       '/e2e/fixtures/today-harness.html?scenario=group&navigationTest&route=' +
-        encodeURIComponent('/group?challenge=e2e-second-group&tab=records'),
+        encodeURIComponent(`/group?challenge=${secondGroupId}&tab=records`),
     )
     await expect(
       page.getByRole('button', {
@@ -5636,24 +5695,27 @@ for (const width of [320, 390, 430, 1440]) {
       }),
     ).toBeVisible()
     await page.getByRole('link', { name: 'Dashboard', exact: true }).click()
-    const dashboardTrigger = page.getByRole('button', {
-      name: 'Choose group',
-      exact: true,
+    const dashboardTrigger = page.getByRole('link', {
+      name: 'Open group: Second authorized group',
     })
-    const alignment = await dashboardTrigger.evaluate((button) => {
-      const span = button.querySelector('span')!
+    const alignment = await dashboardTrigger.evaluate((link) => {
       const range = document.createRange()
-      range.selectNodeContents(span)
+      range.selectNodeContents(link)
       const glyph = range.getBoundingClientRect()
-      const box = button.getBoundingClientRect()
-      const frame = getComputedStyle(button, '::before')
+      const frameElement = link.closest<HTMLElement>('.group-switcher-trigger')!
+      const box = frameElement.getBoundingClientRect()
+      const nameBox = link.getBoundingClientRect()
+      const frame = getComputedStyle(frameElement, '::before')
       return {
-        horizontalOffset: glyph.x + glyph.width / 2 - box.x - box.width / 2,
-        verticalOffset: glyph.y + glyph.height / 2 - box.y - box.height / 2,
+        horizontalOffset:
+          glyph.x + glyph.width / 2 - nameBox.x - nameBox.width / 2,
+        verticalOffset:
+          glyph.y + glyph.height / 2 - nameBox.y - nameBox.height / 2,
         width: box.width,
         height: box.height,
         frameTop: parseFloat(frame.top),
         frameBottom: parseFloat(frame.bottom),
+        linkBackground: getComputedStyle(link).backgroundColor,
       }
     })
     console.log('navbar trigger text bounds', width, alignment)
@@ -5663,6 +5725,27 @@ for (const width of [320, 390, 430, 1440]) {
     expect(alignment.height).toBe(44)
     expect(alignment.frameTop).toBe(0)
     expect(alignment.frameBottom).toBe(0)
+    expect(alignment.linkBackground).toBe('rgba(0, 0, 0, 0)')
+    await dashboardTrigger.hover()
+    await expect
+      .poll(() =>
+        dashboardTrigger.evaluate(
+          (link) => getComputedStyle(link).backgroundColor,
+        ),
+      )
+      .toBe('rgba(0, 0, 0, 0)')
+    await page.getByRole('link', { name: 'Dashboard', exact: true }).focus()
+    await page.keyboard.press('Tab')
+    await expect(dashboardTrigger).toBeFocused()
+    const focusStyle = await dashboardTrigger.evaluate((link) => {
+      const style = getComputedStyle(link)
+      return {
+        background: style.backgroundColor,
+        outlineWidth: style.outlineWidth,
+      }
+    })
+    expect(focusStyle.background).toBe('rgba(0, 0, 0, 0)')
+    expect(parseFloat(focusStyle.outlineWidth)).toBeGreaterThanOrEqual(2)
     expect(await expectMatchingFrames()).toEqual(originalFrames)
     await page.screenshot({
       path: testInfo.outputPath(`navbar-dashboard-closed-${width}.png`),
@@ -5675,23 +5758,33 @@ for (const width of [320, 390, 430, 1440]) {
     await page.screenshot({
       path: testInfo.outputPath(`navbar-dashboard-open-${width}.png`),
     })
+    const selectedGroupArrow = page.getByRole('button', {
+      name: 'Choose group: Second authorized group',
+    })
+    await selectedGroupArrow.click()
     await page
       .locator('.group-switcher-panel')
       .getByRole('link', { name: 'E2E authorized group', exact: true })
       .click()
     await expect(page.getByTestId('fixture-route')).toHaveText(
-      /challenge=e2e-challenge&tab=overview/,
+      new RegExp(`challenge=${ownGroupId}&tab=overview`),
     )
-    await trigger.press('ArrowDown')
+    const currentTrigger = page.getByRole('button', {
+      name: 'Choose group: E2E authorized group',
+    })
+    await currentTrigger.press('ArrowDown')
     await expect(
       page
         .locator('.group-switcher-panel')
         .getByRole('link', { name: 'E2E authorized group', exact: true }),
     ).toBeFocused()
     await page.keyboard.press('Escape')
-    await expect(trigger).toBeFocused()
-    await expect(trigger).toHaveAttribute('aria-expanded', 'false')
-    await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    await expect(currentTrigger).toBeFocused()
+    await expect(currentTrigger).toHaveAttribute('aria-expanded', 'false')
+    await page.goto(
+      '/e2e/fixtures/today-harness.html?scenario=group&route=' +
+        encodeURIComponent(`/group?challenge=${ownGroupId}`),
+    )
     await expect(
       page.getByRole('heading', { name: 'Group progress', exact: true }),
     ).toBeVisible()

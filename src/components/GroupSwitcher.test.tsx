@@ -1,10 +1,13 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { MemoryRouter, useLocation } from 'react-router-dom'
+import { Link, MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, expect, it } from 'vitest'
 import { createChallengeFixture } from '../models/fixtures'
 import { GroupSwitcher } from './GroupSwitcher'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  window.localStorage.clear()
+})
 const groups = [
   createChallengeFixture({ id: 'first', name: 'First group' }),
   createChallengeFixture({ id: 'second', name: 'Second group' }),
@@ -22,29 +25,156 @@ const groups = [
 function Route() {
   const l = useLocation()
   return (
-    <output data-testid="route">
-      {l.pathname}
-      {l.search}
-    </output>
+    <>
+      <output data-testid="route">
+        {l.pathname}
+        {l.search}
+      </output>
+      <Link to="/dashboard?tab=overview">Dashboard Overview</Link>
+    </>
   )
 }
-function setup(path: string, loading = false, error = '') {
+function setup(
+  path: string,
+  loading = false,
+  error = '',
+  challenges = groups,
+  accountId?: string,
+) {
   return render(
     <MemoryRouter initialEntries={[path]}>
-      <GroupSwitcher challenges={groups} loading={loading} error={error} />
+      <GroupSwitcher
+        challenges={challenges}
+        loading={loading}
+        error={error}
+        accountId={accountId}
+      />
       <Route />
     </MemoryRouter>,
   )
 }
+it('navigates from the group name while the arrow independently opens the menu', () => {
+  setup('/group?challenge=first&tab=records')
+  fireEvent.click(screen.getByRole('link', { name: 'Open group: First group' }))
+  expect(screen.getByTestId('route')).toHaveTextContent(
+    '/group?challenge=first&tab=records',
+  )
+  const arrow = screen.getByRole('button', {
+    name: 'Choose group: First group',
+  })
+  fireEvent.click(arrow)
+  expect(arrow).toHaveAttribute('aria-expanded', 'true')
+  expect(screen.getByRole('link', { name: 'Second group' })).toBeVisible()
+  expect(screen.getByTestId('route')).toHaveTextContent(
+    '/group?challenge=first&tab=records',
+  )
+})
+
+it('keeps current Group section when clicking group name and arrow only toggles menu', () => {
+  setup('/group?challenge=first&tab=records&source=invite')
+  fireEvent.click(screen.getByRole('link', { name: 'Open group: First group' }))
+  expect(screen.getByTestId('route')).toHaveTextContent(
+    '/group?challenge=first&tab=records',
+  )
+  const arrow = screen.getByRole('button', {
+    name: 'Choose group: First group',
+  })
+  fireEvent.click(arrow)
+  expect(arrow).toHaveAttribute('aria-expanded', 'true')
+  expect(screen.getByTestId('route')).toHaveTextContent(
+    '/group?challenge=first&tab=records',
+  )
+})
+
+it('retains an authorized group on Dashboard and returns to that group from its name', () => {
+  window.localStorage.clear()
+  setup('/group?challenge=first&tab=records')
+  fireEvent.click(screen.getByRole('link', { name: 'Dashboard Overview' }))
+  expect(
+    screen.getByRole('link', { name: 'Open group: First group' }),
+  ).toHaveAttribute('href', '/group?challenge=first&tab=overview')
+  fireEvent.click(screen.getByRole('link', { name: 'Open group: First group' }))
+  expect(screen.getByTestId('route')).toHaveTextContent(
+    '/group?challenge=first&tab=overview',
+  )
+})
+it('keeps the verified name during same-account loading and hides it on account change', () => {
+  const view = setup(
+    '/group?challenge=first&tab=records',
+    false,
+    '',
+    groups,
+    'account-one',
+  )
+  fireEvent.click(screen.getByRole('link', { name: 'Dashboard Overview' }))
+  const selectedName = screen.getByRole('link', {
+    name: 'Open group: First group',
+  })
+  expect(selectedName).toBeVisible()
+
+  view.rerender(
+    <MemoryRouter initialEntries={['/dashboard']}>
+      <GroupSwitcher challenges={[]} loading error="" accountId="account-one" />
+      <Route />
+    </MemoryRouter>,
+  )
+  expect(
+    screen.getByRole('link', { name: 'Open group: First group' }),
+  ).toHaveAttribute('href', '/group?challenge=first&tab=overview')
+
+  view.rerender(
+    <MemoryRouter initialEntries={['/dashboard']}>
+      <GroupSwitcher
+        challenges={[groups[1]]}
+        loading={false}
+        error=""
+        accountId="account-two"
+      />
+      <Route />
+    </MemoryRouter>,
+  )
+  expect(screen.getByRole('link', { name: 'Group' })).toHaveAttribute(
+    'href',
+    '/group',
+  )
+  expect(
+    screen.queryByRole('link', { name: 'Open group: First group' }),
+  ).toBeNull()
+})
+it('does not show a remembered group name on cold load before authorization resolves', () => {
+  window.localStorage.setItem('slimpossible:last-authorized-group', 'first')
+  const view = setup('/dashboard', true, '', [], 'account-one')
+  expect(screen.getByRole('link', { name: 'Group' })).toBeVisible()
+  expect(
+    screen.queryByRole('link', { name: 'Open group: First group' }),
+  ).toBeNull()
+
+  view.rerender(
+    <MemoryRouter initialEntries={['/dashboard']}>
+      <GroupSwitcher
+        challenges={groups}
+        loading={false}
+        error=""
+        accountId="account-one"
+      />
+      <Route />
+    </MemoryRouter>,
+  )
+  expect(
+    screen.getByRole('link', { name: 'Open group: First group' }),
+  ).toBeVisible()
+})
 it('switches authorized groups while retaining the Group tab and safe URL state', () => {
   setup('/group?challenge=first&tab=records&source=invite')
   fireEvent.click(
     screen.getByRole('button', { name: 'Choose group: First group' }),
   )
-  expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual([
-    'First group',
-    'Second group',
-  ])
+  expect(
+    screen
+      .getAllByRole('link')
+      .filter((link) => link.closest('.group-switcher-panel'))
+      .map((link) => link.textContent),
+  ).toEqual(['First group', 'Second group'])
   expect(screen.queryByRole('link', { name: 'Group overview' })).toBeNull()
   expect(
     screen.queryByRole('link', { name: 'Personal' }),
@@ -118,7 +248,11 @@ it('keeps empty and single-group navigation usable without an unavailable select
     'aria-current',
     'page',
   )
-  expect(screen.getAllByRole('link')).toHaveLength(1)
+  expect(
+    screen
+      .getAllByRole('link')
+      .filter((link) => link.closest('.group-switcher-panel')),
+  ).toHaveLength(1)
   expect(screen.queryByRole('link', { name: 'Group overview' })).toBeNull()
 })
 
@@ -136,7 +270,9 @@ it('shows one owner-authorized Manage groups action after the group list', () =>
   )
 
   fireEvent.click(screen.getByRole('button', { name: 'Choose group' }))
-  const links = screen.getAllByRole('link')
+  const links = screen
+    .getAllByRole('link')
+    .filter((link) => link.closest('.group-switcher-panel'))
   expect(links.map((link) => link.textContent)).toEqual([
     'First group',
     'Second group',

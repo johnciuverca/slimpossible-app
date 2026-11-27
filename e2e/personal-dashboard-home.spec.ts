@@ -25,7 +25,12 @@ for (const width of [1280, 390]) {
       page
         .getByRole('navigation', { name: 'Primary navigation' })
         .getByRole('link'),
-    ).toHaveCount(1)
+    ).toHaveCount(2)
+    await expect(
+      page
+        .getByRole('navigation', { name: 'Primary navigation' })
+        .getByRole('link', { name: 'Group', exact: true }),
+    ).toHaveAttribute('href', '/group')
     await expect(
       page.getByRole('button', { name: /^Choose group/ }),
     ).toBeVisible()
@@ -82,7 +87,7 @@ for (const width of [1280, 390]) {
       page
         .getByRole('navigation', { name: 'Primary navigation' })
         .getByRole('link'),
-    ).toHaveCount(1)
+    ).toHaveCount(2)
     await expect(
       page.getByRole('button', { name: /^Choose group/ }),
     ).toBeVisible()

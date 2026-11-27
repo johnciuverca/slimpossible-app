@@ -8,22 +8,86 @@ export function GroupSwitcher({
   loading,
   error,
   canManageGroups = false,
+  accountId,
 }: {
   challenges: Challenge[]
   loading: boolean
   error: string
   canManageGroups?: boolean
+  accountId?: string
 }) {
   const { pathname, search, hash } = useLocation()
   const requested = new URLSearchParams(search).get('challenge')
   const groups = challenges.filter(
     (c) => c.kind === 'group' && c.status !== 'archived',
   )
-  const selected =
+  const routeSelected =
     pathname === '/group'
       ? (challenges.find((c) => c.kind === 'group' && c.id === requested) ??
         (!requested ? groups[0] : undefined))
       : undefined
+  const routeSelectedId = routeSelected?.id
+  const [rememberedId, setRememberedId] = useState(() => {
+    try {
+      return window.localStorage.getItem('slimpossible:last-authorized-group')
+    } catch {
+      return null
+    }
+  })
+  const selectedFromAuthorizedList =
+    routeSelected ?? groups.find((group) => group.id === rememberedId)
+  const [lastAuthorizedGroup, setLastAuthorizedGroup] = useState<{
+    accountId?: string
+    challenge: Challenge
+  } | null>(null)
+  const selected =
+    selectedFromAuthorizedList ??
+    ((loading || error) &&
+    lastAuthorizedGroup &&
+    lastAuthorizedGroup.accountId === accountId
+      ? lastAuthorizedGroup.challenge
+      : undefined)
+  useEffect(() => {
+    if (!routeSelectedId) return
+    setRememberedId(routeSelectedId)
+    try {
+      window.localStorage.setItem(
+        'slimpossible:last-authorized-group',
+        routeSelectedId,
+      )
+    } catch {
+      // Navigation still works when storage is unavailable.
+    }
+  }, [routeSelectedId])
+  useEffect(() => {
+    if (loading || error) return
+    if (selectedFromAuthorizedList) {
+      setLastAuthorizedGroup({
+        accountId,
+        challenge: selectedFromAuthorizedList,
+      })
+      return
+    }
+    setLastAuthorizedGroup((current) =>
+      current?.accountId === accountId ? null : current,
+    )
+  }, [accountId, error, loading, selectedFromAuthorizedList])
+  useEffect(() => {
+    if (loading || error) return
+    if (rememberedId && !groups.some((group) => group.id === rememberedId)) {
+      setRememberedId(null)
+      try {
+        window.localStorage.removeItem('slimpossible:last-authorized-group')
+      } catch {
+        // Ignore unavailable storage; the ID is never used without authorization.
+      }
+    }
+  }, [error, groups, loading, rememberedId])
+  useEffect(() => {
+    setLastAuthorizedGroup((current) =>
+      current?.accountId === accountId ? current : null,
+    )
+  }, [accountId])
   const root = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false)
@@ -103,19 +167,34 @@ export function GroupSwitcher({
         }
       }}
     >
-      <button
-        ref={trigger}
-        type="button"
-        aria-label={`Choose group${selected ? `: ${selected.name}` : ''}`}
-        aria-expanded={open}
-        aria-controls={open ? id : undefined}
-        aria-current={pathname === '/group' ? 'page' : undefined}
-        onClick={() => setOpen(!open)}
+      <div
         className="group-switcher-trigger"
-        title={selected?.name}
+        data-open={open ? 'true' : 'false'}
       >
-        <span>{selected?.name ?? 'Group'}</span>
-        <span className="account-chevron" aria-hidden="true">
+        {selected ? (
+          <Link
+            to={`/group?${new URLSearchParams({ challenge: selected.id, tab: pathname === '/group' ? workspaceSection('group', pathname, search, hash) : 'overview' })}`}
+            aria-label={`Open group: ${selected.name}`}
+            aria-current={pathname === '/group' ? 'page' : undefined}
+            title={selected.name}
+            className="group-switcher-name"
+          >
+            {selected.name}
+          </Link>
+        ) : (
+          <Link to="/group" className="group-switcher-name">
+            Group
+          </Link>
+        )}
+        <button
+          ref={trigger}
+          type="button"
+          aria-label={`Choose group${selected ? `: ${selected.name}` : ''}`}
+          aria-expanded={open}
+          aria-controls={open ? id : undefined}
+          onClick={() => setOpen(!open)}
+          className="group-switcher-arrow"
+        >
           <svg viewBox="0 0 12 10" width="12" height="10" fill="none">
             <path
               d="m2 3 4 4 4-4"
@@ -125,8 +204,8 @@ export function GroupSwitcher({
               strokeWidth="1.6"
             />
           </svg>
-        </span>
-      </button>
+        </button>
+      </div>
       <div
         hidden={!open}
         ref={panel}
