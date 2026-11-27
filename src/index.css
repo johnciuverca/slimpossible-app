@@ -1329,6 +1329,11 @@ body {
   color: var(--color-forest-900);
   font-weight: 700;
 }
+.app-shell.signed-in-shell .app-shell-header nav .group-switcher-name[aria-current='page'] {
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-forest-900);
+}
 .app-shell.signed-in-shell
   .app-shell-header
   nav
