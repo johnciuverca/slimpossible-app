@@ -268,6 +268,10 @@ export function ChallengeContextTabs({ navbar = false }: { navbar?: boolean }) {
         challenges={current.challenges}
         loading={current.loading}
         error={current.error}
+        canManageGroups={current.challenges.some(
+          (challenge) =>
+            challenge.kind === 'group' && challenge.ownerId === auth.user?.id,
+        )}
       />
     )
   return (

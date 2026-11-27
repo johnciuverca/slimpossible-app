@@ -121,3 +121,40 @@ it('keeps empty and single-group navigation usable without an unavailable select
   expect(screen.getAllByRole('link')).toHaveLength(1)
   expect(screen.queryByRole('link', { name: 'Group overview' })).toBeNull()
 })
+
+it('shows one owner-authorized Manage groups action after the group list', () => {
+  render(
+    <MemoryRouter initialEntries={['/dashboard']}>
+      <GroupSwitcher
+        challenges={groups}
+        loading={false}
+        error=""
+        canManageGroups
+      />
+      <Route />
+    </MemoryRouter>,
+  )
+
+  fireEvent.click(screen.getByRole('button', { name: 'Choose group' }))
+  const links = screen.getAllByRole('link')
+  expect(links.map((link) => link.textContent)).toEqual([
+    'First group',
+    'Second group',
+    'Manage groups',
+  ])
+  expect(screen.getByRole('link', { name: 'Manage groups' })).toHaveAttribute(
+    'href',
+    '/challenge/manage',
+  )
+  expect(
+    screen.getByRole('link', { name: 'Manage groups' }).previousElementSibling,
+  ).toHaveAttribute('class', 'group-switcher-divider')
+})
+
+it('hides Manage groups for viewers without a manageable group', () => {
+  setup('/dashboard')
+  fireEvent.click(screen.getByRole('button', { name: 'Choose group' }))
+  expect(
+    screen.queryByRole('link', { name: 'Manage groups' }),
+  ).not.toBeInTheDocument()
+})

@@ -2094,6 +2094,11 @@ body {
   overflow-wrap: anywhere;
   padding: 8px 10px;
 }
+.group-switcher-divider {
+  margin: 6px 4px;
+  border: 0;
+  border-top: 1px solid var(--color-line);
+}
 .group-switcher-panel p {
   padding: 10px;
   font-size: 13px;

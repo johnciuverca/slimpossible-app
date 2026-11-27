@@ -5027,11 +5027,13 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
       )
       expect(edges.plot.width).toBeGreaterThan(300)
     }
+    const trigger = page.getByRole('button', { name: 'Choose group: testtest' })
+    await trigger.click()
     const manage = page.getByRole('link', {
-      name: 'Manage',
+      name: 'Manage groups',
       exact: true,
     })
-    await expect(manage).toHaveAttribute('title', 'Manage challenges')
+    await expect(manage).toHaveAttribute('title', 'Manage group challenges')
     expect(
       await manage.evaluate((element) =>
         Boolean(element.parentElement?.closest('a,button')),
@@ -5040,7 +5042,10 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
     const manageBox = (await manage.boundingBox())!
     expect(manageBox.width).toBeGreaterThanOrEqual(44)
     expect(manageBox.height).toBeGreaterThanOrEqual(44)
-    await expect(manage).toHaveCSS('font-size', '12.6px')
+    await expect(manage).toHaveCSS(
+      'font-size',
+      width <= 390 ? '12px' : '12.6px',
+    )
     await manage.focus()
     await expect(manage).toBeFocused()
     await page.keyboard.press('Enter')
@@ -5070,8 +5075,9 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
       await expect(
         page.getByRole('button', { name: 'Choose group: testtest' }),
       ).toBeVisible()
+      await trigger.click()
       await expect(
-        page.getByRole('link', { name: 'Manage', exact: true }),
+        page.getByRole('link', { name: 'Manage groups', exact: true }),
       ).toHaveCount(0)
     }
   })

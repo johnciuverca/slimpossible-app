@@ -7,10 +7,12 @@ export function GroupSwitcher({
   challenges,
   loading,
   error,
+  canManageGroups = false,
 }: {
   challenges: Challenge[]
   loading: boolean
   error: string
+  canManageGroups?: boolean
 }) {
   const { pathname, search, hash } = useLocation()
   const requested = new URLSearchParams(search).get('challenge')
@@ -167,6 +169,18 @@ export function GroupSwitcher({
             )
           })
         )}
+        {!loading && !error && canManageGroups ? (
+          <>
+            <hr className="group-switcher-divider" />
+            <Link
+              to="/challenge/manage"
+              onClick={() => setOpen(false)}
+              title="Manage group challenges"
+            >
+              Manage groups
+            </Link>
+          </>
+        ) : null}
       </div>
     </div>
   )

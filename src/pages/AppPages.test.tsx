@@ -1603,9 +1603,9 @@ describe('GroupDashboardPage', () => {
     expect(
       screen.queryByRole('table', { name: 'Shared group weight history' }),
     ).not.toBeInTheDocument()
-    const manage = screen.getByRole('link', { name: 'Manage' })
-    expect(manage).toHaveAttribute('href', '/challenge/manage')
-    expect(manage).toHaveAttribute('title', 'Manage challenges')
+    expect(
+      screen.queryByRole('link', { name: 'Manage' }),
+    ).not.toBeInTheDocument()
     expect(
       screen.queryByRole('navigation', { name: 'Challenge contexts' }),
     ).not.toBeInTheDocument()
