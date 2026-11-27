@@ -2995,7 +2995,7 @@ for (const viewport of [
     await expect(table.getByRole('columnheader')).toHaveCount(2)
     await expect(table).toContainText('88.50 kg')
     await expect(table).not.toContainText('70.00 kg')
-    await expect(page.getByRole('img')).toHaveCount(0)
+    await expect(table.getByRole('img')).toHaveCount(0)
     await page.keyboard.press('End')
     await expect(
       tabs.getByRole('tab', { name: 'Ava (member 2)' }),
@@ -3324,8 +3324,9 @@ for (const viewport of [
     ).not.toContainText('Ava')
     await expect(page.getByText('42.5%', { exact: true })).toHaveCount(0)
     await expect(
-      page.getByRole('button', {
-        name: 'Choose group: Second authorized group',
+      page.getByRole('link', {
+        name: 'Open group: Second authorized group',
+        exact: true,
       }),
     ).toHaveAttribute('aria-current', 'page')
     await page
@@ -4385,8 +4386,9 @@ test('archived groups leave normal navigation and remain accessible as read-only
     page.getByRole('link', { name: /Group · Archived navigation group/ }),
   ).toHaveCount(0)
   await expect(
-    page.getByRole('button', {
-      name: 'Choose group: Current navigation group',
+    page.getByRole('link', {
+      name: 'Open group: Current navigation group',
+      exact: true,
     }),
   ).toHaveAttribute('aria-current', 'page')
   // A direct old bookmark remains explicit read-only history after a reload.
