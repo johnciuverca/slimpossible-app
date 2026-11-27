@@ -2104,10 +2104,6 @@ body {
 .app-shell.signed-in-shell .group-switcher-panel a.group-switcher-manage {
   gap: 8px;
   margin-top: 2px;
-  border: 1px solid var(--color-line);
-  border-radius: 8px;
-  background: var(--color-panel-soft, #f1f5f3);
-  color: var(--color-forest-800);
   font-weight: 700;
   position: relative;
   padding-left: 34px;
