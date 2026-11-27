@@ -1329,6 +1329,17 @@ body {
   color: var(--color-forest-900);
   font-weight: 700;
 }
+.app-shell.signed-in-shell .app-shell-header nav > a,
+.app-shell.signed-in-shell .app-shell-header nav > .group-switcher {
+  box-sizing: border-box;
+  height: 44px;
+  min-height: 44px;
+}
+.app-shell.signed-in-shell .app-shell-header nav > .group-switcher .group-switcher-trigger {
+  box-sizing: border-box;
+  height: 44px;
+  min-height: 44px;
+}
 .app-shell.signed-in-shell .app-shell-header nav .group-switcher-name[aria-current='page'] {
   border-color: transparent;
   background: transparent;
