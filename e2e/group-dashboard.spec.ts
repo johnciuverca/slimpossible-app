@@ -4998,11 +4998,11 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
       }
     })
     for (const edge of [
-      edges.selector,
       edges.tabs,
       Math.min(...edges.cards.map((c) => c.bounds.x)),
     ])
       expect(Math.abs(edge - edges.chart.left)).toBeLessThanOrEqual(1)
+    expect(edges.selector - edges.chart.left).toBe(8)
     for (const edge of [
       edges.refresh,
       Math.max(...edges.cards.map((c) => c.bounds.right)),
