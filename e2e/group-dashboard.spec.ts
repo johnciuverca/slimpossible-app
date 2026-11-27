@@ -4456,6 +4456,15 @@ test.describe('group chart weigh-in dots', () => {
       .getByRole('navigation', { name: 'Group sections' })
       .getByRole('link', { name: 'Charts', exact: true })
       .click()
+    // Overview and Charts share point locators; wait for the Charts instance.
+    await expect(
+      page
+        .getByRole('navigation', { name: 'Group sections' })
+        .getByRole('link', { name: 'Charts', exact: true }),
+    ).toHaveAttribute('aria-current', 'page')
+    await expect(
+      page.getByRole('heading', { name: 'Group charts', exact: true }),
+    ).toBeVisible()
     const chart = page.getByRole('img', {
       name: 'Weight (kg) — shared group history',
     })
