@@ -2299,14 +2299,6 @@ export function GroupDashboardPage() {
               View current groups
             </Link>
           </div>
-        ) : selectedChallenge?.ownerId === ownerId ? (
-          <Link
-            to="/challenge/manage"
-            title="Manage challenges"
-            className="group-manage-link inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-line bg-panel px-4 py-2 font-semibold text-forest-800"
-          >
-            Manage
-          </Link>
         ) : null}
       </div>
       {!selectedChallenge && !isLoading ? (

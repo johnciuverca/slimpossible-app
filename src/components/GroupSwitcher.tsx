@@ -7,10 +7,12 @@ export function GroupSwitcher({
   challenges,
   loading,
   error,
+  canManageGroups = false,
 }: {
   challenges: Challenge[]
   loading: boolean
   error: string
+  canManageGroups?: boolean
 }) {
   const { pathname, search, hash } = useLocation()
   const requested = new URLSearchParams(search).get('challenge')
@@ -167,6 +169,33 @@ export function GroupSwitcher({
             )
           })
         )}
+        {!loading && !error && canManageGroups ? (
+          <>
+            <hr className="group-switcher-divider" />
+            <Link
+              to="/challenge/manage"
+              className="group-switcher-manage"
+              onClick={() => setOpen(false)}
+              title="Manage group challenges"
+            >
+              <svg
+                aria-hidden="true"
+                width="19"
+                height="19"
+                viewBox="0 0 28 28"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12.3 2.5h3.4l.6 2.2a9.7 9.7 0 0 1 1.8.8l2.1-1.1 2.4 2.4-1.1 2.1c.4.6.7 1.2.8 1.8l2.2.6v3.4l-2.2.6a9.7 9.7 0 0 1-.8 1.8l1.1 2.1-2.4 2.4-2.1-1.1c-.6.4-1.2.7-1.8.8l-.6 2.2h-3.4l-.6-2.2a9.7 9.7 0 0 1-1.8-.8l-2.1 1.1-2.4-2.4 1.1-2.1a9.7 9.7 0 0 1-.8-1.8l-2.2-.6v-3.4l2.2-.6a9.7 9.7 0 0 1 .8-1.8L5.4 6.8l2.4-2.4 2.1 1.1a9.7 9.7 0 0 1 1.8-.8l.6-2.2Z" />
+                <circle cx="14" cy="13" r="3.4" />
+              </svg>
+              Manage groups
+            </Link>
+          </>
+        ) : null}
       </div>
     </div>
   )

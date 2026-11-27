@@ -2089,10 +2089,31 @@ body {
 .app-shell.signed-in-shell .group-switcher-panel a {
   display: flex;
   align-items: center;
+  justify-content: center;
+  text-align: center;
   min-height: 44px;
   white-space: normal;
   overflow-wrap: anywhere;
   padding: 8px 10px;
+}
+.group-switcher-divider {
+  margin: 10px 4px 8px;
+  border: 0;
+  border-top: 2px solid var(--color-line);
+}
+.app-shell.signed-in-shell .group-switcher-panel a.group-switcher-manage {
+  gap: 7px;
+  margin-top: 2px;
+  font-weight: 700;
+}
+.group-switcher-manage svg {
+  flex: 0 0 auto;
+  width: 19px;
+  height: 19px;
+}
+.group-switcher-manage:focus-visible {
+  outline: 2px solid var(--color-forest-800);
+  outline-offset: 2px;
 }
 .group-switcher-panel p {
   padding: 10px;
