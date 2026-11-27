@@ -277,6 +277,14 @@ for (const width of [1280, 390]) {
     await expect(
       dateControls.getByRole('button', { name: 'Show all dates' }),
     ).toHaveAttribute('aria-pressed', 'true')
+    const selectedAll = dateControls.getByRole('button', {
+      name: 'Show all dates',
+    })
+    await expect(selectedAll).toBeDisabled()
+    await expect(selectedAll).toHaveCSS('opacity', '1')
+    await expect(selectedAll).toHaveCSS('border-color', 'rgb(49, 219, 176)')
+    await expect(selectedAll).toHaveCSS('background-color', 'rgb(20, 84, 71)')
+    await expect(selectedAll).toHaveCSS('color', 'rgb(241, 255, 251)')
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,

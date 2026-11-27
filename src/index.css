@@ -1867,6 +1867,7 @@ body {
   border-top: 1px solid #354353;
   padding-top: 10px;
 }
+
 .group-workspace .chart-value {
   fill: #f7fbff;
   font-weight: 800;
@@ -2081,6 +2082,12 @@ body {
   .group-context-subnav-inner {
     padding-inline: 24px;
   }
+}
+
+/* All is disabled when selected to avoid a redundant action. Keep its active
+   contrast on par with the other selected presets in both chart surfaces. */
+[aria-label='Quick date ranges'] button[aria-pressed='true']:disabled {
+  opacity: 1;
 }
 @media (max-width: 1023px) {
   .group-context-subnav-inner {

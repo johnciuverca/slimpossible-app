@@ -3751,6 +3751,16 @@ for (const viewport of [
     await expect(
       chartPanel.getByRole('status', { name: 'Visible date range' }),
     ).toContainText('Last 7 days')
+    const allDates = quickRanges.getByRole('button', {
+      name: 'Show all dates',
+    })
+    await allDates.click()
+    await expect(allDates).toHaveAttribute('aria-pressed', 'true')
+    await expect(allDates).toBeDisabled()
+    await expect(allDates).toHaveCSS('opacity', '1')
+    await expect(allDates).toHaveCSS('border-color', 'rgb(49, 219, 176)')
+    await expect(allDates).toHaveCSS('background-color', 'rgb(20, 84, 71)')
+    await expect(allDates).toHaveCSS('color', 'rgb(241, 255, 251)')
     for (const [index, name] of [
       'Show last 1 week',
       'Show last 2 weeks',
