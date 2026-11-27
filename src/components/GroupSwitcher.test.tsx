@@ -1,10 +1,13 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { MemoryRouter, useLocation } from 'react-router-dom'
+import { Link, MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, expect, it } from 'vitest'
 import { createChallengeFixture } from '../models/fixtures'
 import { GroupSwitcher } from './GroupSwitcher'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  window.localStorage.clear()
+})
 const groups = [
   createChallengeFixture({ id: 'first', name: 'First group' }),
   createChallengeFixture({ id: 'second', name: 'Second group' }),
@@ -22,10 +25,13 @@ const groups = [
 function Route() {
   const l = useLocation()
   return (
-    <output data-testid="route">
-      {l.pathname}
-      {l.search}
-    </output>
+    <>
+      <output data-testid="route">
+        {l.pathname}
+        {l.search}
+      </output>
+      <Link to="/dashboard?tab=overview">Dashboard Overview</Link>
+    </>
   )
 }
 function setup(path: string, loading = false, error = '') {
@@ -68,6 +74,19 @@ it('keeps current Group section when clicking group name and arrow only toggles 
     '/group?challenge=first&tab=records',
   )
 })
+
+it('retains an authorized group on Dashboard and returns to that group from its name', () => {
+  window.localStorage.clear()
+  setup('/group?challenge=first&tab=records')
+  fireEvent.click(screen.getByRole('link', { name: 'Dashboard Overview' }))
+  expect(
+    screen.getByRole('link', { name: 'Open group: First group' }),
+  ).toHaveAttribute('href', '/group?challenge=first&tab=overview')
+  fireEvent.click(screen.getByRole('link', { name: 'Open group: First group' }))
+  expect(screen.getByTestId('route')).toHaveTextContent(
+    '/group?challenge=first&tab=overview',
+  )
+})
 it('switches authorized groups while retaining the Group tab and safe URL state', () => {
   setup('/group?challenge=first&tab=records&source=invite')
   fireEvent.click(
@@ -76,7 +95,7 @@ it('switches authorized groups while retaining the Group tab and safe URL state'
   expect(
     screen
       .getAllByRole('link')
-      .slice(1)
+      .filter((link) => link.closest('.group-switcher-panel'))
       .map((link) => link.textContent),
   ).toEqual(['First group', 'Second group'])
   expect(screen.queryByRole('link', { name: 'Group overview' })).toBeNull()
@@ -152,7 +171,11 @@ it('keeps empty and single-group navigation usable without an unavailable select
     'aria-current',
     'page',
   )
-  expect(screen.getAllByRole('link')).toHaveLength(2)
+  expect(
+    screen
+      .getAllByRole('link')
+      .filter((link) => link.closest('.group-switcher-panel')),
+  ).toHaveLength(1)
   expect(screen.queryByRole('link', { name: 'Group overview' })).toBeNull()
 })
 
@@ -170,8 +193,10 @@ it('shows one owner-authorized Manage groups action after the group list', () =>
   )
 
   fireEvent.click(screen.getByRole('button', { name: 'Choose group' }))
-  const links = screen.getAllByRole('link')
-  expect(links.slice(1).map((link) => link.textContent)).toEqual([
+  const links = screen
+    .getAllByRole('link')
+    .filter((link) => link.closest('.group-switcher-panel'))
+  expect(links.map((link) => link.textContent)).toEqual([
     'First group',
     'Second group',
     'Manage groups',

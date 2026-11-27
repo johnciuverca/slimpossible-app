@@ -19,11 +19,42 @@ export function GroupSwitcher({
   const groups = challenges.filter(
     (c) => c.kind === 'group' && c.status !== 'archived',
   )
-  const selected =
+  const routeSelected =
     pathname === '/group'
       ? (challenges.find((c) => c.kind === 'group' && c.id === requested) ??
         (!requested ? groups[0] : undefined))
       : undefined
+  const [rememberedId, setRememberedId] = useState(() => {
+    try {
+      return window.localStorage.getItem('slimpossible:last-authorized-group')
+    } catch {
+      return null
+    }
+  })
+  const selected =
+    routeSelected ?? groups.find((group) => group.id === rememberedId)
+  useEffect(() => {
+    if (!routeSelected) return
+    setRememberedId(routeSelected.id)
+    try {
+      window.localStorage.setItem(
+        'slimpossible:last-authorized-group',
+        routeSelected.id,
+      )
+    } catch {
+      // Navigation still works when storage is unavailable.
+    }
+  }, [routeSelected?.id])
+  useEffect(() => {
+    if (rememberedId && !groups.some((group) => group.id === rememberedId)) {
+      setRememberedId(null)
+      try {
+        window.localStorage.removeItem('slimpossible:last-authorized-group')
+      } catch {
+        // Ignore unavailable storage; the ID is never used without authorization.
+      }
+    }
+  }, [groups, rememberedId])
   const root = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false)

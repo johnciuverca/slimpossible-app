@@ -2054,6 +2054,10 @@ body {
   pointer-events: none;
 }
 .group-switcher-name {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
   position: relative;
   min-width: 0;
   flex: 1;
