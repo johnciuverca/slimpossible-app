@@ -2162,10 +2162,6 @@ body {
   }
 }
 
-.group-switcher-trigger[aria-current='page']::before {
-  background: #253b2d;
-  border-color: #527b5e;
-}
 .signed-in-shell .contextual-subnav-scroll {
   max-width: none;
 }
