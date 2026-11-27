@@ -1,7 +1,18 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Locator } from '@playwright/test'
 
 const fixture = (path: string, single = false) =>
   `/e2e/fixtures/personal-dashboard-harness.html?${new URLSearchParams({ scenario: 'groups', path, ...(single ? { groupCount: '1' } : {}) })}`
+
+async function expectCenteredActions(editor: Locator) {
+  const row = (await editor.locator('.record-weight-actions').boundingBox())!
+  const buttons = await editor.locator('.record-weight-actions button').all()
+  const boxes = await Promise.all(buttons.map((button) => button.boundingBox()))
+  expect(boxes.length).toBeGreaterThan(0)
+  expect(boxes.every(Boolean)).toBe(true)
+  expect(boxes.every((box) => Math.abs(box!.y - boxes[0]!.y) < 1)).toBe(true)
+  const groupCenter = (boxes[0]!.x + boxes.at(-1)!.x + boxes.at(-1)!.width) / 2
+  expect(groupCenter).toBeCloseTo(row.x + row.width / 2, 0)
+}
 
 for (const width of [320, 390, 430, 1440]) {
   test(`sharing choices precede private note and preserve multi-group edits at ${width}px`, async ({
@@ -23,6 +34,7 @@ for (const width of [320, 390, 430, 1440]) {
     await expect(
       editor.getByRole('group', { name: 'Share record with groups' }),
     ).toBeVisible()
+    await expectCenteredActions(editor)
     const [date, weight, sharing, note] = await Promise.all(
       [
         '.record-weight-date-field',
@@ -68,6 +80,7 @@ for (const width of [320, 390, 430, 1440]) {
     await expect(editor).toHaveCount(0)
     await record.click()
     editor = page.getByRole('dialog', { name: 'Edit weight' })
+    await expectCenteredActions(editor)
     for (const checkbox of await editor.getByRole('checkbox').all())
       await expect(checkbox).toBeChecked()
     expect(
@@ -159,6 +172,7 @@ for (const width of [320, 390, 430, 1440]) {
     await expect(
       editor.getByRole('group', { name: 'Share record with groups' }),
     ).toBeVisible()
+    await expectCenteredActions(editor)
 
     const [date, weight, sharing, note] = await Promise.all(
       [
@@ -187,6 +201,19 @@ for (const width of [320, 390, 430, 1440]) {
     expect(
       await editor.evaluate((el) => el.scrollWidth <= el.clientWidth),
     ).toBe(true)
+    await editor.getByLabel('Weight in kg').fill('82.3')
+    await editor
+      .getByRole('button', { name: 'Save weight', exact: true })
+      .click()
+    await page
+      .getByRole('button', { name: /^Edit weight/ })
+      .first()
+      .click()
+    const editForm = page.getByRole('form', { name: 'Personal weigh-in form' })
+    await expect(
+      editForm.getByRole('button', { name: 'Update weight', exact: true }),
+    ).toBeVisible()
+    await expectCenteredActions(editForm)
     await page.screenshot({
       path: test.info().outputPath(`inline-editor-${width}.png`),
     })

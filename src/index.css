@@ -295,6 +295,7 @@ body {
 
 .record-weight-actions {
   grid-column: 1 / -1;
+  justify-content: center;
 }
 
 .record-weight-actions {
