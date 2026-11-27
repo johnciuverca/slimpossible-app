@@ -3751,6 +3751,16 @@ for (const viewport of [
     await expect(
       chartPanel.getByRole('status', { name: 'Visible date range' }),
     ).toContainText('Last 7 days')
+    const allDates = quickRanges.getByRole('button', {
+      name: 'Show all dates',
+    })
+    await allDates.click()
+    await expect(allDates).toHaveAttribute('aria-pressed', 'true')
+    await expect(allDates).toBeDisabled()
+    await expect(allDates).toHaveCSS('opacity', '1')
+    await expect(allDates).toHaveCSS('border-color', 'rgb(49, 219, 176)')
+    await expect(allDates).toHaveCSS('background-color', 'rgb(20, 84, 71)')
+    await expect(allDates).toHaveCSS('color', 'rgb(241, 255, 251)')
     for (const [index, name] of [
       'Show last 1 week',
       'Show last 2 weeks',
@@ -4957,9 +4967,19 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
       const chart = document
         .querySelector('.group-history-workspace')!
         .getBoundingClientRect()
+      const main = document
+        .querySelector('.app-shell-main')!
+        .getBoundingClientRect()
+      const mainStyle = getComputedStyle(
+        document.querySelector('.app-shell-main')!,
+      )
       const selector = document
         .querySelector('.app-shell-brand')!
         .getBoundingClientRect()
+      const brandMarginLeft = Number.parseFloat(
+        getComputedStyle(document.querySelector('.app-shell-brand')!)
+          .marginLeft,
+      )
       const tabs = document
         .querySelector('.group-context-subnav .contextual-subnav-scroll')!
         .getBoundingClientRect()
@@ -4988,7 +5008,11 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
         .getBoundingClientRect()
       return {
         chart: { left: chart.left, right: chart.right },
+        mainContentLeft: main.left + Number.parseFloat(mainStyle.paddingLeft),
+        mainContentRight:
+          main.right - Number.parseFloat(mainStyle.paddingRight),
         selector: selector.left,
+        brandMarginLeft,
         tabs: tabs.left,
         refresh: refresh.right,
         arrow: arrow.right,
@@ -4998,11 +5022,13 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
       }
     })
     for (const edge of [
-      edges.selector,
       edges.tabs,
       Math.min(...edges.cards.map((c) => c.bounds.x)),
     ])
       expect(Math.abs(edge - edges.chart.left)).toBeLessThanOrEqual(1)
+    expect(
+      Math.abs(edges.selector - edges.chart.left - edges.brandMarginLeft),
+    ).toBeLessThanOrEqual(1)
     for (const edge of [
       edges.refresh,
       Math.max(...edges.cards.map((c) => c.bounds.right)),
@@ -5011,6 +5037,8 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
     expect(edges.arrow).toBeLessThanOrEqual(edges.chart.right)
     expect(edges.arrow).toBeGreaterThanOrEqual(edges.chart.left)
     expect(edges.overflow).toBe(0)
+    expect(edges.chart.left).toBeCloseTo(edges.mainContentLeft, 0)
+    expect(edges.chart.right).toBeCloseTo(edges.mainContentRight, 0)
     const accentColors = [
       'rgb(49, 219, 176)',
       'rgb(103, 165, 255)',

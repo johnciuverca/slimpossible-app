@@ -131,7 +131,7 @@ for (const width of [320, 390, 768, 1280, 1920]) {
   })
 }
 
-for (const width of [1280, 390]) {
+for (const width of [1920, 1280, 390]) {
   test(`brand hover and keyboard-focus affordances work in Dashboard and Group shells at ${width}px`, async ({
     page,
   }) => {
@@ -146,6 +146,27 @@ for (const width of [1280, 390]) {
         exact: true,
       })
       await expect(brand).toHaveAttribute('href', '/dashboard')
+      const brandInset = await brand.evaluate((element) =>
+        Number.parseFloat(getComputedStyle(element).marginLeft),
+      )
+      const expectedBrandInset =
+        width <= 639
+          ? Math.min(16, Math.max(12, width * 0.04))
+          : Math.min(124, Math.max(16, width * 0.093))
+      expect(brandInset).toBeCloseTo(expectedBrandInset, 1)
+      const brandFontSize = await brand.evaluate((element) =>
+        Number.parseFloat(getComputedStyle(element).fontSize),
+      )
+      expect(brandFontSize).toBeCloseTo(width <= 639 ? 17.28 : 21.6, 1)
+      if (width >= 1280) {
+        const brandBox = await brand.boundingBox()
+        const actionsBox = await page
+          .locator('.app-shell-header-actions')
+          .boundingBox()
+        expect(brandBox).not.toBeNull()
+        expect(actionsBox).not.toBeNull()
+        expect(brandBox!.x + brandBox!.width).toBeLessThan(actionsBox!.x)
+      }
       const initialBackground = await brand.evaluate(
         (element) => getComputedStyle(element).backgroundColor,
       )
