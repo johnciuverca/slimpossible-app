@@ -2073,7 +2073,8 @@ body {
   margin: 3px 0 3px 3px;
 }
 .group-switcher-name[aria-current='page'] {
-  background: color-mix(in srgb, var(--color-forest-800) 12%, transparent);
+  color: var(--color-forest-800);
+  font-weight: 750;
 }
 .group-switcher-name:empty::after {
   content: 'Group';
