@@ -102,6 +102,9 @@ test('compact mobile Record weight keeps group choices and Save reachable', asyn
     actionRowBox.x + actionRowBox.width / 2,
     0,
   )
+  expect(
+    Math.max(...actionBoxes.map((box) => box!.y + box!.height)),
+  ).toBeLessThanOrEqual(844 - 24)
   expect(Math.abs(dateBox!.x - weightBox!.x)).toBeGreaterThan(0)
   expect(dateBox!.y).toBeCloseTo(weightBox!.y, 1)
   await expect(date).toHaveAttribute('type', 'date')
