@@ -79,7 +79,7 @@ test('Dashboard remains usable at 200% text sizing and reflows at a narrow viewp
     .toBe(390)
 })
 
-test('content type and controls shrink while navigation and chart geometry stay fixed', async ({
+test('content controls shrink while Dashboard chart labels stay readable', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
@@ -176,9 +176,9 @@ test('content type and controls shrink while navigation and chart geometry stay 
   }))
   expect(chartText).toEqual({
     axisTitle: 12,
-    axisTick: 10.2,
-    value: 9,
-    dateTick: 10.2,
+    axisTick: 11.9,
+    value: 11,
+    dateTick: 11.9,
   })
 
   const inputSize = await page.evaluate(() => {

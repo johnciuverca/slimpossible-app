@@ -104,7 +104,7 @@ for (const width of [1280, 390]) {
     await expect(chart.locator('.chart-value')).toHaveCount(2)
     await expect(chart).toHaveAttribute(
       'viewBox',
-      width <= 600 ? '0 0 320 266' : '0 0 760 266',
+      width <= 600 ? '0 0 320 266' : /^0 0 \d+ 320$/,
     )
     const firstPoint = chart
       .locator('circle[data-point-kind="weekly-summary"][data-value="80.3"]')
@@ -134,7 +134,7 @@ for (const width of [1280, 390]) {
     for (const label of await chart.locator('.chart-value').all())
       await expect(label).toHaveAttribute(
         'font-size',
-        width <= 600 ? '9' : '6.6',
+        width <= 600 ? '11' : '12.5',
       )
     const yTicks = await chart
       .locator('[data-chart-tick]')
@@ -145,7 +145,7 @@ for (const width of [1280, 390]) {
     await expect(chart.locator('[data-chart-minor-tick]')).not.toHaveCount(0)
     await expect(chart.locator('[data-chart-date-tick]').first()).toHaveCSS(
       'font-size',
-      '10.2px',
+      '11.9px',
     )
     await expect(page.getByText('Weight (kg)', { exact: true })).toHaveCount(1)
     await chart.screenshot({
@@ -155,24 +155,28 @@ for (const width of [1280, 390]) {
       name: 'Chart date range controls',
     })
     await expect(dateControls).toBeVisible()
-    const dateRangeLabel = await dateControls
-      .getByText('Date range', { exact: true })
+    const chartHeading = dateControls.getByRole('heading', {
+      name: 'Your personal trend',
+    })
+    await expect(chartHeading).toBeVisible()
+    const chartHeadingBox = await chartHeading.boundingBox()
+    const quickRangesBox = await dateControls
+      .getByRole('group', { name: 'Quick date ranges' })
       .boundingBox()
     const chartBox = await chart.boundingBox()
     const chartCardBox = await chart
       .locator('xpath=ancestor::section[1]')
       .boundingBox()
-    expect(dateRangeLabel).not.toBeNull()
+    expect(chartHeadingBox).not.toBeNull()
+    expect(quickRangesBox).not.toBeNull()
     expect(chartBox).not.toBeNull()
     expect(chartCardBox).not.toBeNull()
     if (width <= 600) {
-      expect(
-        Math.abs(
-          dateRangeLabel!.x +
-            dateRangeLabel!.width / 2 -
-            (chartBox!.x + chartBox!.width / 2),
-        ),
-      ).toBeLessThan(2)
+      expect(chartHeadingBox!.y).toBeLessThan(quickRangesBox!.y)
+      expect(quickRangesBox!.x).toBeGreaterThanOrEqual(chartCardBox!.x)
+      expect(quickRangesBox!.x + quickRangesBox!.width).toBeLessThanOrEqual(
+        chartCardBox!.x + chartCardBox!.width,
+      )
       const presetButtons = await dateControls
         .getByRole('button')
         .evaluateAll((buttons) =>
@@ -182,16 +186,14 @@ for (const width of [1280, 390]) {
         Math.max(...presetButtons) - Math.min(...presetButtons),
       ).toBeLessThan(1)
     } else {
-      const viewBoxWidth = Number(
-        (await chart.getAttribute('viewBox'))?.trim().split(/\s+/)[2],
+      expect(chartHeadingBox!.y + chartHeadingBox!.height / 2).toBeCloseTo(
+        quickRangesBox!.y + quickRangesBox!.height / 2,
+        0,
       )
-      const plotStart =
-        Number(await chart.getAttribute('data-chart-plot-left')) / viewBoxWidth
-      expect(
-        Math.abs(
-          dateRangeLabel!.x - (chartBox!.x + plotStart * chartBox!.width),
-        ),
-      ).toBeLessThan(2)
+      expect(chartHeadingBox!.x).toBeLessThan(quickRangesBox!.x)
+      expect(quickRangesBox!.x + quickRangesBox!.width).toBeLessThanOrEqual(
+        chartCardBox!.x + chartCardBox!.width,
+      )
     }
     for (const name of [
       'Show last 1 week',

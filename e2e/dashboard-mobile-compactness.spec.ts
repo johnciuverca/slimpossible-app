@@ -55,6 +55,7 @@ test('Dashboard compactness bounds and screenshots', async ({ page }) => {
         '[role="img"][viewBox]',
       )!
       const chart = rect('[role="img"][viewBox]')
+      const chartCard = rect('.dashboard-personal-chart-card')
       const viewBoxHeight = Number(
         chartElement.getAttribute('viewBox')?.trim().split(/\s+/)[3],
       )
@@ -78,6 +79,7 @@ test('Dashboard compactness bounds and screenshots', async ({ page }) => {
           Number.parseFloat(actionsStyle.paddingRight),
         compactCardStackHeight: actions.bottom - latest.y,
         chart,
+        chartCard,
         plotTopY,
         plotBottomY,
         plotHeight: plotBottomY - plotTopY,
@@ -138,8 +140,9 @@ test('Dashboard compactness bounds and screenshots', async ({ page }) => {
       expect(metrics.latest.height).toBeCloseTo(metrics.actions.height, 0)
       expect(metrics.actions.height).toBeLessThanOrEqual(76)
       expect(metrics.actions.height).toBeGreaterThanOrEqual(64)
-      expect(metrics.chart.width).toBeCloseTo(1150, 0)
-      expect(metrics.chart.height).toBeCloseTo(402.5, 0)
+      expect(metrics.chart.x).toBeGreaterThanOrEqual(metrics.chartCard.x)
+      expect(metrics.chart.right).toBeLessThanOrEqual(metrics.chartCard.right)
+      expect(metrics.chart.height).toBeCloseTo(320, 0)
       expect(metrics.chart.y).toBeLessThan(400)
     }
     await page.screenshot({

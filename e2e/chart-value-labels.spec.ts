@@ -38,14 +38,18 @@ for (const width of [1280, 390]) {
     ).not.toHaveCount(0)
     await expect(chart.locator('.chart-value')).toHaveCount(2)
     const labels = await chart.locator('.chart-value').evaluateAll((elements) =>
-      elements.map((element) => ({
-        date: element.getAttribute('data-date'),
-        text: element.textContent ?? '',
-        x: Number(element.getAttribute('x')),
-        y: Number(element.getAttribute('y')),
-        anchor: element.getAttribute('text-anchor'),
-        value: Number(element.getAttribute('data-value')),
-      })),
+      elements.map((element) => {
+        const bounds = (element as SVGTextElement).getBBox()
+        return {
+          date: element.getAttribute('data-date'),
+          x: Number(element.getAttribute('x')),
+          y: Number(element.getAttribute('y')),
+          anchor: element.getAttribute('text-anchor'),
+          value: Number(element.getAttribute('data-value')),
+          left: bounds.x,
+          right: bounds.x + bounds.width,
+        }
+      }),
     )
     const points = await chart
       .locator(
@@ -73,18 +77,12 @@ for (const width of [1280, 390]) {
       expect(label.anchor).toBe('middle')
       expect(label.y).toBeLessThan(point!.y)
       expect(label.y).toBeGreaterThan(0)
-      const estimatedHalfWidth =
-        (label.text.length * (width <= 600 ? 5.4 : 4.2)) / 2
       const plotLeft = Number(await chart.getAttribute('data-chart-plot-left'))
       const plotRight = Number(
         await chart.getAttribute('data-chart-plot-right'),
       )
-      expect(label.x - estimatedHalfWidth).toBeGreaterThanOrEqual(
-        width <= 600 ? plotLeft : 0,
-      )
-      expect(label.x + estimatedHalfWidth).toBeLessThanOrEqual(
-        width <= 600 ? plotRight : 760,
-      )
+      expect(label.left).toBeGreaterThanOrEqual(plotLeft)
+      expect(label.right).toBeLessThanOrEqual(plotRight)
     }
     await chart.screenshot({
       path: test.info().outputPath(`chart-value-labels-${width}px.png`),
