@@ -174,9 +174,23 @@ export function GroupSwitcher({
             <hr className="group-switcher-divider" />
             <Link
               to="/challenge/manage"
+              className="group-switcher-manage"
               onClick={() => setOpen(false)}
               title="Manage group challenges"
             >
+              <svg
+                aria-hidden="true"
+                width="16"
+                height="16"
+                viewBox="0 0 28 28"
+                fill="currentColor"
+              >
+                <path
+                  d="M11.2 2h5.6l.8 3.1 2.5 1.4 3-.9 2.8 4.8-2.2 2.3v2.8l2.2 2.3-2.8 4.8-3-.9-2.5 1.4-.8 3.1h-5.6l-.8-3.1-2.5-1.4-3 .9-2.8-4.8 2.2-2.3v-2.8L2.1 10.4l2.8-4.8 3 .9 2.5-1.4L11.2 2Zm2.8 7.2a4.8 4.8 0 1 0 0 9.6 4.8 4.8 0 0 0 0-9.6Z"
+                  fillRule="evenodd"
+                  clipRule="evenodd"
+                />
+              </svg>
               Manage groups
             </Link>
           </>
