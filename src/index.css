@@ -284,13 +284,22 @@ body {
   width: 100%;
   min-height: 44px;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 0.5rem;
   border: 0;
   background: transparent;
-  padding: 0 0.25rem;
+  padding: 0;
   color: var(--color-ink);
   text-align: left;
+}
+
+.record-weight-note-toggle > span:first-child {
+  margin-left: -0.75rem;
+}
+
+.record-weight-actions > button {
+  position: relative;
+  top: 0.25rem;
 }
 
 .record-weight-actions {

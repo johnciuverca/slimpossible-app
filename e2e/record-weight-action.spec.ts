@@ -33,7 +33,6 @@ test('compact mobile Record weight keeps group choices and Save reachable', asyn
     weightFieldBox,
     sharingBox,
     noteBox,
-    saveButton,
   ] = await Promise.all([
     dateShell.boundingBox(),
     weightShell.boundingBox(),
@@ -41,7 +40,6 @@ test('compact mobile Record weight keeps group choices and Save reachable', asyn
     weightField.boundingBox(),
     sharingField.boundingBox(),
     noteField.boundingBox(),
-    dialog.getByRole('button', { name: 'Save weight', exact: true }),
   ])
   const [dateShellStyle, weightShellStyle] = await Promise.all([
     dateShell.evaluate((element) => {
@@ -90,8 +88,20 @@ test('compact mobile Record weight keeps group choices and Save reachable', asyn
   expect(weightFieldBox!.width).toBeCloseTo(noteBox!.width, 1)
   expect(sharingBox!.y).toBeCloseTo(noteBox!.y, 1)
   expect(sharingBox!.y).toBeGreaterThan(dateFieldBox!.y)
-  const actionBox = (await saveButton.boundingBox())!
-  expect(actionBox.x).toBeCloseTo(dateFieldBox!.x, 1)
+  const actionRowBox = (await dialog
+    .locator('.record-weight-actions')
+    .boundingBox())!
+  const actionBoxes = await Promise.all(
+    (await dialog.locator('.record-weight-actions button').all()).map(
+      (button) => button.boundingBox(),
+    ),
+  )
+  const actionGroupCenter =
+    (actionBoxes[0]!.x + actionBoxes.at(-1)!.x + actionBoxes.at(-1)!.width) / 2
+  expect(actionGroupCenter).toBeCloseTo(
+    actionRowBox.x + actionRowBox.width / 2,
+    0,
+  )
   expect(Math.abs(dateBox!.x - weightBox!.x)).toBeGreaterThan(0)
   expect(dateBox!.y).toBeCloseTo(weightBox!.y, 1)
   await expect(date).toHaveAttribute('type', 'date')
@@ -100,6 +110,17 @@ test('compact mobile Record weight keeps group choices and Save reachable', asyn
   await dialog.focus()
 
   const noteToggle = dialog.getByRole('button', { name: /Private note/ })
+  await expect(noteToggle.locator('svg')).toHaveCount(0)
+  const [weightLegendBox, noteLabelBox] = await Promise.all([
+    dialog.locator('.record-weight-weight-field legend').boundingBox(),
+    noteToggle.locator('span').first().boundingBox(),
+  ])
+  expect(weightLegendBox).not.toBeNull()
+  expect(noteLabelBox).not.toBeNull()
+  expect(Math.abs(noteLabelBox!.x - weightLegendBox!.x)).toBeLessThanOrEqual(8)
+  await page.screenshot({
+    path: test.info().outputPath('record-weight-popup-phone.png'),
+  })
   await expect(noteToggle).toHaveAttribute('aria-expanded', 'false')
   await expect(dialog.getByLabel('Private note (optional)')).not.toBeVisible()
   await expect(

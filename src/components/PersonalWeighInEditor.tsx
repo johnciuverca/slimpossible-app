@@ -162,20 +162,6 @@ export function PersonalWeighInEditor({
                     Needs attention
                   </span>
                 ) : null}
-                <svg
-                  aria-hidden="true"
-                  className={`size-5 shrink-0 transition-transform${noteExpanded ? ' rotate-180' : ''}`}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    d="m6 9 6 6 6-6"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                  />
-                </svg>
               </button>
             ) : (
               'Private note (optional)'
