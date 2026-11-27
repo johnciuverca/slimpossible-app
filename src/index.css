@@ -1335,12 +1335,19 @@ body {
   height: 44px;
   min-height: 44px;
 }
-.app-shell.signed-in-shell .app-shell-header nav > .group-switcher .group-switcher-trigger {
+.app-shell.signed-in-shell
+  .app-shell-header
+  nav
+  > .group-switcher
+  .group-switcher-trigger {
   box-sizing: border-box;
   height: 44px;
   min-height: 44px;
 }
-.app-shell.signed-in-shell .app-shell-header nav .group-switcher-name[aria-current='page'] {
+.app-shell.signed-in-shell
+  .app-shell-header
+  nav
+  .group-switcher-name[aria-current='page'] {
   border-color: transparent;
   background: transparent;
   color: var(--color-forest-900);
@@ -2049,7 +2056,11 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
+  flex: 0 0 44px;
+  align-self: center;
   min-height: 44px;
+  height: 44px;
   width: 180px;
   max-width: 28vw;
   padding: 0 4px;
@@ -2076,7 +2087,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  align-self: stretch;
+  align-self: center;
+  height: 38px;
   position: relative;
   min-width: 0;
   flex: 1;
@@ -2086,7 +2098,7 @@ body {
   white-space: nowrap;
   padding: 0 2px;
   border-radius: 6px;
-  margin: 3px 0 3px 3px;
+  margin: 0 0 0 3px;
 }
 .group-switcher-name[aria-current='page'] {
   color: var(--color-forest-800);
@@ -2106,15 +2118,20 @@ body {
 }
 .group-switcher-arrow {
   position: relative;
-  flex: 0 0 40px;
-  min-height: 40px;
+  box-sizing: border-box;
+  flex: 0 0 44px;
+  height: 44px;
+  min-height: 44px;
   display: grid;
   place-items: center;
   border: 0;
   background: transparent;
   color: inherit;
   border-radius: 0 7px 7px 0;
-  margin: 2px 2px 2px 0;
+  margin: 0 0 0 0;
+}
+.group-switcher-arrow svg {
+  transform: translateY(1.5px);
 }
 .group-switcher-name:focus-visible,
 .group-switcher-arrow:focus-visible {
