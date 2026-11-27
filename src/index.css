@@ -2102,16 +2102,12 @@ body {
   border-top: 2px solid var(--color-line);
 }
 .app-shell.signed-in-shell .group-switcher-panel a.group-switcher-manage {
-  gap: 8px;
+  gap: 7px;
   margin-top: 2px;
   font-weight: 700;
-  position: relative;
-  padding-left: 34px;
-  padding-right: 34px;
 }
 .group-switcher-manage svg {
-  position: absolute;
-  left: 12px;
+  flex: 0 0 auto;
   width: 19px;
   height: 19px;
 }
