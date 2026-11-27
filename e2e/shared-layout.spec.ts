@@ -11,6 +11,9 @@ for (const width of [320, 390, 768, 1280, 1920]) {
     const nav = page.getByRole('navigation', { name: 'Primary navigation' })
     const dashboard = nav.getByRole('link', { name: 'Dashboard', exact: true })
     const group = nav.getByRole('button', { name: /^Choose group/ })
+    const groupName = nav.getByRole('link', {
+      name: 'Open group: Synthetic active group',
+    })
     const account = page.getByLabel('Profile and account for Synthetic Alex', {
       exact: true,
     })
@@ -28,13 +31,15 @@ for (const width of [320, 390, 768, 1280, 1920]) {
     await expect(page.getByTestId('fixture-route')).toHaveText(
       '/group?challenge=dashboard-active&tab=overview',
     )
-    await expect(group).toHaveAttribute('aria-current', 'page')
+    await expect(
+      page.getByRole('link', { name: 'Open group: Synthetic active group' }),
+    ).toHaveAttribute('aria-current', 'page')
     await expect(dashboard).not.toHaveAttribute('aria-current')
     expect(
-      await group.evaluate(
-        (el) => getComputedStyle(el, '::before').backgroundColor,
-      ),
-    ).toBe('rgb(37, 59, 45)')
+      await page
+        .locator('.group-switcher-trigger')
+        .evaluate((el) => getComputedStyle(el, '::before').backgroundColor),
+    ).toBe('rgb(26, 28, 26)')
     await expect(dashboard).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
     await expect(account).toBeVisible()
     if (width > 640) {
@@ -83,6 +88,8 @@ for (const width of [320, 390, 768, 1280, 1920]) {
     await page.getByRole('link', { name: 'Slimpossible', exact: true }).focus()
     await page.keyboard.press('Tab')
     await expect(dashboard).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(groupName).toBeFocused()
     await page.keyboard.press('Tab')
     await expect(group).toBeFocused()
     await page.keyboard.press('Tab')

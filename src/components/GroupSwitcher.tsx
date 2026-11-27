@@ -8,11 +8,13 @@ export function GroupSwitcher({
   loading,
   error,
   canManageGroups = false,
+  accountId,
 }: {
   challenges: Challenge[]
   loading: boolean
   error: string
   canManageGroups?: boolean
+  accountId?: string
 }) {
   const { pathname, search, hash } = useLocation()
   const requested = new URLSearchParams(search).get('challenge')
@@ -24,6 +26,7 @@ export function GroupSwitcher({
       ? (challenges.find((c) => c.kind === 'group' && c.id === requested) ??
         (!requested ? groups[0] : undefined))
       : undefined
+  const routeSelectedId = routeSelected?.id
   const [rememberedId, setRememberedId] = useState(() => {
     try {
       return window.localStorage.getItem('slimpossible:last-authorized-group')
@@ -31,20 +34,44 @@ export function GroupSwitcher({
       return null
     }
   })
-  const selected =
+  const selectedFromAuthorizedList =
     routeSelected ?? groups.find((group) => group.id === rememberedId)
+  const [lastAuthorizedGroup, setLastAuthorizedGroup] = useState<{
+    accountId?: string
+    challenge: Challenge
+  } | null>(null)
+  const selected =
+    selectedFromAuthorizedList ??
+    ((loading || error) &&
+    lastAuthorizedGroup &&
+    lastAuthorizedGroup.accountId === accountId
+      ? lastAuthorizedGroup.challenge
+      : undefined)
   useEffect(() => {
-    if (!routeSelected) return
-    setRememberedId(routeSelected.id)
+    if (!routeSelectedId) return
+    setRememberedId(routeSelectedId)
     try {
       window.localStorage.setItem(
         'slimpossible:last-authorized-group',
-        routeSelected.id,
+        routeSelectedId,
       )
     } catch {
       // Navigation still works when storage is unavailable.
     }
-  }, [routeSelected?.id])
+  }, [routeSelectedId])
+  useEffect(() => {
+    if (loading || error) return
+    if (selectedFromAuthorizedList) {
+      setLastAuthorizedGroup({
+        accountId,
+        challenge: selectedFromAuthorizedList,
+      })
+      return
+    }
+    setLastAuthorizedGroup((current) =>
+      current?.accountId === accountId ? null : current,
+    )
+  }, [accountId, error, loading, selectedFromAuthorizedList])
   useEffect(() => {
     if (loading || error) return
     if (rememberedId && !groups.some((group) => group.id === rememberedId)) {
@@ -56,6 +83,11 @@ export function GroupSwitcher({
       }
     }
   }, [error, groups, loading, rememberedId])
+  useEffect(() => {
+    setLastAuthorizedGroup((current) =>
+      current?.accountId === accountId ? current : null,
+    )
+  }, [accountId])
   const root = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false)

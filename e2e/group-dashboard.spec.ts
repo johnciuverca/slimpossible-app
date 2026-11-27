@@ -48,6 +48,7 @@ async function installGroupFixtures(
     weeklyResultMode?: 'finalized' | 'unfinished' | 'error' | 'pending'
     ownSundayRecorded?: boolean
     groupName?: string
+    holdChallengeList?: boolean
   } = {},
 ) {
   const challengeId = ownEntries ? ownGroupId : 'e2e-challenge'
@@ -66,6 +67,8 @@ async function installGroupFixtures(
   const releasePersonalContexts: (() => void)[] = []
   const releaseWeeklyResultStatus: (() => void)[] = []
   let personalContextsHeld = false
+  let challengeListHeld = false
+  const releaseChallengeLists: (() => void)[] = []
   let ownTarget = 80
   let ownStartingWeight = 100
   const estimatedOwnWeight = () => {
@@ -416,6 +419,12 @@ async function installGroupFixtures(
     }
 
     if (url.pathname === '/rest/v1/challenges') {
+      if (options.holdChallengeList) {
+        challengeListHeld = true
+        await new Promise<void>((resolve) => {
+          releaseChallengeLists.push(resolve)
+        })
+      }
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify([
@@ -756,6 +765,9 @@ async function installGroupFixtures(
   })
   return Object.assign(requests, {
     personalContextsHeld: () => personalContextsHeld,
+    challengeListHeld: () => challengeListHeld,
+    releaseChallengeLists: () =>
+      releaseChallengeLists.splice(0).forEach((release) => release()),
     releasePersonalContexts: () =>
       releasePersonalContexts.splice(0).forEach((release) => release()),
     releaseWeeklyResultStatus: () =>
@@ -5492,6 +5504,50 @@ test('shows the challenge owner badge only in Members and fits on mobile', async
     page.getByRole('list', { name: 'Group chart legend' }),
   ).not.toContainText('Owner')
 })
+
+for (const width of [320, 390, 430, 1440]) {
+  test(`keeps the verified group label visible during delayed Dashboard context loading at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 })
+    const fixtureOptions = { holdChallengeList: false }
+    const fixtureRequests = await installGroupFixtures(
+      page,
+      true,
+      true,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'e2e-owner',
+      fixtureOptions,
+    )
+    await page.goto(
+      '/e2e/fixtures/today-harness.html?scenario=group&route=' +
+        encodeURIComponent(`/group?challenge=${ownGroupId}`),
+    )
+    const selectedGroupName = page.getByRole('link', {
+      name: 'Open group: E2E authorized group',
+    })
+    await expect(selectedGroupName).toBeVisible()
+
+    fixtureOptions.holdChallengeList = true
+    await page.getByRole('link', { name: 'Dashboard', exact: true }).click()
+    await expect.poll(() => fixtureRequests.challengeListHeld()).toBe(true)
+    await expect(selectedGroupName).toBeVisible()
+    await expect(
+      page.getByRole('link', { name: 'Group', exact: true }),
+    ).toHaveCount(0)
+    await expect(selectedGroupName).toHaveAttribute(
+      'href',
+      `/group?challenge=${ownGroupId}&tab=overview`,
+    )
+
+    fixtureRequests.releaseChallengeLists()
+    await expect(selectedGroupName).toBeVisible()
+  })
+}
 
 for (const width of [320, 390, 430, 1440]) {
   test(`navbar group dropdown routes and fits at ${width}px`, async ({

@@ -34,10 +34,21 @@ function Route() {
     </>
   )
 }
-function setup(path: string, loading = false, error = '') {
+function setup(
+  path: string,
+  loading = false,
+  error = '',
+  challenges = groups,
+  accountId?: string,
+) {
   return render(
     <MemoryRouter initialEntries={[path]}>
-      <GroupSwitcher challenges={groups} loading={loading} error={error} />
+      <GroupSwitcher
+        challenges={challenges}
+        loading={loading}
+        error={error}
+        accountId={accountId}
+      />
       <Route />
     </MemoryRouter>,
   )
@@ -86,6 +97,72 @@ it('retains an authorized group on Dashboard and returns to that group from its 
   expect(screen.getByTestId('route')).toHaveTextContent(
     '/group?challenge=first&tab=overview',
   )
+})
+it('keeps the verified name during same-account loading and hides it on account change', () => {
+  const view = setup(
+    '/group?challenge=first&tab=records',
+    false,
+    '',
+    groups,
+    'account-one',
+  )
+  fireEvent.click(screen.getByRole('link', { name: 'Dashboard Overview' }))
+  const selectedName = screen.getByRole('link', {
+    name: 'Open group: First group',
+  })
+  expect(selectedName).toBeVisible()
+
+  view.rerender(
+    <MemoryRouter initialEntries={['/dashboard']}>
+      <GroupSwitcher challenges={[]} loading error="" accountId="account-one" />
+      <Route />
+    </MemoryRouter>,
+  )
+  expect(
+    screen.getByRole('link', { name: 'Open group: First group' }),
+  ).toHaveAttribute('href', '/group?challenge=first&tab=overview')
+
+  view.rerender(
+    <MemoryRouter initialEntries={['/dashboard']}>
+      <GroupSwitcher
+        challenges={[groups[1]]}
+        loading={false}
+        error=""
+        accountId="account-two"
+      />
+      <Route />
+    </MemoryRouter>,
+  )
+  expect(screen.getByRole('link', { name: 'Group' })).toHaveAttribute(
+    'href',
+    '/group',
+  )
+  expect(
+    screen.queryByRole('link', { name: 'Open group: First group' }),
+  ).toBeNull()
+})
+it('does not show a remembered group name on cold load before authorization resolves', () => {
+  window.localStorage.setItem('slimpossible:last-authorized-group', 'first')
+  const view = setup('/dashboard', true, '', [], 'account-one')
+  expect(screen.getByRole('link', { name: 'Group' })).toBeVisible()
+  expect(
+    screen.queryByRole('link', { name: 'Open group: First group' }),
+  ).toBeNull()
+
+  view.rerender(
+    <MemoryRouter initialEntries={['/dashboard']}>
+      <GroupSwitcher
+        challenges={groups}
+        loading={false}
+        error=""
+        accountId="account-one"
+      />
+      <Route />
+    </MemoryRouter>,
+  )
+  expect(
+    screen.getByRole('link', { name: 'Open group: First group' }),
+  ).toBeVisible()
 })
 it('switches authorized groups while retaining the Group tab and safe URL state', () => {
   setup('/group?challenge=first&tab=records&source=invite')
