@@ -2053,6 +2053,9 @@ body {
   content: '';
   pointer-events: none;
 }
+.group-switcher-trigger[aria-expanded='true']::before {
+  border-color: var(--color-forest-800);
+}
 .group-switcher-name {
   display: flex;
   align-items: center;
@@ -2066,6 +2069,23 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   padding: 0 2px;
+  border-radius: 6px;
+  margin: 3px 0 3px 3px;
+}
+.group-switcher-name[aria-current='page'] {
+  background: color-mix(in srgb, var(--color-forest-800) 12%, transparent);
+}
+.group-switcher-name:empty::after {
+  content: 'Group';
+}
+.group-switcher-arrow::before {
+  position: absolute;
+  left: 0;
+  top: 7px;
+  bottom: 7px;
+  border-left: 1px solid var(--color-line);
+  content: '';
+  pointer-events: none;
 }
 .group-switcher-arrow {
   position: relative;
@@ -2076,6 +2096,8 @@ body {
   border: 0;
   background: transparent;
   color: inherit;
+  border-radius: 0 7px 7px 0;
+  margin: 2px 2px 2px 0;
 }
 .group-switcher-name:focus-visible,
 .group-switcher-arrow:focus-visible {

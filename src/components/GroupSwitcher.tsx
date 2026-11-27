@@ -134,7 +134,10 @@ export function GroupSwitcher({
         }
       }}
     >
-      <div className="group-switcher-trigger">
+      <div
+        className="group-switcher-trigger"
+        data-open={open ? 'true' : 'false'}
+      >
         {selected ? (
           <Link
             to={`/group?${new URLSearchParams({ challenge: selected.id, tab: pathname === '/group' ? workspaceSection('group', pathname, search, hash) : 'overview' })}`}
