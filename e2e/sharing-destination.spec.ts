@@ -20,24 +20,33 @@ for (const width of [320, 390, 430, 1440]) {
     ).toHaveCount(0)
     for (const checkbox of await editor.getByRole('checkbox').all())
       await expect(checkbox).not.toBeChecked()
-    const fields = (await editor
-      .locator('.record-weight-fields')
-      .boundingBox())!
-    const sharing = (await editor.locator('fieldset').boundingBox())!
-    const note = await editor
-      .locator('#personal-weigh-in-note-content')
-      .evaluate(
-        (el) =>
-          el.previousElementSibling?.getBoundingClientRect().toJSON() ??
-          el.getBoundingClientRect().toJSON(),
-      )
-    if (width < 768)
+    await expect(
+      editor.getByRole('group', { name: 'Share record with groups' }),
+    ).toBeVisible()
+    const [date, weight, sharing, note] = await Promise.all(
+      [
+        '.record-weight-date-field',
+        '.record-weight-weight-field',
+        '.record-weight-sharing-field',
+        '.record-weight-note-field',
+      ].map(
+        async (selector) => (await editor.locator(selector).boundingBox())!,
+      ),
+    )
+    if (width < 360) {
+      expect(date.y + date.height).toBeLessThanOrEqual(weight.y)
+      expect(weight.y + weight.height).toBeLessThanOrEqual(sharing.y)
       expect(sharing.y + sharing.height).toBeLessThanOrEqual(note.y)
-    else
-      expect(sharing.y + sharing.height).toBeLessThanOrEqual(
-        (await editor.getByLabel('Private note (optional)').boundingBox())!.y,
-      )
-    expect(fields.y + fields.height).toBeLessThanOrEqual(sharing.y)
+    } else {
+      expect(date.x + date.width).toBeLessThanOrEqual(weight.x)
+      expect(sharing.x).toBeCloseTo(date.x, 1)
+      expect(sharing.width).toBeCloseTo(date.width, 1)
+      expect(note.x).toBeCloseTo(weight.x, 1)
+      expect(note.width).toBeCloseTo(weight.width, 1)
+      expect(date.y).toBeCloseTo(weight.y, 1)
+      expect(sharing.y).toBeCloseTo(note.y, 1)
+      expect(sharing.y).toBeGreaterThan(date.y)
+    }
     await editor.getByLabel('Weight in kg').fill('82.3')
     await editor
       .getByRole('button', { name: 'Save weight', exact: true })
@@ -137,5 +146,49 @@ for (const path of ['/dashboard', '/weigh-ins']) {
       ),
     )
     expect(rows).toEqual([expect.objectContaining({ sharedChallengeIds: [] })])
+  })
+}
+
+for (const width of [320, 390, 430, 1440]) {
+  test(`inline Record/Edit fields follow the compact labeled layout at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto(fixture('/weigh-ins'))
+    const editor = page.getByRole('form', { name: 'Personal weigh-in form' })
+    await expect(
+      editor.getByRole('group', { name: 'Share record with groups' }),
+    ).toBeVisible()
+
+    const [date, weight, sharing, note] = await Promise.all(
+      [
+        '.record-weight-date-field',
+        '.record-weight-weight-field',
+        '.record-weight-sharing-field',
+        '.record-weight-note-field',
+      ].map(
+        async (selector) => (await editor.locator(selector).boundingBox())!,
+      ),
+    )
+    if (width < 360) {
+      expect(date.y + date.height).toBeLessThanOrEqual(weight.y)
+      expect(weight.y + weight.height).toBeLessThanOrEqual(sharing.y)
+      expect(sharing.y + sharing.height).toBeLessThanOrEqual(note.y)
+    } else {
+      expect(date.x + date.width).toBeLessThanOrEqual(weight.x)
+      expect(sharing.x).toBeCloseTo(date.x, 1)
+      expect(sharing.width).toBeCloseTo(date.width, 1)
+      expect(note.x).toBeCloseTo(weight.x, 1)
+      expect(note.width).toBeCloseTo(weight.width, 1)
+      expect(date.y).toBeCloseTo(weight.y, 1)
+      expect(sharing.y).toBeCloseTo(note.y, 1)
+      expect(sharing.y).toBeGreaterThan(date.y)
+    }
+    expect(
+      await editor.evaluate((el) => el.scrollWidth <= el.clientWidth),
+    ).toBe(true)
+    await page.screenshot({
+      path: test.info().outputPath(`inline-editor-${width}.png`),
+    })
   })
 }

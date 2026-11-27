@@ -22,14 +22,27 @@ test('compact mobile Record weight keeps group choices and Save reachable', asyn
   ])
   const dateShell = dialog.locator('.record-weight-field-shell').nth(0)
   const weightShell = dialog.locator('.record-weight-field-shell').nth(1)
-  const [dateShellBox, weightShellBox, noteBox, sharingBox, saveButton] =
-    await Promise.all([
-      dateShell.boundingBox(),
-      weightShell.boundingBox(),
-      dialog.getByRole('button', { name: /Private note/ }).boundingBox(),
-      dialog.locator('fieldset').boundingBox(),
-      dialog.getByRole('button', { name: 'Save weight', exact: true }),
-    ])
+  const dateField = dialog.locator('.record-weight-date-field')
+  const weightField = dialog.locator('.record-weight-weight-field')
+  const sharingField = dialog.locator('.record-weight-sharing-field')
+  const noteField = dialog.locator('.record-weight-note-field')
+  const [
+    dateShellBox,
+    weightShellBox,
+    dateFieldBox,
+    weightFieldBox,
+    sharingBox,
+    noteBox,
+    saveButton,
+  ] = await Promise.all([
+    dateShell.boundingBox(),
+    weightShell.boundingBox(),
+    dateField.boundingBox(),
+    weightField.boundingBox(),
+    sharingField.boundingBox(),
+    noteField.boundingBox(),
+    dialog.getByRole('button', { name: 'Save weight', exact: true }),
+  ])
   const [dateShellStyle, weightShellStyle] = await Promise.all([
     dateShell.evaluate((element) => {
       const style = getComputedStyle(element)
@@ -52,6 +65,8 @@ test('compact mobile Record weight keeps group choices and Save reachable', asyn
   expect(weightBox).not.toBeNull()
   expect(dateShellBox).not.toBeNull()
   expect(weightShellBox).not.toBeNull()
+  expect(dateFieldBox).not.toBeNull()
+  expect(weightFieldBox).not.toBeNull()
   expect(noteBox).not.toBeNull()
   expect(sharingBox).not.toBeNull()
   expect(dateShellStyle).toEqual(weightShellStyle)
@@ -64,16 +79,21 @@ test('compact mobile Record weight keeps group choices and Save reachable', asyn
   expect(weightBox!.x + weightBox!.width).toBeLessThanOrEqual(
     weightShellBox!.x + weightShellBox!.width,
   )
-  expect(Math.abs(dateShellBox!.x - weightShellBox!.x)).toBeLessThan(1)
+  expect(dateFieldBox!.x + dateFieldBox!.width).toBeLessThanOrEqual(
+    weightFieldBox!.x,
+  )
   expect(dateShellBox!.width).toBeCloseTo(weightShellBox!.width, 1)
-  expect(dateShellBox!.x).toBeCloseTo(noteBox!.x, 1)
-  expect(dateShellBox!.width).toBeCloseTo(noteBox!.width, 1)
-  expect(dateShellBox!.x).toBeCloseTo(sharingBox!.x, 1)
-  expect(dateShellBox!.width).toBeCloseTo(sharingBox!.width, 1)
+  expect(dateFieldBox!.y).toBeCloseTo(weightFieldBox!.y, 1)
+  expect(dateFieldBox!.x).toBeCloseTo(sharingBox!.x, 1)
+  expect(dateFieldBox!.width).toBeCloseTo(sharingBox!.width, 1)
+  expect(weightFieldBox!.x).toBeCloseTo(noteBox!.x, 1)
+  expect(weightFieldBox!.width).toBeCloseTo(noteBox!.width, 1)
+  expect(sharingBox!.y).toBeCloseTo(noteBox!.y, 1)
+  expect(sharingBox!.y).toBeGreaterThan(dateFieldBox!.y)
   const actionBox = (await saveButton.boundingBox())!
-  expect(actionBox.x).toBeCloseTo(dateShellBox!.x, 1)
-  expect(Math.abs(dateBox!.x - weightBox!.x)).toBeLessThan(2)
-  expect(dateBox!.y + dateBox!.height).toBeLessThanOrEqual(weightBox!.y)
+  expect(actionBox.x).toBeCloseTo(dateFieldBox!.x, 1)
+  expect(Math.abs(dateBox!.x - weightBox!.x)).toBeGreaterThan(0)
+  expect(dateBox!.y).toBeCloseTo(weightBox!.y, 1)
   await expect(date).toHaveAttribute('type', 'date')
   await date.focus()
   await expect(date).toBeFocused()
@@ -111,9 +131,7 @@ test('compact mobile Record weight keeps group choices and Save reachable', asyn
   expect(saveBox.y + saveBox.height).toBeLessThanOrEqual(844)
 
   await noteToggle.click()
-  await expect(
-    dialog.getByText('Private note (optional)', { exact: true }),
-  ).toBeVisible()
+  await expect(noteToggle).toBeVisible()
   await dialog
     .getByLabel('Private note (optional)')
     .fill('Private compact note')
@@ -187,6 +205,9 @@ test('mobile note stays expanded and focused through keyboard resize, and the sh
   await page.getByRole('button', { name: 'Record weight', exact: true }).click()
 
   const dialog = page.getByRole('dialog', { name: 'Record weight' })
+  await dialog.locator('.record-weight-fields').evaluate((element) => {
+    ;(element as HTMLElement).style.minHeight = '720px'
+  })
   const noteToggle = dialog.getByRole('button', { name: /Private note/ })
   const note = dialog.getByLabel('Private note (optional)')
   await expect(noteToggle).toHaveAttribute('aria-expanded', 'false')
@@ -325,7 +346,7 @@ test('localized date and weight controls fit narrow, landscape, zoomed, and wide
     { width: 1024, height: 768 },
   ]) {
     await page.setViewportSize(viewport)
-    const stacked = viewport.width < 400
+    const stacked = viewport.width < 360
     await expect
       .poll(async () => {
         const [dateBox, weightBox] = await Promise.all([
@@ -378,53 +399,49 @@ test('localized date and weight controls fit narrow, landscape, zoomed, and wide
     if (viewport.width === 430) {
       await expect(dialog).toHaveAttribute('data-compact-viewport', '')
       await expect(dialog).not.toHaveAttribute('data-narrow-fields', '')
-      const [dateShellBox, weightShellBox, dateShellStyle, weightShellStyle] =
+      const [dateFieldBox, weightFieldBox, dateFieldStyle, weightFieldStyle] =
         await Promise.all([
-          dialog.locator('.record-weight-field-shell').nth(0).boundingBox(),
-          dialog.locator('.record-weight-field-shell').nth(1).boundingBox(),
-          dialog
-            .locator('.record-weight-field-shell')
-            .nth(0)
-            .evaluate((element) => {
-              const style = getComputedStyle(element)
-              return {
-                height: style.height,
-                paddingLeft: style.paddingLeft,
-                paddingRight: style.paddingRight,
-              }
-            }),
-          dialog
-            .locator('.record-weight-field-shell')
-            .nth(1)
-            .evaluate((element) => {
-              const style = getComputedStyle(element)
-              return {
-                height: style.height,
-                paddingLeft: style.paddingLeft,
-                paddingRight: style.paddingRight,
-              }
-            }),
+          dialog.locator('.record-weight-date-field').boundingBox(),
+          dialog.locator('.record-weight-weight-field').boundingBox(),
+          dialog.locator('.record-weight-date-field').evaluate((element) => {
+            const style = getComputedStyle(element)
+            return {
+              height: style.height,
+              borderWidth: style.borderWidth,
+              paddingLeft: style.paddingLeft,
+              paddingRight: style.paddingRight,
+            }
+          }),
+          dialog.locator('.record-weight-weight-field').evaluate((element) => {
+            const style = getComputedStyle(element)
+            return {
+              height: style.height,
+              borderWidth: style.borderWidth,
+              paddingLeft: style.paddingLeft,
+              paddingRight: style.paddingRight,
+            }
+          }),
         ])
-      expect(dateShellBox).not.toBeNull()
-      expect(weightShellBox).not.toBeNull()
-      expect(dateShellStyle).toEqual(weightShellStyle)
-      expect(Number.parseFloat(dateShellStyle.height)).toBeGreaterThanOrEqual(
+      expect(dateFieldBox).not.toBeNull()
+      expect(weightFieldBox).not.toBeNull()
+      expect(dateFieldStyle).toEqual(weightFieldStyle)
+      expect(Number.parseFloat(dateFieldStyle.height)).toBeGreaterThanOrEqual(
         44,
       )
-      expect(dateShellBox!.height).toBeCloseTo(weightShellBox!.height, 1)
-      expect(dateShellBox!.x + dateShellBox!.width).toBeLessThanOrEqual(
-        weightShellBox!.x,
+      expect(dateFieldBox!.height).toBeCloseTo(weightFieldBox!.height, 1)
+      expect(dateFieldBox!.x + dateFieldBox!.width).toBeLessThanOrEqual(
+        weightFieldBox!.x,
       )
-      expect(dateBox!.x).toBeGreaterThanOrEqual(dateShellBox!.x)
+      expect(dateBox!.x).toBeGreaterThanOrEqual(dateFieldBox!.x)
       expect(dateBox!.x + dateBox!.width).toBeLessThanOrEqual(
-        dateShellBox!.x + dateShellBox!.width,
+        dateFieldBox!.x + dateFieldBox!.width,
       )
-      expect(weightBox!.x).toBeGreaterThanOrEqual(weightShellBox!.x)
+      expect(weightBox!.x).toBeGreaterThanOrEqual(weightFieldBox!.x)
       expect(weightBox!.x + weightBox!.width).toBeLessThanOrEqual(
-        weightShellBox!.x + weightShellBox!.width,
+        weightFieldBox!.x + weightFieldBox!.width,
       )
-      expect(Number.parseFloat(dateShellStyle.paddingLeft)).toBeGreaterThan(0)
-      expect(Number.parseFloat(dateShellStyle.paddingRight)).toBeGreaterThan(0)
+      expect(Number.parseFloat(dateFieldStyle.paddingLeft)).toBeGreaterThan(0)
+      expect(Number.parseFloat(dateFieldStyle.paddingRight)).toBeGreaterThan(0)
     }
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth),

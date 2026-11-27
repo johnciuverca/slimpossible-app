@@ -90,7 +90,7 @@ describe('PersonalWeighInEditor', () => {
     )
     expect(
       container.querySelector('label[for="personal-weigh-in-note"]'),
-    ).toBeNull()
+    ).toHaveClass('sr-only')
 
     fireEvent.click(toggle)
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
@@ -101,5 +101,42 @@ describe('PersonalWeighInEditor', () => {
     expect(note.parentElement).not.toHaveClass('is-collapsed')
     expect(note).toHaveValue('Existing private note')
     expect(screen.getByText('Note must be text when provided.')).toBeVisible()
+  })
+
+  it('keeps visible border legends and programmatic labels in the requested columns', () => {
+    const { container } = render(
+      <PersonalWeighInEditor
+        compactMobile
+        groups={[]}
+        isSaving={false}
+        onChange={vi.fn()}
+        onSubmit={vi.fn()}
+        submitLabel="Save weight"
+        values={{
+          date: '',
+          note: '',
+          sharedChallengeIds: [],
+          weightKg: '',
+        }}
+      />,
+    )
+    const fieldsets = Array.from(container.querySelectorAll('fieldset'))
+    expect(
+      fieldsets.map(
+        (fieldset) => fieldset.querySelector('legend')?.textContent,
+      ),
+    ).toEqual([
+      'Date',
+      'Weight in kg',
+      'Share record with groups',
+      expect.stringContaining('Private note (optional)'),
+    ])
+    expect(screen.getByLabelText('Date')).toBeVisible()
+    expect(screen.getByLabelText('Weight in kg')).toBeVisible()
+    expect(screen.getByLabelText('Private note (optional)')).toBeInTheDocument()
+    expect(fieldsets[0]).toHaveClass('record-weight-date-field')
+    expect(fieldsets[1]).toHaveClass('record-weight-weight-field')
+    expect(fieldsets[2]).toHaveClass('record-weight-sharing-field')
+    expect(fieldsets[3]).toHaveClass('record-weight-note-field')
   })
 })
