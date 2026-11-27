@@ -90,6 +90,7 @@ describe('Supabase repositories', () => {
         {
           memberKey: 'opaque-a',
           displayName: 'Ava',
+          latestRecordedDate: '2026-09-20',
           avatarPresetId: 'female-03',
           startingWeightKg: 100,
           targetWeightKg: 80,

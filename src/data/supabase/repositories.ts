@@ -903,6 +903,7 @@ export function createRepositories(client: DatabaseClient): Repositories {
             return {
               memberKey: row.member_key,
               displayName: row.display_name,
+              latestRecordedDate: row.latest_recorded_date,
               avatarPresetId: isProfileAvatarPresetId(row.avatar_preset_id)
                 ? row.avatar_preset_id
                 : null,

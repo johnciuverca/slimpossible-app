@@ -8,6 +8,7 @@ import {
   type PersonalWeighInFormValues,
 } from './PersonalWeighInEditor'
 import type { PersonalWorkspace } from '../data/usePersonalWorkspace'
+import { defaultNewWeighInShares } from '../models/groupSharingEligibility'
 import {
   personalWeighInToday,
   validatePersonalWeighIn,
@@ -99,7 +100,7 @@ export function RecordWeightDialog({
       ...new Set([
         ...(entry?.sharedChallengeIds ??
           initialValues?.sharedChallengeIds ??
-          []),
+          (preselectSharedChallengeId ? [] : defaultNewWeighInShares(groups))),
         ...(preselectSharedChallengeId &&
         eligibleIds.has(preselectSharedChallengeId)
           ? [preselectSharedChallengeId]
@@ -113,6 +114,34 @@ export function RecordWeightDialog({
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const initial = useRef(JSON.stringify(values))
+  const sharingInitialized = useRef(workspace.contexts.state !== 'loading')
+  useEffect(() => {
+    if (sharingInitialized.current || workspace.contexts.state === 'loading')
+      return
+    sharingInitialized.current = true
+    if (entry || workspace.contexts.state !== 'ready') return
+    const sharedChallengeIds = [
+      ...new Set([
+        ...(initialValues?.sharedChallengeIds ??
+          (preselectSharedChallengeId ? [] : defaultNewWeighInShares(groups))),
+        ...(preselectSharedChallengeId &&
+        groups.some(({ id }) => id === preselectSharedChallengeId)
+          ? [preselectSharedChallengeId]
+          : []),
+      ]),
+    ]
+    initial.current = JSON.stringify({
+      ...JSON.parse(initial.current),
+      sharedChallengeIds,
+    })
+    setValues((current) => ({ ...current, sharedChallengeIds }))
+  }, [
+    workspace.contexts.state,
+    groups,
+    entry,
+    initialValues,
+    preselectSharedChallengeId,
+  ])
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   useUnsavedNavigation(
     saving
@@ -357,7 +386,10 @@ export function RecordWeightDialog({
                 private. This change is saved only when you explicitly save.
               </>
             ) : (
-              <> Sharing is optional and off by default.</>
+              <>
+                {' '}
+                Review the group checkboxes below; uncheck to keep it private.
+              </>
             )}
           </p>
         ) : null}

@@ -17,6 +17,15 @@ function shiftDate(dateOnly: string, days: number) {
   return date.toISOString().slice(0, 10)
 }
 
+async function groupLink(page: Page, name: string) {
+  const trigger = page.getByRole('button', { name: /^Choose group/ })
+  if ((await trigger.getAttribute('aria-expanded')) !== 'true')
+    await trigger.click()
+  return page
+    .locator('.group-switcher-panel')
+    .getByRole('link', { name: name.replace(/^Group · /, ''), exact: true })
+}
+
 async function installGroupFixtures(
   page: Page,
   multiple = false,
@@ -31,9 +40,14 @@ async function installGroupFixtures(
     privateEntryAtEstimatedDate?: boolean
     privateEntrySharedWithOtherGroup?: boolean
     duplicateEstimateOnSave?: boolean
+    estimateShareOptOut?: boolean
     holdPersonalContexts?: boolean
     participantAvatars?: boolean
     finalizedWeeklyResultForPrimaryGroup?: boolean
+    finalizedSunday?: string
+    weeklyResultMode?: 'finalized' | 'unfinished' | 'error' | 'pending'
+    ownSundayRecorded?: boolean
+    groupName?: string
   } = {},
 ) {
   const challengeId = ownEntries ? ownGroupId : 'e2e-challenge'
@@ -50,6 +64,7 @@ async function installGroupFixtures(
   let privateEntrySharedChallengeIds: string[] =
     options.privateEntrySharedWithOtherGroup ? [secondId] : []
   const releasePersonalContexts: (() => void)[] = []
+  const releaseWeeklyResultStatus: (() => void)[] = []
   let personalContextsHeld = false
   let ownTarget = 80
   let ownStartingWeight = 100
@@ -235,7 +250,9 @@ async function installGroupFixtures(
         expect(body.target_recorded_date).toBe('2026-09-21')
         expect(body.target_weight_kg).toBeCloseTo(estimatedOwnWeight())
         expect(body.target_note).toBeNull()
-        expect(body.target_shared_challenge_ids).toEqual([challengeId])
+        expect(body.target_shared_challenge_ids).toEqual(
+          options.estimateShareOptOut ? [] : [challengeId],
+        )
         if (options.duplicateEstimateOnSave && !privateEntryAtEstimatedDate) {
           privateEntryAtEstimatedDate = true
           await route.fulfill({
@@ -408,7 +425,7 @@ async function installGroupFixtures(
             description: null,
             end_date: '2026-12-01',
             id: challengeId,
-            name: 'E2E authorized group',
+            name: options.groupName ?? 'E2E authorized group',
             owner_id: challengeOwnerId,
             start_date: '2026-09-17',
             status: 'active',
@@ -509,9 +526,32 @@ async function installGroupFixtures(
       expect([challengeId, ...(multiple ? [secondId] : [])]).toContain(
         body.target_challenge_id,
       )
-      const hasFinalizedResult =
-        options.finalizedWeeklyResultForPrimaryGroup === true &&
+      if (options.weeklyResultMode === 'pending') {
+        await new Promise<void>((resolve) => {
+          releaseWeeklyResultStatus.push(resolve)
+        })
+      }
+      if (options.weeklyResultMode === 'error') {
+        await route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            message: 'Fixture weekly status unavailable',
+          }),
+        })
+        return
+      }
+      const hasWeeklyResult =
+        (options.weeklyResultMode === 'finalized' ||
+          options.weeklyResultMode === 'unfinished' ||
+          (options.weeklyResultMode !== 'unfinished' &&
+            options.finalizedWeeklyResultForPrimaryGroup === true)) &&
         body.target_challenge_id === challengeId
+      const isFinalized =
+        hasWeeklyResult &&
+        options.weeklyResultMode !== 'unfinished' &&
+        (!options.finalizedSunday ||
+          body.target_sunday === options.finalizedSunday)
       const winnerNames =
         body.target_challenge_id === challengeId
           ? ['Ava', 'Ben']
@@ -520,19 +560,27 @@ async function installGroupFixtures(
         contentType: 'application/json',
         body: JSON.stringify([
           {
-            active_participant_count: hasFinalizedResult ? 3 : 0,
-            recorded_participant_count: hasFinalizedResult ? 2 : 0,
-            eligible_participant_count: hasFinalizedResult ? 2 : 0,
-            finalized_at: hasFinalizedResult
-              ? '2026-09-21T17:00:00.000Z'
+            active_participant_count: hasWeeklyResult ? 3 : 0,
+            recorded_participant_count: hasWeeklyResult
+              ? isFinalized
+                ? 2
+                : 1
+              : 0,
+            eligible_participant_count: hasWeeklyResult ? 2 : 0,
+            finalized_at: isFinalized
+              ? `${body.target_sunday}T18:00:00.000Z`
               : null,
-            result_outcome: hasFinalizedResult
+            result_outcome: hasWeeklyResult
               ? 'shared_winners'
               : 'no_eligible_candidates',
-            result_state: hasFinalizedResult ? 'finalized' : 'disabled',
+            result_state: isFinalized
+              ? 'finalized'
+              : hasWeeklyResult
+                ? 'provisional'
+                : 'disabled',
             sole_participant_name: null,
-            winner_count: hasFinalizedResult ? 2 : 0,
-            winner_details: hasFinalizedResult
+            winner_count: hasWeeklyResult ? 2 : 0,
+            winner_details: hasWeeklyResult
               ? [
                   {
                     member_key: memberKey(body.target_challenge_id, viewerId),
@@ -547,7 +595,7 @@ async function installGroupFixtures(
                   },
                 ]
               : [],
-            winner_names: hasFinalizedResult ? winnerNames : [],
+            winner_names: hasWeeklyResult ? winnerNames : [],
           },
         ]),
       })
@@ -594,7 +642,9 @@ async function installGroupFixtures(
                 ? ownStartingWeight
                 : 100,
             target_weight_kg: ownTarget,
-            latest_recorded_date: '2026-09-22',
+            latest_recorded_date: options.ownSundayRecorded
+              ? '2026-11-22'
+              : '2026-09-22',
             completion_percentage:
               body.target_challenge_id === challengeId
                 ? Math.round(
@@ -708,6 +758,8 @@ async function installGroupFixtures(
     personalContextsHeld: () => personalContextsHeld,
     releasePersonalContexts: () =>
       releasePersonalContexts.splice(0).forEach((release) => release()),
+    releaseWeeklyResultStatus: () =>
+      releaseWeeklyResultStatus.splice(0).forEach((release) => release()),
   })
 }
 
@@ -1152,7 +1204,7 @@ test('selected Group sections retain readable contrast in both color schemes', a
   }
 })
 
-for (const width of [320, 390, 430, 1280]) {
+for (const width of [320, 390, 430, 1280, 1920]) {
   test(`weekly Group history expands and collapses at ${width}px`, async ({
     page,
   }, testInfo) => {
@@ -1221,34 +1273,39 @@ for (const width of [320, 390, 430, 1280]) {
       await expect(
         chart.locator('[data-series="target-reference"]'),
       ).toHaveCount(0)
-      const styles = await chart
-        .locator('[data-chart-trend]')
-        .evaluateAll((trends) =>
-          trends.map((trend) => {
-            const seriesId = trend.getAttribute('data-chart-series-id')
-            const seriesLine = Array.from(
-              trend
-                .closest('svg')!
-                .querySelectorAll('path[data-chart-series-id]'),
-            ).find(
-              (path) => path.getAttribute('data-chart-series-id') === seriesId,
-            )
-            return {
-              seriesId,
-              stroke: trend.getAttribute('stroke'),
-              seriesStroke: seriesLine?.getAttribute('stroke'),
-              opacity: trend.getAttribute('opacity'),
-              dash: trend.getAttribute('stroke-dasharray'),
-            }
-          }),
-        )
-      expect(styles.length).toBeGreaterThan(0)
-      for (const style of styles) {
-        expect(style.seriesId).toBeTruthy()
-        expect(style.stroke).toBe(style.seriesStroke)
-        expect(style.opacity).toBe('0.32')
-        expect(style.dash).toBeNull()
-      }
+      // Navigation can replace the Overview SVG between the count check and read.
+      // Retry the style snapshot as one assertion against the settled Charts SVG.
+      await expect(async () => {
+        const styles = await chart
+          .locator('[data-chart-trend]')
+          .evaluateAll((trends) =>
+            trends.map((trend) => {
+              const seriesId = trend.getAttribute('data-chart-series-id')
+              const seriesLine = Array.from(
+                trend
+                  .closest('svg')!
+                  .querySelectorAll('path[data-chart-series-id]'),
+              ).find(
+                (path) =>
+                  path.getAttribute('data-chart-series-id') === seriesId,
+              )
+              return {
+                seriesId,
+                stroke: trend.getAttribute('stroke'),
+                seriesStroke: seriesLine?.getAttribute('stroke'),
+                opacity: trend.getAttribute('opacity'),
+                dash: trend.getAttribute('stroke-dasharray'),
+              }
+            }),
+          )
+        expect(styles.length).toBeGreaterThan(0)
+        for (const style of styles) {
+          expect(style.seriesId).toBeTruthy()
+          expect(style.stroke).toBe(style.seriesStroke)
+          expect(style.opacity).toBe('0.32')
+          expect(style.dash).toBeNull()
+        }
+      }).toPass({ timeout: 5000 })
     }
     await expectTrendStyles()
     await chart.screenshot({
@@ -1511,11 +1568,12 @@ for (const width of [320, 390, 430, 1280]) {
   })
 }
 
-for (const width of [320, 390, 430, 1280]) {
+for (const width of [320, 390, 430, 1280, 1366, 1440, 1920]) {
   test(`Group overview summary row geometry at ${width}px`, async ({
     page,
   }, testInfo) => {
-    await page.setViewportSize({ width, height: 900 })
+    const height = width === 1366 ? 768 : 900
+    await page.setViewportSize({ width, height })
     await installGroupFixtures(page, true)
     await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
     await expect(
@@ -1526,7 +1584,21 @@ for (const width of [320, 390, 430, 1280]) {
     const chart = page
       .locator('.group-history-workspace svg[role="img"]')
       .first()
+    const rangeControls = page.getByRole('group', {
+      name: 'Chart date range controls',
+    })
     await expect(chart).toBeVisible()
+    await expect(
+      rangeControls.getByText('Group progress', { exact: true }),
+    ).toBeVisible()
+    await expect(
+      rangeControls.getByText('Date range', { exact: true }),
+    ).toHaveCount(0)
+    await expect(
+      rangeControls
+        .getByRole('group', { name: 'Quick date ranges' })
+        .getByRole('button'),
+    ).toHaveCount(5)
     const bounds = await page.evaluate(() => {
       const rect = (element: Element) => {
         const { x, y, width, height, right, bottom } =
@@ -1534,12 +1606,41 @@ for (const width of [320, 390, 430, 1280]) {
         return { x, y, width, height, right, bottom }
       }
       const card = document.querySelector('#group-summary')!
-      const row = card.querySelector('dl')!
+      const main = document.querySelector('.app-shell-main')!
+      const checkIn = card.querySelector(
+        '[aria-labelledby="weekly-check-in-heading"]',
+      )!
+      const row = document.querySelector('.group-overview-stats dl')!
+      const legend = document.querySelector(
+        '.group-history-workspace [aria-label="Group chart legend"]',
+      )!
       const chart = document.querySelector(
         '.group-history-workspace svg[role="img"]',
       )!
+      const chartSection = document.querySelector(
+        '.group-history-workspace section[aria-labelledby$="-history-heading"]',
+      )!
+      const chartControls = document.querySelector(
+        '.group-overview-chart-controls',
+      )!
+      const chartHeading = chartControls.querySelector(
+        '.group-overview-chart-heading',
+      )!
+      const quickRanges = chartControls.querySelector(
+        '[aria-label="Quick date ranges"]',
+      )!
+      const renderedTextBounds = (selector: string) =>
+        Array.from(chart.querySelectorAll(selector), (element) => {
+          const { height } = element.getBoundingClientRect()
+          return {
+            fontSize: Number.parseFloat(getComputedStyle(element).fontSize),
+            glyphHeight: height,
+          }
+        })
       return {
         card: rect(card),
+        main: rect(main),
+        checkIn: rect(checkIn),
         row: rect(row),
         metrics: Array.from(row.children, rect),
         metricText: Array.from(row.children, (metric) => {
@@ -1555,16 +1656,139 @@ for (const width of [320, 390, 430, 1280]) {
           return { label: rangeRect(label), value: rangeRect(value) }
         }),
         chart: rect(chart),
+        chartSection: rect(chartSection),
+        chartControls: rect(chartControls),
+        chartHeading: rect(chartHeading),
+        quickRanges: rect(quickRanges),
+        rangeButtons: Array.from(quickRanges.querySelectorAll('button'), rect),
+        rangeLabels: Array.from(
+          quickRanges.querySelectorAll('.group-overview-range-label'),
+          rect,
+        ),
+        rangeLabelFontSizes: Array.from(
+          quickRanges.querySelectorAll('.group-overview-range-label'),
+          (label) => Number.parseFloat(getComputedStyle(label).fontSize),
+        ),
+        rangeFrame: (() => {
+          const frame = getComputedStyle(quickRanges, '::before')
+          return {
+            top: Number.parseFloat(frame.top),
+            bottom: Number.parseFloat(frame.bottom),
+            left: Number.parseFloat(frame.left),
+            right: Number.parseFloat(frame.right),
+            borderWidth: Number.parseFloat(frame.borderTopWidth),
+            radius: Number.parseFloat(frame.borderTopLeftRadius),
+          }
+        })(),
+        axisTitle: rect(chart.querySelector('.group-overview-axis-title')!),
+        yTickLabels: Array.from(
+          chart.querySelectorAll(
+            '.chart-axis-tick:not([data-chart-date-tick])',
+          ),
+          rect,
+        ),
+        legend: rect(legend),
+        valueLabels: renderedTextBounds('.chart-value'),
+        axisLabels: renderedTextBounds('.chart-axis-tick'),
         pageWidth: document.documentElement.scrollWidth,
         viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
       }
     })
-    console.log('group-overview-summary-bounds', width, bounds)
+    console.log('Group overview visual geometry', width, {
+      headerInsets: {
+        left: bounds.chartControls.x - bounds.chartSection.x,
+        right: bounds.chartSection.right - bounds.chartControls.right,
+        top: bounds.chartControls.y - bounds.chartSection.y,
+      },
+      chartHeading: bounds.chartHeading,
+      quickRanges: bounds.quickRanges,
+      axisTitle: bounds.axisTitle,
+      firstYAxisTickX: Math.min(...bounds.yTickLabels.map((tick) => tick.x)),
+      plotHeight: bounds.chart.height,
+      legendBottom: bounds.legend.bottom,
+      viewportHeight: bounds.viewportHeight,
+      pageWidth: bounds.pageWidth,
+      viewportWidth: bounds.viewportWidth,
+      rangeButtonHeights: bounds.rangeButtons.map((button) => button.height),
+    })
     await expect(metrics.nth(0)).toContainText('Members')
     await expect(metrics.nth(0)).toContainText('3')
     await expect(metrics.nth(1)).toContainText('42.5%')
-    await expect(metrics.nth(2)).toContainText('Checked in')
+    await expect(metrics.nth(2)).toContainText('Shared weights')
     await expect(metrics.nth(3)).toContainText('Goals reached')
+    expect(bounds.checkIn.y).toBeGreaterThanOrEqual(bounds.card.y)
+    expect(bounds.chartControls.bottom).toBeLessThan(bounds.chart.y)
+    const chartHeaderInset = bounds.chartControls.x - bounds.chartSection.x
+    const chartHeaderRightInset =
+      bounds.chartSection.right - bounds.chartControls.right
+    const expectedHeaderInset = width < 640 ? 21 : 17
+    expect(chartHeaderInset).toBeCloseTo(expectedHeaderInset, 0)
+    expect(chartHeaderRightInset).toBeCloseTo(expectedHeaderInset, 0)
+    expect(chartHeaderInset).toBeCloseTo(chartHeaderRightInset, 0)
+    expect(bounds.chartControls.y - bounds.chartSection.y).toBeCloseTo(13, 0)
+    expect(bounds.chartHeading.x).toBeGreaterThanOrEqual(bounds.chartControls.x)
+    expect(bounds.quickRanges.right).toBeLessThanOrEqual(
+      bounds.chartControls.right,
+    )
+    expect(bounds.rangeButtons).toHaveLength(5)
+    for (const button of bounds.rangeButtons) {
+      expect(button.height).toBeGreaterThanOrEqual(width < 640 ? 44 : 32)
+      if (width < 640) expect(button.width).toBeGreaterThanOrEqual(44)
+    }
+    if (width < 640) {
+      expect(bounds.rangeLabels).toHaveLength(5)
+      expect(bounds.rangeLabelFontSizes).toEqual([11, 11, 11, 11, 11])
+      expect(bounds.quickRanges.height).toBe(44)
+      expect(bounds.rangeFrame).toEqual({
+        top: 8,
+        bottom: 8,
+        left: 0,
+        right: 0,
+        borderWidth: 1,
+        radius: 7,
+      })
+      for (const [index, label] of bounds.rangeLabels.entries()) {
+        expect(label.width).toBe(44)
+        expect(label.height).toBe(28)
+        expect(label.y).toBeCloseTo(bounds.quickRanges.y + 8, 0)
+        if (index > 0) {
+          expect(label.x).toBeCloseTo(
+            bounds.rangeLabels[index - 1].x +
+              bounds.rangeLabels[index - 1].width,
+            0,
+          )
+        }
+      }
+    }
+    expect(bounds.chart.y).toBeGreaterThan(bounds.checkIn.bottom)
+    expect(bounds.row.y).toBeGreaterThan(bounds.chart.bottom)
+    expect(bounds.legend.bottom).toBeLessThanOrEqual(bounds.row.y)
+    expect(bounds.axisTitle.height).toBeGreaterThan(bounds.axisTitle.width)
+    expect(bounds.axisTitle.x).toBeGreaterThanOrEqual(bounds.chartSection.x)
+    expect(bounds.axisTitle.y).toBeGreaterThanOrEqual(bounds.chart.y)
+    expect(bounds.axisTitle.bottom).toBeLessThanOrEqual(bounds.chart.bottom)
+    expect(
+      Math.min(...bounds.yTickLabels.map((tick) => tick.x)) -
+        bounds.axisTitle.right,
+    ).toBeGreaterThanOrEqual(2)
+    if (width >= 1280) {
+      expect(bounds.chart.height).toBeLessThanOrEqual(330)
+      expect(bounds.legend.bottom).toBeLessThanOrEqual(bounds.viewportHeight)
+      expect(bounds.valueLabels.length).toBeGreaterThan(0)
+      expect(
+        Math.min(...bounds.valueLabels.map((label) => label.fontSize)),
+      ).toBeGreaterThanOrEqual(12)
+      expect(
+        Math.min(...bounds.valueLabels.map((label) => label.glyphHeight)),
+      ).toBeGreaterThanOrEqual(11)
+      expect(
+        Math.min(...bounds.axisLabels.map((label) => label.fontSize)),
+      ).toBeGreaterThanOrEqual(11)
+      expect(
+        Math.min(...bounds.axisLabels.map((label) => label.glyphHeight)),
+      ).toBeGreaterThanOrEqual(9)
+    }
     if (width < 640) {
       const row = bounds.row
       for (const metric of bounds.metrics) {
@@ -1577,25 +1801,68 @@ for (const width of [320, 390, 430, 1280]) {
           expect(box.right).toBeLessThanOrEqual(row.right)
         }
       }
-      if (width >= 390) {
-        expect(new Set(bounds.metrics.map((metric) => metric.y)).size).toBe(1)
-        expect(bounds.row.height).toBeLessThanOrEqual(60)
-        expect(bounds.chart.y).toBeLessThan(530)
-      } else {
-        expect(new Set(bounds.metrics.map((metric) => metric.y)).size).toBe(2)
-        expect(bounds.chart.y).toBeLessThan(665)
+      expect(new Set(bounds.metrics.map((metric) => metric.y)).size).toBe(2)
+      if (width >= 420) {
+        expect(
+          Math.abs(
+            bounds.chartHeading.y +
+              bounds.chartHeading.height / 2 -
+              bounds.quickRanges.y -
+              bounds.quickRanges.height / 2,
+          ),
+        ).toBeLessThan(1)
+        expect(bounds.chartHeading.right).toBeLessThan(bounds.quickRanges.x)
       }
     } else {
-      expect(bounds.card.height).toBeCloseTo(103.15625, 1)
-      expect(bounds.row.height).toBeCloseTo(67.1875, 1)
-      expect(bounds.chart.x).toBeCloseTo(37, 1)
-      expect(bounds.chart.y).toBeCloseTo(444.15625, 1)
-      expect(bounds.chart.width).toBeCloseTo(1206, 1)
-      expect(bounds.chart.height).toBeCloseTo(441.140625, 1)
+      expect(bounds.card.width).toBeGreaterThan(bounds.main.width * 0.9)
+      expect(bounds.chart.width).toBeGreaterThan(bounds.card.width * 0.85)
+      expect(
+        Math.abs(
+          bounds.chartHeading.y +
+            bounds.chartHeading.height / 2 -
+            bounds.quickRanges.y -
+            bounds.quickRanges.height / 2,
+        ),
+      ).toBeLessThan(1)
+      expect(bounds.chartHeading.right).toBeLessThan(bounds.quickRanges.x)
     }
     await page.screenshot({
       path: testInfo.outputPath(`group-overview-${width}-after.png`),
+      fullPage: true,
     })
+    if (width < 640) {
+      const oneWeek = rangeControls.getByRole('button', {
+        name: 'Show last 1 week',
+      })
+      await oneWeek.click()
+      await expect(oneWeek).toHaveAttribute('aria-pressed', 'true')
+      await expect(
+        page.getByRole('status', { name: 'Visible date range' }),
+      ).toContainText('Last 7 days')
+      const rangeLabels = page.locator('.group-overview-range-label')
+      await rangeLabels.evaluateAll((labels) => {
+        for (const label of labels)
+          (label as HTMLElement).style.fontSize = '20px'
+      })
+      const enlargedLabels = await rangeLabels.evaluateAll((labels) =>
+        labels.map((label) => {
+          const range = document.createRange()
+          range.selectNodeContents(label)
+          const text = range.getBoundingClientRect()
+          const box = label.getBoundingClientRect()
+          return {
+            textLeft: text.left,
+            textRight: text.right,
+            boxLeft: box.left,
+            boxRight: box.right,
+          }
+        }),
+      )
+      for (const label of enlargedLabels) {
+        expect(label.textLeft).toBeGreaterThanOrEqual(label.boxLeft)
+        expect(label.textRight).toBeLessThanOrEqual(label.boxRight)
+      }
+    }
     if (width < 640) {
       await page.locator('#group-summary').evaluate((card) => {
         ;(card as HTMLElement).style.fontSize = '20px'
@@ -2224,9 +2491,10 @@ for (const viewport of [
     await expect(
       page.getByRole('list', { name: 'Your own personal entry actions' }),
     ).toHaveCount(0)
+    await page.getByRole('button', { name: /^Choose group/ }).click()
     await page
-      .getByRole('navigation', { name: 'Primary navigation' })
-      .getByRole('link', { name: 'Group', exact: true })
+      .locator('.group-switcher-panel')
+      .getByRole('link', { name: 'E2E authorized group', exact: true })
       .click()
     await page
       .getByRole('navigation', { name: 'Group sections' })
@@ -2372,13 +2640,7 @@ for (const viewport of [
     const countBefore = requests.filter((url) =>
       url.includes('get_group_chart_history'),
     ).length
-    await page
-      .getByRole('navigation', { name: 'Challenge contexts' })
-      .getByRole('link', {
-        name: 'Group · Second authorized group',
-        exact: true,
-      })
-      .click()
+    await (await groupLink(page, 'Group · Second authorized group')).click()
     await expect(matrix.getByText('87.00 kg', { exact: true })).toBeVisible()
     await expect(
       matrix.getByRole('button', { name: /^(Edit weight|Delete)\b/ }),
@@ -2388,10 +2650,7 @@ for (const viewport of [
       .click()
     await expect(editor.getByLabel('Weight in kg')).toHaveValue('87')
     await page.keyboard.press('Escape')
-    await page
-      .getByRole('navigation', { name: 'Challenge contexts' })
-      .getByRole('link', { name: 'Group · E2E authorized group', exact: true })
-      .click()
+    await (await groupLink(page, 'Group · E2E authorized group')).click()
     await remove.click()
     const deletion = page.getByRole('dialog', { name: 'Delete weight?' })
     await expect(deletion).toContainText('87 kg recorded 2026-09-22')
@@ -2414,13 +2673,7 @@ for (const viewport of [
     expect(
       requests.filter((url) => url.includes('get_group_chart_history')).length,
     ).toBeGreaterThan(countBefore)
-    await page
-      .getByRole('navigation', { name: 'Challenge contexts' })
-      .getByRole('link', {
-        name: 'Group · Second authorized group',
-        exact: true,
-      })
-      .click()
+    await (await groupLink(page, 'Group · Second authorized group')).click()
     await page
       .getByRole('navigation', { name: 'Group sections' })
       .getByRole('link', { name: 'Overview', exact: true })
@@ -2865,15 +3118,9 @@ for (const viewport of [
         /\/(personal_weigh_ins|weigh_ins)(?:\?|$)/.test(url),
       ),
     ).toBe(false)
-    const contexts = page.getByRole('navigation', {
-      name: 'Challenge contexts',
-    })
-    await contexts
-      .getByRole('link', {
-        name: 'Group · Second authorized group',
-        exact: true,
-      })
-      .press('Enter')
+    await (
+      await groupLink(page, 'Group · Second authorized group')
+    ).press('Enter')
     await expect(
       tabs.getByRole('tab', { name: 'All members' }),
     ).toHaveAttribute('aria-selected', 'true')
@@ -3010,15 +3257,13 @@ for (const viewport of [
     await expect(
       page.getByRole('table', { name: 'Shared group weight history' }),
     ).toContainText('Ava')
-    const contexts = page.getByRole('navigation', {
-      name: 'Challenge contexts',
-    })
-    await expect(contexts).toHaveCount(1)
-    const row = (await contexts.boundingBox())!
+    const row = (await page
+      .getByRole('button', { name: /Choose group:/ })
+      .boundingBox())!
     const chart = (await page
       .locator('.group-history-workspace')
       .boundingBox())!
-    expect(row.x).toBeCloseTo(chart.x, 0)
+    expect(row.x).toBeGreaterThanOrEqual(chart.x)
     expect(row.y + row.height).toBeLessThanOrEqual(chart.y)
     await expect(
       page
@@ -3047,10 +3292,7 @@ for (const viewport of [
       .getByRole('navigation', { name: 'Group sections' })
       .getByRole('link', { name: 'Charts', exact: true })
       .click()
-    const second = contexts.getByRole('link', {
-      name: 'Group · Second authorized group',
-      exact: true,
-    })
+    const second = await groupLink(page, 'Group · Second authorized group')
     await second.focus()
     await page.keyboard.press('Enter')
     await page
@@ -3070,7 +3312,9 @@ for (const viewport of [
     ).not.toContainText('Ava')
     await expect(page.getByText('42.5%', { exact: true })).toHaveCount(0)
     await expect(
-      contexts.getByRole('link', { name: /Second authorized group/ }),
+      page.getByRole('button', {
+        name: 'Choose group: Second authorized group',
+      }),
     ).toHaveAttribute('aria-current', 'page')
     await page
       .getByRole('navigation', { name: 'Group sections' })
@@ -3087,7 +3331,9 @@ for (const viewport of [
     )
     await page.reload()
     await expect(page.getByText('73.2%', { exact: true })).toBeVisible()
-    await expect(contexts.getByRole('combobox')).toHaveCount(0)
+    await expect(
+      page.getByRole('navigation', { name: 'Challenge contexts' }),
+    ).toHaveCount(0)
     await expect(
       page.getByText('fixture private note must never render'),
     ).toHaveCount(0)
@@ -3095,6 +3341,253 @@ for (const viewport of [
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
       .toBeLessThanOrEqual(viewport.width)
   })
+
+  test(`locked weekly result replaces provisional leaders and survives week rollover on ${viewport.label}`, async ({
+    page,
+  }) => {
+    await page.clock.install({
+      time: new Date('2026-11-22T21:59:30.000Z'),
+    })
+    await page.setViewportSize({ height: 900, width: viewport.width })
+    await installGroupFixtures(
+      page,
+      false,
+      false,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        weeklyResultMode: 'finalized',
+        finalizedSunday: '2026-11-22',
+      },
+    )
+    await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    const overviewCard = page.getByRole('region', {
+      name: 'This week’s check-in',
+    })
+    await expect(overviewCard).toContainText('2 of 3 active members checked in')
+    await expect(overviewCard).toContainText('Finalized and locked')
+    const sections = page.getByRole('navigation', {
+      name: 'Group sections',
+    })
+    await sections.getByRole('link', { name: 'Weekly results' }).click()
+
+    const winnerList = page.getByRole('list', { name: 'Weekly winners' })
+    await expect(
+      page.getByText('Final shared weekly winners — 2 of 3 members recorded'),
+    ).toBeVisible()
+    await expect(winnerList).toContainText('Ava')
+    await expect(winnerList).toContainText('Ben')
+    await expect(
+      page.getByRole('heading', { name: 'Provisional leader' }),
+    ).toHaveCount(0)
+    await page
+      .locator('.group-overview-result')
+      .first()
+      .locator('..')
+      .screenshot({
+        path: test.info().outputPath(`weekly-finalized-${viewport.width}.png`),
+      })
+
+    await page.clock.fastForward(60_000)
+    await expect(
+      page.getByText('Shared provisional leaders', { exact: true }),
+    ).toBeVisible()
+    await expect(winnerList).toContainText('Ava')
+    await expect(winnerList).toContainText('Ben')
+    await sections.getByRole('link', { name: 'Overview' }).click()
+    await expect(overviewCard).toContainText('Opens Nov 29, 2026')
+    await expect(overviewCard).not.toContainText(
+      'of 3 active members checked in',
+    )
+    await expect(
+      overviewCard.getByRole('button', { name: 'Record weight' }),
+    ).toHaveCount(0)
+    await sections.getByRole('link', { name: 'Weekly results' }).click()
+    await expect(winnerList).toContainText('Ava')
+    await expect(winnerList).toContainText('Ben')
+    await page
+      .locator('.group-overview-result')
+      .first()
+      .locator('..')
+      .screenshot({
+        path: test.info().outputPath(`weekly-rollover-${viewport.width}.png`),
+      })
+  })
+
+  test(`weekly check-in card shows authoritative count and own Sunday status on ${viewport.label}`, async ({
+    page,
+  }) => {
+    await page.clock.install({ time: new Date('2026-11-22T10:00:00.000Z') })
+    await page.setViewportSize({ height: 900, width: viewport.width })
+    await installGroupFixtures(
+      page,
+      false,
+      true,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        weeklyResultMode: 'unfinished',
+        ownSundayRecorded: true,
+        participantAvatars: true,
+      },
+    )
+    await page.goto(
+      `/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
+    )
+
+    const card = page.getByRole('region', { name: 'This week’s check-in' })
+    await expect(card).toContainText('1 of 3 active members checked in')
+    await expect(card).toContainText('Your Sunday weigh-in is shared')
+    await expect(
+      card.getByRole('list', { name: 'Members checked in this Sunday' }),
+    ).toContainText('Ava')
+    await expect(
+      card
+        .getByRole('list', { name: 'Members checked in this Sunday' })
+        .locator('[data-avatar-preset="female-03"]'),
+    ).toBeVisible()
+    await expect(card).not.toContainText('2 have a usable baseline')
+    await expect(
+      card.getByRole('button', { name: 'Record weight' }),
+    ).toHaveCount(0)
+    await card.screenshot({
+      path: test
+        .info()
+        .outputPath(`weekly-check-in-recorded-${viewport.width}.png`),
+    })
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+      .toBeLessThanOrEqual(viewport.width)
+  })
+
+  test(`weekly check-in card offers one action when the viewer has not shared Sunday weight on ${viewport.label}`, async ({
+    page,
+  }) => {
+    await page.clock.install({ time: new Date('2026-11-22T10:00:00.000Z') })
+    await page.setViewportSize({ height: 900, width: viewport.width })
+    await installGroupFixtures(
+      page,
+      false,
+      true,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { weeklyResultMode: 'unfinished' },
+    )
+    await page.goto(
+      `/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
+    )
+
+    const card = page.getByRole('region', { name: 'This week’s check-in' })
+    await expect(card).toContainText('1 of 3 active members checked in')
+    await expect(card).toContainText(
+      'Your Sunday weigh-in has not been shared yet',
+    )
+    await expect(
+      card.getByRole('button', { name: 'Record weight' }),
+    ).toHaveCount(1)
+    await expect(
+      page.getByRole('button', { name: 'Record weight' }),
+    ).toHaveCount(1)
+    const buttonBounds = await card
+      .getByRole('button', { name: 'Record weight' })
+      .boundingBox()
+    expect(buttonBounds?.height).toBeGreaterThanOrEqual(44)
+    await card.screenshot({
+      path: test
+        .info()
+        .outputPath(`weekly-check-in-needed-${viewport.width}.png`),
+    })
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+      .toBeLessThanOrEqual(viewport.width)
+  })
+
+  test(`weekly check-in error never presents a false count or action on ${viewport.label}`, async ({
+    page,
+  }) => {
+    await page.clock.install({ time: new Date('2026-11-22T10:00:00.000Z') })
+    await page.setViewportSize({ height: 900, width: viewport.width })
+    await installGroupFixtures(
+      page,
+      false,
+      true,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { weeklyResultMode: 'error' },
+    )
+    await page.goto(
+      `/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
+    )
+
+    const card = page.getByRole('region', { name: 'This week’s check-in' })
+    await expect(card).toContainText('Status unavailable')
+    await expect(card).not.toContainText('active members checked in')
+    await expect(
+      card.getByRole('button', { name: 'Record weight' }),
+    ).toHaveCount(0)
+  })
+
+  for (const weeklyResultMode of ['pending', 'error'] as const) {
+    test(`authoritative ${weeklyResultMode} status does not expose provisional leaders on ${viewport.label}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ height: 900, width: viewport.width })
+      const fixtures = await installGroupFixtures(
+        page,
+        false,
+        false,
+        false,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        { weeklyResultMode },
+      )
+      await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+      await page
+        .getByRole('navigation', { name: 'Group sections' })
+        .getByRole('link', { name: 'Weekly results' })
+        .click()
+
+      if (weeklyResultMode === 'pending') {
+        await expect(
+          page.getByText('Checking the weekly result.'),
+        ).toBeVisible()
+      } else {
+        await expect(
+          page.getByText('Weekly result status unavailable'),
+        ).toBeVisible()
+      }
+      await expect(
+        page.getByRole('heading', { name: 'Provisional leader' }),
+      ).toHaveCount(0)
+
+      if (weeklyResultMode === 'pending') {
+        fixtures.releaseWeeklyResultStatus()
+        await expect(
+          page.getByText('Shared provisional leaders', { exact: true }),
+        ).toBeVisible()
+      }
+    })
+  }
+
   test(`renders only authorized Group data accessibly on ${viewport.label}`, async ({
     page,
   }) => {
@@ -3289,9 +3782,7 @@ for (const viewport of [
       .getByRole('navigation', { name: 'Group sections' })
       .getByRole('link', { name: 'Members', exact: true })
       .click()
-    await page
-      .getByRole('link', { name: 'Group · E2E authorized group' })
-      .click()
+    await (await groupLink(page, 'Group · E2E authorized group')).click()
 
     await expect(
       page.getByRole('heading', { name: 'Member progress' }),
@@ -3353,9 +3844,7 @@ for (const viewport of [
       .getByRole('navigation', { name: 'Group sections' })
       .getByRole('link', { name: 'Members', exact: true })
       .click()
-    await page
-      .getByRole('link', { name: 'Group · E2E authorized group' })
-      .click()
+    await (await groupLink(page, 'Group · E2E authorized group')).click()
 
     const editButton = page.getByRole('button', {
       name: 'Edit starting weight',
@@ -3446,9 +3935,7 @@ for (const viewport of [
       .getByRole('navigation', { name: 'Group sections' })
       .getByRole('link', { name: 'Members', exact: true })
       .click()
-    await page
-      .getByRole('link', { name: 'Group · E2E authorized group' })
-      .click()
+    await (await groupLink(page, 'Group · E2E authorized group')).click()
     await expect(
       page.getByRole('button', { name: 'Change target' }),
     ).toBeVisible()
@@ -3495,18 +3982,13 @@ for (const viewport of [
       .getByRole('navigation', { name: 'Group sections' })
       .getByRole('link', { name: 'Members', exact: true })
       .click()
-    await page
-      .getByRole('link', { name: 'Group · E2E authorized group' })
-      .click()
+    await (await groupLink(page, 'Group · E2E authorized group')).click()
     const oldMember = page.getByRole('heading', {
       name: 'Same display name',
     })
     await expect(oldMember).toHaveCount(2)
 
-    await page
-      .getByRole('navigation', { name: 'Challenge contexts' })
-      .getByRole('link', { name: 'Group · Second authorized group' })
-      .click()
+    await (await groupLink(page, 'Group · Second authorized group')).click()
     await expect(oldMember).toHaveCount(0)
     await expect(page.getByText('Loading member progress…')).toBeVisible()
     releaseProjection()
@@ -3537,24 +4019,19 @@ for (const viewport of [
       .getByRole('navigation', { name: 'Group sections' })
       .getByRole('link', { name: 'Members', exact: true })
       .click()
-    await page
-      .getByRole('link', { name: 'Group · E2E authorized group' })
-      .click()
-    const contexts = page.getByRole('navigation', {
-      name: 'Challenge contexts',
-    })
-    const firstGroup = contexts.getByRole('link', {
-      name: 'Group · E2E authorized group',
-    })
-    const secondGroup = contexts.getByRole('link', {
-      name: 'Group · Second authorized group',
-    })
+    await (await groupLink(page, 'Group · E2E authorized group')).click()
+    const firstGroup = page
+      .locator('.group-switcher-panel a')
+      .filter({ hasText: 'E2E authorized group' })
+    const secondGroup = page
+      .locator('.group-switcher-panel a')
+      .filter({ hasText: 'Second authorized group' })
 
     await page.getByRole('button', { name: 'Change target' }).click()
     await secondGroup.evaluate((link: HTMLAnchorElement) => link.click())
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await expect(secondGroup).toHaveAttribute('aria-current', 'page')
-    await firstGroup.click()
+    await (await groupLink(page, 'E2E authorized group')).click()
 
     await page.getByRole('button', { name: 'Change target' }).click()
     await page.getByLabel('New target (kg)').fill('85')
@@ -3568,7 +4045,7 @@ for (const viewport of [
       .click()
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await expect(secondGroup).toHaveAttribute('aria-current', 'page')
-    await firstGroup.click()
+    await (await groupLink(page, 'E2E authorized group')).click()
 
     await page.getByRole('button', { name: 'Change target' }).click()
     await page.getByLabel('New target (kg)').fill('85')
@@ -3604,9 +4081,7 @@ for (const viewport of [
       .getByRole('navigation', { name: 'Group sections' })
       .getByRole('link', { name: 'Members', exact: true })
       .click()
-    await page
-      .getByRole('link', { name: 'Group · E2E authorized group' })
-      .click()
+    await (await groupLink(page, 'Group · E2E authorized group')).click()
 
     const negativeCard = page.locator('article').filter({ hasText: '-25%' })
     await expect(negativeCard).toHaveCount(1)
@@ -3898,7 +4373,9 @@ test('archived groups leave normal navigation and remain accessible as read-only
     page.getByRole('link', { name: /Group · Archived navigation group/ }),
   ).toHaveCount(0)
   await expect(
-    page.getByRole('link', { name: /Group · Current navigation group/ }),
+    page.getByRole('button', {
+      name: 'Choose group: Current navigation group',
+    }),
   ).toHaveAttribute('aria-current', 'page')
   // A direct old bookmark remains explicit read-only history after a reload.
   await page.goto(
@@ -3955,6 +4432,66 @@ test('archived groups leave normal navigation and remain accessible as read-only
 
 test.describe('group chart weigh-in dots', () => {
   test.use({ hasTouch: true, viewport: { width: 1280, height: 900 } })
+
+  test('Group estimate context supports an explicit private save', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 900 })
+    const requests = await installGroupFixtures(
+      page,
+      true,
+      true,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'e2e-owner',
+      { estimateShareOptOut: true },
+    )
+    await page.goto(
+      `/e2e/fixtures/today-harness.html?scenario=group&selected=${ownGroupId}&user=${viewerId}`,
+    )
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Charts', exact: true })
+      .click()
+    // Overview and Charts share point locators; wait for the Charts instance.
+    await expect(
+      page
+        .getByRole('navigation', { name: 'Group sections' })
+        .getByRole('link', { name: 'Charts', exact: true }),
+    ).toHaveAttribute('aria-current', 'page')
+    await expect(
+      page.getByRole('heading', { name: 'Group charts', exact: true }),
+    ).toBeVisible()
+    const chart = page.getByRole('img', {
+      name: 'Weight (kg) — shared group history',
+    })
+    const estimate = chart.locator(
+      `circle[data-series-id="${memberKey(ownGroupId, viewerId)}"][data-date="2026-09-21"][data-point-kind="estimated"]`,
+    )
+    await estimate.focus()
+    await page.keyboard.press('Enter')
+    await page
+      .getByRole('group', { name: /Chart point details/ })
+      .getByRole('button', { name: 'Record weight', exact: true })
+      .click()
+    const editor = page.getByRole('dialog', { name: 'Record weight' })
+    await expect(editor.getByLabel('E2E authorized group')).toBeChecked()
+    await expect(editor.getByLabel('Second authorized group')).not.toBeChecked()
+    await editor.getByLabel('E2E authorized group').uncheck()
+    const save = editor.getByRole('button', {
+      name: 'Save weight',
+      exact: true,
+    })
+    await save.click()
+    await expect(editor).toHaveCount(0)
+    expect(
+      requests.filter((url) => url.includes('/rpc/save_personal_weigh_in')),
+    ).toHaveLength(1)
+    await expect(estimate).toBeVisible()
+  })
 
   test('adds the current Group share to an estimate-resolved entry while preserving its other share', async ({
     page,
@@ -4037,6 +4574,7 @@ test.describe('group chart weigh-in dots', () => {
     )
     await expect(edit.getByLabel('E2E authorized group')).toBeChecked()
     await expect(edit.getByLabel('Second authorized group')).toBeChecked()
+
     await expect(edit.getByText(/matches a saved personal entry/)).toBeVisible()
 
     await edit.getByLabel('Weight in kg').fill('84.5')
@@ -4363,13 +4901,16 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
     const overviewChart = page
       .locator('.group-history-workspace svg[role="img"]')
       .first()
+    const overviewViewBoxWidth = await overviewChart.evaluate((chart) =>
+      Number(chart.getAttribute('viewBox')?.trim().split(/\s+/)[2]),
+    )
     await expect(overviewChart).toHaveAttribute(
       'data-chart-plot-left',
-      width <= 600 ? '32' : '44',
+      width <= 600 ? '40' : '46',
     )
     await expect(overviewChart).toHaveAttribute(
       'data-chart-plot-right',
-      width <= 600 ? '304' : '736',
+      width <= 600 ? '304' : String(overviewViewBoxWidth - 24),
     )
     const [overviewCardBounds, overviewFrameBounds] = await Promise.all([
       overviewChart.locator('xpath=ancestor::section[1]').boundingBox(),
@@ -4403,7 +4944,7 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
         .querySelector('.group-history-workspace')!
         .getBoundingClientRect()
       const selector = document
-        .querySelector('[aria-label="Challenge contexts"] > div')!
+        .querySelector('.app-shell-brand')!
         .getBoundingClientRect()
       const tabs = document
         .querySelector('.group-context-subnav .contextual-subnav-scroll')!
@@ -4419,6 +4960,7 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
       ).map((card) => ({
         bounds: card.getBoundingClientRect().toJSON(),
         border: ['Top', 'Right', 'Bottom', 'Left'].map((side) => ({
+          side,
           width: getComputedStyle(card).getPropertyValue(
             `border-${side.toLowerCase()}-width`,
           ),
@@ -4449,19 +4991,34 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
       expect(Math.abs(edge - edges.chart.left)).toBeLessThanOrEqual(1)
     for (const edge of [
       edges.refresh,
-      edges.arrow,
       Math.max(...edges.cards.map((c) => c.bounds.right)),
     ])
       expect(Math.abs(edge - edges.chart.right)).toBeLessThanOrEqual(1)
+    expect(edges.arrow).toBeLessThanOrEqual(edges.chart.right)
+    expect(edges.arrow).toBeGreaterThanOrEqual(edges.chart.left)
     expect(edges.overflow).toBe(0)
-    for (const card of edges.cards)
+    const accentColors = [
+      'rgb(49, 219, 176)',
+      'rgb(103, 165, 255)',
+      'rgb(196, 156, 255)',
+      'rgb(255, 193, 100)',
+    ]
+    for (const [index, card] of edges.cards.entries())
       for (const side of card.border) {
-        expect(side.width).toBe('1px')
-        expect(side.color).toBe('rgb(53, 67, 83)')
+        if (side.side === 'Top') {
+          expect(side.width).toBe('3px')
+          expect(side.color).toBe(accentColors[index])
+        } else {
+          expect(side.width).toBe('1px')
+          expect(side.color).toBe('rgb(53, 67, 83)')
+        }
       }
     if (width === 1440) {
-      expect(edges.plot.width).toBeCloseTo(1206, 0)
-      expect(edges.plot.height).toBeCloseTo(441.140625, 0)
+      expect(edges.plot.width).toBeCloseTo(
+        edges.chart.right - edges.chart.left - 10,
+        0,
+      )
+      expect(edges.plot.height).toBe(320)
     }
     if (width === 390) {
       expect(edges.plot.width).toBeLessThan(600)
@@ -4477,11 +5034,6 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
     await expect(manage).toHaveAttribute('title', 'Manage challenges')
     expect(
       await manage.evaluate((element) =>
-        Boolean(element.parentElement?.querySelector('a[aria-current="page"]')),
-      ),
-    ).toBe(true)
-    expect(
-      await manage.evaluate((element) =>
         Boolean(element.parentElement?.closest('a,button')),
       ),
     ).toBe(false)
@@ -4489,8 +5041,7 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
     expect(manageBox.width).toBeGreaterThanOrEqual(44)
     expect(manageBox.height).toBeGreaterThanOrEqual(44)
     await expect(manage).toHaveCSS('font-size', '12.6px')
-    await page.getByRole('link', { name: /Group · testtest/ }).focus()
-    await page.keyboard.press('Tab')
+    await manage.focus()
     await expect(manage).toBeFocused()
     await page.keyboard.press('Enter')
     await expect(
@@ -4517,7 +5068,7 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
       owner = false
       await page.goto(url)
       await expect(
-        page.getByRole('link', { name: /Group · testtest/ }),
+        page.getByRole('button', { name: 'Choose group: testtest' }),
       ).toBeVisible()
       await expect(
         page.getByRole('link', { name: 'Manage', exact: true }),
@@ -4526,10 +5077,9 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
   })
 }
 
-test('group selector matches the member tabs container surface on Charts', async ({
+test('navbar selector replaces the duplicate Group context strip on Charts', async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 390, height: 900 })
   await installGroupFixtures(page, false, true)
   await page.goto(
     `/e2e/fixtures/today-harness.html?scenario=group&user=${viewerId}&route=${encodeURIComponent(`/group?challenge=${ownGroupId}`)}`,
@@ -4538,24 +5088,13 @@ test('group selector matches the member tabs container surface on Charts', async
     .getByRole('navigation', { name: 'Group sections' })
     .getByRole('link', { name: 'Charts', exact: true })
     .click()
-
-  const selector = page.locator('[aria-label="Challenge contexts"] > div')
-  const memberTabs = page.locator('.group-history-workspace > .sticky')
-  await expect(selector).toBeVisible()
-  await expect(memberTabs).toBeVisible()
-  const chartContextWidths = await page
-    .getByRole('navigation', { name: 'Challenge contexts' })
-    .evaluate((navigation) => ({
-      link: navigation.querySelector('a')!.getBoundingClientRect().width,
-      row: navigation.querySelector(':scope > div')!.getBoundingClientRect()
-        .width,
-    }))
-  expect(chartContextWidths.link).toBeLessThan(chartContextWidths.row * 0.9)
-  const [selectorBackground, memberTabsBackground] = await Promise.all([
-    selector.evaluate((element) => getComputedStyle(element).backgroundColor),
-    memberTabs.evaluate((element) => getComputedStyle(element).backgroundColor),
-  ])
-  expect(selectorBackground).toBe(memberTabsBackground)
+  await expect(
+    page.getByRole('button', { name: /Choose group:/ }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('navigation', { name: 'Challenge contexts' }),
+  ).toHaveCount(0)
+  await expect(page.locator('.group-history-workspace > .sticky')).toBeVisible()
 })
 
 for (const viewport of [
@@ -4687,41 +5226,12 @@ for (const viewport of [
         )
       }
 
-      const contextFilter = page.getByRole('navigation', {
-        name: 'Challenge contexts',
-      })
-      const filterGeometry = await contextFilter.evaluate((navigation) => {
-        const list = navigation.querySelector('ul')!
-        const listItem = list.querySelector('li')!
-        const link = listItem.querySelector('a')!
-        return {
-          listWidth: list.getBoundingClientRect().width,
-          itemWidth: listItem.getBoundingClientRect().width,
-          linkWidth: link.getBoundingClientRect().width,
-          linkCenter:
-            link.getBoundingClientRect().left +
-            link.getBoundingClientRect().width / 2,
-          textCenter: (() => {
-            const range = document.createRange()
-            range.selectNodeContents(link)
-            const bounds = range.getBoundingClientRect()
-            return bounds.left + bounds.width / 2
-          })(),
-          itemCount: list.children.length,
-          scrollWidth: list.parentElement!.scrollWidth,
-          clientWidth: list.parentElement!.clientWidth,
-        }
-      })
-      expect(filterGeometry.itemWidth).toBeGreaterThanOrEqual(
-        filterGeometry.listWidth / filterGeometry.itemCount - 1,
-      )
-      expect(filterGeometry.linkWidth).toBeCloseTo(filterGeometry.itemWidth, 0)
-      expect(
-        Math.abs(filterGeometry.linkCenter - filterGeometry.textCenter),
-      ).toBeLessThanOrEqual(2)
-      expect(filterGeometry.scrollWidth).toBeLessThanOrEqual(
-        filterGeometry.clientWidth,
-      )
+      await expect(
+        page.getByRole('navigation', { name: 'Challenge contexts' }),
+      ).toHaveCount(0)
+      await expect(
+        page.getByRole('button', { name: /Choose group:/ }),
+      ).toBeVisible()
 
       const recordPairWidths = await table
         .locator('tbody td')
@@ -4975,4 +5485,266 @@ test('shows the challenge owner badge only in Members and fits on mobile', async
   await expect(
     page.getByRole('list', { name: 'Group chart legend' }),
   ).not.toContainText('Owner')
+})
+
+for (const width of [320, 390, 430, 1440]) {
+  test(`navbar group dropdown routes and fits at ${width}px`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 })
+    await installGroupFixtures(page, true)
+    await page.goto(
+      '/e2e/fixtures/today-harness.html?scenario=group&navigationTest',
+    )
+    const trigger = page.getByRole('button', {
+      name: 'Choose group: E2E authorized group',
+    })
+    await expect(trigger).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: 'Group progress', exact: true }),
+    ).toBeVisible()
+    const expectMatchingFrames = async () => {
+      const frames = await page.evaluate(() => {
+        const dashboard = document
+          .querySelector<HTMLAnchorElement>(
+            'nav[aria-label="Primary navigation"] a[href="/dashboard"]',
+          )!
+          .getBoundingClientRect()
+        const group = document.querySelector<HTMLElement>(
+          '.group-switcher-trigger',
+        )!
+        const bounds = group.getBoundingClientRect()
+        const frame = getComputedStyle(group, '::before')
+        const top = parseFloat(frame.top),
+          bottom = parseFloat(frame.bottom)
+        return {
+          dashboardHeight: dashboard.height,
+          groupHeight: bounds.height - top - bottom,
+          topOffset: bounds.y + top - dashboard.y,
+          width: bounds.width,
+          noOverflow: [dashboard, bounds].every(
+            (box) => box.left >= 0 && box.right <= innerWidth,
+          ),
+        }
+      })
+      expect(frames.dashboardHeight).toBe(44)
+      expect(frames.groupHeight).toBe(44)
+      expect(Math.abs(frames.topOffset)).toBeLessThanOrEqual(1)
+      expect(frames.noOverflow).toBe(true)
+      return frames
+    }
+    const originalFrames = await expectMatchingFrames()
+
+    await expect(
+      page.getByRole('navigation', { name: 'Challenge contexts' }),
+    ).toHaveCount(0)
+    await page
+      .getByRole('navigation', { name: 'Group sections' })
+      .getByRole('link', { name: 'Records', exact: true })
+      .click()
+    const chevrons = await page.evaluate(() => {
+      const measure = (pathSelector: string, controlSelector: string) => {
+        const path = document.querySelector<SVGGraphicsElement>(pathSelector)!
+        const control = document
+          .querySelector(controlSelector)!
+          .getBoundingClientRect()
+        const bounds = path.getBBox()
+        const center = new DOMPoint(
+          bounds.x + bounds.width / 2,
+          bounds.y + bounds.height / 2,
+        ).matrixTransform(path.getScreenCTM()!)
+        const svg = path.ownerSVGElement!.getBoundingClientRect()
+        return {
+          offset: center.y - control.y - control.height / 2,
+          width: svg.width,
+          height: svg.height,
+          stroke: path.getAttribute('stroke-width'),
+          shape: path.getAttribute('d'),
+        }
+      }
+      return {
+        group: measure(
+          '.group-switcher-trigger svg path',
+          '.group-switcher-trigger',
+        ),
+        profile: measure(
+          '.account-control .account-chevron svg path',
+          '.account-control summary',
+        ),
+      }
+    })
+    console.log('navbar chevron bounds', width, chevrons)
+    expect(chevrons.group.width).toBe(chevrons.profile.width)
+    expect(chevrons.group.height).toBe(chevrons.profile.height)
+    expect(chevrons.group.shape).toBe(chevrons.profile.shape)
+    expect(chevrons.group.stroke).toBe(chevrons.profile.stroke)
+    expect(
+      Math.abs(chevrons.group.offset - chevrons.profile.offset),
+    ).toBeLessThanOrEqual(0.5)
+    await trigger.click()
+    expect(await expectMatchingFrames()).toEqual(originalFrames)
+    await expect(
+      page.locator('.group-switcher-panel').getByRole('link'),
+    ).toHaveText(['E2E authorized group', 'Second authorized group'])
+    const second = page
+      .locator('.group-switcher-panel')
+      .getByRole('link', { name: 'Second authorized group', exact: true })
+    await expect(second).toHaveAttribute('href', /tab=records/)
+    await page.screenshot({
+      path: testInfo.outputPath(`group-dropdown-${width}.png`),
+      fullPage: true,
+    })
+    const panel = (await page.locator('.group-switcher-panel').boundingBox())!
+    expect(panel.x).toBeGreaterThanOrEqual(0)
+    expect(panel.x + panel.width).toBeLessThanOrEqual(width)
+    const box = (await trigger.boundingBox())!
+    expect(box.height).toBeGreaterThanOrEqual(44)
+    await second.click()
+    await expect(page.getByTestId('fixture-route')).toHaveText(
+      /challenge=e2e-second-group.*tab=records/,
+    )
+    await expect(
+      page.getByRole('button', {
+        name: 'Choose group: Second authorized group',
+      }),
+    ).toHaveAttribute('aria-expanded', 'false')
+    await page
+      .getByRole('button', { name: 'Fixture Back', exact: true })
+      .click()
+    await expect(trigger).toBeVisible()
+    await page
+      .getByRole('button', { name: 'Fixture Forward', exact: true })
+      .click()
+    await expect(
+      page.getByRole('button', {
+        name: 'Choose group: Second authorized group',
+      }),
+    ).toBeVisible()
+    await page.goto(
+      '/e2e/fixtures/today-harness.html?scenario=group&navigationTest&route=' +
+        encodeURIComponent('/group?challenge=e2e-second-group&tab=records'),
+    )
+    await expect(
+      page.getByRole('button', {
+        name: 'Choose group: Second authorized group',
+      }),
+    ).toBeVisible()
+    await page.getByRole('link', { name: 'Dashboard', exact: true }).click()
+    const dashboardTrigger = page.getByRole('button', {
+      name: 'Choose group',
+      exact: true,
+    })
+    const alignment = await dashboardTrigger.evaluate((button) => {
+      const span = button.querySelector('span')!
+      const range = document.createRange()
+      range.selectNodeContents(span)
+      const glyph = range.getBoundingClientRect()
+      const box = button.getBoundingClientRect()
+      const frame = getComputedStyle(button, '::before')
+      return {
+        horizontalOffset: glyph.x + glyph.width / 2 - box.x - box.width / 2,
+        verticalOffset: glyph.y + glyph.height / 2 - box.y - box.height / 2,
+        width: box.width,
+        height: box.height,
+        frameTop: parseFloat(frame.top),
+        frameBottom: parseFloat(frame.bottom),
+      }
+    })
+    console.log('navbar trigger text bounds', width, alignment)
+    expect(Math.abs(alignment.horizontalOffset)).toBeLessThanOrEqual(1)
+    expect(Math.abs(alignment.verticalOffset)).toBeLessThanOrEqual(1)
+    expect(alignment.width).toBeLessThanOrEqual(width < 640 ? 110 : 180)
+    expect(alignment.height).toBe(44)
+    expect(alignment.frameTop).toBe(0)
+    expect(alignment.frameBottom).toBe(0)
+    expect(await expectMatchingFrames()).toEqual(originalFrames)
+    await page.screenshot({
+      path: testInfo.outputPath(`navbar-dashboard-closed-${width}.png`),
+    })
+    await page.locator('.app-shell-header-inner').screenshot({
+      path: testInfo.outputPath(`dashboard-navbar-frame-${width}.png`),
+    })
+    await dashboardTrigger.click()
+    expect(await expectMatchingFrames()).toEqual(originalFrames)
+    await page.screenshot({
+      path: testInfo.outputPath(`navbar-dashboard-open-${width}.png`),
+    })
+    await page
+      .locator('.group-switcher-panel')
+      .getByRole('link', { name: 'E2E authorized group', exact: true })
+      .click()
+    await expect(page.getByTestId('fixture-route')).toHaveText(
+      /challenge=e2e-challenge&tab=overview/,
+    )
+    await trigger.press('ArrowDown')
+    await expect(
+      page
+        .locator('.group-switcher-panel')
+        .getByRole('link', { name: 'E2E authorized group', exact: true }),
+    ).toBeFocused()
+    await page.keyboard.press('Escape')
+    await expect(trigger).toBeFocused()
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+    await expect(
+      page.getByRole('heading', { name: 'Group progress', exact: true }),
+    ).toBeVisible()
+    expect(await expectMatchingFrames()).toEqual(originalFrames)
+    await page.screenshot({
+      path: testInfo.outputPath(`group-overview-navbar-${width}.png`),
+      fullPage: true,
+    })
+    await page.locator('.app-shell-header-inner').screenshot({
+      path: testInfo.outputPath(`group-navbar-frame-${width}.png`),
+    })
+    await page.getByRole('button', { name: /^Choose group:/ }).click()
+    expect(await expectMatchingFrames()).toEqual(originalFrames)
+    await page.screenshot({
+      path: testInfo.outputPath(`group-dropdown-overview-${width}.png`),
+      fullPage: true,
+    })
+  })
+}
+
+test('long group names wrap in the dropdown and fit enlarged phone text', async ({
+  page,
+}) => {
+  const name =
+    'A very long authorized family group name that must remain readable on a narrow phone'
+  await page.setViewportSize({ width: 320, height: 900 })
+  await installGroupFixtures(
+    page,
+    false,
+    false,
+    false,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    'e2e-owner',
+    { groupName: name },
+  )
+  await page.goto('/e2e/fixtures/today-harness.html?scenario=group')
+  const trigger = page.getByRole('button', { name: `Choose group: ${name}` })
+  await expect(trigger).toBeVisible()
+  await trigger.click()
+  await page.locator('.group-switcher').evaluate((el) => {
+    for (const target of el.querySelectorAll<HTMLElement>('button,a'))
+      target.style.fontSize = '20px'
+  })
+  const link = page
+    .locator('.group-switcher-panel')
+    .getByRole('link', { name, exact: true })
+  await expect(link).toBeVisible()
+  const bounds = await link.evaluate((el) => ({
+    client: el.clientWidth,
+    scroll: el.scrollWidth,
+    height: el.getBoundingClientRect().height,
+  }))
+  expect(bounds.scroll).toBeLessThanOrEqual(bounds.client)
+  expect(bounds.height).toBeGreaterThanOrEqual(44)
+  await page
+    .getByRole('heading', { name: 'Group progress', exact: true })
+    .click()
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false')
 })

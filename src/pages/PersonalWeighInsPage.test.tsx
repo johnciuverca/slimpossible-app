@@ -103,7 +103,9 @@ describe('PersonalWeighInsPage', () => {
     )
     expect(screen.getByLabelText('Date')).toHaveValue(dateOffset(-2))
     expect(screen.getByLabelText('Weight in kg')).toHaveValue('79.5')
-    expect(screen.getByText(/no groups are selected/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/review the optional group checkboxes/i),
+    ).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Save weight' }))
 
     await screen.findByText('Personal weigh-in saved in this browser.')
@@ -314,8 +316,7 @@ describe('PersonalWeighInsPage', () => {
     const choice = await screen.findByRole('checkbox', {
       name: 'Setup active group',
     })
-    expect(choice).not.toBeChecked()
-    fireEvent.click(choice)
+    expect(choice).toBeChecked()
     fireEvent.change(screen.getByLabelText('Weight in kg'), {
       target: { value: '82' },
     })

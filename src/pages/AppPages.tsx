@@ -11,7 +11,6 @@ import {
 } from '../components/ui'
 import { MilestoneProgress } from '../components/MilestoneProgress'
 import { PersonalProgressChart } from '../components/PersonalProgressChart'
-import { ChallengeTabs } from '../components/ChallengeContextTabs'
 import { GroupSubnavActions } from '../components/GroupSubnavActions'
 import { ChallengeSettingsLink } from '../components/ChallengeSettingsLink'
 import {
@@ -70,12 +69,14 @@ import {
 } from '../models/groupProgress'
 import {
   localDateOnly,
+  provisionalWeekDates,
   type ProvisionalGroupLeaderSummary,
 } from '../models/provisionalGroupLeader'
 import { createSavedWeeklyWinCelebration } from '../models/weeklyCelebrations'
 import {
   mostRecentWeeklySunday,
   previousWeeklySunday,
+  weeklyCurrentDate,
 } from '../models/weeklyFinalization'
 import { calculateDailyWeightChange } from '../models/weightChange'
 import { calculatePersonalWeeklyChange } from '../models/personalWeeklyChange'
@@ -1490,10 +1491,11 @@ export function GroupDashboardPage() {
   )
   const challengeParam = searchParams.get('challenge')
   const persistence = useMemo(() => createPersistence(authState), [authState])
+  const [localToday, setLocalToday] = useState(() => weeklyCurrentDate())
   const [savedData, setData] = useState<GroupDashboardData | null>(null)
   const [savedChallenges, setChallenges] = useState<Challenge[]>([])
   const weightRevision = usePersonalWeightRevision(ownerId ?? '')
-  const requestKey = `${authState.status}:${ownerId ?? ''}:${challengeParam ?? ''}:${persistence.mode}:${weightRevision}`
+  const requestKey = `${authState.status}:${ownerId ?? ''}:${challengeParam ?? ''}:${persistence.mode}:${weightRevision}:${localToday}`
   const [loadedKey, setLoadedKey] = useState('')
   const data = loadedKey === requestKey ? savedData : null
   const challenges = loadedKey === requestKey ? savedChallenges : []
@@ -1511,6 +1513,21 @@ export function GroupDashboardPage() {
         ownGroupMemberKey(data?.challenge.id ?? '', ownerId) !== null),
     ),
   })
+
+  useEffect(() => {
+    const refreshLocalDate = () => {
+      const today = weeklyCurrentDate()
+      setLocalToday((current) => (current === today ? current : today))
+    }
+    const interval = window.setInterval(refreshLocalDate, 60_000)
+    window.addEventListener('focus', refreshLocalDate)
+    document.addEventListener('visibilitychange', refreshLocalDate)
+    return () => {
+      window.clearInterval(interval)
+      window.removeEventListener('focus', refreshLocalDate)
+      document.removeEventListener('visibilitychange', refreshLocalDate)
+    }
+  }, [])
   const [memberProgressSnapshot, setMemberProgressSnapshot] = useState<{
     key: string
     rows: GroupMemberProgress[]
@@ -1536,6 +1553,71 @@ export function GroupDashboardPage() {
   )
   const memberProgress = visibleMemberProgressSnapshot.rows
   const memberProgressState = visibleMemberProgressSnapshot.state
+  const checkInSunday = provisionalWeekDates(localToday).currentWeekEnd
+  const checkInSnapshotKey = data
+    ? JSON.stringify([requestKey, data.challenge.id, checkInSunday, reloadKey])
+    : ''
+  const [checkInSnapshot, setCheckInSnapshot] = useState<{
+    key: string
+    result: GroupWeeklyResultDisplay | null
+    state: 'loading' | 'ready' | 'error'
+  }>({ key: '', result: null, state: 'loading' })
+  const checkInSnapshotRef = useRef(checkInSnapshotKey)
+  checkInSnapshotRef.current = checkInSnapshotKey
+  const visibleCheckInSnapshot =
+    checkInSnapshot.key === checkInSnapshotKey
+      ? checkInSnapshot
+      : { key: checkInSnapshotKey, result: null, state: 'loading' as const }
+
+  useEffect(() => {
+    let current = true
+    let latestRequest = 0
+    const challengeId = data?.challenge.id
+    const key = checkInSnapshotKey
+    const loadDisplay =
+      persistence.mode === 'remote'
+        ? persistence.repositories.groupProgress.getWeeklyResultDisplay
+        : undefined
+    if (!challengeId || !loadDisplay) {
+      setCheckInSnapshot({ key, result: null, state: 'error' })
+      return () => {
+        current = false
+      }
+    }
+    setCheckInSnapshot({ key, result: null, state: 'loading' })
+    const refreshDisplay = () => {
+      const requestId = ++latestRequest
+      void loadDisplay(challengeId, checkInSunday)
+        .then((result) => {
+          if (
+            !current ||
+            requestId !== latestRequest ||
+            checkInSnapshotRef.current !== key
+          )
+            return
+          setCheckInSnapshot({
+            key,
+            result: result.state === 'success' ? result.data : null,
+            state: result.state === 'success' ? 'ready' : 'error',
+          })
+        })
+        .catch(() => {
+          if (
+            !current ||
+            requestId !== latestRequest ||
+            checkInSnapshotRef.current !== key
+          )
+            return
+          setCheckInSnapshot({ key, result: null, state: 'error' })
+        })
+    }
+    refreshDisplay()
+    const refreshInterval = window.setInterval(refreshDisplay, 60_000)
+    return () => {
+      current = false
+      window.clearInterval(refreshInterval)
+    }
+  }, [checkInSnapshotKey, checkInSunday, data?.challenge.id, persistence])
 
   useEffect(() => {
     let current = true
@@ -1628,6 +1710,7 @@ export function GroupDashboardPage() {
 
   useEffect(() => {
     let current = true
+    let latestRequest = 0
     const challengeId = data?.challenge.id
     const currentSunday = data?.summary.currentSunday
     const loadDisplay =
@@ -1657,16 +1740,22 @@ export function GroupDashboardPage() {
     )
     const refreshDisplay = () => {
       const resultSunday = mostRecentWeeklySunday()
+      const requestId = ++latestRequest
       setData((currentData) =>
         currentData?.challenge.id === challengeId
           ? currentData.weeklyResultSunday === resultSunday
             ? currentData
-            : { ...currentData, weeklyResultSunday: resultSunday }
+            : {
+                ...currentData,
+                weeklyResultSunday: resultSunday,
+                weeklyResultDisplay: null,
+                weeklyResultDisplayState: 'loading',
+              }
           : currentData,
       )
       void loadDisplay(challengeId, resultSunday)
         .then((result) => {
-          if (!current) return
+          if (!current || requestId !== latestRequest) return
           setData((currentData) =>
             currentData?.challenge.id === challengeId
               ? {
@@ -1682,7 +1771,7 @@ export function GroupDashboardPage() {
           )
         })
         .catch(() => {
-          if (!current) return
+          if (!current || requestId !== latestRequest) return
           setData((currentData) =>
             currentData?.challenge.id === challengeId
               ? {
@@ -1920,7 +2009,7 @@ export function GroupDashboardPage() {
           const provisionalResult =
             await persistence.repositories.groupProgress.getProvisionalLeader(
               challenge.id,
-              localDateOnly(),
+              localToday,
             )
           if (!isCurrent) return
 
@@ -1967,6 +2056,7 @@ export function GroupDashboardPage() {
     persistence,
     reloadKey,
     requestKey,
+    localToday,
   ])
 
   const summary = data?.summary
@@ -2053,6 +2143,17 @@ export function GroupDashboardPage() {
   const displayedPreviousSunday = displayedCurrentSunday
     ? previousWeeklySunday(displayedCurrentSunday)
     : summary?.previousSunday
+  const finalizedThisProvisionalWeek = Boolean(
+    hasManagedWeeklyResult &&
+    weeklyResultDisplayState === 'ready' &&
+    weeklyResultDisplay?.state === 'finalized' &&
+    displayedCurrentSunday === provisionalWeekDates(localToday).currentWeekEnd,
+  )
+  const showProvisionalLeader =
+    (!hasManagedWeeklyResult ||
+      (weeklyResultDisplayState === 'ready' && Boolean(weeklyResultDisplay)) ||
+      data?.provisionalLeaderState === 'error') &&
+    !finalizedThisProvisionalWeek
   const selectedChallengeId =
     challengeParam ||
     data?.challenge.id ||
@@ -2065,8 +2166,27 @@ export function GroupDashboardPage() {
   )
 
   const archivedHistory = selectedChallenge?.status === 'archived'
-  const currentChallenges = challenges.filter(
-    ({ status }) => status !== 'archived',
+  const checkInResult = visibleCheckInSnapshot.result
+  const checkInResultAvailable = Boolean(
+    visibleCheckInSnapshot.state === 'ready' &&
+    checkInResult &&
+    ['provisional', 'finalized'].includes(checkInResult.state),
+  )
+  const checkInSundayIsToday = localToday === checkInSunday
+  const ownSharedSundayRecorded = Boolean(
+    memberProgressState === 'ready' &&
+    ownMemberKey &&
+    ownProgressRow?.latestRecordedDate === checkInSunday,
+  )
+  const showOverviewRecordAction = Boolean(
+    section === 'overview' &&
+    !archivedHistory &&
+    checkInResultAvailable &&
+    checkInSundayIsToday &&
+    ownMemberKey &&
+    memberProgressState === 'ready' &&
+    ownProgressRow &&
+    !ownSharedSundayRecorded,
   )
 
   const scrolledNavigation = useRef('')
@@ -2107,14 +2227,16 @@ export function GroupDashboardPage() {
 
   return (
     <section
-      className="group-workspace mx-auto w-full max-w-7xl space-y-4"
+      className="group-workspace mx-auto w-full space-y-4"
       aria-labelledby="group-title"
     >
       <div className="space-y-2">
         <GroupSubnavActions>
-          <StandaloneRecordWeightAction
-            onRecorded={() => setReloadKey((value) => value + 1)}
-          />
+          {!showOverviewRecordAction ? (
+            <StandaloneRecordWeightAction
+              onRecorded={() => setReloadKey((value) => value + 1)}
+            />
+          ) : null}
           {!archivedHistory ? (
             <GroupActionsPopover
               compact
@@ -2177,17 +2299,15 @@ export function GroupDashboardPage() {
               View current groups
             </Link>
           </div>
-        ) : (
-          <ChallengeTabs
-            challenges={currentChallenges}
-            selectedId={selectedChallengeId}
-            loading={isLoading}
-            showPersonalTracking={false}
-            compact
-            stretchItems={section === 'records'}
-            managementOwnerId={ownerId}
-          />
-        )}
+        ) : selectedChallenge?.ownerId === ownerId ? (
+          <Link
+            to="/challenge/manage"
+            title="Manage challenges"
+            className="group-manage-link inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-line bg-panel px-4 py-2 font-semibold text-forest-800"
+          >
+            Manage
+          </Link>
+        ) : null}
       </div>
       {!selectedChallenge && !isLoading ? (
         <Link
@@ -2214,115 +2334,121 @@ export function GroupDashboardPage() {
                 }
               >
                 {section === 'weekly-results' ? (
-                  <div className="grid gap-5 lg:grid-cols-2">
-                    <section
-                      aria-labelledby="provisional-leader-heading"
-                      className="group-overview-leader min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 sm:p-7"
-                    >
-                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-800">
-                        This week
-                      </p>
-                      <h2
-                        className="mt-2 text-xl font-bold text-slate-950"
-                        id="provisional-leader-heading"
+                  <div
+                    className={`grid gap-5 ${showProvisionalLeader ? 'lg:grid-cols-2' : ''}`}
+                  >
+                    {showProvisionalLeader ? (
+                      <section
+                        aria-labelledby="provisional-leader-heading"
+                        className="group-overview-leader min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 sm:p-7"
                       >
-                        Provisional leader
-                      </h2>
-                      {data.provisionalLeaderState === 'loading' ? (
-                        <p
-                          className="mt-4 text-sm text-slate-700"
-                          role="status"
-                        >
-                          Loading this week’s group update…
+                        <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-800">
+                          This week
                         </p>
-                      ) : data.provisionalLeaderState === 'error' ? (
-                        <p
-                          className="mt-4 text-sm text-slate-700"
-                          role="status"
+                        <h2
+                          className="mt-2 text-xl font-bold text-slate-950"
+                          id="provisional-leader-heading"
                         >
-                          Provisional group progress is unavailable right now.
-                        </p>
-                      ) : provisionalLeader?.state === 'leaders' ? (
-                        <>
-                          <p className="mt-3 text-sm text-slate-700">
-                            Comparing check-ins since Sunday{' '}
+                          Provisional leader
+                        </h2>
+                        {data.provisionalLeaderState === 'loading' ? (
+                          <p
+                            className="mt-4 text-sm text-slate-700"
+                            role="status"
+                          >
+                            Loading this week’s group update…
+                          </p>
+                        ) : data.provisionalLeaderState === 'error' ? (
+                          <p
+                            className="mt-4 text-sm text-slate-700"
+                            role="status"
+                          >
+                            Provisional group progress is unavailable right now.
+                          </p>
+                        ) : provisionalLeader?.state === 'leaders' ? (
+                          <>
+                            <p className="mt-3 text-sm text-slate-700">
+                              Comparing check-ins since Sunday{' '}
+                              <time dateTime={provisionalLeader.previousSunday}>
+                                {formatDate(provisionalLeader.previousSunday)}
+                              </time>
+                              ; this week runs{' '}
+                              <time
+                                dateTime={provisionalLeader.currentWeekStart}
+                              >
+                                {formatDate(provisionalLeader.currentWeekStart)}
+                              </time>{' '}
+                              to{' '}
+                              <time dateTime={provisionalLeader.currentWeekEnd}>
+                                {formatDate(provisionalLeader.currentWeekEnd)}
+                              </time>
+                              .
+                            </p>
+                            <p className="mt-4 text-lg font-bold text-slate-950">
+                              {provisionalLeader.leaderCount > 1
+                                ? 'Shared provisional leaders'
+                                : 'Current provisional leader'}
+                            </p>
+                            <ul
+                              aria-label="Provisional leaders"
+                              className="mt-2 space-y-2"
+                            >
+                              {provisionalLeader.leaderNames.map(
+                                (name, index) => (
+                                  <li
+                                    className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-xl bg-white/80 px-4 py-3"
+                                    key={`${name}-${index}`}
+                                  >
+                                    <span className="font-semibold text-slate-950">
+                                      {name}
+                                    </span>
+                                    <span className="text-sm text-slate-600">
+                                      Latest check-in{' '}
+                                      <time
+                                        dateTime={
+                                          provisionalLeader.leaderLatestDates[
+                                            index
+                                          ]
+                                        }
+                                      >
+                                        {formatDate(
+                                          provisionalLeader.leaderLatestDates[
+                                            index
+                                          ],
+                                        )}
+                                      </time>
+                                    </span>
+                                  </li>
+                                ),
+                              )}
+                            </ul>
+                            <p className="mt-3 text-sm leading-6 text-slate-700">
+                              {provisionalLeader.eligibleParticipantCount} of{' '}
+                              {provisionalLeader.activeParticipantCount} active
+                              members have both comparison check-ins. Ties are
+                              shared; this result is provisional until Sunday.
+                            </p>
+                          </>
+                        ) : provisionalLeader?.state ===
+                          'no-eligible-candidates' ? (
+                          <p className="mt-4 text-sm leading-6 text-slate-700">
+                            No provisional leader is available yet. A member
+                            needs a saved check-in on Sunday{' '}
                             <time dateTime={provisionalLeader.previousSunday}>
                               {formatDate(provisionalLeader.previousSunday)}
-                            </time>
-                            ; this week runs{' '}
-                            <time dateTime={provisionalLeader.currentWeekStart}>
-                              {formatDate(provisionalLeader.currentWeekStart)}
                             </time>{' '}
-                            to{' '}
-                            <time dateTime={provisionalLeader.currentWeekEnd}>
-                              {formatDate(provisionalLeader.currentWeekEnd)}
-                            </time>
-                            .
+                            and one during this week. The result updates as
+                            saved check-ins change.
                           </p>
-                          <p className="mt-4 text-lg font-bold text-slate-950">
-                            {provisionalLeader.leaderCount > 1
-                              ? 'Shared provisional leaders'
-                              : 'Current provisional leader'}
+                        ) : (
+                          <p className="mt-4 text-sm leading-6 text-slate-700">
+                            {provisionalLeader?.activeParticipantCount === 0
+                              ? 'No active members are available for a provisional result.'
+                              : 'At least two active members are needed for a provisional group result.'}
                           </p>
-                          <ul
-                            aria-label="Provisional leaders"
-                            className="mt-2 space-y-2"
-                          >
-                            {provisionalLeader.leaderNames.map(
-                              (name, index) => (
-                                <li
-                                  className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-xl bg-white/80 px-4 py-3"
-                                  key={`${name}-${index}`}
-                                >
-                                  <span className="font-semibold text-slate-950">
-                                    {name}
-                                  </span>
-                                  <span className="text-sm text-slate-600">
-                                    Latest check-in{' '}
-                                    <time
-                                      dateTime={
-                                        provisionalLeader.leaderLatestDates[
-                                          index
-                                        ]
-                                      }
-                                    >
-                                      {formatDate(
-                                        provisionalLeader.leaderLatestDates[
-                                          index
-                                        ],
-                                      )}
-                                    </time>
-                                  </span>
-                                </li>
-                              ),
-                            )}
-                          </ul>
-                          <p className="mt-3 text-sm leading-6 text-slate-700">
-                            {provisionalLeader.eligibleParticipantCount} of{' '}
-                            {provisionalLeader.activeParticipantCount} active
-                            members have both comparison check-ins. Ties are
-                            shared; this result is provisional until Sunday.
-                          </p>
-                        </>
-                      ) : provisionalLeader?.state ===
-                        'no-eligible-candidates' ? (
-                        <p className="mt-4 text-sm leading-6 text-slate-700">
-                          No provisional leader is available yet. A member needs
-                          a saved check-in on Sunday{' '}
-                          <time dateTime={provisionalLeader.previousSunday}>
-                            {formatDate(provisionalLeader.previousSunday)}
-                          </time>{' '}
-                          and one during this week. The result updates as saved
-                          check-ins change.
-                        </p>
-                      ) : (
-                        <p className="mt-4 text-sm leading-6 text-slate-700">
-                          {provisionalLeader?.activeParticipantCount === 0
-                            ? 'No active members are available for a provisional result.'
-                            : 'At least two active members are needed for a provisional group result.'}
-                        </p>
-                      )}
-                    </section>
+                        )}
+                      </section>
+                    ) : null}
 
                     <section
                       aria-labelledby="weekly-winners-heading"
@@ -2403,68 +2529,172 @@ export function GroupDashboardPage() {
                 ) : null}
 
                 {section === 'overview' ? (
-                  <section aria-labelledby="group-progress-heading">
-                    <h2
-                      className="text-sm font-semibold text-slate-700"
-                      id="group-progress-heading"
+                  <div className="space-y-3">
+                    <section
+                      aria-labelledby="weekly-check-in-heading"
+                      className="group-weekly-checkin-strip rounded-xl border px-4 py-3"
                     >
-                      Group progress
-                    </h2>
-                    <dl className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-                      <div className="group-overview-metric min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2">
-                        <dt className="text-xs font-semibold text-slate-600">
-                          Members
-                        </dt>
-                        <dd className="mt-1 text-xl font-bold tracking-tight text-slate-950">
-                          {summary.activeParticipantCount}
-                        </dd>
+                      <div className="group-checkin-summary min-w-0">
+                        <span className="group-checkin-kicker">This week</span>
+                        <h2
+                          className="font-semibold text-slate-950"
+                          id="weekly-check-in-heading"
+                        >
+                          This week’s check-in
+                        </h2>
+                        <p className="group-checkin-status text-sm text-slate-700">
+                          {!checkInSundayIsToday ? (
+                            <>
+                              Opens{' '}
+                              <time dateTime={checkInSunday}>
+                                {formatDate(checkInSunday)}
+                              </time>
+                            </>
+                          ) : visibleCheckInSnapshot.state === 'loading' ? (
+                            'Checking status…'
+                          ) : visibleCheckInSnapshot.state === 'error' ||
+                            (checkInResult &&
+                              !['provisional', 'finalized'].includes(
+                                checkInResult.state,
+                              )) ? (
+                            'Status unavailable'
+                          ) : checkInResultAvailable &&
+                            checkInResult?.state === 'finalized' ? (
+                            'Finalized and locked'
+                          ) : checkInResultAvailable ? (
+                            'Check-in open'
+                          ) : (
+                            'Status unavailable'
+                          )}
+                        </p>
+                        {checkInResultAvailable && checkInSundayIsToday ? (
+                          <p
+                            className="mt-0.5 text-sm text-slate-700"
+                            role="status"
+                          >
+                            {checkInResult?.recordedParticipantCount} of{' '}
+                            {checkInResult?.activeParticipantCount} active
+                            members checked in
+                          </p>
+                        ) : null}
+                        {checkInResultAvailable &&
+                        checkInSundayIsToday &&
+                        ownMemberKey ? (
+                          memberProgressState === 'loading' ? (
+                            <p
+                              className="mt-0.5 text-xs text-slate-600"
+                              role="status"
+                            >
+                              Checking your shared weigh-in…
+                            </p>
+                          ) : memberProgressState === 'error' ? (
+                            <p
+                              className="mt-0.5 text-xs text-slate-700"
+                              role="status"
+                            >
+                              Your check-in status is unavailable.
+                            </p>
+                          ) : ownSharedSundayRecorded ? (
+                            <p
+                              className="mt-0.5 text-xs font-medium text-ink"
+                              role="status"
+                            >
+                              Your Sunday weigh-in is shared with this group.
+                            </p>
+                          ) : ownProgressRow ? (
+                            <p
+                              className="mt-0.5 text-xs text-slate-700"
+                              role="status"
+                            >
+                              Your Sunday weigh-in has not been shared yet.
+                            </p>
+                          ) : (
+                            <p
+                              className="mt-0.5 text-xs text-slate-700"
+                              role="status"
+                            >
+                              Your group membership status is unavailable.
+                            </p>
+                          )
+                        ) : null}
                       </div>
-                      <div className="group-overview-metric min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2">
-                        <dt className="text-xs font-semibold text-slate-600">
-                          Avg. goal progress
-                        </dt>
-                        <dd className="mt-1 text-xl font-bold tracking-tight text-slate-950">
-                          {summary.averageCompletionPercentage === null
-                            ? '—'
-                            : `${summary.averageCompletionPercentage}%`}
-                        </dd>
+                      <div className="group-checkin-deadline">
+                        <svg
+                          aria-hidden="true"
+                          className="group-checkin-calendar"
+                          viewBox="0 0 24 24"
+                        >
+                          <rect x="3.5" y="5" width="17" height="15" rx="2" />
+                          <path d="M7.5 3.5v3M16.5 3.5v3M3.5 9h17" />
+                        </svg>
+                        <span>
+                          <strong>
+                            {checkInResultAvailable &&
+                            checkInSundayIsToday &&
+                            checkInResult?.state === 'finalized'
+                              ? 'Locked Sunday at 20:00'
+                              : 'Locks Sunday at 20:00'}
+                          </strong>
+                          <span className="group-checkin-muted">
+                            Romanian time
+                          </span>
+                        </span>
                       </div>
-                      <div className="group-overview-metric min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2">
-                        <dt className="text-xs font-semibold text-slate-600">
-                          Checked in
-                        </dt>
-                        <dd className="mt-1 text-xl font-bold tracking-tight text-slate-950">
-                          {summary.participantsWithRecordedWeightCount}
-                        </dd>
-                      </div>
-                      <div className="group-overview-metric min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2">
-                        <dt className="text-xs font-semibold text-slate-600">
-                          Goals reached
-                        </dt>
-                        <dd className="mt-1 text-xl font-bold tracking-tight text-slate-950">
-                          {summary.reachedTargetCount}
-                        </dd>
-                      </div>
-                    </dl>
-                    <div
-                      role="group"
-                      className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-sm"
-                      aria-label="This week’s winners"
-                    >
-                      <span className="font-semibold">This week’s winners</span>
-                      <span className="text-ink-muted">
-                        {hasManagedWeeklyResult
-                          ? weeklyResultDisplay?.winnerCount === 0
-                            ? 'No result yet'
-                            : weeklyWinnerNames.join(', ')
-                          : weeklyCelebration?.state ===
-                              'no-eligible-candidates'
-                            ? 'No result yet'
-                            : weeklyCelebration?.winnerNames.join(', ') ||
-                              'No result yet'}
-                      </span>
-                    </div>
-                  </section>
+                      {checkInSundayIsToday &&
+                      memberProgressState === 'ready' ? (
+                        <div className="group-checkin-members">
+                          {memberProgress.filter(
+                            (member) =>
+                              member.latestRecordedDate === checkInSunday,
+                          ).length > 0 ? (
+                            <ul
+                              aria-label="Members checked in this Sunday"
+                              className="group-weekly-checkin-members flex flex-wrap gap-2"
+                            >
+                              {memberProgress
+                                .filter(
+                                  (member) =>
+                                    member.latestRecordedDate === checkInSunday,
+                                )
+                                .map((member) => (
+                                  <li
+                                    key={member.memberKey}
+                                    className="inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-medium"
+                                  >
+                                    <GroupParticipantAvatar
+                                      avatarPresetId={member.avatarPresetId}
+                                      displayName={member.displayName}
+                                      className="h-6! w-6! text-xs!"
+                                    />
+                                    <span>{member.displayName}</span>
+                                    <span
+                                      aria-hidden="true"
+                                      className="group-weekly-checkin-check"
+                                    >
+                                      ✓
+                                    </span>
+                                  </li>
+                                ))}
+                            </ul>
+                          ) : checkInResultAvailable &&
+                            checkInResult?.recordedParticipantCount === 0 ? (
+                            <span className="group-checkin-muted">
+                              No Sunday check-ins yet
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      {showOverviewRecordAction ? (
+                        <div className="group-checkin-action shrink-0 [&_button]:min-h-11">
+                          <StandaloneRecordWeightAction
+                            onRecorded={() =>
+                              setReloadKey((value) => value + 1)
+                            }
+                          />
+                        </div>
+                      ) : null}
+                    </section>
+                  </div>
                 ) : null}
                 {section === 'weekly-results' ? (
                   <section
@@ -2536,6 +2766,70 @@ export function GroupDashboardPage() {
           compactOverview
           memberProgress={memberProgressState === 'ready' ? memberProgress : []}
         />
+      ) : null}
+      {summary && section === 'overview' ? (
+        <section
+          aria-labelledby="group-progress-heading"
+          className="group-overview-stats space-y-2"
+        >
+          <h2
+            className="text-sm font-semibold text-slate-700"
+            id="group-progress-heading"
+          >
+            Progress metrics
+          </h2>
+          <dl className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+            <div className="group-overview-metric min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2">
+              <dt className="text-xs font-semibold text-slate-600">Members</dt>
+              <dd className="mt-1 text-xl font-bold tracking-tight text-slate-950">
+                {summary.activeParticipantCount}
+              </dd>
+            </div>
+            <div className="group-overview-metric min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2">
+              <dt className="text-xs font-semibold text-slate-600">
+                Avg. goal progress
+              </dt>
+              <dd className="mt-1 text-xl font-bold tracking-tight text-slate-950">
+                {summary.averageCompletionPercentage === null
+                  ? '—'
+                  : `${summary.averageCompletionPercentage}%`}
+              </dd>
+            </div>
+            <div className="group-overview-metric min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2">
+              <dt className="text-xs font-semibold text-slate-600">
+                Shared weights
+              </dt>
+              <dd className="mt-1 text-xl font-bold tracking-tight text-slate-950">
+                {summary.participantsWithRecordedWeightCount}
+              </dd>
+            </div>
+            <div className="group-overview-metric min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2">
+              <dt className="text-xs font-semibold text-slate-600">
+                Goals reached
+              </dt>
+              <dd className="mt-1 text-xl font-bold tracking-tight text-slate-950">
+                {summary.reachedTargetCount}
+              </dd>
+            </div>
+          </dl>
+          <div
+            role="group"
+            className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-sm"
+            aria-label="This week’s winners"
+          >
+            <span className="font-semibold">This week’s winners</span>
+            <span className="text-ink-muted">
+              {hasManagedWeeklyResult
+                ? weeklyResultDisplay?.winnerCount === 0
+                  ? 'No result yet'
+                  : weeklyWinnerNames.join(', ')
+                : weeklyCelebration?.state === 'no-eligible-candidates'
+                  ? 'No result yet'
+                  : weeklyCelebration?.winnerNames.join(', ') ||
+                    'No result yet'}
+            </span>
+          </div>
+        </section>
       ) : null}
       {summary && section === 'members' ? (
         <Card id="group-progress" className="space-y-5 p-5 sm:p-8">

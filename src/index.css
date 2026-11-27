@@ -1528,15 +1528,22 @@ body {
   box-shadow: none;
 }
 
-.group-workspace .group-overview-compact .group-overview-metric {
+.group-workspace .group-overview-metric {
   border: 1px solid #354353;
-  padding: 10px 12px;
+  padding: 6px 9px;
   box-shadow: none;
 }
 
 /* Group content uses the chart card's outer edges as the shared shell gutter. */
 .group-shell .app-shell-header-inner {
   padding-inline: 16px;
+}
+.group-shell .app-shell-main {
+  max-width: none;
+  padding-inline: 16px;
+}
+.group-shell .contextual-subnav-scroll {
+  max-width: none;
 }
 .group-shell .account-control summary {
   padding-right: 0;
@@ -1548,9 +1555,339 @@ body {
   justify-content: space-between;
   gap: 16px;
   width: 100%;
-  max-width: 1280px;
+  max-width: none;
   margin-inline: auto;
   padding-inline: 16px;
+}
+
+/* Wide Group Overview hierarchy follows the owner-provided reference. */
+.group-workspace .group-weekly-checkin-strip {
+  display: grid;
+  grid-template-columns:
+    minmax(220px, 1.15fr) minmax(180px, 0.9fr) minmax(0, 1.5fr)
+    auto;
+  align-items: center;
+  gap: 12px 16px;
+  border-color: #354353;
+  background: #111c28;
+  color: #f1f6fa;
+  box-shadow: 0 12px 32px -26px #000;
+}
+.group-checkin-summary h2 {
+  font-size: 0.9rem;
+}
+.group-checkin-kicker {
+  display: block;
+  margin-bottom: 2px;
+  color: #b5c1d0;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.group-checkin-status {
+  margin-top: 2px;
+  font-weight: 700;
+}
+.group-checkin-summary [role='status'] {
+  line-height: 1.35;
+}
+.group-checkin-deadline,
+.group-checkin-members {
+  min-width: 0;
+  border-left: 1px solid #354353;
+  padding-left: 16px;
+}
+.group-checkin-deadline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.group-checkin-deadline > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.group-checkin-calendar {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: #d6e0e9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+.group-checkin-muted {
+  color: #b5c1d0;
+  font-size: 0.75rem;
+}
+.group-checkin-action {
+  grid-column: 4;
+}
+.group-workspace .group-weekly-checkin-strip .text-slate-950,
+.group-workspace .group-weekly-checkin-strip .text-slate-700,
+.group-workspace .group-weekly-checkin-strip .text-slate-600 {
+  color: #d6e0e9;
+}
+.group-weekly-checkin-members li {
+  border-color: #354353;
+  background: #172431;
+  color: #f1f6fa;
+}
+.group-weekly-checkin-members li [data-avatar-preset],
+.group-weekly-checkin-members li [aria-label*='avatar'] {
+  flex: 0 0 auto;
+}
+.group-weekly-checkin-check {
+  color: #31dbb0;
+  font-weight: 800;
+}
+.group-workspace .group-history-workspace > [id$='-panel'] > section {
+  border-color: #354353;
+  background: #111c28;
+}
+.group-workspace .group-history-workspace [aria-label='Quick date ranges'] {
+  gap: 6px;
+}
+.group-workspace .group-overview-chart-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 12px 4px;
+}
+.group-workspace .group-overview-chart-heading {
+  flex: 0 0 auto;
+  color: #f4f7fb;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.group-workspace .group-overview-axis-title {
+  fill: #d6e0e9;
+}
+.group-workspace .group-overview-history-collapse {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding-inline: 12px;
+}
+.group-workspace
+  .group-history-workspace
+  .group-overview-chart-controls
+  [aria-label='Quick date ranges'] {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: 0;
+  width: auto;
+  margin: 0 0 0 auto;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #354353;
+  border-radius: 8px;
+  background: #111c28;
+}
+.group-workspace
+  .group-history-workspace
+  [aria-label='Quick date ranges']
+  > span {
+  color: #b5c1d0;
+  font-size: 0.75rem;
+}
+.group-workspace
+  .group-history-workspace
+  [aria-label='Quick date ranges']
+  button {
+  min-height: 44px;
+  min-width: 40px;
+  border-radius: 999px;
+  border-color: #354353;
+  padding-inline: 12px;
+}
+.group-workspace
+  .group-history-workspace
+  .group-overview-chart-controls
+  [aria-label='Quick date ranges']
+  button {
+  min-height: 32px;
+  min-width: 36px;
+  padding-inline: 8px;
+  border: 0;
+  border-right: 1px solid #354353;
+  border-radius: 0;
+}
+.group-workspace
+  .group-history-workspace
+  .group-overview-chart-controls
+  [aria-label='Quick date ranges']
+  button:last-child {
+  border-right: 0;
+}
+.group-workspace
+  .group-history-workspace
+  [aria-label='Quick date ranges']
+  button[aria-pressed='true'] {
+  border-color: #31dbb0;
+  background: #145447;
+  color: #f1fffb;
+}
+.group-workspace .group-history-workspace [aria-label='Group chart legend'] {
+  justify-content: center;
+  border-top: 1px solid #354353;
+  padding-top: 10px;
+}
+.group-workspace .chart-value {
+  fill: #f7fbff;
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: #111c28;
+  stroke-linejoin: round;
+  stroke-width: 3px;
+}
+@media (max-width: 1023px) {
+  .group-workspace .group-weekly-checkin-strip {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  }
+  .group-checkin-members {
+    grid-column: 1 / -1;
+  }
+  .group-checkin-action {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+@media (max-width: 639px) {
+  .group-workspace .group-overview-chart-controls {
+    gap: 4px;
+    margin-inline: 16px;
+  }
+  .group-workspace .group-overview-chart-heading {
+    font-size: 1rem;
+  }
+  .group-workspace .group-overview-history-collapse {
+    flex-basis: 100%;
+    min-height: 44px;
+  }
+  .group-workspace .group-weekly-checkin-strip {
+    padding: 12px;
+  }
+  .group-checkin-deadline {
+    gap: 8px;
+  }
+  .group-checkin-deadline,
+  .group-checkin-members {
+    border-left: 0;
+    padding-left: 0;
+  }
+  .group-checkin-members,
+  .group-checkin-action {
+    grid-column: 1 / -1;
+  }
+  .group-weekly-checkin-members li {
+    padding: 4px 8px;
+  }
+  .group-workspace .group-history-workspace [aria-label='Group chart legend'] {
+    gap: 4px 8px;
+  }
+  .group-workspace
+    .group-history-workspace
+    .group-overview-chart-controls
+    [aria-label='Quick date ranges'] {
+    position: relative;
+    flex-wrap: nowrap;
+    gap: 0;
+    overflow: visible;
+    border: 0;
+    background: transparent;
+  }
+  .group-workspace
+    .group-history-workspace
+    .group-overview-chart-controls
+    [aria-label='Quick date ranges']::before {
+    position: absolute;
+    z-index: 2;
+    inset: 8px 0;
+    border: 1px solid #354353;
+    border-radius: 7px;
+    content: '';
+    pointer-events: none;
+  }
+  .group-workspace
+    .group-history-workspace
+    .group-overview-chart-controls
+    [aria-label='Quick date ranges']
+    button {
+    display: grid;
+    position: relative;
+    z-index: 1;
+    width: 44px;
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+  .group-workspace
+    .group-history-workspace
+    .group-overview-chart-controls
+    [aria-label='Quick date ranges']
+    .group-overview-range-label {
+    display: grid;
+    box-sizing: border-box;
+    width: 44px;
+    min-width: 44px;
+    max-width: 44px;
+    height: 28px;
+    align-self: center;
+    place-items: center;
+    border-right: 1px solid #354353;
+    background: transparent;
+    color: #e4edf4;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    padding: 0;
+  }
+  .group-workspace
+    .group-history-workspace
+    .group-overview-chart-controls
+    [aria-label='Quick date ranges']
+    button:first-child
+    .group-overview-range-label {
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+  }
+  .group-workspace
+    .group-history-workspace
+    .group-overview-chart-controls
+    [aria-label='Quick date ranges']
+    button:last-child
+    .group-overview-range-label {
+    border-right: 0;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+  }
+  .group-workspace
+    .group-history-workspace
+    .group-overview-chart-controls
+    [aria-label='Quick date ranges']
+    button[aria-pressed='true']
+    .group-overview-range-label {
+    border-color: #31dbb0;
+    background: #145447;
+    color: #f1fffb;
+  }
+  .group-workspace
+    .group-history-workspace
+    [aria-label='Group chart legend']
+    button {
+    max-width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    overflow-wrap: anywhere;
+  }
 }
 .group-context-subnav .contextual-subnav-scroll {
   min-width: 0;
@@ -1608,9 +1945,12 @@ body {
   border-width: 0;
 }
 @media (min-width: 640px) {
+  .shared-layout.group-shell .app-shell-main {
+    padding-inline: 24px;
+  }
   .group-shell .app-shell-header-inner,
   .group-context-subnav-inner {
-    padding-inline: 32px;
+    padding-inline: 24px;
   }
 }
 @media (max-width: 1023px) {
@@ -1633,31 +1973,31 @@ body {
 }
 
 @media (max-width: 639px) {
-  .group-workspace .group-overview-card.group-overview-compact {
+  .group-workspace .group-overview-stats {
     container-name: group-overview;
     container-type: inline-size;
   }
-  .group-workspace .group-overview-compact #group-progress-heading + dl {
+  .group-workspace .group-overview-stats #group-progress-heading + dl {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0.25rem;
   }
-  .group-workspace .group-overview-compact .group-overview-metric {
+  .group-workspace .group-overview-stats .group-overview-metric {
     min-width: 0;
     padding: 4px 5px;
   }
-  .group-workspace .group-overview-compact .group-overview-metric dt {
+  .group-workspace .group-overview-stats .group-overview-metric dt {
     font-size: 0.625rem;
     line-height: 1.2;
     overflow-wrap: anywhere;
   }
-  .group-workspace .group-overview-compact .group-overview-metric dd {
+  .group-workspace .group-overview-stats .group-overview-metric dd {
     margin-block-start: 2px;
     font-size: 0.875rem;
     line-height: 1.1;
     overflow-wrap: anywhere;
   }
   .group-workspace
-    .group-overview-compact
+    .group-overview-stats
     [role='group'][aria-label='This week’s winners'] {
     gap: 2px 0.5rem;
     padding-inline: 0.25rem;
@@ -1668,13 +2008,124 @@ body {
 }
 
 @media (max-width: 359px) {
-  .group-workspace .group-overview-compact #group-progress-heading + dl {
+  .group-workspace .group-overview-stats #group-progress-heading + dl {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@container group-overview (max-width: 22em) {
-  .group-workspace .group-overview-compact #group-progress-heading + dl {
+@container group-overview (max-width: 400px) {
+  .group-workspace .group-overview-stats #group-progress-heading + dl {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+/* Shared small gutters keep the primary shell aligned with workspace edges. */
+.signed-in-shell .app-shell-header-inner {
+  max-width: none;
+  padding-inline: 16px;
+}
+.group-switcher {
+  position: relative;
+  min-width: 0;
+}
+.group-switcher-trigger {
+  position: relative;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) 16px;
+  align-items: center;
+  min-height: 44px;
+  width: 180px;
+  max-width: 28vw;
+  padding: 0 6px;
+  border: 0;
+  color: var(--color-ink);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1;
+}
+.group-switcher-trigger::before {
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: var(--color-panel);
+  content: '';
+  pointer-events: none;
+}
+.group-switcher-trigger > span {
+  position: relative;
+  min-width: 0;
+  text-align: center;
+}
+.group-switcher-trigger > span:first-child {
+  grid-column: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.group-switcher-trigger > span:last-child {
+  grid-column: 3;
+}
+.group-switcher-trigger:focus-visible {
+  outline: 2px solid var(--color-forest-800);
+  outline-offset: 2px;
+}
+.group-switcher-panel {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 300px;
+  max-width: calc(100vw - 32px);
+  max-height: 60vh;
+  overflow-y: auto;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  padding: 6px;
+  background: var(--color-panel);
+  box-shadow: 0 12px 30px #0008;
+}
+.app-shell.signed-in-shell .group-switcher-panel a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  padding: 8px 10px;
+}
+.group-switcher-panel p {
+  padding: 10px;
+  font-size: 13px;
+}
+@media (max-width: 640px) {
+  .group-switcher-trigger {
+    width: 110px;
+    max-width: 28vw;
+    font-size: 12px;
+    grid-template-columns: 12px minmax(0, 1fr) 12px;
+    padding-inline: 4px;
+  }
+}
+
+.group-switcher-trigger[aria-current='page']::before {
+  background: #253b2d;
+  border-color: #527b5e;
+}
+.signed-in-shell .contextual-subnav-scroll {
+  max-width: none;
+}
+
+.signed-in-shell .app-shell-main .group-workspace a.group-manage-link {
+  min-height: 44px;
+  min-width: 44px;
+  font-size: 12.6px;
+}
+@media (min-width: 640px) {
+  .signed-in-shell.group-shell .app-shell-header-inner {
+    padding-inline: 24px;
+  }
+}
+.signed-in-shell .app-shell-brand {
+  padding-inline: 0;
 }

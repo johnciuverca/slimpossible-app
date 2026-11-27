@@ -93,6 +93,7 @@ export function SharedWeightChart({
   labelExtremesOnly = false,
   labelSeriesExtremesOnly = false,
   compactOlderHistory = false,
+  compactOverview = false,
   className = 'block h-auto w-full min-w-[600px]',
   viewBox = '0 0 760 266',
 }: {
@@ -117,6 +118,7 @@ export function SharedWeightChart({
   labelExtremesOnly?: boolean
   labelSeriesExtremesOnly?: boolean
   compactOlderHistory?: boolean
+  compactOverview?: boolean
   className?: string
   viewBox?: string
 }) {
@@ -141,6 +143,10 @@ export function SharedWeightChart({
     () =>
       fitContainer && typeof window !== 'undefined' && window.innerWidth <= 600,
   )
+  const [overviewViewBox, setOverviewViewBox] = useState({
+    width: 760,
+    height: 300,
+  })
   useEffect(() => {
     if (!fitContainer) {
       setCompactFitLayout(false)
@@ -157,11 +163,62 @@ export function SharedWeightChart({
     window.addEventListener('resize', update)
     return () => window.removeEventListener('resize', update)
   }, [fitContainer])
+  useEffect(() => {
+    if (!compactOverview || !fitContainer) return
+    const plot = plotRef.current
+    if (!plot) return
+    const update = () => {
+      const width = Math.round(plot.getBoundingClientRect().width)
+      const height = Math.round(
+        Math.max(200, Math.min(320, 200 + window.innerHeight - 768)),
+      )
+      if (width > 0)
+        setOverviewViewBox((current) =>
+          current.width === width && current.height === height
+            ? current
+            : { width, height },
+        )
+    }
+    update()
+    const observer =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update)
+    observer?.observe(plot)
+    window.addEventListener('resize', update)
+    return () => {
+      observer?.disconnect()
+      window.removeEventListener('resize', update)
+    }
+  }, [compactOverview, fitContainer])
   const compactLayout = fitContainer && compactFitLayout
-  const chartLeft = compactLayout ? sharedChartTheme.plot.compactLeft : left
+  const chartAxisTickPx = compactOverview
+    ? 14 * sharedChartTheme.axisTickScale
+    : sharedChartAxisTickPx
+  const valueLabelFontSize = compactOverview
+    ? compactLayout
+      ? 11
+      : 12.5
+    : compactLayout
+      ? 9
+      : 6.6
+  const valueLabelCharacterWidth = compactOverview
+    ? valueLabelFontSize * 0.58
+    : compactLayout && labelExtremesOnly
+      ? 5.4
+      : 4.2
+  const chartLeft = compactLayout
+    ? compactOverview
+      ? 40
+      : sharedChartTheme.plot.compactLeft
+    : compactOverview
+      ? left + 2
+      : left
   let chartRight = compactLayout ? 312 : right
   const chartTop = top
-  const chartViewBox = compactLayout ? '0 0 320 266' : viewBox
+  const chartViewBox = compactLayout
+    ? '0 0 320 266'
+    : compactOverview
+      ? `0 0 ${overviewViewBox.width} ${overviewViewBox.height}`
+      : viewBox
   const chartClassName = fitContainer
     ? className.replace('min-w-[600px]', 'min-w-0')
     : className
@@ -393,7 +450,7 @@ export function SharedWeightChart({
   const pointLabelX = (point: SharedChartPoint) => {
     const pointX = x(point.date)
     if (!labelExtremesOnly || !compactLayout || !point.label) return pointX
-    const halfLabelWidth = (point.label.length * 5.4) / 2
+    const halfLabelWidth = (point.label.length * valueLabelCharacterWidth) / 2
     return Math.max(
       chartLeft + halfLabelWidth + 2,
       Math.min(pointX, chartRight - halfLabelWidth - 2),
@@ -402,8 +459,7 @@ export function SharedWeightChart({
   const seriesLabelX = (point: SharedChartPoint) => {
     const pointX = x(point.date)
     if (!labelSeriesExtremesOnly || !point.label) return pointX
-    const halfLabelWidth =
-      (point.label.length * (compactLayout ? 5.4 : 4.2)) / 2
+    const halfLabelWidth = (point.label.length * valueLabelCharacterWidth) / 2
     return Math.max(
       chartLeft + halfLabelWidth + 2,
       Math.min(pointX, chartRight - halfLabelWidth - 2),
@@ -615,8 +671,12 @@ export function SharedWeightChart({
   const viewBoxHeight = viewBoxParts[3] || 266
   if (compactLayout) {
     chartRight = viewBoxWidth - sharedChartTheme.plot.compactRightInset
+  } else if (compactOverview) {
+    chartRight = viewBoxWidth - (760 - sharedChartTheme.plot.right)
   }
   const plotBottom = viewBoxHeight - sharedChartTheme.plot.bottomInset
+  const axisTitleX = compactOverview ? (compactLayout ? 8 : 15) : chartLeft
+  const axisTitleY = compactOverview ? (chartTop + plotBottom) / 2 : 17
   const y = (value: number) =>
     plotBottom -
     ((value - yMinimum) / (yMaximum - yMinimum)) * (plotBottom - chartTop)
@@ -658,7 +718,8 @@ export function SharedWeightChart({
       ],
       viewBoxWidth,
       viewBoxHeight,
-      labelExtremesOnly && compactLayout ? 5.4 : undefined,
+      valueLabelCharacterWidth,
+      valueLabelFontSize,
     ).map(({ id, x: labelX, y: labelY }) => [id, { x: labelX, y: labelY }]),
   )
   const valueLabelPosition = (
@@ -780,7 +841,7 @@ export function SharedWeightChart({
       span
     : Infinity
   const minimumDateLabelGap =
-    sharedChartAxisTickPx *
+    chartAxisTickPx *
       sharedChartTheme.dates.averageGlyphWidthEm *
       sharedChartTheme.dates.labelCharacters *
       sharedChartTheme.dates.edgeLabelWidthMultiplier +
@@ -975,21 +1036,28 @@ export function SharedWeightChart({
             ? { top: 'calc(var(--group-navigation-height, 0px) + 8px)' }
             : undefined
         }
-        className={`w-full text-sm ${compactOlderHistory && expandedWeeks.size > 0 ? 'sticky z-20 rounded-lg bg-panel py-2 shadow-panel' : ''}`}
+        className={`${compactOverview ? 'group-overview-chart-controls' : 'w-full text-sm'} ${compactOlderHistory && expandedWeeks.size > 0 ? 'sticky z-20 rounded-lg bg-panel py-2 shadow-panel' : ''}`}
       >
+        {compactOverview ? (
+          <h2 className="group-overview-chart-heading">Group progress</h2>
+        ) : null}
         <div
           role="group"
-          className={`${sharedChartTheme.spacing.quickRangesBottomClass} flex w-full flex-wrap items-center ${sharedChartTheme.spacing.quickRangesGapClass} ${compactLayout ? 'justify-center' : ''}`}
+          className={`${compactOverview ? '' : sharedChartTheme.spacing.quickRangesBottomClass} flex flex-wrap items-center ${compactOverview ? 'group-overview-quick-ranges' : `w-full ${sharedChartTheme.spacing.quickRangesGapClass} ${compactLayout ? 'justify-center' : ''}`}`}
           aria-label="Quick date ranges"
           style={
-            compactLayout ? undefined : { paddingLeft: `${plotStartPercent}%` }
+            compactOverview || compactLayout
+              ? undefined
+              : { paddingLeft: `${plotStartPercent}%` }
           }
         >
-          <span
-            className={`${compactLayout ? 'w-full text-center' : 'mr-1'} font-semibold text-ink`}
-          >
-            Date range
-          </span>
+          {!compactOverview ? (
+            <span
+              className={`${compactLayout ? 'w-full text-center' : 'mr-1'} font-semibold text-ink`}
+            >
+              Date range
+            </span>
+          ) : null}
           <button
             type="button"
             aria-label="Show last 1 week"
@@ -998,7 +1066,13 @@ export function SharedWeightChart({
             onClick={() => choosePreset('1w', oneWeekStart)}
             className={presetClass(selectedPreset === '1w')}
           >
-            1W
+            <span
+              className={
+                compactOverview ? 'group-overview-range-label' : undefined
+              }
+            >
+              1W
+            </span>
           </button>
           <button
             type="button"
@@ -1008,7 +1082,13 @@ export function SharedWeightChart({
             onClick={() => choosePreset('2w', twoWeekStart)}
             className={presetClass(selectedPreset === '2w')}
           >
-            2W
+            <span
+              className={
+                compactOverview ? 'group-overview-range-label' : undefined
+              }
+            >
+              2W
+            </span>
           </button>
           <button
             type="button"
@@ -1018,7 +1098,13 @@ export function SharedWeightChart({
             onClick={() => choosePreset('1m', oneMonthStart)}
             className={presetClass(selectedPreset === '1m')}
           >
-            1M
+            <span
+              className={
+                compactOverview ? 'group-overview-range-label' : undefined
+              }
+            >
+              1M
+            </span>
           </button>
           <button
             type="button"
@@ -1028,7 +1114,13 @@ export function SharedWeightChart({
             onClick={() => choosePreset('3m', threeMonthStart)}
             className={presetClass(selectedPreset === '3m')}
           >
-            3M
+            <span
+              className={
+                compactOverview ? 'group-overview-range-label' : undefined
+              }
+            >
+              3M
+            </span>
           </button>
           <button
             type="button"
@@ -1038,23 +1130,29 @@ export function SharedWeightChart({
             onClick={() => choosePreset('all', firstDay)}
             className={presetClass(selectedPreset === 'all')}
           >
-            All
-          </button>
-          {compactOlderHistory && expandedWeeks.size > 0 ? (
-            <button
-              type="button"
-              className={`${presetClass(true)} min-h-11 w-full px-3 sm:w-auto`}
-              onClick={() => {
-                setExpandedWeeks(new Set())
-                setSelectedPoint(null)
-                setHoveredPointId(null)
-                setRestoreWeeklyFocus(true)
-              }}
+            <span
+              className={
+                compactOverview ? 'group-overview-range-label' : undefined
+              }
             >
-              Back to weekly averages
-            </button>
-          ) : null}
+              All
+            </span>
+          </button>
         </div>
+        {compactOlderHistory && expandedWeeks.size > 0 ? (
+          <button
+            type="button"
+            className={`${presetClass(true)} ${compactOverview ? 'group-overview-history-collapse' : 'min-h-11 w-full px-3 sm:w-auto'}`}
+            onClick={() => {
+              setExpandedWeeks(new Set())
+              setSelectedPoint(null)
+              setHoveredPointId(null)
+              setRestoreWeeklyFocus(true)
+            }}
+          >
+            Back to weekly averages
+          </button>
+        ) : null}
       </div>
       <div
         className="relative"
@@ -1079,9 +1177,14 @@ export function SharedWeightChart({
           <title>{title}</title>
           <desc>{description}</desc>
           <text
-            x={chartLeft}
-            y="17"
-            className="chart-axis-title"
+            x={axisTitleX}
+            y={axisTitleY}
+            transform={
+              compactOverview
+                ? `rotate(-90 ${axisTitleX} ${axisTitleY})`
+                : undefined
+            }
+            className={`chart-axis-title ${compactOverview ? 'group-overview-axis-title' : ''}`}
             style={{ fontSize: `${sharedChartTheme.axisTitlePx}px` }}
           >
             {yLabel}
@@ -1114,7 +1217,7 @@ export function SharedWeightChart({
                 y={y(value) + 4}
                 textAnchor="end"
                 className="chart-axis-tick"
-                style={{ fontSize: `${sharedChartAxisTickPx}px` }}
+                style={{ fontSize: `${chartAxisTickPx}px` }}
               >
                 {format(value)}
               </text>
@@ -1327,7 +1430,7 @@ export function SharedWeightChart({
                           y={labelPosition.y}
                           textAnchor="middle"
                           className="chart-value"
-                          fontSize={compactLayout ? '9' : '6.6'}
+                          fontSize={valueLabelFontSize}
                           fontWeight="700"
                           data-chart-series-id={item.id}
                           data-date={point.date}
@@ -1438,7 +1541,7 @@ export function SharedWeightChart({
                       y={labelPosition.y}
                       textAnchor="middle"
                       className="chart-value"
-                      fontSize={compactLayout ? '9' : '6.6'}
+                      fontSize={valueLabelFontSize}
                       fontWeight="700"
                       data-date={point.date}
                       data-weight-kg={point.value}
@@ -1469,7 +1572,7 @@ export function SharedWeightChart({
                       : 'middle'
               }
               className="chart-axis-tick"
-              style={{ fontSize: `${sharedChartAxisTickPx}px` }}
+              style={{ fontSize: `${chartAxisTickPx}px` }}
               data-chart-date-tick={dateAtDay(date)}
             >
               {formatChartDate(dateAtDay(date))}

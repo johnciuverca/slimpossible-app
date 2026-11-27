@@ -70,9 +70,13 @@ for (const width of [1280, 390]) {
     await expect(
       page.getByText('Synthetic first-account private note', { exact: true }),
     ).toBeVisible()
-    await primary.getByRole('link', { name: 'Group', exact: true }).click()
+    await primary.getByRole('button', { name: /^Choose group/ }).click()
+    await page
+      .locator('.group-switcher-panel')
+      .getByRole('link', { name: 'Synthetic draft group', exact: true })
+      .click()
     await expect(
-      page.getByRole('heading', { name: 'Group', exact: true }),
+      page.getByRole('heading', { name: 'Synthetic draft group', exact: true }),
     ).toBeVisible()
     await primary.getByRole('link', { name: 'Dashboard', exact: true }).click()
     await expect(page.getByTestId('fixture-route')).toHaveText('/dashboard')

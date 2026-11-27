@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { useOptionalAuth } from '../auth/useAuth'
 import { createPersistence } from '../data/persistence'
 import type { Challenge } from '../models/challenge'
+import { GroupSwitcher } from './GroupSwitcher'
 import { workspaceSection } from '../models/workspaceNavigation'
 
 function challengeTabDestination(
@@ -190,10 +191,16 @@ export function ChallengeTabs({
   )
 }
 
-export function ChallengeContextTabs() {
+export function ChallengeContextTabs({ navbar = false }: { navbar?: boolean }) {
   const { state: auth } = useOptionalAuth()
   const { pathname } = useLocation()
   const groupPage = pathname === '/group'
+  const [refresh, setRefresh] = useState(0)
+  useEffect(() => {
+    const reload = () => setRefresh((value) => value + 1)
+    window.addEventListener('focus', reload)
+    return () => window.removeEventListener('focus', reload)
+  }, [])
   const persistence = useMemo(() => createPersistence(auth), [auth])
   const key = `${auth.status}:${auth.user?.id ?? ''}:${persistence.mode}`
   const [snapshot, setSnapshot] = useState({
@@ -246,7 +253,7 @@ export function ChallengeContextTabs() {
     return () => {
       current = false
     }
-  }, [auth.status, auth.user?.id, key, persistence, pathname])
+  }, [auth.status, auth.user?.id, key, persistence, pathname, refresh])
   if (auth.status !== 'signed-in') return null
   const current =
     snapshot.key === key
@@ -255,6 +262,14 @@ export function ChallengeContextTabs() {
   const challenges = groupPage
     ? current.challenges.filter(({ kind }) => kind === 'group')
     : current.challenges
+  if (navbar)
+    return (
+      <GroupSwitcher
+        challenges={current.challenges}
+        loading={current.loading}
+        error={current.error}
+      />
+    )
   return (
     <ChallengeTabs
       key={key}

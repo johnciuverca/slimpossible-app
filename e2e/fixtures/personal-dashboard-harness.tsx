@@ -70,6 +70,7 @@ const challenges = hasGroups
       }),
     ]
   : []
+if (params.get('groupCount') === '1') challenges.splice(1, 1)
 if (scenario === 'tabs') {
   challenges.push(
     ...Array.from({ length: 12 }, (_, index) =>

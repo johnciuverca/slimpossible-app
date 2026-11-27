@@ -18,10 +18,7 @@ import { AuthProvider } from '../auth/AuthContext'
 import type { AuthState } from '../auth/context'
 import { AppLayout } from './AppLayout'
 
-const liveNavigation = [
-  { label: 'Dashboard', path: '/dashboard' },
-  { label: 'Group', path: '/group' },
-]
+const liveNavigation = [{ label: 'Dashboard', path: '/dashboard' }]
 
 function renderLayout(path: string, state: AuthState) {
   return render(
@@ -200,6 +197,7 @@ describe('AppLayout', () => {
         path,
       )
     }
+    expect(screen.getByRole('button', { name: 'Choose group' })).toBeVisible()
     for (const retired of ['Challenges', 'My progress', 'Goals']) {
       expect(
         screen.queryByRole('link', { name: retired }),

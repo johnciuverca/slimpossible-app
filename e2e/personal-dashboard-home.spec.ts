@@ -25,7 +25,10 @@ for (const width of [1280, 390]) {
       page
         .getByRole('navigation', { name: 'Primary navigation' })
         .getByRole('link'),
-    ).toHaveCount(2)
+    ).toHaveCount(1)
+    await expect(
+      page.getByRole('button', { name: /^Choose group/ }),
+    ).toBeVisible()
     await expect(
       page.getByText('Synthetic first-account private note', { exact: true }),
     ).toHaveCount(0)
@@ -79,7 +82,10 @@ for (const width of [1280, 390]) {
       page
         .getByRole('navigation', { name: 'Primary navigation' })
         .getByRole('link'),
-    ).toHaveCount(2)
+    ).toHaveCount(1)
+    await expect(
+      page.getByRole('button', { name: /^Choose group/ }),
+    ).toBeVisible()
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth),
     ).toBe(width)
@@ -130,7 +136,9 @@ for (const width of [1280, 390]) {
       const primary = page.getByRole('navigation', {
         name: 'Primary navigation',
       })
-      await expect(primary.getByRole('link', { name: 'Group' })).toBeVisible()
+      await expect(
+        primary.getByRole('button', { name: /^Choose group/ }),
+      ).toBeVisible()
       await expect(
         primary.getByRole('link', { name: 'Challenges', exact: true }),
       ).toHaveCount(0)

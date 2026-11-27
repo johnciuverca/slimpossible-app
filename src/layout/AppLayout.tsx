@@ -30,10 +30,7 @@ type AppLayoutProps = {
   children: ReactNode
 }
 
-const navigationItems = [
-  { label: 'Dashboard', to: '/dashboard' },
-  { label: 'Group', to: '/group' },
-]
+const navigationItems = [{ label: 'Dashboard', to: '/dashboard' }]
 
 const publicNavigationItems = [
   { label: 'Home', to: '/' },
@@ -213,6 +210,11 @@ export function AppLayout({ children }: AppLayoutProps) {
                         )
                       },
                     )}
+                    {signedIn ? (
+                      <li className="min-w-0">
+                        <ChallengeContextTabs navbar />
+                      </li>
+                    ) : null}
                   </ul>
                 </nav>
                 {signedIn ||
