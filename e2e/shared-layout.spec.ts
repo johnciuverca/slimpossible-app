@@ -146,6 +146,7 @@ for (const width of [1280, 390]) {
         exact: true,
       })
       await expect(brand).toHaveAttribute('href', '/dashboard')
+      await expect(brand).toHaveCSS('margin-left', '8px')
       const initialBackground = await brand.evaluate(
         (element) => getComputedStyle(element).backgroundColor,
       )

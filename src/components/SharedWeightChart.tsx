@@ -94,6 +94,8 @@ export function SharedWeightChart({
   labelSeriesExtremesOnly = false,
   compactOlderHistory = false,
   compactOverview = false,
+  compactOverviewTitle = 'Group progress',
+  compactOverviewHeadingId,
   className = 'block h-auto w-full min-w-[600px]',
   viewBox = '0 0 760 266',
 }: {
@@ -119,6 +121,8 @@ export function SharedWeightChart({
   labelSeriesExtremesOnly?: boolean
   compactOlderHistory?: boolean
   compactOverview?: boolean
+  compactOverviewTitle?: string
+  compactOverviewHeadingId?: string
   className?: string
   viewBox?: string
 }) {
@@ -1039,7 +1043,12 @@ export function SharedWeightChart({
         className={`${compactOverview ? 'group-overview-chart-controls' : 'w-full text-sm'} ${compactOlderHistory && expandedWeeks.size > 0 ? 'sticky z-20 rounded-lg bg-panel py-2 shadow-panel' : ''}`}
       >
         {compactOverview ? (
-          <h2 className="group-overview-chart-heading">Group progress</h2>
+          <h2
+            className="group-overview-chart-heading"
+            id={compactOverviewHeadingId}
+          >
+            {compactOverviewTitle}
+          </h2>
         ) : null}
         <div
           role="group"

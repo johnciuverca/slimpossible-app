@@ -35,8 +35,7 @@ export function PersonalHistoryContent({
       ) : workspace.personal.state === 'error' ? (
         <FeedbackPanel tone="error">{workspace.personal.error}</FeedbackPanel>
       ) : (
-        <Card className="min-w-0 p-4">
-          <h2 className="text-lg font-bold">Your personal trend</h2>
+        <Card className="dashboard-personal-chart-card min-w-0 p-3 sm:px-5 sm:pt-3 sm:pb-5">
           <p className="sr-only">
             Solid points are saved personal entries. Hollow estimated points
             appear only between saved dates, are visual only, and are not a
@@ -44,6 +43,8 @@ export function PersonalHistoryContent({
           </p>
           {history.length ? (
             <PersonalProgressChart
+              compactOverview
+              compactOverviewTitle="Your personal trend"
               compactOlderHistory
               fitContainer
               labelExtremesOnly

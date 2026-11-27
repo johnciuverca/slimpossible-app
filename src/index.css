@@ -1201,6 +1201,92 @@ body {
 .chart-value {
   fill: var(--color-ink);
 }
+.dashboard-personal-chart-card {
+  --color-page: #0b121b;
+  --color-line: #354353;
+  --color-ink: #f1f6fa;
+  --color-ink-muted: #b5c1d0;
+  border-color: #354353;
+  background: #111c28;
+  color: #f1f6fa;
+  color-scheme: dark;
+}
+.dashboard-personal-chart-card .group-overview-chart-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 12px 4px;
+}
+.dashboard-personal-chart-card .group-overview-chart-heading {
+  flex: 0 0 auto;
+  color: #f4f7fb;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.dashboard-personal-chart-card .group-overview-axis-title {
+  fill: #d6e0e9;
+}
+.dashboard-personal-chart-card [aria-label='Quick date ranges'] {
+  gap: 6px;
+}
+.dashboard-personal-chart-card
+  .group-overview-chart-controls
+  [aria-label='Quick date ranges'] {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: 0;
+  width: auto;
+  margin: 0 0 0 auto;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #354353;
+  border-radius: 8px;
+  background: #111c28;
+}
+.dashboard-personal-chart-card [aria-label='Quick date ranges'] button {
+  min-height: 44px;
+  min-width: 40px;
+  border-radius: 999px;
+  border-color: #354353;
+  padding-inline: 12px;
+}
+.dashboard-personal-chart-card
+  .group-overview-chart-controls
+  [aria-label='Quick date ranges']
+  button {
+  min-height: 32px;
+  min-width: 36px;
+  padding-inline: 8px;
+  border: 0;
+  border-right: 1px solid #354353;
+  border-radius: 0;
+}
+.dashboard-personal-chart-card
+  .group-overview-chart-controls
+  [aria-label='Quick date ranges']
+  button:last-child {
+  border-right: 0;
+}
+.dashboard-personal-chart-card
+  .group-overview-chart-controls
+  [aria-label='Quick date ranges']
+  button[aria-pressed='true'] {
+  border-color: #31dbb0;
+  background: #145447;
+  color: #f1fffb;
+}
+.dashboard-personal-chart-card .chart-value {
+  fill: #f7fbff;
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: #111c28;
+  stroke-linejoin: round;
+  stroke-width: 3px;
+}
 .personal-weight-chart circle:focus-visible {
   outline: 3px solid var(--chart-trend, #a86312);
 }
@@ -2224,4 +2310,95 @@ body {
 }
 .signed-in-shell .app-shell-brand {
   padding-inline: 0;
+  margin-left: 8px;
+}
+@media (max-width: 639px) {
+  .dashboard-personal-chart-card .group-overview-chart-controls {
+    gap: 4px;
+    margin-inline: 16px;
+  }
+  .dashboard-personal-chart-card .group-overview-chart-heading {
+    font-size: 1rem;
+  }
+  .dashboard-personal-chart-card
+    .group-overview-chart-controls
+    [aria-label='Quick date ranges'] {
+    position: relative;
+    flex-wrap: nowrap;
+    gap: 0;
+    overflow: visible;
+    border: 0;
+    background: transparent;
+  }
+  .dashboard-personal-chart-card
+    .group-overview-chart-controls
+    [aria-label='Quick date ranges']::before {
+    position: absolute;
+    z-index: 2;
+    inset: 8px 0;
+    border: 1px solid #354353;
+    border-radius: 7px;
+    content: '';
+    pointer-events: none;
+  }
+  .dashboard-personal-chart-card
+    .group-overview-chart-controls
+    [aria-label='Quick date ranges']
+    button {
+    display: grid;
+    position: relative;
+    z-index: 1;
+    width: 44px;
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+  .dashboard-personal-chart-card
+    .group-overview-chart-controls
+    [aria-label='Quick date ranges']
+    .group-overview-range-label {
+    display: grid;
+    box-sizing: border-box;
+    width: 44px;
+    min-width: 44px;
+    max-width: 44px;
+    height: 28px;
+    align-self: center;
+    place-items: center;
+    border-right: 1px solid #354353;
+    background: transparent;
+    color: #e4edf4;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    padding: 0;
+  }
+  .dashboard-personal-chart-card
+    .group-overview-chart-controls
+    [aria-label='Quick date ranges']
+    button:first-child
+    .group-overview-range-label {
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+  }
+  .dashboard-personal-chart-card
+    .group-overview-chart-controls
+    [aria-label='Quick date ranges']
+    button:last-child
+    .group-overview-range-label {
+    border-right: 0;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+  }
+  .dashboard-personal-chart-card
+    .group-overview-chart-controls
+    [aria-label='Quick date ranges']
+    button[aria-pressed='true']
+    .group-overview-range-label {
+    border-color: #31dbb0;
+    background: #145447;
+    color: #f1fffb;
+  }
 }

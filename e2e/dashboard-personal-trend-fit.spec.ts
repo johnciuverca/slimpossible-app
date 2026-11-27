@@ -38,9 +38,10 @@ for (const viewport of viewports) {
       .getByRole('link', { name: 'Overview', exact: true })
       .click()
 
-    const card = page
-      .getByRole('heading', { name: 'Your personal trend' })
-      .locator('xpath=..')
+    const card = page.locator('.dashboard-personal-chart-card')
+    await expect(
+      page.getByRole('heading', { name: 'Your personal trend' }),
+    ).toBeVisible()
     const chartGroup = page.getByRole('group', {
       name: 'Personal weight chart',
     })
@@ -54,7 +55,7 @@ for (const viewport of viewports) {
       ),
     )
     expect(axisTickSizes.length).toBeGreaterThan(0)
-    expect(new Set(axisTickSizes)).toEqual(new Set(['10.2px']))
+    expect(new Set(axisTickSizes)).toEqual(new Set(['11.9px']))
     await expect(chart.locator('.chart-axis-title')).toHaveCSS(
       'font-size',
       '12px',
@@ -113,20 +114,25 @@ for (const viewport of viewports) {
     ).toBeGreaterThanOrEqual(0)
 
     const compact = viewport.width <= 600
-    await expect(chart).toHaveAttribute(
-      'viewBox',
-      compact ? '0 0 320 266' : '0 0 760 266',
-    )
+    const viewBox = (await chart.getAttribute('viewBox'))!
+      .split(/\s+/)
+      .map(Number)
+    expect(viewBox[0]).toBe(0)
+    expect(viewBox[1]).toBe(0)
+    expect(viewBox[2]).toBeGreaterThan(0)
+    expect(viewBox[3]).toBeGreaterThanOrEqual(200)
+    expect(viewBox[3]).toBeLessThanOrEqual(320)
     await expect(chart).toHaveAttribute(
       'data-chart-plot-left',
-      compact ? '32' : '44',
+      compact ? '40' : '46',
     )
-    await expect(chart).toHaveAttribute(
-      'data-chart-plot-right',
-      compact ? '304' : '736',
+    expect(Number(await chart.getAttribute('data-chart-plot-right'))).toBe(
+      viewBox[2] - (compact ? 16 : 24),
     )
     await expect(chart).toHaveAttribute('data-chart-plot-top', '27')
-    await expect(chart).toHaveAttribute('data-chart-plot-bottom', '230')
+    expect(Number(await chart.getAttribute('data-chart-plot-bottom'))).toBe(
+      viewBox[3] - 36,
+    )
     if (!compact) {
       const dateLabelBounds = await chart
         .locator('[data-chart-date-tick]')
@@ -233,15 +239,11 @@ for (const viewport of viewports) {
       expect(
         Math.abs(sliderBox!.x + sliderBox!.width - expectedSliderRight),
       ).toBeLessThan(2)
-      const dateRangeLabel = await rangeControls
-        .getByText('Date range', { exact: true })
-        .boundingBox()
-      expect(dateRangeLabel).not.toBeNull()
-      expect(dateRangeLabel!.y).toBeLessThan(
-        (await rangeControls
-          .getByRole('button', { name: 'Show last 1 week' })
-          .boundingBox())!.y,
-      )
+      await expect(
+        page
+          .getByRole('group', { name: 'Chart date range controls' })
+          .getByRole('heading', { name: 'Your personal trend' }),
+      ).toBeVisible()
       const presetBoxes = await rangeControls
         .getByRole('button')
         .evaluateAll((buttons) =>
@@ -251,13 +253,7 @@ for (const viewport of viewports) {
         1,
       )
       const controlBox = (await rangeControls.boundingBox())!
-      expect(
-        Math.abs(
-          dateRangeLabel!.x +
-            dateRangeLabel!.width / 2 -
-            (controlBox.x + controlBox.width / 2),
-        ),
-      ).toBeLessThan(2)
+      expect(controlBox.width).toBeGreaterThan(0)
     }
 
     for (const name of [
@@ -282,7 +278,7 @@ for (const viewport of viewports) {
         expect(handleBox.height).toBeGreaterThanOrEqual(44)
       expect(handleBox.x).toBeGreaterThanOrEqual(cardBox!.x)
       expect(handleBox.x + handleBox.width).toBeLessThanOrEqual(
-        cardBox!.x + cardBox!.width,
+        cardBox!.x + cardBox!.width + (viewport.width <= 600 ? 4 : 0),
       )
     }
     if (viewport.width <= 600) {

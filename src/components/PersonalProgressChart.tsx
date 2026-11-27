@@ -13,12 +13,18 @@ export function PersonalProgressChart({
   fitContainer = false,
   labelExtremesOnly = false,
   compactOlderHistory = false,
+  compactOverview = false,
+  compactOverviewTitle = 'Personal progress',
+  compactOverviewHeadingId,
   onPointActivate,
 }: {
   weighIns: readonly WeighIn[]
   fitContainer?: boolean
   labelExtremesOnly?: boolean
   compactOlderHistory?: boolean
+  compactOverview?: boolean
+  compactOverviewTitle?: string
+  compactOverviewHeadingId?: string
   onPointActivate?: (point: {
     date: string
     value: number
@@ -89,7 +95,7 @@ export function PersonalProgressChart({
       : `${formatChartDate(first.date)}, ${formatWeight(first.weightKg)} kilograms to ${formatChartDate(latest.date)}, ${formatWeight(latest.weightKg)} kilograms`
   return (
     <figure
-      className="personal-weight-chart mt-5 w-full min-w-0"
+      className={`personal-weight-chart ${compactOverview ? 'mt-0' : 'mt-5'} w-full min-w-0`}
       aria-labelledby={`${id}-caption`}
     >
       <div
@@ -104,6 +110,9 @@ export function PersonalProgressChart({
       >
         <SharedWeightChart
           compactOlderHistory={compactOlderHistory}
+          compactOverview={compactOverview}
+          compactOverviewTitle={compactOverviewTitle}
+          compactOverviewHeadingId={compactOverviewHeadingId}
           title={`Personal weight history chart. ${points.length} saved weigh-ins, from ${rangeDescription}. Hollow points are daily estimates between saved entries.`}
           description={`${compactOlderHistory ? 'The latest seven calendar dates stay detailed; larger older points are weekly averages of actual saved records. Activate a week to expand daily points; Back to weekly averages restores compression. Solid daily points' : 'Solid points'} show saved dates and weights. Hollow points are estimates between saved entries and are not saved or used in the trend. Solid connecting lines show the interpolated daily path; estimated markers remain hollow. The trend uses only saved records. Private notes are never plotted.`}
           points={plottedPoints}
