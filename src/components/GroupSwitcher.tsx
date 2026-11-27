@@ -103,19 +103,31 @@ export function GroupSwitcher({
         }
       }}
     >
-      <button
-        ref={trigger}
-        type="button"
-        aria-label={`Choose group${selected ? `: ${selected.name}` : ''}`}
-        aria-expanded={open}
-        aria-controls={open ? id : undefined}
-        aria-current={pathname === '/group' ? 'page' : undefined}
-        onClick={() => setOpen(!open)}
-        className="group-switcher-trigger"
-        title={selected?.name}
-      >
-        <span>{selected?.name ?? 'Group'}</span>
-        <span className="account-chevron" aria-hidden="true">
+      <div className="group-switcher-trigger">
+        {selected ? (
+          <Link
+            to={`/group?${new URLSearchParams({ challenge: selected.id, tab: pathname === '/group' ? workspaceSection('group', pathname, search, hash) : 'overview' })}`}
+            aria-label={`Open group: ${selected.name}`}
+            aria-current={pathname === '/group' ? 'page' : undefined}
+            title={selected.name}
+            className="group-switcher-name"
+          >
+            {selected.name}
+          </Link>
+        ) : (
+          <Link to="/group" className="group-switcher-name">
+            Group
+          </Link>
+        )}
+        <button
+          ref={trigger}
+          type="button"
+          aria-label={`Choose group${selected ? `: ${selected.name}` : ''}`}
+          aria-expanded={open}
+          aria-controls={open ? id : undefined}
+          onClick={() => setOpen(!open)}
+          className="group-switcher-arrow"
+        >
           <svg viewBox="0 0 12 10" width="12" height="10" fill="none">
             <path
               d="m2 3 4 4 4-4"
@@ -125,8 +137,8 @@ export function GroupSwitcher({
               strokeWidth="1.6"
             />
           </svg>
-        </span>
-      </button>
+        </button>
+      </div>
       <div
         hidden={!open}
         ref={panel}
