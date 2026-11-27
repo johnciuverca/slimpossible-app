@@ -2324,11 +2324,13 @@ body {
 }
 .signed-in-shell .app-shell-brand {
   padding-inline: 0;
-  margin-left: clamp(16px, 15vw, 200px);
+  margin-left: clamp(16px, 9.3vw, 124px);
+  font-size: 1.35rem;
 }
 @media (max-width: 639px) {
   .signed-in-shell .app-shell-brand {
     margin-left: clamp(12px, 4vw, 16px);
+    font-size: 17.28px;
   }
   .dashboard-personal-chart-card .group-overview-chart-controls {
     gap: 4px;
