@@ -59,6 +59,13 @@ for (const width of [1280, 390]) {
         const baseline = mode === 'create' ? '81.2' : '82.3'
         await expect(weight).toHaveAttribute('inputmode', 'decimal')
         await weight.fill(baseline)
+        if (surface === 'page') {
+          // Keep the page scrollable independently of the editor's content
+          // height; compact form layouts can otherwise leave nothing to scroll.
+          await page.evaluate(() => {
+            document.body.style.minHeight = '1500px'
+          })
+        }
         const scrollBefore = await page.evaluate(() => window.scrollY)
         const box = (await weight.boundingBox())!
         await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
